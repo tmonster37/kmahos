@@ -1,0 +1,53 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: hospital-api
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/kmahos}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 15
+      minimum-idle: 5
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+  jackson:
+    time-zone: Asia/Ho_Chi_Minh
+    serialization:
+      fail-on-empty-beans: false
+
+jwt:
+  secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+  expiration-ms: ${JWT_EXPIRATION_MS:86400000} # 1 ngày (mili-giây)
+
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000,http://localhost:8080,http://127.0.0.1:5173,http://127.0.0.1:3000,https://hospital.kma.edu.vn,https://kiosk.hospital.kma.edu.vn,https://admin.hospital.kma.edu.vn}
+
+vnpay:
+  tmn-code: ${VNPAY_TMN_CODE:P48XA8RI}
+  hash-secret: ${VNPAY_HASH_SECRET:BRYEEDJIJFAGUSDLEPIOPDMDYEMLDCAX}
+  pay-url: ${VNPAY_PAY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
+  return-url: ${VNPAY_RETURN_URL:http://localhost:8080/api/payment/vnpay/callback}
+
+payos:
+  client-id: ${PAYOS_CLIENT_ID:demo-client-id}
+  api-key: ${PAYOS_API_KEY:demo-api-key}
+  checksum-key: ${PAYOS_CHECKSUM_KEY:demo-checksum-key}
+  bank-bin: ${PAYOS_BANK_BIN:MB}
+  bank-name: ${PAYOS_BANK_NAME:MBBank - Ngân hàng TMCP Quân Đội}
+  bank-account: ${PAYOS_BANK_ACCOUNT:0987654321}
+  account-holder: ${PAYOS_ACCOUNT_HOLDER:BENH VIEN DA KHOA QUOC TE TNT}
+

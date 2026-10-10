@@ -1,0 +1,105 @@
+version: '3.8'
+
+services:
+  # 1. Cơ sở dữ liệu PostgreSQL
+  postgres_db:
+    image: postgres:16-alpine
+    container_name: tnt_postgres_db
+    environment:
+      POSTGRES_DB: tnt_hospital_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: hospital_secret_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - tnt_network
+
+  # 2. Backend Spring Boot (Java 21/25)
+  backend:
+    build:
+      context: ./hospital-api
+      dockerfile: Dockerfile
+    container_name: tnt_backend_api
+    env_file:
+      - .env
+    environment:
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://postgres_db:5432/tnt_hospital_db}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-hospital_secret_password}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: ${SPRING_JPA_HIBERNATE_DDL_AUTO:-update}
+      JWT_SECRET: ${JWT_SECRET:-8bde59bc3c8eeaf8cce051d3cb035c35fb31a004a48370b7c42a0f1e85b9b843003d40161d6fe6ba0d97177ce964ab9f8b41e21fdd7eb3ceefef8f37838338b5}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:3000,http://localhost:8080,https://hospital.kma.edu.vn,https://kiosk.hospital.kma.edu.vn}
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres_db
+    restart: unless-stopped
+    networks:
+      - tnt_network
+
+  # 3. Frontend Web React (Nginx)
+  frontend:
+    build:
+      context: ./hospital-ui
+      dockerfile: Dockerfile
+    container_name: tnt_frontend_web
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - tnt_network
+
+  # 4. Giao diện quản lý Database trực quan (pgAdmin)
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: tnt_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@tnthospital.vn
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres_db
+    networks:
+      - tnt_network
+
+  # 5. Dịch vụ tự động sao lưu Database định kỳ (pg_dump daily cron lúc 02:00 sáng)
+  postgres_backup:
+    image: postgres:16-alpine
+    container_name: tnt_postgres_backup
+    environment:
+      POSTGRES_HOST: postgres_db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: tnt_hospital_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: hospital_secret_password
+      BACKUP_DIR: /backups
+      BACKUP_RETENTION_DAYS: 30
+    volumes:
+      - ./backups:/backups
+      - ./scripts/backup-db.sh:/backup-db.sh:ro
+    entrypoint: |
+      /bin/sh -c "
+      chmod +x /backup-db.sh
+      echo '0 2 * * * /backup-db.sh >> /backups/backup.log 2>&1' > /etc/crontabs/root
+      echo 'Dịch vụ Cronjob Sao lưu PostgreSQL Bệnh viện đã kích hoạt (chạy hàng ngày lúc 02:00 sáng)'
+      crond -f -l 8
+      "
+    depends_on:
+      - postgres_db
+    restart: unless-stopped
+    networks:
+      - tnt_network
+
+volumes:
+  postgres_data:
+  postgres_backups:
+
+networks:
+  tnt_network:
+    driver: bridge

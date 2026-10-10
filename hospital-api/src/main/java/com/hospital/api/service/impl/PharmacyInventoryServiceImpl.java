@@ -1,0 +1,421 @@
+package com.hospital.api.service.impl;
+
+import com.hospital.api.constant.BatchStatus;
+import com.hospital.api.constant.DispenseStatus;
+import com.hospital.api.constant.StockTransferStatus;
+import com.hospital.api.dto.request.*;
+import com.hospital.api.dto.response.*;
+import com.hospital.api.entity.*;
+import com.hospital.api.exception.AppException;
+import com.hospital.api.repository.*;
+import com.hospital.api.service.PharmacyInventoryService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class PharmacyInventoryServiceImpl implements PharmacyInventoryService {
+
+    private final PharmacyWarehouseRepository warehouseRepository;
+    private final MedicineBatchRepository batchRepository;
+    private final WarehouseStockRepository stockRepository;
+    private final StockTransferRepository transferRepository;
+    private final StockTransferItemRepository transferItemRepository;
+    private final PrescriptionDispenseRepository dispenseRepository;
+    private final PrescriptionDispenseItemRepository dispenseItemRepository;
+    private final MedicineRepository medicineRepository;
+    private final PrescriptionRepository prescriptionRepository;
+    private final StaffRepository staffRepository;
+    private final DepartmentRepository departmentRepository;
+
+    // 1. Quản lý hệ thống Kho Dược đa cấp
+    @Override
+    @Transactional
+    public WarehouseResponse createWarehouse(CreateWarehouseRequest request) {
+        if (warehouseRepository.findByWarehouseCode(request.warehouseCode().trim()).isPresent()) {
+            throw new AppException("Mã kho [" + request.warehouseCode() + "] đã tồn tại trong hệ thống", HttpStatus.BAD_REQUEST);
+        }
+
+        Department department = null;
+        if (request.departmentId() != null) {
+            department = departmentRepository.findById(request.departmentId()).orElse(null);
+        }
+
+        Staff manager = null;
+        if (request.managerStaffId() != null) {
+            manager = staffRepository.findById(request.managerStaffId()).orElse(null);
+        }
+
+        PharmacyWarehouse warehouse = PharmacyWarehouse.builder()
+                .warehouseCode(request.warehouseCode().trim().toUpperCase())
+                .warehouseName(request.warehouseName().trim())
+                .warehouseType(request.warehouseType())
+                .location(request.location())
+                .department(department)
+                .managerStaff(manager)
+                .isActive(true)
+                .build();
+
+        return WarehouseResponse.fromEntity(warehouseRepository.save(warehouse));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<WarehouseResponse> getAllWarehouses() {
+        return warehouseRepository.findAllByIsActiveTrue().stream()
+                .map(WarehouseResponse::fromEntity)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public WarehouseResponse getWarehouseById(UUID warehouseId) {
+        PharmacyWarehouse w = warehouseRepository.findById(warehouseId)
+                .orElseThrow(() -> new AppException("Không tìm thấy kho dược với ID: " + warehouseId, HttpStatus.NOT_FOUND));
+        return WarehouseResponse.fromEntity(w);
+    }
+
+    // 2. Nhập kho theo Lô & Hạn sử dụng (Goods Receipt)
+    @Override
+    @Transactional
+    public WarehouseStockResponse receiveGoodsBatch(ReceiveGoodsBatchRequest request) {
+        PharmacyWarehouse warehouse = warehouseRepository.findById(request.warehouseId())
+                .orElseThrow(() -> new AppException("Không tìm thấy kho nhận hàng", HttpStatus.NOT_FOUND));
+
+        Medicine medicine = medicineRepository.findById(request.medicineId())
+                .orElseThrow(() -> new AppException("Không tìm thấy thuốc với ID: " + request.medicineId(), HttpStatus.NOT_FOUND));
+
+        if (request.expiryDate().isBefore(LocalDate.now())) {
+            throw new AppException("Hạn sử dụng của lô thuốc [" + request.expiryDate() + "] không được nhỏ hơn ngày hiện tại!", HttpStatus.BAD_REQUEST);
+        }
+
+        // Tìm hoặc tạo mới Lô thuốc (MedicineBatch)
+        String batchNum = request.batchNumber().trim().toUpperCase();
+        MedicineBatch batch = batchRepository.findByMedicineMedicineIdAndBatchNumber(medicine.getMedicineId(), batchNum)
+                .orElseGet(() -> {
+                    MedicineBatch newBatch = MedicineBatch.builder()
+                            .medicine(medicine)
+                            .batchNumber(batchNum)
+                            .manufacturingDate(request.manufacturingDate())
+                            .expiryDate(request.expiryDate())
+                            .purchasePrice(request.purchasePrice())
+                            .unitPrice(request.unitPrice() != null ? request.unitPrice() : medicine.getPrice())
+                            .manufacturer(request.manufacturer())
+                            .status(BatchStatus.ACTIVE)
+                            .build();
+                    return batchRepository.save(newBatch);
+                });
+
+        // Tìm hoặc tạo mới Tồn kho (WarehouseStock)
+        WarehouseStock stock = stockRepository.findByWarehouseWarehouseIdAndBatchBatchId(warehouse.getWarehouseId(), batch.getBatchId())
+                .orElseGet(() -> WarehouseStock.builder()
+                        .warehouse(warehouse)
+                        .medicine(medicine)
+                        .batch(batch)
+                        .quantityOnHand(0)
+                        .quantityReserved(0)
+                        .minimumThreshold(10)
+                        .build());
+
+        stock.setQuantityOnHand(stock.getQuantityOnHand() + request.quantity());
+        WarehouseStock savedStock = stockRepository.save(stock);
+
+        // Cập nhật tổng tồn kho trong Medicine để đảm bảo tương thích ngược
+        medicine.setStockQuantity(medicine.getStockQuantity() + request.quantity());
+        medicineRepository.save(medicine);
+
+        log.info("Goods received: Warehouse={}, Medicine={}, Batch={}, Qty={}", warehouse.getWarehouseName(), medicine.getMedicineName(), batch.getBatchNumber(), request.quantity());
+        return WarehouseStockResponse.fromEntity(savedStock);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<WarehouseStockResponse> getStockByWarehouse(UUID warehouseId) {
+        return stockRepository.findByWarehouseWarehouseId(warehouseId).stream()
+                .map(WarehouseStockResponse::fromEntity)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<MedicineBatchResponse> getBatchesByMedicine(Integer medicineId) {
+        if (medicineId == null) {
+            return getAllBatches();
+        }
+        return batchRepository.findByMedicineMedicineIdOrderByExpiryDateAsc(medicineId).stream()
+                .map(MedicineBatchResponse::fromEntity)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<MedicineBatchResponse> getAllBatches() {
+        return batchRepository.findAll().stream()
+                .map(MedicineBatchResponse::fromEntity)
+                .toList();
+    }
+
+    // 3. Luân chuyển Kho nội bộ (Internal Stock Transfer)
+    @Override
+    @Transactional
+    public StockTransferResponse createStockTransfer(UUID requestedStaffId, CreateStockTransferRequest request) {
+        if (request.fromWarehouseId().equals(request.toWarehouseId())) {
+            throw new AppException("Kho xuất và Kho nhận không được trùng nhau!", HttpStatus.BAD_REQUEST);
+        }
+
+        PharmacyWarehouse fromWh = warehouseRepository.findById(request.fromWarehouseId())
+                .orElseThrow(() -> new AppException("Không tìm thấy kho xuất hàng", HttpStatus.NOT_FOUND));
+
+        PharmacyWarehouse toWh = warehouseRepository.findById(request.toWarehouseId())
+                .orElseThrow(() -> new AppException("Không tìm thấy kho nhận hàng", HttpStatus.NOT_FOUND));
+
+        Staff staff = requestedStaffId != null ? staffRepository.findById(requestedStaffId).orElse(null) : null;
+
+        String code = "TRF-" + LocalDate.now().toString().replace("-", "") + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+
+        StockTransfer transfer = StockTransfer.builder()
+                .transferCode(code)
+                .fromWarehouse(fromWh)
+                .toWarehouse(toWh)
+                .status(StockTransferStatus.PENDING_APPROVAL)
+                .requestedBy(staff)
+                .transferDate(LocalDateTime.now())
+                .reason(request.reason())
+                .build();
+
+        List<StockTransferItem> items = new ArrayList<>();
+        for (var itemReq : request.items()) {
+            Medicine medicine = medicineRepository.findById(itemReq.medicineId())
+                    .orElseThrow(() -> new AppException("Không tìm thấy thuốc với ID: " + itemReq.medicineId(), HttpStatus.NOT_FOUND));
+
+            MedicineBatch batch = batchRepository.findById(itemReq.batchId())
+                    .orElseThrow(() -> new AppException("Không tìm thấy lô thuốc với ID: " + itemReq.batchId(), HttpStatus.NOT_FOUND));
+
+            // Kiểm tra số lượng tồn kho khả dụng tại kho xuất
+            WarehouseStock stock = stockRepository.findByWarehouseWarehouseIdAndBatchBatchId(fromWh.getWarehouseId(), batch.getBatchId())
+                    .orElseThrow(() -> new AppException("Lô thuốc [" + batch.getBatchNumber() + "] không tồn tại tại kho xuất [" + fromWh.getWarehouseName() + "]", HttpStatus.BAD_REQUEST));
+
+            if (stock.getAvailableQuantity() < itemReq.quantity()) {
+                throw new AppException("Lô thuốc [" + batch.getBatchNumber() + "] tại kho xuất chỉ còn " + stock.getAvailableQuantity() + " khả dụng, không đủ điều chuyển " + itemReq.quantity(), HttpStatus.BAD_REQUEST);
+            }
+
+            // Đặt giữ chỗ số lượng để tránh bị xuất trùng
+            stock.setQuantityReserved(stock.getQuantityReserved() + itemReq.quantity());
+            stockRepository.save(stock);
+
+            StockTransferItem item = StockTransferItem.builder()
+                    .stockTransfer(transfer)
+                    .medicine(medicine)
+                    .batch(batch)
+                    .quantity(itemReq.quantity())
+                    .notes(itemReq.notes())
+                    .build();
+            items.add(item);
+        }
+
+        transfer.setItems(items);
+        return StockTransferResponse.fromEntity(transferRepository.save(transfer));
+    }
+
+    @Override
+    @Transactional
+    public StockTransferResponse approveAndExecuteTransfer(UUID transferId, UUID approvedStaffId) {
+        StockTransfer transfer = transferRepository.findById(transferId)
+                .orElseThrow(() -> new AppException("Không tìm thấy phiếu điều chuyển với ID: " + transferId, HttpStatus.NOT_FOUND));
+
+        if (transfer.getStatus() == StockTransferStatus.COMPLETED) {
+            throw new AppException("Phiếu điều chuyển đã được hoàn tất trước đó!", HttpStatus.BAD_REQUEST);
+        }
+
+        Staff approvedStaff = approvedStaffId != null ? staffRepository.findById(approvedStaffId).orElse(null) : null;
+        transfer.setApprovedBy(approvedStaff);
+
+        PharmacyWarehouse fromWh = transfer.getFromWarehouse();
+        PharmacyWarehouse toWh = transfer.getToWarehouse();
+
+        // Thực thi chuyển kho: trừ kho xuất, cộng kho nhận
+        for (StockTransferItem item : transfer.getItems()) {
+            // Trừ kho xuất
+            WarehouseStock sourceStock = stockRepository.findByWarehouseWarehouseIdAndBatchBatchId(fromWh.getWarehouseId(), item.getBatch().getBatchId())
+                    .orElseThrow(() -> new AppException("Lỗi dữ liệu: Lô thuốc không tồn tại tại kho xuất", HttpStatus.INTERNAL_SERVER_ERROR));
+
+            sourceStock.setQuantityOnHand(sourceStock.getQuantityOnHand() - item.getQuantity());
+            sourceStock.setQuantityReserved(Math.max(0, sourceStock.getQuantityReserved() - item.getQuantity()));
+            stockRepository.save(sourceStock);
+
+            // Cộng kho nhận
+            WarehouseStock targetStock = stockRepository.findByWarehouseWarehouseIdAndBatchBatchId(toWh.getWarehouseId(), item.getBatch().getBatchId())
+                    .orElseGet(() -> WarehouseStock.builder()
+                            .warehouse(toWh)
+                            .medicine(item.getMedicine())
+                            .batch(item.getBatch())
+                            .quantityOnHand(0)
+                            .quantityReserved(0)
+                            .minimumThreshold(5)
+                            .build());
+
+            targetStock.setQuantityOnHand(targetStock.getQuantityOnHand() + item.getQuantity());
+            stockRepository.save(targetStock);
+        }
+
+        transfer.setStatus(StockTransferStatus.COMPLETED);
+        transfer.setTransferDate(LocalDateTime.now());
+        return StockTransferResponse.fromEntity(transferRepository.save(transfer));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<StockTransferResponse> getTransfersByWarehouse(UUID warehouseId) {
+        if (warehouseId == null) {
+            return getAllStockTransfers();
+        }
+        List<StockTransfer> list = transferRepository.findByFromWarehouseWarehouseId(warehouseId);
+        list.addAll(transferRepository.findByToWarehouseWarehouseId(warehouseId));
+        return list.stream().map(StockTransferResponse::fromEntity).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<StockTransferResponse> getAllStockTransfers() {
+        return transferRepository.findAll().stream()
+                .map(StockTransferResponse::fromEntity)
+                .toList();
+    }
+
+    // 4. Cấp phát thuốc theo đơn áp dụng THUẬT TOÁN FEFO (First Expired, First Out)
+    @Override
+    @Transactional
+    public PrescriptionDispenseResponse dispensePrescription(UUID prescriptionId, DispensePrescriptionRequest request) {
+        Prescription prescription = prescriptionRepository.findById(prescriptionId)
+                .orElseThrow(() -> new AppException("Không tìm thấy đơn thuốc với ID: " + prescriptionId, HttpStatus.NOT_FOUND));
+
+        PharmacyWarehouse warehouse = warehouseRepository.findById(request.warehouseId())
+                .orElseThrow(() -> new AppException("Không tìm thấy kho cấp phát thuốc", HttpStatus.NOT_FOUND));
+
+        Staff dispenser = request.dispenserStaffId() != null ? staffRepository.findById(request.dispenserStaffId()).orElse(null) : null;
+
+        String code = "DISP-" + LocalDate.now().toString().replace("-", "") + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+
+        PrescriptionDispense dispense = PrescriptionDispense.builder()
+                .dispenseCode(code)
+                .prescription(prescription)
+                .warehouse(warehouse)
+                .status(DispenseStatus.DISPENSED)
+                .dispensedBy(dispenser)
+                .dispensedAt(LocalDateTime.now())
+                .notes(request.notes())
+                .build();
+
+        List<PrescriptionDispenseItem> dispenseItems = new ArrayList<>();
+        LocalDate today = LocalDate.now();
+
+        // Duyệt từng mặt hàng trong đơn thuốc để cấp phát theo FEFO
+        for (PrescriptionItem prescItem : prescription.getPrescriptionItems()) {
+            Medicine medicine = prescItem.getMedicine();
+            int remainingNeeded = prescItem.getQuantity();
+
+            // THUẬT TOÁN FEFO: Lấy các lô còn hạn, sắp xếp hạn dùng gần nhất (expiryDate ASC)
+            List<WarehouseStock> fefoStocks = stockRepository.findAvailableStockByFefo(warehouse.getWarehouseId(), medicine.getMedicineId(), today);
+
+            int totalAvailable = fefoStocks.stream().mapToInt(WarehouseStock::getAvailableQuantity).sum();
+            if (totalAvailable < remainingNeeded) {
+                throw new AppException("Kho [" + warehouse.getWarehouseName() + "] không đủ số lượng thuốc [" + medicine.getMedicineName() + "] để cấp phát! "
+                        + "(Cần: " + remainingNeeded + ", Khả dụng FEFO: " + totalAvailable + ")", HttpStatus.BAD_REQUEST);
+            }
+
+            // Trừ dần theo từng lô có date gần nhất đến xa hơn
+            for (WarehouseStock stock : fefoStocks) {
+                if (remainingNeeded <= 0) break;
+
+                int availableInBatch = stock.getAvailableQuantity();
+                int takeFromThisBatch = Math.min(remainingNeeded, availableInBatch);
+
+                // Trừ tồn kho lô này
+                stock.setQuantityOnHand(stock.getQuantityOnHand() - takeFromThisBatch);
+                stockRepository.save(stock);
+
+                // Cập nhật tổng tồn kho Medicine
+                medicine.setStockQuantity(Math.max(0, medicine.getStockQuantity() - takeFromThisBatch));
+                medicineRepository.save(medicine);
+
+                BigDecimal unitPrice = stock.getBatch().getUnitPrice() != null ? stock.getBatch().getUnitPrice() : medicine.getPrice();
+                BigDecimal totalPrice = unitPrice.multiply(BigDecimal.valueOf(takeFromThisBatch));
+
+                PrescriptionDispenseItem dispenseItem = PrescriptionDispenseItem.builder()
+                        .prescriptionDispense(dispense)
+                        .medicine(medicine)
+                        .batch(stock.getBatch())
+                        .batchNumber(stock.getBatch().getBatchNumber())
+                        .expiryDate(stock.getBatch().getExpiryDate())
+                        .quantityDispensed(takeFromThisBatch)
+                        .unitPrice(unitPrice)
+                        .totalPrice(totalPrice)
+                        .build();
+
+                dispenseItems.add(dispenseItem);
+                remainingNeeded -= takeFromThisBatch;
+
+                log.info("FEFO Dispensed: Medicine={}, Batch={}, Exp={}: Qty={}", medicine.getMedicineName(), stock.getBatch().getBatchNumber(), stock.getBatch().getExpiryDate(), takeFromThisBatch);
+            }
+        }
+
+        dispense.setItems(dispenseItems);
+        PrescriptionDispense savedDispense = dispenseRepository.save(dispense);
+
+        return PrescriptionDispenseResponse.fromEntity(savedDispense);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PrescriptionDispenseResponse> getDispensesByPrescription(UUID prescriptionId) {
+        if (prescriptionId == null) {
+            return getAllDispenses();
+        }
+        return dispenseRepository.findByPrescriptionPrescriptionId(prescriptionId).stream()
+                .map(PrescriptionDispenseResponse::fromEntity)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PrescriptionDispenseResponse> getAllDispenses() {
+        return dispenseRepository.findAll().stream()
+                .map(PrescriptionDispenseResponse::fromEntity)
+                .toList();
+    }
+
+    // 5. Hệ thống Cảnh báo Dược
+    @Override
+    @Transactional(readOnly = true)
+    public List<ExpiryAlertResponse> getNearExpiryAlerts(int daysAhead) {
+        LocalDate today = LocalDate.now();
+        LocalDate alertDate = today.plusDays(daysAhead > 0 ? daysAhead : 90);
+        return batchRepository.findNearExpiryBatches(today, alertDate, BatchStatus.ACTIVE).stream()
+                .map(b -> ExpiryAlertResponse.fromEntity(b, today))
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<LowStockAlertResponse> getLowStockAlerts(UUID warehouseId) {
+        if (warehouseId == null) {
+            return stockRepository.findAllLowStockAlerts().stream()
+                    .map(LowStockAlertResponse::fromEntity)
+                    .toList();
+        }
+        return stockRepository.findLowStockAlerts(warehouseId).stream()
+                .map(LowStockAlertResponse::fromEntity)
+                .toList();
+    }
+}

@@ -1,0 +1,125 @@
+package com.hospital.api.controller;
+
+import com.hospital.api.common.ApiResponse;
+import com.hospital.api.constant.PaymentMethod;
+import com.hospital.api.constant.TransactionType;
+import com.hospital.api.dto.response.PaymentGatewayResponse;
+import com.hospital.api.entity.Transaction;
+import com.hospital.api.security.UserPrincipal;
+import com.hospital.api.service.PaymentService;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/payment")
+@RequiredArgsConstructor
+public class PaymentController {
+
+    private final PaymentService paymentService;
+
+    // 1. Tạo URL thanh toán VNPay
+    @PostMapping("/vnpay/create-url")
+    public ResponseEntity<ApiResponse<String>> createVNPayPayment(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @RequestParam BigDecimal amount,
+            @RequestParam TransactionType type,
+            HttpServletRequest request
+    ) {
+        String ipAddress = request.getRemoteAddr();
+        String paymentUrl = paymentService.createVNPayUrl(userPrincipal.getId(), amount, type, ipAddress);
+        return ResponseEntity.ok(ApiResponse.ok(paymentUrl, "Khởi tạo URL VNPay thành công"));
+    }
+
+    // 2. Khởi tạo thanh toán VietQR Napas 247 (Dynamic QR Ngân hàng)
+    @PostMapping("/vietqr/create")
+    public ResponseEntity<ApiResponse<PaymentGatewayResponse>> createVietQRPayment(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @RequestParam BigDecimal amount,
+            @RequestParam TransactionType type
+    ) {
+        UUID accountId = userPrincipal != null ? userPrincipal.getId() : null;
+        PaymentGatewayResponse response = paymentService.createVietQRPayment(accountId, amount, type);
+        return ResponseEntity.ok(ApiResponse.ok(response, "Tạo mã thanh toán VietQR thành công"));
+    }
+
+    // 3. Khởi tạo thanh toán Ví MoMo (MoMo QR & Deeplink)
+    @PostMapping("/momo/create")
+    public ResponseEntity<ApiResponse<PaymentGatewayResponse>> createMoMoPayment(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @RequestParam BigDecimal amount,
+            @RequestParam TransactionType type
+    ) {
+        UUID accountId = userPrincipal != null ? userPrincipal.getId() : null;
+        PaymentGatewayResponse response = paymentService.createMoMoPayment(accountId, amount, type);
+        return ResponseEntity.ok(ApiResponse.ok(response, "Tạo mã thanh toán MoMo thành công"));
+    }
+
+    // 4. Thanh toán qua Ví nội bộ viện phí
+    @PostMapping("/wallet/pay")
+    public ResponseEntity<ApiResponse<Void>> payWithWallet(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @RequestParam BigDecimal amount,
+            @RequestParam TransactionType type
+    ) {
+        paymentService.payWithInternalWallet(userPrincipal.getId(), amount, type);
+        return ResponseEntity.ok(ApiResponse.ok(null, "Thanh toán bằng ví nội bộ thành công"));
+    }
+
+    // 5. Kiểm tra trạng thái giao dịch theo thời gian thực (Polling status)
+    @GetMapping("/status/{txnRef}")
+    public ResponseEntity<ApiResponse<Transaction>> checkTransactionStatus(@PathVariable String txnRef) {
+        Transaction transaction = paymentService.checkTransactionStatus(txnRef);
+        return ResponseEntity.ok(ApiResponse.ok(transaction, "Kiểm tra trạng thái giao dịch thành công"));
+    }
+
+    // 6. Xác nhận thanh toán thành công (Chỉ dành cho Quầy thu ngân & Quản trị viên)
+    @PostMapping("/confirm/{txnRef}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CASHIER')")
+    public ResponseEntity<ApiResponse<Transaction>> confirmPaymentSuccess(
+            @PathVariable String txnRef,
+            @RequestParam(required = false, defaultValue = "VIETQR") PaymentMethod method
+    ) {
+        Transaction transaction = paymentService.confirmPaymentSuccess(txnRef, method);
+        return ResponseEntity.ok(ApiResponse.ok(transaction, "Xác nhận thanh toán thành công"));
+    }
+
+    // 7. Webhook tiếp nhận biến động số dư / thanh toán tự động từ PayOS Open Banking
+    @PostMapping("/payos/webhook")
+    public ResponseEntity<ApiResponse<Transaction>> payOSWebhook(@RequestBody com.hospital.api.dto.request.PayOSWebhookRequest request) {
+        Transaction transaction = paymentService.processPayOSWebhook(request);
+        return ResponseEntity.ok(ApiResponse.ok(transaction, "Xử lý PayOS webhook thành công"));
+    }
+
+    // 8. Callback xử lý kết quả từ VNPay
+    @GetMapping("/vnpay/callback")
+    public ResponseEntity<ApiResponse<Transaction>> vnpayCallback(@RequestParam Map<String, String> queryParams) {
+        Transaction transaction = paymentService.processVNPayCallback(queryParams);
+        return ResponseEntity.ok(ApiResponse.ok(transaction, "Xử lý kết quả thanh toán VNPay thành công"));
+    }
+
+    // 8. Lịch sử giao dịch của người dùng
+    @GetMapping("/history")
+    public ResponseEntity<ApiResponse<List<Transaction>>> getTransactionHistory(
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        List<Transaction> history = paymentService.getTransactionHistory(userPrincipal.getId());
+        return ResponseEntity.ok(ApiResponse.ok(history, "Lấy lịch sử giao dịch thành công"));
+    }
+
+    // 9. Danh sách toàn bộ giao dịch đối soát dành cho Quản trị viên & Kế toán
+    @GetMapping("/admin/transactions")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CASHIER')")
+    public ResponseEntity<ApiResponse<List<Transaction>>> getAllTransactions() {
+        List<Transaction> all = paymentService.getAllTransactions();
+        return ResponseEntity.ok(ApiResponse.ok(all, "Lấy danh sách đối soát giao dịch thành công"));
+    }
+}
