@@ -118,6 +118,14 @@ public class InpatientController {
         return ResponseEntity.ok(ApiResponse.ok(inpatientService.transferBed(admissionId, request), "Điều chuyển giường bệnh nhân thành công"));
     }
 
+    @RequestMapping(value = "/{admissionId}/transfer", method = {RequestMethod.PUT, RequestMethod.POST})
+    @PreAuthorize("hasAnyRole('DOCTOR', 'HEAD_OF_DEPARTMENT', 'ADMIN')")
+    public ResponseEntity<ApiResponse<HospitalAdmission>> transferRoom(
+            @PathVariable UUID admissionId,
+            @RequestParam Integer newRoomId) {
+        return ResponseEntity.ok(ApiResponse.ok(inpatientService.transferRoom(admissionId, newRoomId), "Chuyển buồng bệnh nhân thành công"));
+    }
+
     @GetMapping("/{admissionId}/transfers")
     public ResponseEntity<ApiResponse<List<com.hospital.api.dto.response.BedTransferResponse>>> getBedTransfers(
             @PathVariable UUID admissionId) {
