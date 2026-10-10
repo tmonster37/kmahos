@@ -503,13 +503,13 @@ export default function AccountManagePage() {
                                             {acc.phoneNumber}
                                         </Typography>
                                     </TableCell>
-                                    <TableCell>{acc.email || <i style={{ color: "#94A3B8" }}>Chưa cập nhật</i>}</TableCell>
+                                    <TableCell>{acc.email || <i style={{ color: "#64748B" }}>Chưa cập nhật</i>}</TableCell>
                                     <TableCell>{getRoleBadge(acc.role)}</TableCell>
                                     <TableCell align="center">
                                         <Chip
                                             label={acc.isActive ? "Hoạt động" : "Đã khóa"}
                                             size="small"
-                                            color={acc.isActive ? "success" : "default"}
+                                            color={acc.isActive ? "success" : "error"}
                                             sx={{ fontWeight: 700 }}
                                         />
                                     </TableCell>

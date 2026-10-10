@@ -1637,7 +1637,7 @@ export default function ExaminationPage() {
                                                                                     fontWeight: 800,
                                                                                     fontSize: "0.7rem",
                                                                                     bgcolor: t.state === "COMPLETED" ? "#dcfce7" : "#fef3c7",
-                                                                                    color: t.state === "COMPLETED" ? "#16a34a" : "#d97706"
+                                                                                    color: t.state === "COMPLETED" ? "#15803d" : "#b45309"
                                                                                 }}
                                                                             />
                                                                         </TableCell>

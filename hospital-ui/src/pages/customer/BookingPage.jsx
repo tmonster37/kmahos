@@ -370,8 +370,8 @@ export default function BookingPage() {
                             <StepLabel
                                 StepIconProps={{
                                     sx: {
-                                        "&.Mui-active": { color: "#0ea5e9" },
-                                        "&.Mui-completed": { color: "#10b981" }
+                                        "&.Mui-active": { color: "#0088D6" },
+                                        "&.Mui-completed": { color: "#15803D" }
                                     }
                                 }}
                             >
@@ -430,19 +430,19 @@ export default function BookingPage() {
                                             cursor: "pointer",
                                             borderRadius: 3,
                                             transition: "all 0.3s ease",
-                                            border: isSelected ? "2px solid #0ea5e9" : "1px solid #E2E8F0",
+                                            border: isSelected ? "2px solid #0088D6" : "1px solid #E2E8F0",
                                             bgcolor: isSelected ? "#F0F9FF" : "white",
-                                            boxShadow: isSelected ? "0 10px 25px -5px rgba(14, 165, 233, 0.2)" : "0 1px 3px rgba(0,0,0,0.05)",
+                                            boxShadow: isSelected ? "0 10px 25px -5px rgba(0, 136, 214, 0.2)" : "0 1px 3px rgba(0,0,0,0.05)",
                                             "&:hover": {
                                                 transform: "translateY(-4px)",
                                                 boxShadow: "0 12px 24px -6px rgba(0,0,0,0.1)",
-                                                borderColor: "#0ea5e9"
+                                                borderColor: "#0088D6"
                                             }
                                         }}
                                     >
                                         <CardContent sx={{ p: 3 }}>
                                             <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
-                                                <Avatar sx={{ bgcolor: isSelected ? "#0ea5e9" : "#E0F2FE", color: isSelected ? "white" : "#0284c7", width: 50, height: 50 }}>
+                                                <Avatar sx={{ bgcolor: isSelected ? "#0088D6" : "#E0F2FE", color: isSelected ? "white" : "#0284c7", width: 50, height: 50 }}>
                                                     <MedicalServicesIcon />
                                                 </Avatar>
                                                 {isSelected && (
@@ -484,7 +484,7 @@ export default function BookingPage() {
                             disabled={!selectedDept}
                             endIcon={<ArrowForwardIcon />}
                             onClick={() => setActiveStep(1)}
-                            sx={{ px: 4, py: 1.5, borderRadius: 3, bgcolor: "#0ea5e9", "&:hover": { bgcolor: "#0284c7" }, fontWeight: "bold" }}
+                            sx={{ px: 4, py: 1.5, borderRadius: 3, bgcolor: "#0088D6", "&:hover": { bgcolor: "#0070BA" }, fontWeight: "bold" }}
                         >
                             Tiếp tục: Chọn Bác Sĩ & Ngày Khám
                         </Button>
@@ -504,7 +504,7 @@ export default function BookingPage() {
                                 Bước 2: Chọn Ngày Khám & Bác Sĩ Chuyên Khoa
                             </Typography>
                             <Typography variant="body2" color="textSecondary">
-                                Đang chọn chuyên khoa: <b style={{ color: "#0ea5e9" }}>{selectedDept?.departmentName}</b>
+                                Đang chọn chuyên khoa: <b style={{ color: "#0088D6" }}>{selectedDept?.departmentName}</b>
                             </Typography>
                         </Box>
                     </Box>
@@ -578,11 +578,11 @@ export default function BookingPage() {
                                             sx={{
                                                 cursor: "pointer",
                                                 borderRadius: 3,
-                                                border: isSelected ? "2px solid #0ea5e9" : "1px solid #E2E8F0",
+                                                border: isSelected ? "2px solid #0088D6" : "1px solid #E2E8F0",
                                                 bgcolor: isSelected ? "#F0F9FF" : "white",
                                                 transition: "all 0.25s ease",
                                                 "&:hover": {
-                                                    borderColor: "#0ea5e9",
+                                                    borderColor: "#0088D6",
                                                     boxShadow: "0 8px 20px rgba(0,0,0,0.06)"
                                                 }
                                             }}
@@ -590,7 +590,7 @@ export default function BookingPage() {
                                             <CardContent sx={{ p: 3 }}>
                                                 <Box display="flex" gap={2}>
                                                     <Avatar
-                                                        sx={{ width: 68, height: 68, bgcolor: "#0ea5e9", fontSize: 24, fontWeight: "bold" }}
+                                                        sx={{ width: 68, height: 68, bgcolor: "#0088D6", fontSize: 24, fontWeight: "bold" }}
                                                     >
                                                         {sch.doctorName ? sch.doctorName.charAt(0) : "BS"}
                                                     </Avatar>
@@ -636,7 +636,7 @@ export default function BookingPage() {
                             disabled={!selectedDoctorSchedule}
                             endIcon={<ArrowForwardIcon />}
                             onClick={() => setActiveStep(2)}
-                            sx={{ px: 4, borderRadius: 3, bgcolor: "#0ea5e9", "&:hover": { bgcolor: "#0284c7" }, fontWeight: "bold" }}
+                            sx={{ px: 4, borderRadius: 3, bgcolor: "#0088D6", "&:hover": { bgcolor: "#0070BA" }, fontWeight: "bold" }}
                         >
                             Tiếp tục: Chọn Khung Giờ
                         </Button>
@@ -656,7 +656,7 @@ export default function BookingPage() {
                                 Bước 3: Chọn Khung Giờ Khám Bệnh
                             </Typography>
                             <Typography variant="body2" color="textSecondary">
-                                Bác sĩ: <b style={{ color: "#0ea5e9" }}>{selectedDoctorSchedule?.doctorName}</b> - Buồng: <b>{selectedDoctorSchedule?.roomName}</b> ({formatDate(selectedDate)})
+                                Bác sĩ: <b style={{ color: "#0088D6" }}>{selectedDoctorSchedule?.doctorName}</b> - Buồng: <b>{selectedDoctorSchedule?.roomName}</b> ({formatDate(selectedDate)})
                             </Typography>
                         </Box>
                     </Box>
@@ -692,13 +692,13 @@ export default function BookingPage() {
                                                 borderRadius: 3,
                                                 flexDirection: "column",
                                                 borderWidth: 2,
-                                                borderColor: isSelected ? "#0ea5e9" : isFull ? "#CBD5E1" : "#E2E8F0",
-                                                bgcolor: isSelected ? "#0ea5e9" : isFull ? "#F8FAFC" : "white",
+                                                borderColor: isSelected ? "#0088D6" : isFull ? "#CBD5E1" : "#E2E8F0",
+                                                bgcolor: isSelected ? "#0088D6" : isFull ? "#F8FAFC" : "white",
                                                 color: isSelected ? "white" : isFull ? "#94A3B8" : "#002D5A",
                                                 "&:hover": {
                                                     borderWidth: 2,
-                                                    borderColor: "#0ea5e9",
-                                                    bgcolor: isSelected ? "#0284c7" : "#F0F9FF"
+                                                    borderColor: "#0088D6",
+                                                    bgcolor: isSelected ? "#0070BA" : "#F0F9FF"
                                                 }
                                             }}
                                         >
@@ -728,7 +728,7 @@ export default function BookingPage() {
                             disabled={!selectedSlot}
                             endIcon={<ArrowForwardIcon />}
                             onClick={() => setActiveStep(3)}
-                            sx={{ px: 4, borderRadius: 3, bgcolor: "#0ea5e9", "&:hover": { bgcolor: "#0284c7" }, fontWeight: "bold" }}
+                            sx={{ px: 4, borderRadius: 3, bgcolor: "#0088D6", "&:hover": { bgcolor: "#0070BA" }, fontWeight: "bold" }}
                         >
                             Tiếp tục: Chọn Hồ Sơ Khám
                         </Button>
@@ -798,10 +798,10 @@ export default function BookingPage() {
                                                             sx={{
                                                                 cursor: "pointer",
                                                                 borderRadius: 3,
-                                                                border: isSelected ? "2px solid #0ea5e9" : "1px solid #E2E8F0",
+                                                                border: isSelected ? "2px solid #0088D6" : "1px solid #E2E8F0",
                                                                 bgcolor: isSelected ? "#F0F9FF" : "white",
                                                                 transition: "0.2s",
-                                                                "&:hover": { borderColor: "#0ea5e9" }
+                                                                "&:hover": { borderColor: "#0088D6" }
                                                             }}
                                                         >
                                                             <CardContent sx={{ p: 2 }}>
@@ -910,7 +910,7 @@ export default function BookingPage() {
                                                         p: 1,
                                                         mb: 1,
                                                         borderRadius: 2,
-                                                        borderColor: paymentMethod === "VIETQR" ? "#0ea5e9" : "#E2E8F0",
+                                                        borderColor: paymentMethod === "VIETQR" ? "#0088D6" : "#E2E8F0",
                                                         bgcolor: paymentMethod === "VIETQR" ? "#F0F9FF" : "white"
                                                     }}
                                                 >
@@ -1060,8 +1060,8 @@ export default function BookingPage() {
                                                 mt: 2,
                                                 py: 1.5,
                                                 borderRadius: 3,
-                                                bgcolor: "#0ea5e9",
-                                                "&:hover": { bgcolor: "#0284c7" },
+                                                bgcolor: "#0088D6",
+                                                "&:hover": { bgcolor: "#0070BA" },
                                                 fontWeight: "bold",
                                                 fontSize: "1.05rem"
                                             }}
@@ -1166,7 +1166,7 @@ export default function BookingPage() {
                                 to="/my-history"
                                 variant="contained"
                                 size="large"
-                                sx={{ py: 1.5, px: 3, borderRadius: 3, bgcolor: "#0ea5e9", fontWeight: "bold" }}
+                                sx={{ py: 1.5, px: 3, borderRadius: 3, bgcolor: "#0088D6", "&:hover": { bgcolor: "#0070BA" }, fontWeight: "bold" }}
                             >
                                 📋 Xem Trong Lịch Sử Khám
                             </Button>
@@ -1282,7 +1282,7 @@ export default function BookingPage() {
                         variant="contained"
                         disabled={creatingProfile}
                         onClick={handleCreateNewProfile}
-                        sx={{ bgcolor: "#0ea5e9", "&:hover": { bgcolor: "#0284c7" } }}
+                        sx={{ bgcolor: "#0088D6", "&:hover": { bgcolor: "#0070BA" } }}
                     >
                         {creatingProfile ? <CircularProgress size={20} /> : "Lưu hồ sơ"}
                     </Button>

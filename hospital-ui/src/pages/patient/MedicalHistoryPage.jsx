@@ -210,10 +210,12 @@ export default function MedicalHistoryPage() {
 
     const getStatusChip = (status) => {
         switch (status) {
+            case "PENDING":
+                return <Chip label="Chờ duyệt" color="warning" size="small" sx={{ height: 22, fontSize: "0.75rem", fontWeight: "600" }} />;
             case "CONFIRMED":
                 return <Chip label="Đã xác nhận" color="primary" size="small" sx={{ height: 22, fontSize: "0.75rem", fontWeight: "600" }} />;
             case "IN_PROGRESS":
-                return <Chip label="Đang khám" color="warning" size="small" sx={{ height: 22, fontSize: "0.75rem", fontWeight: "600" }} />;
+                return <Chip label="Đang khám" color="info" size="small" sx={{ height: 22, fontSize: "0.75rem", fontWeight: "600" }} />;
             case "COMPLETED":
                 return <Chip label="Đã khám xong" color="success" size="small" sx={{ height: 22, fontSize: "0.75rem", fontWeight: "600" }} />;
             case "CANCELLED":

@@ -1097,8 +1097,8 @@ export default function NurseReceptionPage() {
                                         </TableCell>
                                         <TableCell align="center">
                                             {item.status === "WAITING" && <Chip label="Đang chờ gọi" color="warning" size="small" sx={{ fontWeight: 700 }} />}
-                                            {item.status === "EXAMINING" && <Chip label="Đang khám" color="success" size="small" sx={{ fontWeight: 700 }} />}
-                                            {item.status === "COMPLETED" && <Chip label="Đã khám xong" color="default" size="small" sx={{ fontWeight: 600 }} />}
+                                            {item.status === "EXAMINING" && <Chip label="Đang khám" color="info" size="small" sx={{ fontWeight: 700 }} />}
+                                            {item.status === "COMPLETED" && <Chip label="Đã khám xong" color="success" size="small" sx={{ fontWeight: 700 }} />}
                                             {item.status === "CANCELLED" && <Chip label="Vắng mặt" color="error" size="small" sx={{ fontWeight: 600 }} />}
                                         </TableCell>
                                         <TableCell align="center">
