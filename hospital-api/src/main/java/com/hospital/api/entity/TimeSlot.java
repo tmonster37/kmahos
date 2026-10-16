@@ -40,5 +40,9 @@ public class TimeSlot extends BaseEntity {
     @Column(name = "current_bookings", nullable = false)
     @Builder.Default
     private Integer currentBookings = 0; // Số người đã đặt thành công
+
+    @Column(name = "holding_count", nullable = false)
+    @Builder.Default
+    private Integer holdingCount = 0; // Số người đang giữ chỗ tạm thời (Holding 10 phút)
 }
 

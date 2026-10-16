@@ -13,6 +13,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import com.hospital.api.security.UserPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -52,15 +54,37 @@ public class InpatientController {
         return ResponseEntity.ok(ApiResponse.ok(discharge, "Làm thủ tục xuất viện thành công"));
     }
 
+    private boolean checkIsStaff(UserPrincipal userPrincipal) {
+        return userPrincipal != null && userPrincipal.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().contains("ADMIN") ||
+                               a.getAuthority().contains("DOCTOR") ||
+                               a.getAuthority().contains("HEAD_OF_DEPARTMENT") ||
+                               a.getAuthority().contains("NURSE") ||
+                               a.getAuthority().contains("CASHIER") ||
+                               a.getAuthority().contains("PHARMACIST") ||
+                               a.getAuthority().contains("LAB_TECHNICIAN") ||
+                               a.getAuthority().contains("STAFF"));
+    }
+
     @GetMapping("/{admissionId}")
-    public ResponseEntity<ApiResponse<HospitalAdmission>> getAdmissionById(@PathVariable UUID admissionId) {
-        HospitalAdmission admission = inpatientService.getAdmissionById(admissionId);
+    public ResponseEntity<ApiResponse<HospitalAdmission>> getAdmissionById(
+            @PathVariable UUID admissionId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        boolean isStaff = checkIsStaff(userPrincipal);
+        UUID currentUserId = userPrincipal != null ? userPrincipal.getId() : null;
+        HospitalAdmission admission = inpatientService.getAdmissionById(admissionId, currentUserId, isStaff);
         return ResponseEntity.ok(ApiResponse.ok(admission, "Lấy thông tin nhập viện thành công"));
     }
 
     @GetMapping("/patient/{patientProfileId}")
-    public ResponseEntity<ApiResponse<List<HospitalAdmission>>> getAdmissionsByPatient(@PathVariable UUID patientProfileId) {
-        List<HospitalAdmission> admissions = inpatientService.getAdmissionsByPatient(patientProfileId);
+    public ResponseEntity<ApiResponse<List<HospitalAdmission>>> getAdmissionsByPatient(
+            @PathVariable UUID patientProfileId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        boolean isStaff = checkIsStaff(userPrincipal);
+        UUID currentUserId = userPrincipal != null ? userPrincipal.getId() : null;
+        List<HospitalAdmission> admissions = inpatientService.getAdmissionsByPatient(patientProfileId, currentUserId, isStaff);
         return ResponseEntity.ok(ApiResponse.ok(admissions, "Lấy danh sách hồ sơ nhập viện của bệnh nhân thành công"));
     }
 
@@ -72,8 +96,13 @@ public class InpatientController {
     }
 
     @GetMapping("/{admissionId}/daily-records")
-    public ResponseEntity<ApiResponse<List<HospitalizationDetail>>> getDailyRecords(@PathVariable UUID admissionId) {
-        List<HospitalizationDetail> details = inpatientService.getDailyRecords(admissionId);
+    public ResponseEntity<ApiResponse<List<HospitalizationDetail>>> getDailyRecords(
+            @PathVariable UUID admissionId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        boolean isStaff = checkIsStaff(userPrincipal);
+        UUID currentUserId = userPrincipal != null ? userPrincipal.getId() : null;
+        List<HospitalizationDetail> details = inpatientService.getDailyRecords(admissionId, currentUserId, isStaff);
         return ResponseEntity.ok(ApiResponse.ok(details, "Lấy danh sách nhật ký theo dõi thành công"));
     }
 

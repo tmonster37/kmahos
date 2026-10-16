@@ -2,6 +2,7 @@ import React from "react";
 import { Outlet, Link } from "react-router-dom";
 import { Box, Container, Typography, Divider, Grid, Button, Stack } from "@mui/material";
 import Navbar from "../components/navbar/Navbar";
+import PatientBottomNav from "../components/navbar/PatientBottomNav";
 import LiveChatWidget from "../components/chat/LiveChatWidget";
 import LocalHospitalIcon from "@mui/icons-material/LocalHospital";
 import PhoneInTalkIcon from "@mui/icons-material/PhoneInTalk";
@@ -206,6 +207,9 @@ export default function MainLayout() {
                     </Box>
                 </Container>
             </Box>
+
+            {/* Mobile Bottom Navigation for Patients */}
+            <PatientBottomNav />
         </Box>
     );
 }

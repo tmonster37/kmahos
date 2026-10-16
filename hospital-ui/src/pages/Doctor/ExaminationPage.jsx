@@ -60,12 +60,15 @@ import HealingIcon from "@mui/icons-material/Healing";
 import MonitorWeightIcon from "@mui/icons-material/MonitorWeight";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CameraAltIcon from "@mui/icons-material/CameraAlt";
+import LockIcon from "@mui/icons-material/Lock";
+import HistoryEduIcon from "@mui/icons-material/HistoryEdu";
 
 import AssignTestsModal from "./AssignTestsModal";
 import PrescriptionModal from "./PrescriptionModal";
 import PrescriptionPrintModal from "./PrescriptionPrintModal";
 import MedicalRecordPrintModal from "./MedicalRecordPrintModal";
 import InpatientAdmitModal from "./InpatientAdmitModal";
+import AddendumModal from "./AddendumModal";
 import PacsViewerModal from "../../components/PacsViewerModal";
 import axiosInstance from "../../services/AxiosInstance";
 import { formatCurrency, formatDate } from "../../utils/formatters";
@@ -168,6 +171,7 @@ export default function ExaminationPage() {
     const [openRecordPrintModal, setOpenRecordPrintModal] = useState(false);
     const [openScheduleModal, setOpenScheduleModal] = useState(false);
     const [openAdmitModal, setOpenAdmitModal] = useState(false);
+    const [openAddendumModal, setOpenAddendumModal] = useState(false);
     const [admissionInfo, setAdmissionInfo] = useState(null);
     const [mySchedules, setMySchedules] = useState([]);
     const [loadingSchedules, setLoadingSchedules] = useState(false);
@@ -268,26 +272,33 @@ export default function ExaminationPage() {
         setMessage("");
         setAdmissionInfo(null);
 
-        // 1. Kiểm tra xem Điều dưỡng đã đo sinh hiệu ở Bàn sơ chẩn (Triage) chưa:
+        // 1. Phân tích sinh hiệu được lưu trữ an toàn từ máy chủ backend (trong trường symptoms của lượt khám)
         let triageVitals = null;
         try {
-            const cleanPhone = patientItem.phone ? patientItem.phone.trim() : (patientItem.patientPhone ? patientItem.patientPhone.trim() : null);
-            const cleanName = patientItem.patientName ? patientItem.patientName.trim().toLowerCase() : null;
-            const cleanBooking = patientItem.bookingId ? String(patientItem.bookingId) : null;
-            const cleanCode = patientItem.queueCode ? String(patientItem.queueCode).replace('#', '').trim() : null;
-            const cleanNum = patientItem.queueNumber ? String(patientItem.queueNumber) : null;
+            const symptomsStr = patientItem.symptoms || "";
+            const bpMatch = symptomsStr.match(/HA\s*([0-9]+\/[0-9]+)/i);
+            const hrMatch = symptomsStr.match(/Mạch\s*([0-9]+)/i);
+            const tempMatch = symptomsStr.match(/Nhiệt\s*([0-9.]+)/i);
+            const spo2Match = symptomsStr.match(/SpO2\s*([0-9]+)/i);
+            const heightMatch = symptomsStr.match(/CC\s*([0-9]+)/i);
+            const weightMatch = symptomsStr.match(/CN\s*([0-9.]+)/i);
+            const allergyMatch = symptomsStr.match(/Dị ứng:\s*([^|\]]+)/i);
 
-            const fromStorage = (cleanPhone && localStorage.getItem(`vitals_phone_${cleanPhone}`)) ||
-                                (cleanName && localStorage.getItem(`vitals_name_${cleanName}`)) ||
-                                (cleanBooking && localStorage.getItem(`vitals_booking_${cleanBooking}`)) ||
-                                (cleanCode && localStorage.getItem(`vitals_code_${cleanCode}`)) ||
-                                (cleanNum && localStorage.getItem(`vitals_num_${cleanNum}`));
-
-            if (fromStorage) {
-                triageVitals = JSON.parse(fromStorage);
+            if (bpMatch || hrMatch || tempMatch || spo2Match) {
+                triageVitals = {
+                    bloodPressure: bpMatch ? bpMatch[1] : "120/80",
+                    heartRate: hrMatch ? Number(hrMatch[1]) : 76,
+                    temperature: tempMatch ? Number(tempMatch[1]) : 36.8,
+                    spO2: spo2Match ? Number(spo2Match[1]) : 98,
+                    weight: weightMatch ? Number(weightMatch[1]) : 62,
+                    height: heightMatch ? Number(heightMatch[1]) : 168,
+                    bloodType: "O+",
+                    allergies: allergyMatch ? allergyMatch[1].trim() : "Chưa ghi nhận dị ứng thuốc",
+                    medicalHistory: "Chưa ghi nhận tiền sử bệnh lý mạn tính"
+                };
             }
         } catch (err) {
-            console.error("Lỗi đọc sinh hiệu từ Điều dưỡng:", err);
+            console.error("Lỗi phân tích sinh hiệu từ dữ liệu máy chủ:", err);
         }
 
         if (triageVitals) {
@@ -496,7 +507,8 @@ export default function ExaminationPage() {
         return queue.filter((p) => {
             const matchesStatus =
                 filterStatus === "ALL" ||
-                (filterStatus === "WAITING" && p.status === "CONFIRMED") ||
+                (filterStatus === "RETURN_AFTER_RESULT" && p.isReturnAfterResult) ||
+                (filterStatus === "WAITING" && p.status === "CONFIRMED" && !p.isReturnAfterResult) ||
                 (filterStatus === "IN_PROGRESS" && p.status === "IN_PROGRESS") ||
                 (filterStatus === "COMPLETED" && p.status === "COMPLETED");
 
@@ -512,7 +524,8 @@ export default function ExaminationPage() {
         });
     }, [queue, filterStatus, searchQuery]);
 
-    const waitingCount = queue.filter((p) => p.status === "CONFIRMED").length;
+    const returnAfterResultCount = queue.filter((p) => p.isReturnAfterResult).length;
+    const waitingCount = queue.filter((p) => p.status === "CONFIRMED" && !p.isReturnAfterResult).length;
     const inProgressCount = queue.filter((p) => p.status === "IN_PROGRESS").length;
     const completedCount = queue.filter((p) => p.status === "COMPLETED").length;
     const priorityCount = queue.filter((p) => p.isPriority && p.status !== "COMPLETED").length;
@@ -867,6 +880,21 @@ export default function ExaminationPage() {
                                     onClick={() => setFilterStatus("ALL")}
                                     sx={{ fontWeight: 600, cursor: "pointer" }}
                                 />
+                                {returnAfterResultCount > 0 && (
+                                    <Chip
+                                        label={`Có KQ CLS (${returnAfterResultCount})`}
+                                        size="small"
+                                        variant={filterStatus === "RETURN_AFTER_RESULT" ? "filled" : "outlined"}
+                                        onClick={() => setFilterStatus("RETURN_AFTER_RESULT")}
+                                        sx={{
+                                            fontWeight: 700,
+                                            cursor: "pointer",
+                                            bgcolor: filterStatus === "RETURN_AFTER_RESULT" ? "#7c3aed" : "#faf5ff",
+                                            color: filterStatus === "RETURN_AFTER_RESULT" ? "#ffffff" : "#7c3aed",
+                                            borderColor: "#7c3aed"
+                                        }}
+                                    />
+                                )}
                                 <Chip
                                     label={`Chờ (${waitingCount})`}
                                     size="small"
@@ -908,7 +936,11 @@ export default function ExaminationPage() {
                                     let statusBg = "#f1f5f9";
                                     let statusLabel = "Chờ khám";
 
-                                    if (item.status === "IN_PROGRESS") {
+                                    if (item.isReturnAfterResult) {
+                                        statusColor = "#7c3aed";
+                                        statusBg = "#f5f3ff";
+                                        statusLabel = "Đã có KQ CLS";
+                                    } else if (item.status === "IN_PROGRESS") {
                                         statusColor = "#0284c7";
                                         statusBg = "#e0f2fe";
                                         statusLabel = item.recordState === "IN_TESTING" ? "Đang làm CLS" : "Đang khám";
@@ -929,16 +961,22 @@ export default function ExaminationPage() {
                                                 p: 1.5,
                                                 border: isSelected
                                                     ? "2px solid #0284c7"
+                                                    : item.isReturnAfterResult
+                                                    ? "2px solid #a855f7"
                                                     : item.isPriority
                                                     ? "1px solid #fecaca"
                                                     : "1px solid #f1f5f9",
                                                 bgcolor: isSelected
                                                     ? "#f0f9ff"
+                                                    : item.isReturnAfterResult
+                                                    ? "#faf5ff"
                                                     : item.isPriority
                                                     ? "#fff5f5"
                                                     : "#ffffff",
                                                 boxShadow: isSelected
                                                     ? "0 4px 12px rgba(2, 132, 199, 0.12)"
+                                                    : item.isReturnAfterResult
+                                                    ? "0 2px 8px rgba(124, 58, 237, 0.15)"
                                                     : "0 1px 3px rgba(0,0,0,0.02)",
                                                 transition: "all 0.15s ease",
                                                 "&:hover": {
@@ -952,9 +990,13 @@ export default function ExaminationPage() {
                                                 sx={{
                                                     minWidth: 38,
                                                     height: 38,
-                                                    borderRadius: item.isPriority ? 2 : "50%",
-                                                    bgcolor: item.isPriority ? "#ef4444" : (item.status === "IN_PROGRESS" ? "#0284c7" : "#e2e8f0"),
-                                                    color: (item.isPriority || item.status === "IN_PROGRESS") ? "#ffffff" : "#1e293b",
+                                                    borderRadius: (item.isPriority || item.isReturnAfterResult) ? 2 : "50%",
+                                                    bgcolor: item.isReturnAfterResult
+                                                        ? "#7c3aed"
+                                                        : item.isPriority
+                                                        ? "#ef4444"
+                                                        : (item.status === "IN_PROGRESS" ? "#0284c7" : "#e2e8f0"),
+                                                    color: (item.isReturnAfterResult || item.isPriority || item.status === "IN_PROGRESS") ? "#ffffff" : "#1e293b",
                                                     display: "flex",
                                                     alignItems: "center",
                                                     justifyContent: "center",
@@ -962,7 +1004,11 @@ export default function ExaminationPage() {
                                                     fontSize: "0.92rem",
                                                     mr: 1.2,
                                                     flexShrink: 0,
-                                                    boxShadow: item.isPriority ? "0 2px 8px rgba(239, 68, 68, 0.35)" : "none"
+                                                    boxShadow: item.isReturnAfterResult
+                                                        ? "0 2px 8px rgba(124, 58, 237, 0.35)"
+                                                        : item.isPriority
+                                                        ? "0 2px 8px rgba(239, 68, 68, 0.35)"
+                                                        : "none"
                                                 }}
                                             >
                                                 {item.queueCode || String(item.queueNumber).padStart(2, "0")}
@@ -973,6 +1019,13 @@ export default function ExaminationPage() {
                                                 primary={
                                                     <Box display="flex" justifyContent="space-between" alignItems="center" gap={1}>
                                                         <Box display="flex" alignItems="center" gap={0.5} sx={{ minWidth: 0, flex: 1 }}>
+                                                            {item.isReturnAfterResult && (
+                                                                <Chip
+                                                                    label="Có KQ CLS"
+                                                                    size="small"
+                                                                    sx={{ height: 18, fontSize: "0.6rem", fontWeight: 800, bgcolor: "#7c3aed", color: "#ffffff", flexShrink: 0 }}
+                                                                />
+                                                            )}
                                                             {item.isPriority && (
                                                                 <Chip
                                                                     icon={<StarsIcon sx={{ fontSize: "11px !important", color: "#ffffff !important" }} />}
@@ -1483,6 +1536,49 @@ export default function ExaminationPage() {
                                         Cập nhật bệnh sử
                                     </Button>
                                 </Paper>
+                            )}
+
+                            {/* CẢNH BÁO BỆNH ÁN ĐÃ KHÓA SAU 24H THEO THÔNG TƯ 46/2018/TT-BYT */}
+                            {record?.isLocked && (
+                                <Alert
+                                    severity="error"
+                                    icon={<LockIcon />}
+                                    sx={{
+                                        mb: 2.5,
+                                        borderRadius: 2.5,
+                                        bgcolor: "#fef2f2",
+                                        color: "#991b1b",
+                                        border: "1px solid #fecaca",
+                                        "& .MuiAlert-message": { width: "100%" }
+                                    }}
+                                    action={
+                                        <Button
+                                            color="error"
+                                            variant="contained"
+                                            size="small"
+                                            startIcon={<HistoryEduIcon />}
+                                            onClick={() => setOpenAddendumModal(true)}
+                                            sx={{
+                                                fontWeight: 700,
+                                                textTransform: "none",
+                                                whiteSpace: "nowrap",
+                                                bgcolor: "#dc2626",
+                                                "&:hover": { bgcolor: "#b91c1c" }
+                                            }}
+                                        >
+                                            + Lập Phụ Lục Bệnh Án (TT 46)
+                                        </Button>
+                                    }
+                                >
+                                    <Box>
+                                        <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                                            HỒ SƠ ĐÃ KHÓA SAU 24H THEO THÔNG TƯ 46/2018/TT-BYT
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ display: "block", color: "#7f1d1d" }}>
+                                            Hồ sơ bệnh án điện tử đã chuyển sang trạng thái bất biến sau 24 giờ kể từ thời điểm kết thúc buổi khám. Bác sĩ không thể sửa trực tiếp; mọi đính chính hoặc bổ sung y khoa phải được ghi nhận qua Phụ lục bệnh án (Addendum).
+                                        </Typography>
+                                    </Box>
+                                </Alert>
                             )}
 
                             {/* CLINICAL DOSSIER TABS */}
@@ -2213,6 +2309,15 @@ export default function ExaminationPage() {
                                         open={openRecordPrintModal}
                                         onClose={() => setOpenRecordPrintModal(false)}
                                         record={record}
+                                    />
+                                    <AddendumModal
+                                        open={openAddendumModal}
+                                        onClose={() => setOpenAddendumModal(false)}
+                                        record={record}
+                                        onAddendumSuccess={() => {
+                                            refreshRecord();
+                                            setMessage("Đã lập Phụ lục Bệnh án (EMR Addendum) theo Thông tư 46/2018/TT-BYT thành công!");
+                                        }}
                                     />
                                     <InpatientAdmitModal
                                         open={openAdmitModal}

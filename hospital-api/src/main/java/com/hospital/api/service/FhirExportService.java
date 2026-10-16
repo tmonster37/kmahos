@@ -25,8 +25,21 @@ public class FhirExportService {
 
     @Transactional(readOnly = true)
     public String exportRecordToFhirJson(UUID recordId) {
+        return exportRecordToFhirJson(recordId, null, true);
+    }
+
+    @Transactional(readOnly = true)
+    public String exportRecordToFhirJson(UUID recordId, UUID currentUserId, boolean isStaff) {
         MedicalExaminationRecord record = recordRepository.findById(recordId)
                 .orElseThrow(() -> new AppException("Không tìm thấy hồ sơ khám bệnh", HttpStatus.NOT_FOUND));
+
+        if (!isStaff) {
+            if (record.getPatientProfile() == null
+                    || record.getPatientProfile().getAccount() == null
+                    || !record.getPatientProfile().getAccount().getUserId().equals(currentUserId)) {
+                throw new AppException("Bạn không có quyền truy cập hồ sơ bệnh án này", HttpStatus.FORBIDDEN);
+            }
+        }
 
         Bundle bundle = new Bundle();
         bundle.setId(UUID.randomUUID().toString());

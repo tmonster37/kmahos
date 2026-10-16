@@ -7,7 +7,7 @@ export const gatewayApi = {
     createConcept: (data) => axiosInstance.post("/api/clinical/concepts", data),
     searchObservations: (params) => axiosInstance.get("/api/ehr/observations/search", { params }),
     searchEncounters: (params) => axiosInstance.get("/api/ehr/encounters/search", { params }),
-    migrateAllToEhr: () => axiosInstance.post("/api/admin/ehr/migrate"),
+    migrateAllToEhr: () => axiosInstance.post("/api/ehr/migrate"),
 
     // 2. RIS / PACS Gateway (Modality Worklist & Webhook)
     getModalityWorklist: (modality) =>

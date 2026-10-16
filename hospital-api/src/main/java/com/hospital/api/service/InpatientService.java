@@ -16,9 +16,12 @@ public interface InpatientService {
     HospitalizationDetail addDailyRecord(UUID admissionId, DailyRecordRequest request);
     Discharge dischargePatient(UUID admissionId, DischargeRequest request);
     HospitalAdmission getAdmissionById(UUID admissionId);
+    HospitalAdmission getAdmissionById(UUID admissionId, UUID currentUserId, boolean isStaff);
     List<HospitalAdmission> getAdmissionsByPatient(UUID patientProfileId);
+    List<HospitalAdmission> getAdmissionsByPatient(UUID patientProfileId, UUID currentUserId, boolean isStaff);
     List<HospitalAdmission> getActiveAdmissions();
     List<HospitalizationDetail> getDailyRecords(UUID admissionId);
+    List<HospitalizationDetail> getDailyRecords(UUID admissionId, UUID currentUserId, boolean isStaff);
     HospitalAdmission transferRoom(UUID admissionId, Integer newRoomId);
 
     // 1. Quản lý Giường bệnh (Bed Allocation - Open Hospital Ward/Bed)

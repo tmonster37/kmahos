@@ -18,4 +18,12 @@ export const clinicalApi = {
 
     // Lấy chi tiết hồ sơ bệnh án
     getRecord: (recordId) => axiosInstance.get(`/api/clinical/records/${recordId}`),
+
+    // Lập Phụ lục Bệnh án (EMR Addendum theo Thông tư 46/2018/TT-BYT)
+    createAddendum: (recordId, data) =>
+        axiosInstance.post(`/api/clinical/records/${recordId}/addendums`, data),
+
+    // Lấy danh sách Phụ lục Bệnh án theo hồ sơ
+    getAddendums: (recordId) =>
+        axiosInstance.get(`/api/clinical/records/${recordId}/addendums`),
 };

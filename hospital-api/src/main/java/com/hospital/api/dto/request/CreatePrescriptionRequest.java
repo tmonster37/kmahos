@@ -12,6 +12,9 @@ public record CreatePrescriptionRequest(
         @NotEmpty(message = "Đơn thuốc phải có ít nhất 1 loại thuốc")
         @Valid
         @JsonAlias({"details", "prescriptionItems"})
-        List<PrescriptionItemRequest> items
+        List<PrescriptionItemRequest> items,
+
+        @JsonAlias({"overrideAllergy", "forcePrescribe"})
+        Boolean overrideAllergyWarning
 ) {}
 

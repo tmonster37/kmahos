@@ -19,6 +19,7 @@
 9. [Cấu trúc Thư mục Dự án](#9-cấu-trúc-thư-mục-dự-án)
 10. [Các lỗi thường gặp & Cách khắc phục (Troubleshooting)](#10-các-lỗi-thường-gặp--cách-khắc-phục-troubleshooting)
 11. [Nguyên tắc An toàn & Bảo mật Y tế](#11-nguyên-tắc-an-toàn--bảo-mật-y-tế)
+12. [Hướng dẫn Triển khai Trực tuyến (Online Deployment)](#12-hướng-dẫn-triển-khai-trực-tuyến-online-deployment)
 
 ---
 
@@ -216,17 +217,18 @@ docker compose up -d --build
 
 ## 6. TÀI KHOẢN KIỂM THỬ MẪU (DEMO CREDENTIALS)
 
-Dữ liệu khởi tạo mẫu của hệ thống cung cấp sẵn các tài khoản tương ứng với từng chức năng nghiệp vụ:
+Dữ liệu khởi tạo mẫu của hệ thống cung cấp sẵn các tài khoản tương ứng với từng chức năng nghiệp vụ (đã được đồng bộ và kiểm thử an toàn):
 
-| Vai trò (Role) | Số điện thoại / Tài khoản | Mật khẩu | Quyền hạn & Màn hình trải nghiệm |
-| :--- | :---: | :---: | :--- |
-| **Quản trị viên (ADMIN)** | `0937050537` | `taizz0537` | Toàn quyền quản trị nhân sự, khoa phòng, ca trực, doanh thu |
-| **Bác sĩ Lâm sàng (DOCTOR)** | `0937050537` | `taizz0537` | Bàn khám bệnh, chẩn đoán ICD-10, kê đơn thuốc, ra chỉ định CLS |
-| **Bệnh nhân (PATIENT)** | `0988889999` | `password123` | Đặt lịch khám, nạp ví 2.000.000đ, 4 hồ sơ y tế gia đình |
-| **Điều dưỡng (NURSE)** | `0911223344` | `password123` | Tiếp đón bệnh nhân, phân buồng khám, cập nhật số thứ tự |
-| **Kỹ thuật viên Lab (LAB_TECH)** | `0944556677` | `password123` | Phòng xét nghiệm, tiếp nhận mẫu bệnh phẩm, trả kết quả xét nghiệm |
-| **Dược sĩ (PHARMACIST)** | `0977889900` | `password123` | Quầy phát thuốc, xuất kho thuốc theo lô hạn dùng (FEFO) |
-| **Thu ngân (CASHIER)** | `0966778899` | `password123` | Quầy thu ngân, xác nhận thanh toán viện phí tiền mặt / thẻ |
+| Vai trò (Role) | Số điện thoại / Tài khoản | Mật khẩu | Họ và tên | Quyền hạn & Màn hình trải nghiệm |
+| :--- | :---: | :---: | :--- | :--- |
+| **Quản trị viên (ADMIN)** | `0937050537` | `taizz0537` | Quản Trị Viên (Tài) | Toàn quyền quản trị nhân sự, khoa phòng, ca trực, doanh thu, KPI |
+| **Trưởng khoa (HEAD_OF_DEPT)** | `0900000002` | `password123` | PGS. TS Lê Văn Thịnh | Quản lý chuyên khoa Nội, duyệt chuyển khoa, điều phối |
+| **Bác sĩ Lâm sàng (DOCTOR)** | `0911000001` | `password123` | BS.CKII Nguyễn Văn Hoàng | Bàn khám bệnh, chẩn đoán ICD-10, kê đơn thuốc, chỉ định CLS |
+| **Điều dưỡng tiếp đón (NURSE)** | `0900000004` | `password123` | ĐD. Nguyễn Mai Hoa | Mở quầy tiếp đón, nhận ca trực, phân buồng khám, gọi số LED |
+| **Thu ngân viện phí (CASHIER)** | `0900000007` | `password123` | TN. Hoàng Kim Ngân | Quầy thu ngân, thu tiền mặt/thẻ, thanh toán đa hóa đơn |
+| **Dược sĩ phát thuốc (PHARMACIST)** | `0900000005` | `password123` | DS. Phạm Thu Trang | Quầy dược, xuất kho thuốc theo lô hạn dùng gần nhất (FEFO) |
+| **Kỹ thuật viên Lab (LAB_TECH)** | `0900000006` | `password123` | KTV. Đỗ Quang Huy | Phòng xét nghiệm, tiếp nhận mẫu bệnh phẩm, trả kết quả LIS |
+| **Bệnh nhân (PATIENT)** | `0988889999` | `password123` | Nguyễn Văn Bệnh Nhân | Đặt lịch khám trực tuyến, nạp ví, tra cứu sổ khám và đơn thuốc |
 
 ---
 
@@ -234,7 +236,15 @@ Dữ liệu khởi tạo mẫu của hệ thống cung cấp sẵn các tài kho
 
 Hệ thống được trang bị bộ kiểm thử tự động toàn diện từ Unit Test đến End-to-End Integration Test:
 
-### 7.1. Chạy Unit Test Backend Spring Boot
+### 7.1. Bộ Kiểm thử Nghiệm thu Tiền Triển khai (Final Pre-Deployment Verification)
+Kiểm thử tự động toàn diện xuyên suốt 10 chặng nghiệp vụ cốt lõi (không làm bẩn database):
+```bash
+node test_final_pre_deploy_verification.js
+```
+- **Kết quả nghiệm thu:** **31/31 Assertions PASSED (100% PASS, 0 FAIL)**.
+- **Phạm vi kiểm tra:** Ping máy chủ & danh mục khoa phòng; Đăng nhập RBAC 7 vai trò & chặn 403 Forbidden; Điều dưỡng nhận ca & mở quầy; Đặt lịch khám trực tuyến; Kiosk sảnh tự động phân luồng Người cao tuổi (`UT-`); Bác sĩ mở bệnh án & chỉ định CLS; **Chốt chặn Lab từ chối HTTP 402 khi chưa đóng tiền**; Thu ngân thu tiền mặt & xuất biên lai; Mở khóa phòng Lab tiếp nhận mẫu & trả kết quả; Bác sĩ chẩn đoán & kê đơn thuốc; Kiểm tra tồn kho dược FEFO; Bệnh nhân tra cứu lịch sử bệnh án điện tử; Xuất chuẩn quốc tế HL7 FHIR R4 Bundle; Điều dưỡng đóng quầy an toàn.
+
+### 7.2. Chạy Unit Test Backend Spring Boot
 ```bash
 cd hospital-api
 .\mvnw.cmd test
@@ -242,14 +252,14 @@ cd hospital-api
 ```
 - Kết quả: **8/8 Tests PASSED** (0 Failures, 0 Errors).
 
-### 7.2. Kiểm tra Build Production Frontend
+### 7.3. Kiểm tra Build Production Frontend
 ```bash
 cd hospital-ui
 npm run build
 ```
-- Kết quả: Chuyển đổi 1202 modules thành công trong ~5 giây, không có lỗi cú pháp.
+- Kết quả: Chuyển đổi 1222 modules thành công trong ~5 giây (Vite v6.4.3), hoàn toàn không có lỗi cú pháp hoặc bundling.
 
-### 7.3. Chạy Bộ Kiểm thử Toàn diện Hệ thống (Master E2E System Audit)
+### 7.4. Chạy Bộ Kiểm thử Toàn diện Hệ thống (Master E2E System Audit)
 Tại thư mục gốc dự án (yêu cầu Backend đang mở tại cổng 8080):
 ```bash
 node test_master_system_audit.js
@@ -257,7 +267,7 @@ node test_master_system_audit.js
 - Kiểm tra toàn bộ 9 phân hệ xuyên suốt: Auth, Patient Profile, Phòng khám, Lịch trực, Đặt hẹn, Kiosk sảnh, Bàn khám bác sĩ, Lab xét nghiệm, Nội trú, AI Chat và Thanh toán VNPay.
 - Kết quả: **32/32 Assertions PASSED (100%)**.
 
-### 7.4. Kiểm thử Tải Đồng thời & Chống Race Condition (Concurrency Test)
+### 7.5. Kiểm thử Tải Đồng thời & Chống Race Condition (Concurrency Test)
 ```bash
 node test_load_concurrency.js
 ```
@@ -364,6 +374,42 @@ hospital-management-system/
 3. **Tuân thủ quy định dữ liệu y tế:** Không sử dụng danh tính và bệnh án thật của bệnh nhân cho mục đích thử nghiệm hoặc demo công khai.
 4. **Bảo vệ Cổng thanh toán:** Trước khi Go-Live, thay thế thông tin tài khoản VNPay Sandbox bằng tài khoản Merchant thật được đối tác ngân hàng cấp và ký hợp đồng.
 5. **Duy trì lịch sao lưu:** Định kỳ kiểm tra file backup trong thư mục `./backups` và chạy thử quy trình khôi phục định kỳ mỗi quý một lần.
+
+---
+ 
+## 12. HƯỚNG DẪN TRIỂN KHAI TRỰC TUYẾN (ONLINE DEPLOYMENT)
+
+Hệ thống được thiết kế tối ưu để triển khai trực tuyến trên máy chủ VPS (Cloud/On-Premise) hoặc các nền tảng PaaS hiện đại.
+
+### 12.1. Phương án Khuyên dùng: VPS Linux (Ubuntu 22.04 / 24.04 LTS) + Docker Compose
+1. **Chuẩn bị máy chủ:**
+   - Cấu hình đề xuất: 2 vCPU, 4GB RAM, 40GB SSD NVMe (Vietnix, TinoHost, Viettel Cloud, Hetzner, Vultr,...).
+   - Cài đặt Docker Engine & Docker Compose Plugin:
+     ```bash
+     curl -fsSL https://get.docker.com | sh
+     sudo usermod -aG docker $USER
+     ```
+2. **Kéo mã nguồn và cấu hình môi trường:**
+   ```bash
+   git clone https://github.com/tmonster37/kmahos.git /opt/hospital-system
+   cd /opt/hospital-system
+   cp .env.example .env
+   # Điền thông tin biến môi trường: JWT_SECRET, SPRING_DATASOURCE_URL, CORS_ALLOWED_ORIGINS
+   ```
+3. **Khởi chạy toàn bộ hệ thống bằng 1 lệnh duy nhất:**
+   ```bash
+   docker compose up -d --build
+   ```
+   *Hệ thống tự động kích hoạt 5 dịch vụ container: Nginx Web (Port 3000), Spring Boot API (Port 8080), PostgreSQL 16 (Port 5432), pgAdmin Quản lý CSDL (Port 5050), và Cronjob Auto Backup lúc 02:00 sáng.*
+
+4. **Cấu hình Tên miền & SSL HTTPS:**
+   - Trỏ DNS tên miền chính thức về IP VPS thông qua **Cloudflare**.
+   - Bật Proxy Cloudflare (Đám mây màu cam) để tự động nhận chứng chỉ HTTPS chuẩn, kích hoạt tường lửa chống DDoS và bật giao thức HTTP/2.
+
+### 12.2. Phương án PaaS / Cloud Serverless (Thử nghiệm & Báo cáo đồ án)
+- **Frontend (hospital-ui):** Triển khai lên **Vercel** hoặc **Cloudflare Pages** (Build: `npm run build`, Output: `dist`, biến `VITE_API_URL`).
+- **Backend (hospital-api):** Triển khai lên **Railway.app** hoặc **Render.com** (Tự động nhận diện Dockerfile Eclipse Temurin 21).
+- **PostgreSQL Database:** Sử dụng dịch vụ cơ sở dữ liệu đám mây **Neon.tech** hoặc **Supabase**.
 
 ---
 *Dự án phát triển phục vụ công tác chuyển đổi số y tế và quản lý bệnh viện thông minh.*

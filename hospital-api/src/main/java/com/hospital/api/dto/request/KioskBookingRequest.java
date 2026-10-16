@@ -13,6 +13,8 @@ public record KioskBookingRequest(
         @NotNull(message = "Vui lòng chọn chuyên khoa khám")
         Integer departmentId,
 
+        Integer birthYear,
+
         Boolean isPriority,
 
         String priorityReason,

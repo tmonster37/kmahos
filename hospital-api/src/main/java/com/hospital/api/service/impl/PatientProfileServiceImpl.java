@@ -38,6 +38,21 @@ public class PatientProfileServiceImpl implements PatientProfileService {
     }
 
     @Override
+    public PatientProfileResponse getProfileById(UUID accountId, UUID profileId, boolean isStaff) {
+        PatientProfile profile = patientProfileRepository.findById(profileId)
+                .filter(p -> !p.isDeleted())
+                .orElseThrow(() -> new AppException("Không tìm thấy hồ sơ bệnh nhân", HttpStatus.NOT_FOUND));
+
+        if (!isStaff) {
+            if (profile.getAccount() == null || !profile.getAccount().getUserId().equals(accountId)) {
+                throw new AppException("Bạn không có quyền truy cập hồ sơ bệnh nhân của tài khoản khác", HttpStatus.FORBIDDEN);
+            }
+        }
+
+        return PatientProfileResponse.fromEntity(profile);
+    }
+
+    @Override
     @Transactional
     public PatientProfileResponse createProfile(UUID accountId, PatientProfileRequest request) {
         Account account = accountRepository.findById(accountId)
@@ -63,9 +78,13 @@ public class PatientProfileServiceImpl implements PatientProfileService {
     @Override
     @Transactional
     public PatientProfileResponse updateProfile(UUID accountId, UUID profileId, PatientProfileRequest request) {
-        PatientProfile profile = patientProfileRepository
-                .findByPatientProfileIdAndAccount_UserIdAndDeletedFalse(profileId, accountId)
-                .orElseThrow(() -> new AppException("Không tìm thấy hồ sơ hoặc bạn không có quyền sửa", HttpStatus.NOT_FOUND));
+        PatientProfile profile = patientProfileRepository.findById(profileId)
+                .filter(p -> !p.isDeleted())
+                .orElseThrow(() -> new AppException("Không tìm thấy hồ sơ bệnh nhân", HttpStatus.NOT_FOUND));
+
+        if (profile.getAccount() == null || !profile.getAccount().getUserId().equals(accountId)) {
+            throw new AppException("Bạn không có quyền sửa hồ sơ bệnh nhân của tài khoản khác", HttpStatus.FORBIDDEN);
+        }
 
         profile.setFullName(request.fullName());
         profile.setPhoneNumber(request.phoneNumber());
@@ -84,9 +103,13 @@ public class PatientProfileServiceImpl implements PatientProfileService {
     @Override
     @Transactional
     public void deleteProfile(UUID accountId, UUID profileId) {
-        PatientProfile profile = patientProfileRepository
-                .findByPatientProfileIdAndAccount_UserIdAndDeletedFalse(profileId, accountId)
-                .orElseThrow(() -> new AppException("Không tìm thấy hồ sơ", HttpStatus.NOT_FOUND));
+        PatientProfile profile = patientProfileRepository.findById(profileId)
+                .filter(p -> !p.isDeleted())
+                .orElseThrow(() -> new AppException("Không tìm thấy hồ sơ bệnh nhân", HttpStatus.NOT_FOUND));
+
+        if (profile.getAccount() == null || !profile.getAccount().getUserId().equals(accountId)) {
+            throw new AppException("Bạn không có quyền xóa hồ sơ bệnh nhân của tài khoản khác", HttpStatus.FORBIDDEN);
+        }
 
         profile.setDeleted(true);
         patientProfileRepository.save(profile);

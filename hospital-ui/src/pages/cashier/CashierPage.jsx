@@ -46,58 +46,6 @@ import axiosInstance from "../../services/AxiosInstance";
 import { formatCurrency, formatDateTime } from "../../utils/formatters";
 import { printReceipt } from "../../utils/printHelper";
 
-const FALLBACK_PENDING_BILLS = [
-    {
-        billId: "BILL-20261003-001",
-        patientName: "Trần Minh Quân",
-        phoneNumber: "0918273645",
-        identityNumber: "001095003456",
-        departmentName: "Khoa Khám Bệnh Đa Khoa",
-        doctorName: "BS. CKI Trần Đình Trọng",
-        billType: "EXAM_AND_TESTS",
-        createdAt: new Date().toISOString(),
-        items: [
-            { name: "Khám chuyên khoa Tim mạch", qty: 1, price: 200000, category: "EXAM" },
-            { name: "Chụp X-Quang ngực thẳng kỹ thuật số", qty: 1, price: 180000, category: "TEST" },
-            { name: "Xét nghiệm Tổng phân tích tế bào máu", qty: 1, price: 150000, category: "TEST" }
-        ],
-        totalAmount: 530000,
-        status: "UNPAID"
-    },
-    {
-        billId: "BILL-20261003-002",
-        patientName: "Phạm Thị Thu Trang",
-        phoneNumber: "0983123456",
-        identityNumber: "001198007890",
-        departmentName: "Khoa Tai Mũi Họng",
-        doctorName: "BS. CKII Lê Hoàng Mai",
-        billType: "PRESCRIPTION",
-        createdAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-        items: [
-            { name: "Kháng sinh Amoxicillin 500mg (20 viên)", qty: 20, price: 3500, category: "MEDICINE" },
-            { name: "Decolgen Forte giảm đau hạ sốt (10 viên)", qty: 10, price: 2500, category: "MEDICINE" },
-            { name: "Vitamin C 500mg tăng đề kháng (10 viên)", qty: 10, price: 2000, category: "MEDICINE" }
-        ],
-        totalAmount: 115000,
-        status: "UNPAID"
-    },
-    {
-        billId: "BILL-20261003-003",
-        patientName: "Nguyễn Văn Hùng",
-        phoneNumber: "0905123987",
-        identityNumber: "001080001122",
-        departmentName: "Khoa Ngoại Tổng Hợp",
-        doctorName: "PGS. TS Nguyễn Văn Minh",
-        billType: "INPATIENT_DEPOSIT",
-        createdAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
-        items: [
-            { name: "Tạm ứng viện phí điều trị nội trú (Phòng 301)", qty: 1, price: 2000000, category: "INPATIENT" }
-        ],
-        totalAmount: 2000000,
-        status: "UNPAID"
-    }
-];
-
 export default function CashierPage() {
     const [searchKeyword, setSearchKeyword] = useState("");
     const [pendingBills, setPendingBills] = useState([]);
@@ -105,21 +53,28 @@ export default function CashierPage() {
     const [selectedBill, setSelectedBill] = useState(null);
     const [activeTab, setActiveTab] = useState(0); // 0: Chờ thanh toán, 1: Lịch sử đã thu
     const [loading, setLoading] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+    const [errorMessage, setErrorMessage] = useState("");
+    const [pageError, setPageError] = useState("");
 
     // Payment Processing States
     const [openPaymentModal, setOpenPaymentModal] = useState(false);
-    const [paymentMethod, setPaymentMethod] = useState("CASH"); // CASH, POS, QR
+    const [paymentMethod, setPaymentMethod] = useState("CASH"); // CASH, QR (PayOS)
     const [cashGiven, setCashGiven] = useState("");
     const [paymentSuccess, setPaymentSuccess] = useState(false);
     const [receiptData, setReceiptData] = useState(null);
 
     // Stats
     const [shiftStats, setShiftStats] = useState({
-        totalCollected: 12500000,
-        cashTotal: 4800000,
-        digitalTotal: 7700000,
-        transactionCount: 18
+        totalCollected: 0,
+        cashTotal: 0,
+        digitalTotal: 0,
+        transactionCount: 0,
+        hasError: false
     });
+
+    const [historyError, setHistoryError] = useState("");
+    const [pendingError, setPendingError] = useState("");
 
     useEffect(() => {
         loadData();
@@ -127,142 +82,150 @@ export default function CashierPage() {
 
     const loadData = async () => {
         setLoading(true);
+        setPageError("");
+        setHistoryError("");
+        setPendingError("");
+
+        // 1. Tải danh sách chờ thu tiền
         try {
-            const [txnRes, queueRes] = await Promise.all([
-                axiosInstance.get("/api/payment/admin/transactions").catch(() => ({ data: [] })),
-                axiosInstance.get("/api/clinical/queue/public").catch(() => ({ data: [] }))
-            ]);
-
-            const txList = (txnRes && Array.isArray(txnRes.data)) ? txnRes.data : [];
-            const queueList = (queueRes && Array.isArray(queueRes.data)) ? queueRes.data : [];
-
-            // 1. Cập nhật lịch sử giao dịch đã thu
-            if (txList.length > 0) {
-                const formattedPaid = txList.map(tx => ({
-                    receiptCode: tx.transactionId || tx.vnpayTxnRef || `RC-${Math.floor(100000 + Math.random() * 900000)}`,
-                    patientName: tx.accountName || "Khách hàng YouMed TNT",
-                    phoneNumber: tx.phoneNumber || "---",
-                    totalAmount: Number(tx.amount) || 0,
-                    paymentMethod: tx.paymentChannel?.includes("CASH") ? "CASH" : tx.paymentChannel?.includes("POS") ? "POS" : "QR",
-                    paidAt: tx.createdAt || new Date().toISOString(),
-                    cashierName: tx.bankCode || "Hệ thống / Thu ngân quầy",
-                    status: tx.status || "SUCCESS"
-                }));
-                setPaidHistory(formattedPaid);
-
-                // Thống kê
-                const total = formattedPaid.reduce((acc, cur) => acc + cur.totalAmount, 0);
-                const cash = formattedPaid.filter(p => p.paymentMethod === "CASH").reduce((acc, cur) => acc + cur.totalAmount, 0);
-                setShiftStats({
-                    totalCollected: total,
-                    cashTotal: cash,
-                    digitalTotal: total - cash,
-                    transactionCount: formattedPaid.length
-                });
-            } else {
-                setPaidHistory([
-                    {
-                        receiptCode: "RC-882101",
-                        patientName: "Trần Minh Quân",
-                        phoneNumber: "0918273645",
-                        totalAmount: 530000,
-                        paymentMethod: "QR",
-                        paidAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
-                        cashierName: "Nguyễn Thu Hà",
-                        status: "SUCCESS"
-                    },
-                    {
-                        receiptCode: "RC-882102",
-                        patientName: "Hoàng Anh Đức",
-                        phoneNumber: "0977889900",
-                        totalAmount: 350000,
-                        paymentMethod: "CASH",
-                        paidAt: new Date(Date.now() - 120 * 60 * 1000).toISOString(),
-                        cashierName: "Nguyễn Thu Hà",
-                        status: "SUCCESS"
-                    }
-                ]);
-            }
-
-            // 2. Cập nhật danh sách chờ thu tiền (kết hợp hàng đợi khám thực tế)
-            if (queueList.length > 0) {
-                const dynamicBills = queueList.map((q, idx) => ({
-                    billId: `BILL-${q.bookingCode || `BK-${1000 + idx}`}`,
-                    patientName: q.patientName,
-                    phoneNumber: q.phoneNumber || "09" + Math.floor(10000000 + Math.random() * 90000000),
-                    identityNumber: "001" + Math.floor(100000000 + Math.random() * 900000000),
-                    departmentName: q.departmentName || "Khoa Khám Bệnh",
-                    doctorName: q.doctorName || "Bác sĩ phụ trách",
-                    billType: "EXAM_AND_TESTS",
-                    createdAt: q.checkInTime || new Date().toISOString(),
-                    items: [
-                        { name: `Phiếu khám ${q.departmentName || "Chuyên khoa"}`, qty: 1, price: 150000, category: "EXAM" },
-                        { name: "Chỉ định xét nghiệm / Cận lâm sàng ban đầu", qty: 1, price: 200000, category: "TEST" }
-                    ],
-                    totalAmount: 350000,
-                    status: "UNPAID"
-                }));
-                setPendingBills(dynamicBills);
-            } else {
-                setPendingBills(FALLBACK_PENDING_BILLS);
-            }
+            const pendingRes = await axiosInstance.get("/api/cashier/pending-bills");
+            const bills = pendingRes.data?.data || pendingRes.data || [];
+            setPendingBills(Array.isArray(bills) ? bills : []);
         } catch (err) {
-            console.error("Lỗi tải danh sách viện phí:", err);
-            setPendingBills(FALLBACK_PENDING_BILLS);
+            console.error("Lỗi tải danh sách chờ thu tiền:", err);
+            const msg = err.message || err.response?.data?.message || "Không thể kết nối máy chủ để tải danh sách viện phí chờ thu.";
+            setPendingError(msg);
+            // Giữ nguyên pendingBills hiện có, không xóa rỗng khi refresh lỗi
+        }
+
+        // 2. Tải lịch sử giao dịch thu ngân
+        try {
+            const historyRes = await axiosInstance.get("/api/cashier/history");
+            const history = historyRes.data?.data || historyRes.data || [];
+            const formattedHistory = Array.isArray(history) ? history : [];
+            setPaidHistory(formattedHistory);
+
+            // Cập nhật thống kê ca trực khi lịch sử tải thành công
+            const total = formattedHistory.reduce((acc, cur) => acc + (Number(cur.totalAmount) || 0), 0);
+            const cash = formattedHistory
+                .filter(p => p.paymentMethod === "CASH" || p.paymentMethod === "COUNTER_CASH")
+                .reduce((acc, cur) => acc + (Number(cur.totalAmount) || 0), 0);
+
+            setShiftStats({
+                totalCollected: total,
+                cashTotal: cash,
+                digitalTotal: total - cash,
+                transactionCount: formattedHistory.length,
+                hasError: false
+            });
+        } catch (err) {
+            console.error("Lỗi tải lịch sử giao dịch:", err);
+            const msg = err.message || err.response?.data?.message || "Không thể tải lịch sử giao dịch từ máy chủ.";
+            setHistoryError(msg);
+            // Giữ nguyên paidHistory hiện có, đánh dấu hasError để không hiển thị số liệu 0 VNĐ gây hiểu nhầm
+            setShiftStats(prev => ({
+                ...prev,
+                hasError: true
+            }));
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleRetryHistory = async () => {
+        setHistoryError("");
+        try {
+            const historyRes = await axiosInstance.get("/api/cashier/history");
+            const history = historyRes.data?.data || historyRes.data || [];
+            const formattedHistory = Array.isArray(history) ? history : [];
+            setPaidHistory(formattedHistory);
+
+            const total = formattedHistory.reduce((acc, cur) => acc + (Number(cur.totalAmount) || 0), 0);
+            const cash = formattedHistory
+                .filter(p => p.paymentMethod === "CASH" || p.paymentMethod === "COUNTER_CASH")
+                .reduce((acc, cur) => acc + (Number(cur.totalAmount) || 0), 0);
+
+            setShiftStats({
+                totalCollected: total,
+                cashTotal: cash,
+                digitalTotal: total - cash,
+                transactionCount: formattedHistory.length,
+                hasError: false
+            });
+        } catch (err) {
+            const msg = err.message || err.response?.data?.message || "Tải lại lịch sử thất bại.";
+            setHistoryError(msg);
         }
     };
 
     const handleOpenPayment = (bill) => {
         setSelectedBill(bill);
         setPaymentMethod("CASH");
-        setCashGiven(String(bill.totalAmount));
+        setCashGiven(String(bill.totalAmount || 0));
         setPaymentSuccess(false);
         setReceiptData(null);
+        setErrorMessage("");
         setOpenPaymentModal(true);
     };
 
-    const handleConfirmPayment = () => {
+    const handleConfirmPayment = async () => {
         if (!selectedBill) return;
 
-        const receipt = {
-            receiptCode: "RC-" + Math.floor(100000 + Math.random() * 900000),
-            billId: selectedBill.billId,
-            patientName: selectedBill.patientName,
-            phoneNumber: selectedBill.phoneNumber,
-            identityNumber: selectedBill.identityNumber,
-            departmentName: selectedBill.departmentName,
-            doctorName: selectedBill.doctorName,
-            items: selectedBill.items,
-            totalAmount: selectedBill.totalAmount,
-            paymentMethod: paymentMethod,
-            cashGiven: paymentMethod === "CASH" ? Number(cashGiven) : selectedBill.totalAmount,
-            cashChange: paymentMethod === "CASH" ? Math.max(0, Number(cashGiven) - selectedBill.totalAmount) : 0,
-            paidAt: new Date().toISOString(),
-            cashierName: "Nguyễn Thu Hà (Quầy Thu Ngân 01)"
+        setSubmitting(true);
+        setErrorMessage("");
+
+        try {
+            const methodToSend = paymentMethod === "QR" ? "VIETQR" : paymentMethod;
+            const targetBookingCode = selectedBill.billId || selectedBill.bookingCode;
+
+            const res = await axiosInstance.post("/api/cashier/pay", {
+                bookingCode: targetBookingCode,
+                paymentMethod: methodToSend,
+                amountGiven: paymentMethod === "CASH" ? Number(cashGiven) : Number(selectedBill.totalAmount),
+                notes: `Thu viện phí tại quầy cho ${targetBookingCode} qua ${methodToSend}`
+            });
+
+            const receipt = res.data?.data || res.data;
+            setReceiptData(receipt);
+            setPaymentSuccess(true);
+
+            // Tải lại danh sách chờ thu và lịch sử thật từ backend để đồng bộ
+            await loadData();
+        } catch (err) {
+            console.error("Lỗi xác nhận thu tiền viện phí:", err);
+            const status = err.status || err.statusCode || err.response?.status;
+            let msg = err.message || err.response?.data?.message || err.response?.data?.error;
+            if (status === 409) {
+                msg = `[XUNG ĐỘT - HTTP 409] ${msg || "Khoản viện phí cho ca khám này đã được ghi nhận thanh toán trước đó!"}`;
+            } else if (!msg) {
+                msg = "Giao dịch thất bại. Vui lòng kiểm tra lại trạng thái ca khám.";
+            }
+            setErrorMessage(msg);
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handlePrintReceipt = (receipt) => {
+        if (!receipt) return;
+        const mapped = {
+            ...receipt,
+            items: receipt.items && receipt.items.length > 0
+                ? receipt.items.map(it => ({
+                    name: it.name,
+                    qty: it.quantity || it.qty || 1,
+                    price: it.unitPrice || it.price || it.totalPrice || 0
+                }))
+                : [{ name: "Thanh toán viện phí", qty: 1, price: receipt.totalAmount || 0 }]
         };
-
-        setReceiptData(receipt);
-        setPaymentSuccess(true);
-
-        // Chuyển phiếu sang danh sách đã thu
-        setPendingBills(prev => prev.filter(b => b.billId !== selectedBill.billId));
-        setPaidHistory(prev => [receipt, ...prev]);
-
-        // Cập nhật thống kê ca trực
-        setShiftStats(prev => ({
-            totalCollected: prev.totalCollected + selectedBill.totalAmount,
-            cashTotal: paymentMethod === "CASH" ? prev.cashTotal + selectedBill.totalAmount : prev.cashTotal,
-            digitalTotal: paymentMethod !== "CASH" ? prev.digitalTotal + selectedBill.totalAmount : prev.digitalTotal,
-            transactionCount: prev.transactionCount + 1
-        }));
+        printReceipt(mapped);
     };
 
     const filteredPending = pendingBills.filter(b =>
         b.patientName?.toLowerCase().includes(searchKeyword.toLowerCase()) ||
         b.phoneNumber?.includes(searchKeyword) ||
-        b.billId?.toLowerCase().includes(searchKeyword.toLowerCase())
+        b.billId?.toLowerCase().includes(searchKeyword.toLowerCase()) ||
+        b.bookingCode?.toLowerCase().includes(searchKeyword.toLowerCase())
     );
 
     const cashChange = Number(cashGiven) >= (selectedBill?.totalAmount || 0)
@@ -315,13 +278,25 @@ export default function CashierPage() {
                 </Box>
             </Paper>
 
+            {pageError && (
+                <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
+                    {pageError}
+                </Alert>
+            )}
+
+            {pendingError && (
+                <Alert severity="warning" sx={{ mb: 3, borderRadius: 2 }}>
+                    {pendingError}
+                </Alert>
+            )}
+
             {/* Thẻ Thống Kê Ca Trực Thu Ngân */}
             <Grid container spacing={2.5} mb={3}>
                 <Grid item xs={12} sm={6} md={3}>
                     <Paper elevation={0} sx={{ p: 2, borderRadius: 3, border: "1px solid #E2E8F0", borderLeft: "5px solid #0088D6", boxShadow: "0 2px 10px rgba(0,0,0,0.03)" }}>
                         <Typography variant="caption" color="text.secondary" fontWeight="bold" sx={{ whiteSpace: "nowrap", display: "block" }}>TỔNG THU TRONG CA</Typography>
                         <Typography variant="h6" fontWeight="bold" color="#0088D6" mt={0.5} sx={{ whiteSpace: "nowrap", fontSize: "1.2rem" }}>
-                            {formatCurrency(shiftStats.totalCollected)}
+                            {shiftStats.hasError ? "-- (Chưa xác định)" : formatCurrency(shiftStats.totalCollected)}
                         </Typography>
                     </Paper>
                 </Grid>
@@ -329,7 +304,7 @@ export default function CashierPage() {
                     <Paper elevation={0} sx={{ p: 2, borderRadius: 3, border: "1px solid #E2E8F0", borderLeft: "5px solid #16A34A", boxShadow: "0 2px 10px rgba(0,0,0,0.03)" }}>
                         <Typography variant="caption" color="text.secondary" fontWeight="bold" sx={{ whiteSpace: "nowrap", display: "block" }}>TIỀN MẶT TẠI KÉT</Typography>
                         <Typography variant="h6" fontWeight="bold" color="#16A34A" mt={0.5} sx={{ whiteSpace: "nowrap", fontSize: "1.2rem" }}>
-                            {formatCurrency(shiftStats.cashTotal)}
+                            {shiftStats.hasError ? "-- (Chưa xác định)" : formatCurrency(shiftStats.cashTotal)}
                         </Typography>
                     </Paper>
                 </Grid>
@@ -337,7 +312,7 @@ export default function CashierPage() {
                     <Paper elevation={0} sx={{ p: 2, borderRadius: 3, border: "1px solid #E2E8F0", borderLeft: "5px solid #0284C7", boxShadow: "0 2px 10px rgba(0,0,0,0.03)" }}>
                         <Typography variant="caption" color="text.secondary" fontWeight="bold" sx={{ whiteSpace: "nowrap", display: "block" }}>QUẸT THẺ POS & VIETQR</Typography>
                         <Typography variant="h6" fontWeight="bold" color="#0284C7" mt={0.5} sx={{ whiteSpace: "nowrap", fontSize: "1.2rem" }}>
-                            {formatCurrency(shiftStats.digitalTotal)}
+                            {shiftStats.hasError ? "-- (Chưa xác định)" : formatCurrency(shiftStats.digitalTotal)}
                         </Typography>
                     </Paper>
                 </Grid>
@@ -345,7 +320,7 @@ export default function CashierPage() {
                     <Paper elevation={0} sx={{ p: 2, borderRadius: 3, border: "1px solid #E2E8F0", borderLeft: "5px solid #EA580C", boxShadow: "0 2px 10px rgba(0,0,0,0.03)" }}>
                         <Typography variant="caption" color="text.secondary" fontWeight="bold" sx={{ whiteSpace: "nowrap", display: "block" }}>SỐ LƯỢT GIAO DỊCH</Typography>
                         <Typography variant="h6" fontWeight="bold" color="#EA580C" mt={0.5} sx={{ whiteSpace: "nowrap", fontSize: "1.2rem" }}>
-                            {shiftStats.transactionCount} lượt
+                            {shiftStats.hasError ? "--" : `${shiftStats.transactionCount} lượt`}
                         </Typography>
                     </Paper>
                 </Grid>
@@ -411,13 +386,20 @@ export default function CashierPage() {
                                             </Typography>
                                             <Chip
                                                 label={
+                                                    bill.billId?.endsWith("-EXAM") ? "HĐ 01: Công khám ban đầu" :
+                                                    bill.billId?.endsWith("-TREATMENT") ? "HĐ 02: CLS & Thuốc phát sinh" :
+                                                    bill.billType === "ALL" ? "Khám, CLS & Thuốc" :
                                                     bill.billType === "EXAM_AND_TESTS" ? "Khám & Xét nghiệm" :
-                                                    bill.billType === "PRESCRIPTION" ? "Đơn thuốc" : "Tạm ứng nội trú"
+                                                    bill.billType === "PRESCRIPTION" ? "Đơn thuốc phát sinh" :
+                                                    bill.billType === "TEST" ? "Xét nghiệm & CĐHA" : "Công khám"
                                                 }
                                                 size="small"
                                                 color={
+                                                    bill.billId?.endsWith("-EXAM") ? "primary" :
+                                                    bill.billId?.endsWith("-TREATMENT") ? "secondary" :
+                                                    bill.billType === "ALL" ? "success" :
                                                     bill.billType === "EXAM_AND_TESTS" ? "info" :
-                                                    bill.billType === "PRESCRIPTION" ? "warning" : "secondary"
+                                                    bill.billType === "PRESCRIPTION" ? "warning" : "primary"
                                                 }
                                                 sx={{ fontWeight: "bold", fontSize: "0.75rem" }}
                                             />
@@ -446,7 +428,7 @@ export default function CashierPage() {
                                                         • {it.name}
                                                     </Typography>
                                                     <Typography variant="body2" fontWeight="bold">
-                                                        {formatCurrency(it.price * (it.qty || 1))}
+                                                        {formatCurrency(it.totalPrice || (it.price * (it.qty || it.quantity || 1)) || it.unitPrice || 0)}
                                                     </Typography>
                                                 </Box>
                                             ))}
@@ -489,64 +471,107 @@ export default function CashierPage() {
 
             {/* TAB 1: LỊCH SỬ CÁC BIÊN LAI ĐÃ THU TIỀN */}
             {activeTab === 1 && (
-                <TableContainer component={Paper} elevation={2} sx={{ borderRadius: 3 }}>
-                    <Table>
-                        <TableHead sx={{ bgcolor: "#F8FAFC" }}>
-                            <TableRow>
-                                <TableCell><b>Mã biên lai</b></TableCell>
-                                <TableCell><b>Bệnh nhân</b></TableCell>
-                                <TableCell><b>Số tiền thu</b></TableCell>
-                                <TableCell><b>Hình thức thanh toán</b></TableCell>
-                                <TableCell><b>Thời gian thu</b></TableCell>
-                                <TableCell><b>Thu ngân / Kênh thu</b></TableCell>
-                                <TableCell align="center"><b>Thao tác</b></TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {paidHistory.map((item, idx) => (
-                                <TableRow key={idx} hover>
-                                    <TableCell>
-                                        <Typography variant="body2" fontWeight="bold" color="primary">
-                                            {item.receiptCode || item.billId}
-                                        </Typography>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Typography variant="body2" fontWeight="bold">{item.patientName}</Typography>
-                                        <Typography variant="caption" color="text.secondary">{item.phoneNumber}</Typography>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Typography variant="body1" fontWeight="bold" color="success.main">
-                                            {formatCurrency(item.totalAmount)}
-                                        </Typography>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Chip
-                                            label={
-                                                item.paymentMethod === "CASH" ? "💵 Tiền mặt" :
-                                                item.paymentMethod === "POS" ? "💳 Quẹt thẻ POS" : "📱 VietQR"
-                                            }
-                                            size="small"
-                                            color={item.paymentMethod === "CASH" ? "default" : "primary"}
-                                        />
-                                    </TableCell>
-                                    <TableCell>{formatDateTime(item.paidAt)}</TableCell>
-                                    <TableCell>{item.cashierName || "Thu ngân ca 1"}</TableCell>
-                                    <TableCell align="center">
-                                        <Button
-                                            size="small"
-                                            variant="outlined"
-                                            startIcon={<PrintIcon />}
-                                            onClick={() => printReceipt(item)}
-                                            sx={{ borderRadius: 2 }}
-                                        >
-                                            In Lại
+                <Box>
+                    {historyError && (
+                        <Alert
+                            severity="error"
+                            action={
+                                <Button color="inherit" size="small" onClick={handleRetryHistory} startIcon={<RefreshIcon />}>
+                                    Thử Lại
+                                </Button>
+                            }
+                            sx={{ mb: 2.5, borderRadius: 2 }}
+                        >
+                            {historyError}
+                        </Alert>
+                    )}
+
+                    {loading ? (
+                        <Box textAlign="center" py={6}>
+                            <CircularProgress size={32} />
+                        </Box>
+                    ) : paidHistory.length === 0 ? (
+                        <Paper sx={{ p: 5, textAlign: "center", borderRadius: 3 }}>
+                            {historyError ? (
+                                <Box>
+                                    <Alert severity="error" sx={{ mb: 2, display: "inline-flex" }}>
+                                        Không thể tải dữ liệu lịch sử từ máy chủ. Vui lòng bấm "Thử Lại" để kết nối lại.
+                                    </Alert>
+                                    <Box mt={1}>
+                                        <Button variant="outlined" onClick={handleRetryHistory} startIcon={<RefreshIcon />}>
+                                            Thử Lại Tải Lịch Sử
                                         </Button>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
+                                    </Box>
+                                </Box>
+                            ) : (
+                                <Box>
+                                    <ReceiptLongIcon sx={{ fontSize: 48, color: "text.secondary", mb: 1 }} />
+                                    <Typography variant="h6" color="text.secondary">
+                                        Chưa có biên lai viện phí nào được thu trong ca làm việc này.
+                                    </Typography>
+                                </Box>
+                            )}
+                        </Paper>
+                    ) : (
+                        <TableContainer component={Paper} elevation={2} sx={{ borderRadius: 3 }}>
+                            <Table>
+                                <TableHead sx={{ bgcolor: "#F8FAFC" }}>
+                                    <TableRow>
+                                        <TableCell><b>Mã biên lai</b></TableCell>
+                                        <TableCell><b>Bệnh nhân</b></TableCell>
+                                        <TableCell><b>Số tiền thu</b></TableCell>
+                                        <TableCell><b>Hình thức thanh toán</b></TableCell>
+                                        <TableCell><b>Thời gian thu</b></TableCell>
+                                        <TableCell><b>Thu ngân / Kênh thu</b></TableCell>
+                                        <TableCell align="center"><b>Thao tác</b></TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {paidHistory.map((item, idx) => (
+                                        <TableRow key={idx} hover>
+                                            <TableCell>
+                                                <Typography variant="body2" fontWeight="bold" color="primary">
+                                                    {item.receiptCode || item.billId}
+                                                </Typography>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Typography variant="body2" fontWeight="bold">{item.patientName}</Typography>
+                                                <Typography variant="caption" color="text.secondary">{item.phoneNumber}</Typography>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Typography variant="body1" fontWeight="bold" color="success.main">
+                                                    {formatCurrency(item.totalAmount)}
+                                                </Typography>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Chip
+                                                    label={
+                                                        item.paymentMethod === "CASH" ? "💵 Tiền mặt" : "📱 Cổng PayOS"
+                                                    }
+                                                    size="small"
+                                                    color={item.paymentMethod === "CASH" ? "default" : "primary"}
+                                                />
+                                            </TableCell>
+                                            <TableCell>{formatDateTime(item.paidAt)}</TableCell>
+                                            <TableCell>{item.cashierName || "Thu ngân ca 1"}</TableCell>
+                                            <TableCell align="center">
+                                                <Button
+                                                    size="small"
+                                                    variant="outlined"
+                                                    startIcon={<PrintIcon />}
+                                                    onClick={() => handlePrintReceipt(item)}
+                                                    sx={{ borderRadius: 2 }}
+                                                >
+                                                    In Lại
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    )}
+                </Box>
             )}
 
             {/* MODAL THU TIỀN & IN BIÊN LAI */}
@@ -568,7 +593,7 @@ export default function CashierPage() {
                             <Paper variant="outlined" sx={{ p: 2.5, textAlign: "left", bgcolor: "#F8FAFC", borderRadius: 2, mb: 2 }}>
                                 <Typography variant="subtitle2" fontWeight="bold" color="primary">Mã biên lai: {receiptData.receiptCode}</Typography>
                                 <Typography variant="body2">Bệnh nhân: <b>{receiptData.patientName}</b> ({receiptData.phoneNumber})</Typography>
-                                <Typography variant="body2">Hình thức: <b>{receiptData.paymentMethod === "CASH" ? "Tiền mặt" : receiptData.paymentMethod === "POS" ? "Quẹt thẻ POS" : "VietQR"}</b></Typography>
+                                <Typography variant="body2">Hình thức: <b>{receiptData.paymentMethod === "CASH" ? "Tiền mặt" : "Cổng PayOS (VietQR)"}</b></Typography>
                                 <Divider sx={{ my: 1 }} />
                                 <Box display="flex" justifyContent="space-between">
                                     <Typography variant="body2">Tổng số tiền đã thu:</Typography>
@@ -586,7 +611,7 @@ export default function CashierPage() {
                                 variant="contained"
                                 color="primary"
                                 startIcon={<PrintIcon />}
-                                onClick={() => printReceipt(receiptData)}
+                                onClick={() => handlePrintReceipt(receiptData)}
                                 sx={{ py: 1.2, px: 3, borderRadius: 2, fontWeight: "bold" }}
                             >
                                 In Biên Lai Thu Tiền
@@ -594,6 +619,11 @@ export default function CashierPage() {
                         </Box>
                     ) : (
                         <Box>
+                            {errorMessage && (
+                                <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
+                                    {errorMessage}
+                                </Alert>
+                            )}
                             {selectedBill && (
                                 <Box mb={2.5}>
                                     <Typography variant="subtitle1" fontWeight="bold" color="#0F766E">
@@ -617,9 +647,8 @@ export default function CashierPage() {
                                     </Typography>
                                     <FormControl component="fieldset" fullWidth>
                                         <RadioGroup row value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
-                                            <FormControlLabel value="CASH" control={<Radio />} label="💵 Tiền mặt" />
-                                            <FormControlLabel value="POS" control={<Radio />} label="💳 Thẻ POS" />
-                                            <FormControlLabel value="QR" control={<Radio />} label="📱 VietQR / MoMo" />
+                                            <FormControlLabel value="CASH" control={<Radio />} label="💵 Tiền mặt tại quầy" />
+                                            <FormControlLabel value="QR" control={<Radio />} label="📱 Cổng PayOS (VietQR)" />
                                         </RadioGroup>
                                     </FormControl>
 
@@ -690,9 +719,11 @@ export default function CashierPage() {
                             variant="contained"
                             color="success"
                             onClick={handleConfirmPayment}
+                            disabled={submitting}
+                            startIcon={submitting ? <CircularProgress size={18} color="inherit" /> : null}
                             sx={{ px: 3, fontWeight: "bold" }}
                         >
-                            Xác Nhận & Xuất Biên Lai
+                            {submitting ? "Đang xử lý..." : "Xác Nhận & Xuất Biên Lai"}
                         </Button>
                     )}
                 </DialogActions>

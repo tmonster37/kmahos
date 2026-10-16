@@ -1,7 +1,9 @@
 package com.hospital.api.repository;
 
 import com.hospital.api.entity.WarehouseStock;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -33,6 +35,24 @@ public interface WarehouseStockRepository extends JpaRepository<WarehouseStock, 
         ORDER BY b.expiryDate ASC, ws.quantityOnHand DESC
     """)
     List<WarehouseStock> findAvailableStockByFefo(
+            @Param("warehouseId") UUID warehouseId,
+            @Param("medicineId") Integer medicineId,
+            @Param("currentDate") LocalDate currentDate
+    );
+
+    // FEFO có khóa bi quan PESSIMISTIC_WRITE chống tranh chấp đồng thời khi xuất kho (BIZ-P1-01)
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        SELECT ws FROM WarehouseStock ws
+        JOIN ws.batch b
+        WHERE ws.warehouse.warehouseId = :warehouseId
+          AND ws.medicine.medicineId = :medicineId
+          AND (ws.quantityOnHand - ws.quantityReserved) > 0
+          AND b.expiryDate > :currentDate
+          AND b.status = com.hospital.api.constant.BatchStatus.ACTIVE
+        ORDER BY b.expiryDate ASC, ws.quantityOnHand DESC
+    """)
+    List<WarehouseStock> findAvailableStockByFefoForUpdate(
             @Param("warehouseId") UUID warehouseId,
             @Param("medicineId") Integer medicineId,
             @Param("currentDate") LocalDate currentDate

@@ -191,4 +191,50 @@ public class DoctorAdminController {
         return ResponseEntity.ok(ApiResponse.ok(DoctorAdminResponse.fromEntity(doctor),
                 isHead ? "Bổ nhiệm Trưởng khoa thành công" : "Bãi nhiệm Trưởng khoa thành công"));
     }
+
+    // 7. Cập nhật Chứng chỉ hành nghề (CCHN) cho Bác sĩ (Thông tư Bộ Y tế)
+    @PutMapping("/{doctorId}/license")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Transactional
+    public ResponseEntity<ApiResponse<com.hospital.api.dto.response.DoctorLicenseResponse>> updateDoctorLicense(
+            @PathVariable UUID doctorId,
+            @Valid @RequestBody com.hospital.api.dto.request.UpdateDoctorLicenseRequest request
+    ) {
+        Doctor doctor = doctorRepository.findById(doctorId)
+                .orElseThrow(() -> new AppException("Bác sĩ không tồn tại", HttpStatus.NOT_FOUND));
+
+        doctor.setDoctorLicense(request.doctorLicense().trim());
+        if (request.licenseIssuedDate() != null) {
+            doctor.setLicenseIssuedDate(request.licenseIssuedDate());
+        }
+        if (request.licenseScope() != null) {
+            doctor.setLicenseScope(request.licenseScope().trim());
+        }
+        doctor = doctorRepository.save(doctor);
+
+        return ResponseEntity.ok(ApiResponse.ok(
+                com.hospital.api.dto.response.DoctorLicenseResponse.fromEntity(doctor),
+                "Cập nhật chứng chỉ hành nghề cho bác sĩ thành công"
+        ));
+    }
+
+    // 8. Tra cứu danh sách chứng chỉ hành nghề của toàn bộ bác sĩ
+    @GetMapping("/licenses")
+    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_OF_DEPARTMENT')")
+    public ResponseEntity<ApiResponse<List<com.hospital.api.dto.response.DoctorLicenseResponse>>> getDoctorLicenses(
+            @RequestParam(required = false, defaultValue = "false") boolean onlyUnlicensed
+    ) {
+        List<Doctor> doctors = doctorRepository.findAllByDeletedFalse();
+        if (onlyUnlicensed) {
+            doctors = doctors.stream()
+                    .filter(d -> d.getDoctorLicense() == null || d.getDoctorLicense().isBlank())
+                    .toList();
+        }
+
+        List<com.hospital.api.dto.response.DoctorLicenseResponse> responses = doctors.stream()
+                .map(com.hospital.api.dto.response.DoctorLicenseResponse::fromEntity)
+                .toList();
+
+        return ResponseEntity.ok(ApiResponse.ok(responses, "Lấy danh sách chứng chỉ hành nghề bác sĩ thành công"));
+    }
 }

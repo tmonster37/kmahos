@@ -13,11 +13,9 @@ export function printReceipt(data) {
     const identityNumber = data.identityNumber || "---";
     const departmentName = data.departmentName || "Khoa Khám Bệnh";
     const doctorName = data.doctorName || "Bác sĩ phụ trách";
-    const paymentMethodText = data.paymentMethod === "CASH" ? "Tiền mặt" :
-                              data.paymentMethod === "POS" ? "Quẹt thẻ POS" :
-                              data.paymentMethod === "VIETQR" ? "Chuyển khoản VietQR" :
-                              data.paymentMethod === "MOMO" ? "Ví điện tử MoMo" :
-                              data.paymentMethod === "VNPAY" ? "Cổng VNPay" : "Chuyển khoản";
+    const paymentMethodText = data.paymentMethod === "CASH" ? "Tiền mặt tại quầy" :
+                              data.paymentMethod === "VIETQR" ? "Cổng PayOS (VietQR Napas 247)" :
+                              data.paymentMethod === "WALLET" ? "Ví Viện Phí Điện Tử" : "Cổng PayOS (Chuyển khoản)";
     const cashierName = data.cashierName || "Thu ngân viện phí";
     const paidAt = data.paidAt ? formatDateTime(data.paidAt) : formatDateTime(new Date().toISOString());
     const totalAmount = Number(data.totalAmount || data.amount || 0);

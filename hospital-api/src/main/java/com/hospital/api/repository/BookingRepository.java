@@ -18,11 +18,21 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     
     Optional<Booking> findByBookingCode(String bookingCode);
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT b FROM Booking b WHERE b.bookingCode = :bookingCode")
+    Optional<Booking> findByBookingCodeForUpdate(@Param("bookingCode") String bookingCode);
+
     List<Booking> findAllByDoctor_Account_UserIdAndBookingDateAndDeletedFalseOrderByIsPriorityDescQueueNumberAsc(UUID doctorUserId, LocalDate bookingDate);
     
     List<Booking> findAllByDoctor_DoctorIdAndBookingDateAndDeletedFalseOrderByIsPriorityDescQueueNumberAsc(UUID doctorId, LocalDate bookingDate);
 
     List<Booking> findAllByBookingDateAndDeletedFalseOrderByIsPriorityDescQueueNumberAsc(LocalDate bookingDate);
+
+    List<Booking> findAllByDeletedFalseOrderByCreatedAtDesc();
+
+    List<Booking> findAllByDoctor_Department_DepartmentIdAndBookingDateAndDeletedFalseOrderByIsPriorityDescQueueNumberAsc(Integer departmentId, LocalDate bookingDate);
+
+    List<Booking> findAllByPatientProfile_PhoneNumberAndBookingDateAndDeletedFalse(String phoneNumber, LocalDate bookingDate);
 }
 
 

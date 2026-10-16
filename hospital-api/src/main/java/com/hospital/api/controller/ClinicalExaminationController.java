@@ -143,10 +143,43 @@ public class ClinicalExaminationController {
                 .body(ApiResponse.ok(clinicalService.createPrescription(recordId, request), "Kê toa thuốc thành công"));
     }
 
-    // 9. Tra cứu chi tiết hồ sơ bệnh án
+    // 8.1. Kiểm tra an toàn dược lý & dị ứng chéo (Clinical Decision Support - CDS)
+    @PostMapping({"/records/{recordId}/prescriptions/check-safety", "/records/{recordId}/prescription/check-safety"})
+    @PreAuthorize("hasAnyRole('DOCTOR', 'HEAD_OF_DEPARTMENT', 'ADMIN')")
+    public ResponseEntity<ApiResponse<DrugSafetyCheckResponse>> checkPrescriptionSafety(
+            @PathVariable UUID recordId,
+            @Valid @RequestBody CheckPrescriptionSafetyRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                clinicalService.checkPrescriptionSafety(recordId, request),
+                "Kiểm tra an toàn đơn thuốc lâm sàng thành công"
+        ));
+    }
+
+    private boolean checkIsStaff(UserPrincipal userPrincipal) {
+        return userPrincipal != null && userPrincipal.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().contains("ADMIN") ||
+                               a.getAuthority().contains("DOCTOR") ||
+                               a.getAuthority().contains("HEAD_OF_DEPARTMENT") ||
+                               a.getAuthority().contains("NURSE") ||
+                               a.getAuthority().contains("CASHIER") ||
+                               a.getAuthority().contains("PHARMACIST") ||
+                               a.getAuthority().contains("LAB_TECHNICIAN") ||
+                               a.getAuthority().contains("STAFF"));
+    }
+
+    // 9. Tra cứu chi tiết hồ sơ bệnh án (Bảo vệ chống IDOR)
     @GetMapping("/records/{recordId}")
-    public ResponseEntity<ApiResponse<MedicalRecordResponse>> getRecordById(@PathVariable UUID recordId) {
-        return ResponseEntity.ok(ApiResponse.ok(clinicalService.getRecordById(recordId), "Lấy thông tin hồ sơ khám bệnh thành công"));
+    public ResponseEntity<ApiResponse<MedicalRecordResponse>> getRecordById(
+            @PathVariable UUID recordId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        boolean isStaff = checkIsStaff(userPrincipal);
+        UUID currentUserId = userPrincipal != null ? userPrincipal.getId() : null;
+        return ResponseEntity.ok(ApiResponse.ok(
+                clinicalService.getRecordById(recordId, currentUserId, isStaff),
+                "Lấy thông tin hồ sơ khám bệnh thành công"
+        ));
     }
 
     // 10. Lấy danh mục dịch vụ cận lâm sàng cho bác sĩ chọn
@@ -191,18 +224,54 @@ public class ClinicalExaminationController {
     @GetMapping("/patients/{patientProfileId}/chart-data")
     public ResponseEntity<ApiResponse<List<MedicalObservationResponse>>> getPatientObservationTrend(
             @PathVariable UUID patientProfileId,
-            @RequestParam String conceptCode
+            @RequestParam String conceptCode,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
+        boolean isStaff = checkIsStaff(userPrincipal);
+        UUID currentUserId = userPrincipal != null ? userPrincipal.getId() : null;
         return ResponseEntity.ok(ApiResponse.ok(
-                clinicalService.getPatientObservationTrend(patientProfileId, conceptCode),
+                clinicalService.getPatientObservationTrend(patientProfileId, conceptCode, currentUserId, isStaff),
                 "Lấy dữ liệu chuỗi thời gian chỉ số y tế thành công"
         ));
     }
 
     // 15. Xuất bệnh án điện tử sang chuẩn quốc tế HL7 FHIR R4 Bundle JSON (HAPI FHIR)
     @GetMapping(value = "/records/{recordId}/fhir", produces = "application/json")
-    public ResponseEntity<String> exportRecordToFhir(@PathVariable UUID recordId) {
-        return ResponseEntity.ok(fhirExportService.exportRecordToFhirJson(recordId));
+    public ResponseEntity<String> exportRecordToFhir(
+            @PathVariable UUID recordId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        boolean isStaff = checkIsStaff(userPrincipal);
+        UUID currentUserId = userPrincipal != null ? userPrincipal.getId() : null;
+        return ResponseEntity.ok(fhirExportService.exportRecordToFhirJson(recordId, currentUserId, isStaff));
+    }
+
+    // 16. Lập Phụ lục Bệnh án điện tử (EMR Addendum) theo Thông tư 46/2018/TT-BYT khi hồ sơ khóa sau 24h
+    @PostMapping("/records/{recordId}/addendums")
+    @PreAuthorize("hasAnyRole('DOCTOR', 'HEAD_OF_DEPARTMENT', 'ADMIN')")
+    public ResponseEntity<ApiResponse<AddendumResponse>> createAddendum(
+            @PathVariable UUID recordId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @Valid @RequestBody CreateAddendumRequest request
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(
+                clinicalService.createAddendum(recordId, userPrincipal.getId(), request),
+                "Lập phụ lục bệnh án (Addendum) theo Thông tư 46/2018/TT-BYT thành công"
+        ));
+    }
+
+    // 17. Tra cứu danh sách Phụ lục Bệnh án điện tử theo hồ sơ
+    @GetMapping("/records/{recordId}/addendums")
+    public ResponseEntity<ApiResponse<List<AddendumResponse>>> getAddendums(
+            @PathVariable UUID recordId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        boolean isStaff = checkIsStaff(userPrincipal);
+        UUID currentUserId = userPrincipal != null ? userPrincipal.getId() : null;
+        return ResponseEntity.ok(ApiResponse.ok(
+                clinicalService.getAddendums(recordId, currentUserId, isStaff),
+                "Lấy danh sách phụ lục bệnh án thành công"
+        ));
     }
 }
 

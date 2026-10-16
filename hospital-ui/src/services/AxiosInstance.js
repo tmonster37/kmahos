@@ -47,7 +47,9 @@ axiosInstance.interceptors.response.use(
         // Tạo thông báo lỗi tiếng Việt thân thiện
         let friendlyMessage = serverMessage;
         if (!friendlyMessage) {
-            if (status === 403) {
+            if (status === 409) {
+                friendlyMessage = "Dữ liệu xung đột hoặc giao dịch đã được xử lý trước đó (HTTP 409 Conflict).";
+            } else if (status === 403) {
                 friendlyMessage = "Bạn không có quyền thực hiện hành động này.";
             } else if (status === 404) {
                 friendlyMessage = "Không tìm thấy tài nguyên hoặc dữ liệu yêu cầu.";
@@ -65,9 +67,11 @@ axiosInstance.interceptors.response.use(
         }
 
         const customError = {
-            ...error.response?.data,
+            ...(error.response?.data || {}),
             status,
+            statusCode: status,
             message: friendlyMessage,
+            response: error.response,
             originalError: error
         };
 

@@ -13,6 +13,11 @@ public record BookingCreateRequest(
         UUID timeSlotId,
 
         @NotBlank(message = "Vui lòng mô tả triệu chứng ban đầu")
-        String symptoms
-) {}
+        String symptoms,
 
+        UUID reservationId
+) {
+    public BookingCreateRequest(UUID patientProfileId, UUID timeSlotId, String symptoms) {
+        this(patientProfileId, timeSlotId, symptoms, null);
+    }
+}

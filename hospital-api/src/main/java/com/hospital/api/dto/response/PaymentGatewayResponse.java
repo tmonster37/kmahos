@@ -20,5 +20,6 @@ public record PaymentGatewayResponse(
         String bankAccountNo,
         String accountHolder,
         String transferContent,
-        String description
+        String description,
+        Long orderCode
 ) {}

@@ -41,20 +41,10 @@ import FileDownloadIcon from "@mui/icons-material/FileDownload";
 import axiosInstance from "../../services/AxiosInstance";
 import { formatCurrency, formatDate } from "../../utils/formatters";
 
-const SAMPLE_FEFO_MEDICINES = [
-    { medicineId: 1, medicineName: "Paracetamol 500mg", activeIngredient: "Paracetamol", unit: "VIEN", price: 1500, stockQuantity: 2500, batchNumber: "LOT-2025-01", expiryDate: "2027-12-31", minStock: 200 },
-    { medicineId: 2, medicineName: "Amoxicillin 500mg", activeIngredient: "Amoxicillin", unit: "VIEN", price: 3000, stockQuantity: 18, batchNumber: "LOT-2024-09", expiryDate: "2026-11-15", minStock: 50 },
-    { medicineId: 3, medicineName: "Decolgen Forte", activeIngredient: "Acetaminophen + Phenylephrine", unit: "VIEN", price: 2000, stockQuantity: 35, batchNumber: "LOT-2024-03", expiryDate: "2026-10-25", minStock: 50 },
-    { medicineId: 4, medicineName: "Berberin 100mg", activeIngredient: "Berberin", unit: "VIEN", price: 1000, stockQuantity: 800, batchNumber: "LOT-2025-06", expiryDate: "2028-05-20", minStock: 100 },
-    { medicineId: 5, medicineName: "Gói Oresol 27.9g", activeIngredient: "Muối khoáng bù nước", unit: "GOI", price: 5000, stockQuantity: 350, batchNumber: "LOT-2025-08", expiryDate: "2027-08-10", minStock: 100 },
-    { medicineId: 6, medicineName: "Amlodipine 5mg", activeIngredient: "Amlodipine Besylate", unit: "VIEN", price: 4500, stockQuantity: 12, batchNumber: "LOT-2024-11", expiryDate: "2026-12-05", minStock: 50 },
-    { medicineId: 7, medicineName: "Metformin 500mg", activeIngredient: "Metformin HCl", unit: "VIEN", price: 2500, stockQuantity: 1400, batchNumber: "LOT-2025-02", expiryDate: "2027-09-30", minStock: 150 },
-    { medicineId: 8, medicineName: "Augmentin 625mg", activeIngredient: "Amoxicillin + Acid Clavulanic", unit: "VIEN", price: 18000, stockQuantity: 8, batchNumber: "LOT-2024-08", expiryDate: "2026-10-18", minStock: 30 }
-];
-
 export default function MedicineManagePage() {
     const [medicines, setMedicines] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
     const [searchKeyword, setSearchKeyword] = useState("");
     const [tabFilter, setTabFilter] = useState("ALL"); // ALL, LOW_STOCK, EXPIRING_SOON, SAFE
     const [openRestock, setOpenRestock] = useState(false);
@@ -66,24 +56,14 @@ export default function MedicineManagePage() {
 
     const loadMedicines = async () => {
         setLoading(true);
+        setError("");
         try {
             const res = await axiosInstance.get("/api/clinical/medicines");
-            const list = (res && Array.isArray(res.data)) ? res.data : [];
-            if (list.length > 0) {
-                // Merge default FEFO data if backend items don't have batch/expiry yet
-                const enriched = list.map((m, idx) => ({
-                    ...m,
-                    batchNumber: m.batchNumber || `LOT-2025-0${(idx % 9) + 1}`,
-                    expiryDate: m.expiryDate || (idx % 3 === 0 ? "2026-11-20" : "2027-12-31"),
-                    minStock: m.minStock || 50
-                }));
-                setMedicines(enriched);
-            } else {
-                setMedicines(SAMPLE_FEFO_MEDICINES);
-            }
+            const list = (res && Array.isArray(res.data)) ? res.data : (Array.isArray(res) ? res : []);
+            setMedicines(list);
         } catch (err) {
             console.error("Lỗi tải danh mục thuốc:", err);
-            setMedicines(SAMPLE_FEFO_MEDICINES);
+            setError(err.message || "Không thể đồng bộ danh mục kho dược từ máy chủ.");
         } finally {
             setLoading(false);
         }
@@ -249,6 +229,21 @@ export default function MedicineManagePage() {
                     </Button>
                 </Stack>
             </Paper>
+
+            {/* Error Banner */}
+            {error && (
+                <Alert
+                    severity="warning"
+                    sx={{ mb: 3, borderRadius: 2.5 }}
+                    action={
+                        <Button color="inherit" size="small" onClick={loadMedicines}>
+                            Thử lại
+                        </Button>
+                    }
+                >
+                    {error}
+                </Alert>
+            )}
 
             {/* FEFO Warning Cards */}
             <Grid container spacing={3} mb={3}>

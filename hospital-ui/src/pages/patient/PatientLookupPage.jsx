@@ -571,7 +571,7 @@ export default function PatientLookupPage() {
                         </AccordionSummary>
                         <AccordionDetails>
                             <Typography variant="body2" color="text.secondary">
-                                Người bệnh đến Quầy Thu ngân tầng 1 thanh toán viện phí bằng Tiền mặt, Thẻ POS hoặc Quét mã VietQR/VNPay, sau đó nhận thuốc tại quầy Dược và ra về.
+                                Người bệnh đến Quầy Thu ngân tầng 1 thanh toán viện phí bằng Tiền mặt hoặc Quét mã Cổng PayOS (VietQR Napas 247), sau đó nhận thuốc tại quầy Dược và ra về.
                             </Typography>
                         </AccordionDetails>
                     </Accordion>

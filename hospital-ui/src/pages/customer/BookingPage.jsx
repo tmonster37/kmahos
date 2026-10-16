@@ -115,7 +115,7 @@ export default function BookingPage() {
     const [creatingProfile, setCreatingProfile] = useState(false);
 
     // Payment & Confirmation States
-    const [paymentMethod, setPaymentMethod] = useState("VIETQR"); // VIETQR, MOMO, VNPAY, WALLET, COUNTER
+    const [paymentMethod, setPaymentMethod] = useState("VIETQR"); // VIETQR (PayOS), WALLET, COUNTER
     const [paymentModalData, setPaymentModalData] = useState(null);
     const [openQRModal, setOpenQRModal] = useState(false);
     const [bookingResult, setBookingResult] = useState(null);
@@ -123,7 +123,55 @@ export default function BookingPage() {
     const [loadingSchedules, setLoadingSchedules] = useState(false);
     const [error, setError] = useState("");
 
-    // Callback khi thanh toán VietQR / MoMo thành công
+    // Holding Slot TTL 600s (10 phút)
+    const [reservationId, setReservationId] = useState(null);
+    const [holdingSecondsLeft, setHoldingSecondsLeft] = useState(null);
+
+    useEffect(() => {
+        if (!holdingSecondsLeft || holdingSecondsLeft <= 0) return;
+        const interval = setInterval(() => {
+            setHoldingSecondsLeft(prev => {
+                if (prev <= 1) {
+                    clearInterval(interval);
+                    setSelectedSlot(null);
+                    setReservationId(null);
+                    setError("Hết thời gian giữ chỗ (10 phút). Khung giờ khám đã được giải phóng tự động.");
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [holdingSecondsLeft]);
+
+    const handleSelectSlot = async (slot) => {
+        if (selectedSlot?.timeSlotId === slot.timeSlotId) return;
+
+        if (reservationId) {
+            try {
+                await axiosInstance.post(`/api/bookings/release-slot/${reservationId}`);
+            } catch (e) {
+                console.log("Giải phóng slot cũ:", e);
+            }
+        }
+
+        try {
+            const res = await axiosInstance.post("/api/bookings/reserve-slot", {
+                timeSlotId: slot.timeSlotId,
+                patientProfileId: selectedProfile?.patientProfileId
+            });
+            const resData = res?.data?.data || res?.data || res;
+            setSelectedSlot(slot);
+            setReservationId(resData.reservationId);
+            setHoldingSecondsLeft(resData.ttlSeconds || 600);
+            setError("");
+        } catch (err) {
+            console.error("Lỗi giữ chỗ slot:", err);
+            setError(err.response?.data?.message || "Không thể giữ chỗ khung giờ này, vui lòng chọn khung giờ khác.");
+        }
+    };
+
+    // Callback khi thanh toán Cổng PayOS (VietQR) thành công
     const handleQRPaymentSuccess = (tx) => {
         setOpenQRModal(false);
         setActiveStep(4);
@@ -197,6 +245,7 @@ export default function BookingPage() {
         } catch (err) {
             setSchedules([]);
             setSelectedDoctorSchedule(null);
+            setError(err.response?.data?.message || err.message || "Không thể tải lịch khám của chuyên khoa. Vui lòng thử lại sau.");
         } finally {
             setLoadingSchedules(false);
         }
@@ -274,6 +323,7 @@ export default function BookingPage() {
                 patientProfileId: selectedProfile.patientProfileId,
                 timeSlotId: selectedSlot.timeSlotId,
                 symptoms: symptoms || "Khám tổng quát và tư vấn sức khỏe",
+                reservationId: reservationId
             });
             const bookingData = res?.data?.data || res?.data || res;
             setBookingResult(bookingData);
@@ -287,17 +337,7 @@ export default function BookingPage() {
                     setPaymentModalData(payData);
                     setOpenQRModal(true);
                 } catch (e) {
-                    console.log("VietQR error:", e);
-                    setActiveStep(4);
-                }
-            } else if (paymentMethod === "MOMO") {
-                try {
-                    const payRes = await axiosInstance.post(`/api/payment/momo/create?amount=${amount}&type=PAY_BOOKING`);
-                    const payData = payRes?.data?.data || payRes?.data || payRes;
-                    setPaymentModalData(payData);
-                    setOpenQRModal(true);
-                } catch (e) {
-                    console.log("MoMo error:", e);
+                    console.log("PayOS / VietQR error:", e);
                     setActiveStep(4);
                 }
             } else if (paymentMethod === "WALLET") {
@@ -308,21 +348,8 @@ export default function BookingPage() {
                     alert(e.message || "Số dư ví không đủ, vui lòng nạp thêm tiền hoặc chọn phương thức khác!");
                     return;
                 }
-            } else if (paymentMethod === "VNPAY") {
-                try {
-                    const payRes = await axiosInstance.post(`/api/payment/vnpay/create-url?amount=${amount}&type=PAY_BOOKING`);
-                    const url = typeof payRes === "string" ? payRes : (payRes?.data?.data || payRes?.data || payRes?.paymentUrl || "");
-                    if (url) {
-                        bookingData.paymentUrl = url;
-                        setBookingResult({ ...bookingData, paymentUrl: url });
-                    }
-                    setActiveStep(4);
-                } catch (e) {
-                    console.log("VNPay generation skipped or offline", e);
-                    setActiveStep(4);
-                }
             } else {
-                // Tiền mặt tại quầy
+                // Tiền mặt tại quầy (COUNTER)
                 setActiveStep(4);
             }
         } catch (err) {
@@ -383,6 +410,31 @@ export default function BookingPage() {
                     ))}
                 </Stepper>
             </Paper>
+
+            {holdingSecondsLeft > 0 && selectedSlot && (
+                <Alert
+                    severity="warning"
+                    icon={<AccessTimeIcon />}
+                    sx={{
+                        mb: 3,
+                        borderRadius: 3,
+                        fontWeight: 600,
+                        border: "1px solid #f59e0b",
+                        bgcolor: "#fffbeb",
+                        display: "flex",
+                        alignItems: "center"
+                    }}
+                >
+                    Khung giờ khám <b>{selectedSlot.startTime} - {selectedSlot.endTime}</b> đang được giữ chỗ độc quyền trong{" "}
+                    <Chip
+                        label={`${String(Math.floor(holdingSecondsLeft / 60)).padStart(2, "0")}:${String(holdingSecondsLeft % 60).padStart(2, "0")}`}
+                        color="warning"
+                        size="small"
+                        sx={{ fontWeight: 800, mx: 0.8, fontSize: "0.85rem" }}
+                    />
+                    . Vui lòng hoàn tất đăng ký trước khi hết hạn giữ chỗ!
+                </Alert>
+            )}
 
             {error && (
                 <Alert severity="error" sx={{ mb: 3, borderRadius: 3 }} onClose={() => setError("")}>
@@ -686,7 +738,7 @@ export default function BookingPage() {
                                             fullWidth
                                             disabled={isFull}
                                             variant={isSelected ? "contained" : "outlined"}
-                                            onClick={() => setSelectedSlot(slot)}
+                                            onClick={() => handleSelectSlot(slot)}
                                             sx={{
                                                 py: 2,
                                                 borderRadius: 3,
@@ -922,68 +974,10 @@ export default function BookingPage() {
                                                                 <AccountBalanceIcon sx={{ color: "#0284c7", fontSize: 20 }} />
                                                                 <Box>
                                                                     <Typography variant="body2" fontWeight="bold">
-                                                                        Chuyển khoản VietQR Napas 247
+                                                                        Cổng thanh toán PayOS (VietQR Napas 247)
                                                                     </Typography>
                                                                     <Typography variant="caption" color="textSecondary">
-                                                                        Quét mã bằng bất kỳ App Ngân hàng nào (0% phí)
-                                                                    </Typography>
-                                                                </Box>
-                                                            </Box>
-                                                        }
-                                                    />
-                                                </Paper>
-
-                                                <Paper
-                                                    variant="outlined"
-                                                    sx={{
-                                                        p: 1,
-                                                        mb: 1,
-                                                        borderRadius: 2,
-                                                        borderColor: paymentMethod === "MOMO" ? "#A50064" : "#E2E8F0",
-                                                        bgcolor: paymentMethod === "MOMO" ? "#FDF2F8" : "white"
-                                                    }}
-                                                >
-                                                    <FormControlLabel
-                                                        value="MOMO"
-                                                        control={<Radio size="small" />}
-                                                        label={
-                                                            <Box display="flex" alignItems="center" gap={1}>
-                                                                <PhoneAndroidIcon sx={{ color: "#A50064", fontSize: 20 }} />
-                                                                <Box>
-                                                                    <Typography variant="body2" fontWeight="bold">
-                                                                        Ví Điện Tử MoMo
-                                                                    </Typography>
-                                                                    <Typography variant="caption" color="textSecondary">
-                                                                        Quét mã QR MoMo hoặc mở App MoMo
-                                                                    </Typography>
-                                                                </Box>
-                                                            </Box>
-                                                        }
-                                                    />
-                                                </Paper>
-
-                                                <Paper
-                                                    variant="outlined"
-                                                    sx={{
-                                                        p: 1,
-                                                        mb: 1,
-                                                        borderRadius: 2,
-                                                        borderColor: paymentMethod === "VNPAY" ? "#dc2626" : "#E2E8F0",
-                                                        bgcolor: paymentMethod === "VNPAY" ? "#FEF2F2" : "white"
-                                                    }}
-                                                >
-                                                    <FormControlLabel
-                                                        value="VNPAY"
-                                                        control={<Radio size="small" />}
-                                                        label={
-                                                            <Box display="flex" alignItems="center" gap={1}>
-                                                                <CreditCardIcon sx={{ color: "#dc2626", fontSize: 20 }} />
-                                                                <Box>
-                                                                    <Typography variant="body2" fontWeight="bold">
-                                                                        Cổng VNPay-QR
-                                                                    </Typography>
-                                                                    <Typography variant="caption" color="textSecondary">
-                                                                        Thẻ ATM nội địa, Visa, Mastercard, JCB
+                                                                        Chuyển khoản Open Banking bằng mọi App Ngân hàng (0% phí)
                                                                     </Typography>
                                                                 </Box>
                                                             </Box>
@@ -1153,12 +1147,11 @@ export default function BookingPage() {
                                     target="_blank"
                                     rel="noreferrer"
                                     variant="contained"
-                                    color="error"
                                     size="large"
                                     startIcon={<PaymentIcon />}
-                                    sx={{ py: 1.5, px: 3, borderRadius: 3, fontWeight: "bold" }}
+                                    sx={{ py: 1.5, px: 3, borderRadius: 3, fontWeight: "bold", bgcolor: "#005BAA", "&:hover": { bgcolor: "#004080" } }}
                                 >
-                                    💳 Thanh toán VNPay-QR Ngay
+                                    📱 Mở Cổng Thanh Toán PayOS Ngay
                                 </Button>
                             )}
                             <Button
@@ -1289,7 +1282,7 @@ export default function BookingPage() {
                 </DialogActions>
             </Dialog>
 
-            {/* Modal Quét Mã VietQR / MoMo cho Đặt Lịch Khám */}
+            {/* Modal Cổng Thanh Toán PayOS (VietQR) cho Đặt Lịch Khám */}
             <PaymentQRModal
                 open={openQRModal}
                 onClose={() => setOpenQRModal(false)}

@@ -33,9 +33,15 @@ public record LabTestDetailResponse(
         String performedByName,
         LocalDateTime completedAt,
         List<TestResultItemResponse> resultItems,
-        Instant createdAt
+        Instant createdAt,
+        Boolean isPaid,
+        String paymentStatus
 ) {
     public static LabTestDetailResponse fromEntity(MedicalTest t) {
+        return fromEntity(t, false);
+    }
+
+    public static LabTestDetailResponse fromEntity(MedicalTest t, boolean isPaid) {
         var record = t.getMedicalRecord();
         var patient = record != null ? record.getPatientProfile() : null;
         var doctor = record != null && record.getDoctor() != null && record.getDoctor().getAccount() != null
@@ -70,7 +76,9 @@ public record LabTestDetailResponse(
                 performedBy,
                 t.getCompletedAt(),
                 items,
-                t.getCreatedAt()
+                t.getCreatedAt(),
+                isPaid,
+                isPaid ? "PAID" : "UNPAID"
         );
     }
 }

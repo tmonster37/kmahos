@@ -6,6 +6,7 @@ public enum PaymentMethod {
     VIETQR,
     MOMO,
     CASH,
-    COUNTER_CASH
+    COUNTER_CASH,
+    POS
 }
 

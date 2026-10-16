@@ -12,7 +12,8 @@ import java.util.UUID;
 @Entity
 @Table(name = "transactions", indexes = {
         @Index(name = "idx_txn_account", columnList = "account_id"),
-        @Index(name = "idx_txn_vnpay_ref", columnList = "vnpay_txn_ref")
+        @Index(name = "idx_txn_vnpay_ref", columnList = "vnpay_txn_ref"),
+        @Index(name = "idx_txn_order_code", columnList = "order_code")
 })
 @Getter
 @Setter
@@ -48,7 +49,17 @@ public class Transaction extends BaseEntity {
     @Column(name = "vnpay_txn_ref", length = 50)
     private String vnpayTxnRef; // Mã tham chiếu VNPay
 
-    @Column(name = "description")
+    @Column(name = "order_code")
+    private Long orderCode; // Mã đơn hàng số cho PayOS / Open Banking
+
+    @Column(name = "is_verified", nullable = false)
+    @Builder.Default
+    private Boolean isVerified = false; // Đánh dấu đã xác thực chữ ký Webhook hợp lệ
+
+    @Column(name = "webhook_reference", length = 100)
+    private String webhookReference; // Mã tham chiếu giao dịch ngân hàng / PayOS
+
+    @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 }
 

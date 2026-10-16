@@ -54,6 +54,13 @@ public class MedicalExaminationRecord extends BaseEntity {
     @Column(name = "re_examination_date")
     private LocalDate reExaminationDate; // Ngày hẹn tái khám
 
+    @Column(name = "completed_at")
+    private java.time.LocalDateTime completedAt; // Thời điểm hoàn thành khám
+
+    @Column(name = "is_locked")
+    @Builder.Default
+    private Boolean isLocked = false; // Khóa sau 24h theo Thông tư 46/2018/TT-BYT
+
     @Enumerated(EnumType.STRING)
     @Column(name = "state", nullable = false, length = 30)
     @Builder.Default
@@ -73,5 +80,24 @@ public class MedicalExaminationRecord extends BaseEntity {
 
     @OneToOne(mappedBy = "medicalRecord", cascade = CascadeType.ALL, orphanRemoval = true)
     private Prescription prescription;
+
+    @OneToMany(mappedBy = "medicalRecord", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<MedicalRecordAddendum> addendums = new ArrayList<>();
+
+    /**
+     * Lazy lock evaluation: Kiểm tra và đánh dấu khóa tự động nếu đã qua 24 giờ kể từ lúc hoàn tất khám.
+     * @return true nếu hồ sơ đã khóa bất biến.
+     */
+    public boolean isLockedRecord() {
+        if (Boolean.TRUE.equals(this.isLocked)) {
+            return true;
+        }
+        if (this.completedAt != null && this.completedAt.plusHours(24).isBefore(java.time.LocalDateTime.now())) {
+            this.isLocked = true;
+            return true;
+        }
+        return false;
+    }
 }
 

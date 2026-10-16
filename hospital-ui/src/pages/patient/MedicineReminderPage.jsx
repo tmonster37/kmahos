@@ -67,6 +67,7 @@ export default function MedicineReminderPage() {
     const [ratingStars, setRatingStars] = useState(5);
     const [ratingComment, setRatingComment] = useState("");
     const [submittingRating, setSubmittingRating] = useState(false);
+    const [fetchError, setFetchError] = useState("");
 
     useEffect(() => {
         loadData();
@@ -74,6 +75,7 @@ export default function MedicineReminderPage() {
 
     const loadData = async () => {
         setLoading(true);
+        setFetchError("");
         try {
             const res = await axiosInstance.get("/api/utilities/reminders");
             const list = (res && Array.isArray(res.data)) ? res.data : (Array.isArray(res) ? res : []);
@@ -89,36 +91,16 @@ export default function MedicineReminderPage() {
                     instruction: r.instruction || "Uống sau khi ăn"
                 })));
             } else {
-                setReminders([
-                    { id: 1, medicineName: "Augmentin 1g (Kháng sinh)", dosage: "1 viên", time: "07:30", session: "Sáng", isTaken: true, instruction: "Uống sau khi ăn sáng no" },
-                    { id: 2, medicineName: "Vitamin C 500mg", dosage: "1 viên sủi", time: "08:00", session: "Sáng", isTaken: true, instruction: "Pha nước uống sau ăn" },
-                    { id: 3, medicineName: "Alpha Choay", dosage: "2 viên", time: "12:30", session: "Trưa", isTaken: false, instruction: "Ngậm dưới lưỡi sau ăn" },
-                    { id: 4, medicineName: "Augmentin 1g (Kháng sinh)", dosage: "1 viên", time: "18:30", session: "Chiều", isTaken: false, instruction: "Uống sau khi ăn tối" },
-                    { id: 5, medicineName: "Decolgen Forte", dosage: "1 viên", time: "21:30", session: "Tối", isTaken: false, instruction: "Uống trước khi đi ngủ" }
-                ]);
+                setReminders([]);
             }
 
             const bookRes = await axiosInstance.get("/api/bookings/my-history").catch(() => ({ data: [] }));
             const bookList = (bookRes && Array.isArray(bookRes.data)) ? bookRes.data : [];
             const upcoming = bookList.filter(b => b.status === "CONFIRMED");
-            if (upcoming.length > 0) {
-                setFollowUps(upcoming);
-            } else {
-                setFollowUps([
-                    {
-                        bookingId: "demo-1",
-                        bookingCode: "TK-20261010-092",
-                        doctorName: "BS. Trần Đình Trọng",
-                        departmentName: "Khoa Nội Tim Mạch",
-                        roomName: "Phòng 201 - Tầng 2",
-                        bookingDate: "2026-10-10",
-                        timeSlot: "08:30 - 09:00",
-                        reason: "Tái khám kiểm tra huyết áp & điện tâm đồ (ECG)"
-                    }
-                ]);
-            }
+            setFollowUps(upcoming);
         } catch (err) {
             console.error("Lỗi tải dữ liệu:", err);
+            setFetchError(err.message || "Không thể kết nối đến máy chủ để tải lịch nhắc thuốc.");
         } finally {
             setLoading(false);
         }
@@ -276,9 +258,29 @@ export default function MedicineReminderPage() {
                 <Tab icon={<EventRepeatIcon fontSize="small" />} iconPosition="start" label={`Lịch Tái Khám (${followUps.length})`} sx={{ fontWeight: "600", textTransform: "none", py: 1 }} />
             </Tabs>
 
+            {/* Alert lỗi nếu có */}
+            {fetchError && (
+                <Alert 
+                    severity="error" 
+                    sx={{ mb: 2.5, borderRadius: 2 }}
+                    action={
+                        <Button color="inherit" size="small" onClick={loadData}>
+                            Thử lại
+                        </Button>
+                    }
+                >
+                    {fetchError}
+                </Alert>
+            )}
+
             {/* TAB 0: LỊCH UỐNG THUỐC */}
             {activeTab === 0 && (
                 <Box display="flex" flexDirection="column" gap={2}>
+                    {reminders.length === 0 && !loading && (
+                        <Alert severity="info" sx={{ borderRadius: 2 }}>
+                            Hiện tại bạn chưa tạo lịch nhắc uống thuốc nào. Nhấn nút "+ Thêm Cữ Thuốc Mới" ở phía trên để tạo lịch nhắc thuốc cho bản thân và người nhà.
+                        </Alert>
+                    )}
                     {SESSIONS.map((ses) => {
                         const sessionReminders = reminders.filter(r => r.session === ses.key);
                         if (sessionReminders.length === 0) return null;

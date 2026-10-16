@@ -663,12 +663,41 @@ export default function LabTestResultsPage() {
                                                 </Typography>
                                             </TableCell>
                                             <TableCell sx={{ whiteSpace: "nowrap" }}>
-                                                <Chip
-                                                    label={t.state === "COMPLETED" ? "ĐÃ CÓ KẾT QUẢ" : "CHỜ THỰC HIỆN"}
-                                                    color={t.state === "COMPLETED" ? "success" : "warning"}
-                                                    size="small"
-                                                    sx={{ fontWeight: "bold", whiteSpace: "nowrap" }}
-                                                />
+                                                <Stack spacing={0.6}>
+                                                    <Chip
+                                                        label={t.state === "COMPLETED" ? "ĐÃ CÓ KẾT QUẢ" : "CHỜ THỰC HIỆN"}
+                                                        color={t.state === "COMPLETED" ? "success" : "warning"}
+                                                        size="small"
+                                                        sx={{ fontWeight: "bold", whiteSpace: "nowrap" }}
+                                                    />
+                                                    {t.isPaid ? (
+                                                        <Chip
+                                                            label="✅ ĐÃ NỘP PHÍ"
+                                                            size="small"
+                                                            sx={{
+                                                                fontWeight: 700,
+                                                                fontSize: "0.68rem",
+                                                                height: 20,
+                                                                bgcolor: "#ECFDF5",
+                                                                color: "#059669",
+                                                                border: "1px solid #A7F3D0"
+                                                            }}
+                                                        />
+                                                    ) : (
+                                                        <Chip
+                                                            label="⚠️ CHỜ THANH TOÁN"
+                                                            size="small"
+                                                            sx={{
+                                                                fontWeight: 700,
+                                                                fontSize: "0.68rem",
+                                                                height: 20,
+                                                                bgcolor: "#FEF2F2",
+                                                                color: "#DC2626",
+                                                                border: "1px solid #FECACA"
+                                                            }}
+                                                        />
+                                                    )}
+                                                </Stack>
                                             </TableCell>
                                             <TableCell sx={{ maxWidth: 280 }}>
                                                 {t.testResult ? (
@@ -721,16 +750,33 @@ export default function LabTestResultsPage() {
                                                 )}
                                             </TableCell>
                                             <TableCell align="center" sx={{ whiteSpace: "nowrap" }}>
-                                                <Button
-                                                    variant={t.state === "COMPLETED" ? "outlined" : "contained"}
-                                                    color={t.state === "COMPLETED" ? "primary" : "success"}
-                                                    size="small"
-                                                    startIcon={<EditNoteIcon />}
-                                                    onClick={() => handleOpenModal(t)}
-                                                    sx={{ borderRadius: 2, whiteSpace: "nowrap", fontWeight: 700 }}
-                                                >
-                                                    {t.state === "COMPLETED" ? "Sửa kết quả" : "Nhập kết quả"}
-                                                </Button>
+                                                {!t.isPaid ? (
+                                                    <Tooltip title="Chưa nộp viện phí tại quầy thu ngân. Chốt chặn phòng xét nghiệm: không thể lấy mẫu / trả kết quả!">
+                                                        <span>
+                                                            <Button
+                                                                variant="outlined"
+                                                                color="inherit"
+                                                                size="small"
+                                                                disabled
+                                                                startIcon={<WarningAmberIcon color="error" />}
+                                                                sx={{ borderRadius: 2, whiteSpace: "nowrap", fontWeight: 700, color: "#94A3B8" }}
+                                                            >
+                                                                Chờ nộp phí
+                                                            </Button>
+                                                        </span>
+                                                    </Tooltip>
+                                                ) : (
+                                                    <Button
+                                                        variant={t.state === "COMPLETED" ? "outlined" : "contained"}
+                                                        color={t.state === "COMPLETED" ? "primary" : "success"}
+                                                        size="small"
+                                                        startIcon={<EditNoteIcon />}
+                                                        onClick={() => handleOpenModal(t)}
+                                                        sx={{ borderRadius: 2, whiteSpace: "nowrap", fontWeight: 700 }}
+                                                    >
+                                                        {t.state === "COMPLETED" ? "Sửa kết quả" : "Nhập kết quả"}
+                                                    </Button>
+                                                )}
                                             </TableCell>
                                         </TableRow>
                                     );

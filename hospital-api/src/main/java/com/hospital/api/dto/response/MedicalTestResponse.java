@@ -19,9 +19,15 @@ public record MedicalTestResponse(
         MedicalTestState state,
         String specimenType,
         String specimenBarcode,
-        List<TestResultItemResponse> resultItems
+        List<TestResultItemResponse> resultItems,
+        Boolean isPaid,
+        String paymentStatus
 ) {
     public static MedicalTestResponse fromEntity(MedicalTest t) {
+        return fromEntity(t, false);
+    }
+
+    public static MedicalTestResponse fromEntity(MedicalTest t, boolean isPaid) {
         List<TestResultItemResponse> items = t.getResultItems() != null
                 ? t.getResultItems().stream().map(TestResultItemResponse::fromEntity).toList()
                 : Collections.emptyList();
@@ -36,7 +42,9 @@ public record MedicalTestResponse(
                 t.getState(),
                 t.getSpecimenType(),
                 t.getSpecimenBarcode(),
-                items
+                items,
+                isPaid,
+                isPaid ? "PAID" : "UNPAID"
         );
     }
 }

@@ -20,7 +20,10 @@ public record DoctorAdminResponse(
         BigDecimal consultationFee,
         Double ratingAverage,
         boolean isActive,
-        Role role
+        Role role,
+        String doctorLicense,
+        java.time.LocalDate licenseIssuedDate,
+        String licenseScope
 ) {
     public static DoctorAdminResponse fromEntity(Doctor doctor) {
         return new DoctorAdminResponse(
@@ -36,7 +39,10 @@ public record DoctorAdminResponse(
                 doctor.getConsultationFee(),
                 doctor.getRatingAverage() != null ? doctor.getRatingAverage() : 5.0,
                 doctor.getAccount().isActive(),
-                doctor.getAccount().getRole()
+                doctor.getAccount().getRole(),
+                doctor.getDoctorLicense(),
+                doctor.getLicenseIssuedDate(),
+                doctor.getLicenseScope()
         );
     }
 }

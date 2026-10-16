@@ -167,7 +167,7 @@ class BookingServiceTest {
 
         AppException ex = assertThrows(AppException.class, () -> bookingService.createBooking(accountId, request));
 
-        assertEquals("Khung giờ khám này đã kín chỗ, vui lòng chọn khung giờ khác", ex.getMessage());
+        assertEquals("Khung giờ khám này đã kín chỗ hoặc đang có người giữ chỗ, vui lòng chọn khung giờ khác", ex.getMessage());
         assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
         verify(bookingRepository, never()).save(any(Booking.class));
     }

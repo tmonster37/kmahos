@@ -27,11 +27,14 @@ public record DoctorQueueResponse(
         UUID recordId,
         MedicalExamState recordState,
         Integer totalTests,
-        Integer completedTests
+        Integer completedTests,
+        Boolean isReturnAfterResult
 ) {
     public static DoctorQueueResponse fromEntity(Booking b, MedicalExaminationRecord record) {
         boolean priority = Boolean.TRUE.equals(b.getIsPriority());
-        String qCode = (priority ? "UT-" : "KB-") + String.format("%02d", b.getQueueNumber() != null ? b.getQueueNumber() : 1);
+        boolean isReturnAfterResult = record != null && record.getState() == MedicalExamState.DIAGNOSING;
+        String prefix = isReturnAfterResult ? "KQ-" : (priority ? "UT-" : "KB-");
+        String qCode = prefix + String.format("%02d", b.getQueueNumber() != null ? b.getQueueNumber() : 1);
 
         return new DoctorQueueResponse(
                 b.getBookingId(),
@@ -53,7 +56,8 @@ public record DoctorQueueResponse(
                 record != null ? record.getState() : null,
                 record != null && record.getMedicalTests() != null ? record.getMedicalTests().size() : 0,
                 record != null && record.getMedicalTests() != null ?
-                        (int) record.getMedicalTests().stream().filter(t -> t.getState() != null && t.getState().name().equals("COMPLETED")).count() : 0
+                        (int) record.getMedicalTests().stream().filter(t -> t.getState() != null && t.getState().name().equals("COMPLETED")).count() : 0,
+                isReturnAfterResult
         );
     }
 }

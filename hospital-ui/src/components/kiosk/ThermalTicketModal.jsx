@@ -150,8 +150,8 @@ export default function ThermalTicketModal({ open, onClose, ticketData, autoRese
   };
 
   const isPriority = ticketData.isPriority || ticketData.priority;
-  const queueCode = ticketData.queueCode || (isPriority ? `UT-${String(ticketData.queueNumber).padStart(2, '0')}` : `KB-${String(ticketData.queueNumber).padStart(2, '0')}`);
-  const trackingUrl = `${window.location.origin}/queue-display?code=${ticketData.bookingCode}`;
+  const queueCode = ticketData.ticketCode || ticketData.formattedQueueNumber || ticketData.queueCode || (isPriority ? `UT-${String(ticketData.queueNumber).padStart(2, '0')}` : `KB-${String(ticketData.queueNumber).padStart(2, '0')}`);
+  const trackingUrl = `${window.location.origin}/queue-display?code=${ticketData.bookingCode || ticketData.ticketCode || 'QUEUE'}`;
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 3, p: 1 } }}>
@@ -242,6 +242,22 @@ export default function ThermalTicketModal({ open, onClose, ticketData, autoRese
                   {ticketData.patientPhone || ticketData.phoneNumber || '---'}
                 </td>
               </tr>
+              {ticketData.counterName && (
+                <tr style={{ backgroundColor: '#f0f7ff' }}>
+                  <td className="info-label" style={{ color: '#0d47a1', padding: '4px 2px', fontWeight: 700, width: '38%' }}>Quầy tiếp đón:</td>
+                  <td className="info-value" style={{ fontWeight: 800, color: '#0d47a1', padding: '4px 2px', fontSize: '0.92rem' }}>
+                    {ticketData.counterName} {ticketData.counterLocation ? `(${ticketData.counterLocation})` : ''}
+                  </td>
+                </tr>
+              )}
+              {ticketData.waitingBefore !== undefined && ticketData.waitingBefore !== null && (
+                <tr>
+                  <td className="info-label" style={{ color: '#666', padding: '3px 0' }}>Đang chờ trước:</td>
+                  <td className="info-value" style={{ fontWeight: 700, color: '#e65100' }}>
+                    {ticketData.waitingBefore === 0 ? 'Mời vào quầy làm thủ tục ngay' : `${ticketData.waitingBefore} người`}
+                  </td>
+                </tr>
+              )}
               <tr>
                 <td className="info-label" style={{ color: '#666', padding: '3px 0' }}>Chuyên khoa:</td>
                 <td className="info-value" style={{ fontWeight: 700, color: '#0d47a1' }}>
@@ -253,6 +269,14 @@ export default function ThermalTicketModal({ open, onClose, ticketData, autoRese
                   <td className="info-label" style={{ color: '#666', padding: '3px 0' }}>Bác sĩ phụ trách:</td>
                   <td className="info-value" style={{ fontWeight: 600 }}>
                     {ticketData.doctorName}
+                  </td>
+                </tr>
+              )}
+              {(ticketData.roomNumber || ticketData.roomName) && (
+                <tr>
+                  <td className="info-label" style={{ color: '#666', padding: '3px 0' }}>Phòng khám:</td>
+                  <td className="info-value" style={{ fontWeight: 800, color: '#d32f2f' }}>
+                    {ticketData.roomNumber ? `P.${ticketData.roomNumber} ` : ''}{ticketData.roomName ? `(${ticketData.roomName})` : ''}
                   </td>
                 </tr>
               )}

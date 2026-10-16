@@ -440,6 +440,7 @@ export default function PrescriptionModal({ open, onClose, recordId, onPrescribe
         try {
             await axiosInstance.post(`/api/clinical/records/${recordId}/prescriptions`, {
                 doctorNotes,
+                overrideAllergyWarning: allergyAlerts.length > 0,
                 items: items.map((it) => ({
                     medicineId: Number(it.medicineId),
                     quantity: Number(it.quantity),

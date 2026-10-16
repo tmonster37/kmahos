@@ -47,6 +47,7 @@ export default function TransactionManagePage() {
     const [selectedTxn, setSelectedTxn] = useState(null);
     const [openDetailModal, setOpenDetailModal] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
 
     useEffect(() => {
         loadTransactions();
@@ -54,79 +55,14 @@ export default function TransactionManagePage() {
 
     const loadTransactions = async () => {
         setLoading(true);
+        setError("");
         try {
-            const res = await axiosInstance.get("/api/payment/admin/transactions").catch(() => ({ data: [] }));
-            const list = (res && Array.isArray(res.data)) ? res.data : [];
-
-            if (list.length > 0) {
-                setTransactions(list);
-            } else {
-                // Mock dữ liệu đối soát phong phú
-                setTransactions([
-                    {
-                        transactionId: "TXN-882101",
-                        vnpayTxnRef: "VNP2026092701",
-                        accountName: "Trần Minh Quân (0918273645)",
-                        amount: 530000,
-                        transactionType: "PAY_BOOKING",
-                        paymentChannel: "VNPAY_QR",
-                        status: "SUCCESS",
-                        description: "Thanh toán phiếu khám tim mạch & xét nghiệm",
-                        bankCode: "NCB",
-                        createdAt: "2026-09-27T08:15:30Z"
-                    },
-                    {
-                        transactionId: "TXN-882102",
-                        vnpayTxnRef: "POS2026092702",
-                        accountName: "Phạm Thị Thu Trang (0983123456)",
-                        amount: 115000,
-                        transactionType: "PAY_PRESCRIPTION",
-                        paymentChannel: "POS_CARD",
-                        status: "SUCCESS",
-                        description: "Thanh toán đơn thuốc ngoại trú",
-                        bankCode: "VIETCOMBANK",
-                        createdAt: "2026-09-27T09:00:15Z"
-                    },
-                    {
-                        transactionId: "TXN-882103",
-                        vnpayTxnRef: "CASH2026092703",
-                        accountName: "Nguyễn Văn Hùng (0905123987)",
-                        amount: 2000000,
-                        transactionType: "PAY_INPATIENT_FEE",
-                        paymentChannel: "CASH",
-                        status: "SUCCESS",
-                        description: "Tạm ứng viện phí nội trú phòng 301",
-                        bankCode: "QUẦY THU NGÂN 01",
-                        createdAt: "2026-09-27T09:30:00Z"
-                    },
-                    {
-                        transactionId: "TXN-882104",
-                        vnpayTxnRef: "VNP2026092704",
-                        accountName: "Lê Văn Tuấn (0971239988)",
-                        amount: 200000,
-                        transactionType: "PAY_BOOKING",
-                        paymentChannel: "VNPAY_QR",
-                        status: "FAILED",
-                        description: "Khách hàng hủy giao dịch trên App Ngân hàng",
-                        bankCode: "MBBANK",
-                        createdAt: "2026-09-27T10:05:22Z"
-                    },
-                    {
-                        transactionId: "TXN-882105",
-                        vnpayTxnRef: "REF2026092705",
-                        accountName: "Đỗ Bích Ngọc (0933445566)",
-                        amount: 350000,
-                        transactionType: "REFUND_FEE",
-                        paymentChannel: "BANK_TRANSFER",
-                        status: "REFUNDED",
-                        description: "Hoàn phí khám do bác sĩ có ca mổ cấp cứu đột xuất",
-                        bankCode: "TECHCOMBANK",
-                        createdAt: "2026-09-27T10:45:10Z"
-                    }
-                ]);
-            }
+            const res = await axiosInstance.get("/api/payment/admin/transactions");
+            const list = (res && Array.isArray(res.data)) ? res.data : (Array.isArray(res) ? res : []);
+            setTransactions(list);
         } catch (err) {
             console.error("Lỗi tải đối soát giao dịch:", err);
+            setError(err.message || "Không thể đồng bộ danh sách giao dịch từ hệ thống thanh toán.");
         } finally {
             setLoading(false);
         }
@@ -176,6 +112,21 @@ export default function TransactionManagePage() {
                     </Button>
                 </Box>
             </Box>
+
+            {/* Error Banner */}
+            {error && (
+                <Alert
+                    severity="warning"
+                    sx={{ mb: 3, borderRadius: 2 }}
+                    action={
+                        <Button color="inherit" size="small" onClick={loadTransactions}>
+                            Thử lại
+                        </Button>
+                    }
+                >
+                    {error}
+                </Alert>
+            )}
 
             {/* Thẻ Thống Kê Dòng Tiền */}
             <Grid container spacing={2.5} mb={3}>
@@ -281,7 +232,16 @@ export default function TransactionManagePage() {
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {filtered.map((t, idx) => (
+                        {filtered.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
+                                    <Typography variant="body1" color="text.secondary">
+                                        {loading ? "Đang tải dữ liệu giao dịch..." : (error ? "Không thể tải danh sách giao dịch. Vui lòng bấm thử lại." : "Chưa có giao dịch thanh toán nào phù hợp.")}
+                                    </Typography>
+                                </TableCell>
+                            </TableRow>
+                        ) : (
+                            filtered.map((t, idx) => (
                             <TableRow key={t.transactionId || idx} hover>
                                 <TableCell>
                                     <Typography variant="body2" fontWeight="bold" color="primary">
@@ -342,7 +302,8 @@ export default function TransactionManagePage() {
                                     </IconButton>
                                 </TableCell>
                             </TableRow>
-                        ))}
+                        ))
+                    )}
                     </TableBody>
                 </Table>
             </TableContainer>

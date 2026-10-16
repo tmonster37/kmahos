@@ -17,7 +17,8 @@ import {
     Drawer,
     List,
     ListItem,
-    ListItemButton
+    ListItemButton,
+    Tooltip
 } from "@mui/material";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import LocalHospitalIcon from "@mui/icons-material/LocalHospital";
@@ -35,17 +36,22 @@ import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
 import MedicationIcon from "@mui/icons-material/Medication";
 import MedicalServicesIcon from "@mui/icons-material/MedicalServices";
 import HowToRegIcon from "@mui/icons-material/HowToReg";
-import EventNoteIcon from "@mui/icons-material/EventNote";
 import ScienceIcon from "@mui/icons-material/Science";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import QrCodeScannerIcon from "@mui/icons-material/QrCodeScanner";
 import TvIcon from "@mui/icons-material/Tv";
 import PointOfSaleIcon from "@mui/icons-material/PointOfSale";
 import HotelIcon from "@mui/icons-material/Hotel";
-import ChatIcon from "@mui/icons-material/Chat";
 import SupportAgentIcon from "@mui/icons-material/SupportAgent";
+import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
+import VerifiedUserIcon from "@mui/icons-material/VerifiedUser";
+import FolderSharedIcon from "@mui/icons-material/FolderShared";
+import Inventory2Icon from "@mui/icons-material/Inventory2";
+import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
+import EventIcon from "@mui/icons-material/Event";
 import NotificationMenu from "./NotificationMenu";
 import { useAuth } from "../../context/AuthContext";
+import designTokens from "../../theme/designTokens";
 
 export default function Navbar() {
     const { user, isAuthenticated, logout } = useAuth();
@@ -53,13 +59,13 @@ export default function Navbar() {
     const location = useLocation();
 
     const [userMenuAnchor, setUserMenuAnchor] = useState(null);
-    const [utilityMenuAnchor, setUtilityMenuAnchor] = useState(null);
+    const [patientRecordsAnchor, setPatientRecordsAnchor] = useState(null);
     const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
     const handleUserMenuOpen = (e) => setUserMenuAnchor(e.currentTarget);
     const handleUserMenuClose = () => setUserMenuAnchor(null);
-    const handleUtilityMenuOpen = (e) => setUtilityMenuAnchor(e.currentTarget);
-    const handleUtilityMenuClose = () => setUtilityMenuAnchor(null);
+    const handlePatientRecordsOpen = (e) => setPatientRecordsAnchor(e.currentTarget);
+    const handlePatientRecordsClose = () => setPatientRecordsAnchor(null);
 
     const isActive = (path) => location.pathname === path;
 
@@ -70,11 +76,12 @@ export default function Navbar() {
     };
 
     const role = user?.role || "GUEST";
+    const isStaff = ["ROLE_DOCTOR", "ROLE_HEAD_OF_DEPARTMENT", "ROLE_NURSE", "ROLE_LAB_TECHNICIAN", "ROLE_CASHIER", "ROLE_PHARMACIST", "ROLE_ADMIN"].includes(role);
 
     const getNavBtnSx = (path) => ({
-        color: isActive(path) ? "#0088D6" : "#334155",
+        color: isActive(path) ? designTokens.brand.primary : designTokens.neutral.textSecondary,
         fontWeight: isActive(path) ? 700 : 600,
-        bgcolor: isActive(path) ? "#EBF6FE" : "transparent",
+        bgcolor: isActive(path) ? designTokens.brand.primaryLight : "transparent",
         borderRadius: 2,
         px: 1.5,
         py: 0.7,
@@ -83,100 +90,85 @@ export default function Navbar() {
         whiteSpace: "nowrap",
         letterSpacing: "-0.2px",
         transition: "all 0.15s ease-in-out",
-        "&:hover": { bgcolor: "#F1F5F9", color: "#0088D6" }
+        "&:hover": {
+            bgcolor: isActive(path) ? designTokens.brand.primaryLight : designTokens.neutral.hoverBg,
+            color: designTokens.brand.primary
+        }
     });
 
+    // Thông tin nút tác nghiệp y tế nhanh cho nhân viên
+    const getStaffQuickAction = () => {
+        switch (role) {
+            case "ROLE_DOCTOR":
+                return { label: "Bàn Khám Lâm Sàng", path: "/doctor/examinations", icon: <MedicalServicesIcon sx={{ fontSize: 18 }} />, color: "primary" };
+            case "ROLE_HEAD_OF_DEPARTMENT":
+                return { label: "Bàn Khám & Cổng Khoa", path: "/doctor/examinations", icon: <MedicalServicesIcon sx={{ fontSize: 18 }} />, color: "secondary" };
+            case "ROLE_NURSE":
+                return { label: "Bàn Tiếp Đón & STT", path: "/nurse/reception", icon: <HowToRegIcon sx={{ fontSize: 18 }} />, color: "info" };
+            case "ROLE_LAB_TECHNICIAN":
+                return { label: "Phòng Xét Nghiệm", path: "/doctor/lab-tests", icon: <ScienceIcon sx={{ fontSize: 18 }} />, color: "warning" };
+            case "ROLE_PHARMACIST":
+                return { label: "Kho Dược & Tủ Thuốc", path: "/admin/pharmacy-inventory", icon: <Inventory2Icon sx={{ fontSize: 18 }} />, color: "secondary" };
+            case "ROLE_CASHIER":
+                return { label: "Quầy Thu Ngân", path: "/cashier", icon: <PointOfSaleIcon sx={{ fontSize: 18 }} />, color: "success" };
+            case "ROLE_ADMIN":
+                return { label: "Cổng Quản Trị Hệ Thống", path: "/admin/dashboard", icon: <AdminPanelSettingsIcon sx={{ fontSize: 18 }} />, color: "error" };
+            default:
+                return null;
+        }
+    };
+
+    const staffAction = getStaffQuickAction();
+
     return (
-        <AppBar position="sticky" color="default" elevation={0} sx={{ bgcolor: "white", borderBottom: "1px solid #E2E8F0", zIndex: 1100 }}>
-            {/* 1. TOP UTILITY STRIP - Tiện ích sảnh & Hotline */}
-            <Box sx={{ bgcolor: "#F8FAFC", borderBottom: "1px solid #EDF2F7", py: 0.5, fontSize: "0.825rem", color: "#475569" }}>
+        <AppBar position="sticky" color="default" elevation={0} sx={{ bgcolor: "#FFFFFF", borderBottom: `1px solid ${designTokens.neutral.border}`, zIndex: 1100 }}>
+            {/* 1. TOP UTILITY STRIP: Hotline y tế & Trạng thái tài khoản */}
+            <Box sx={{ bgcolor: designTokens.neutral.hoverBg, borderBottom: `1px solid ${designTokens.neutral.borderLight}`, py: 0.5, fontSize: "0.825rem", color: designTokens.neutral.textSecondary }}>
                 <Container maxWidth="xl" sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1 }}>
                     <Box display="flex" alignItems="center" gap={2}>
                         <Box display="flex" alignItems="center" gap={0.8}>
-                            <LocalHospitalIcon sx={{ fontSize: 16, color: "#0088D6" }} />
-                            <Typography variant="caption" sx={{ fontWeight: 600, color: "#475569" }}>
+                            <LocalHospitalIcon sx={{ fontSize: 16, color: designTokens.brand.primary }} />
+                            <Typography variant="caption" sx={{ fontWeight: 600, color: designTokens.neutral.textSecondary }}>
                                 Bệnh Viện Đa Khoa Quốc Tế TNT
                             </Typography>
                         </Box>
                         <Divider orientation="vertical" flexItem sx={{ height: 12, my: "auto" }} />
                         <Box display="flex" alignItems="center" gap={0.5}>
-                            <PhoneInTalkIcon sx={{ fontSize: 13, color: "#EF4444" }} />
+                            <PhoneInTalkIcon sx={{ fontSize: 13, color: designTokens.status.danger.main }} />
                             <Typography variant="caption" sx={{ fontWeight: 600 }}>
-                                Hotline: <b style={{ color: "#EF4444" }}>1900 8888</b>
+                                Cấp cứu 24/7 & Hotline: <b style={{ color: designTokens.status.danger.main }}>1900 8888</b>
                             </Typography>
                         </Box>
                     </Box>
 
-                    {/* Phím tắt tiện ích sảnh thông minh & Badge vai trò */}
+                    {/* Phía bên phải: Trạng thái vai trò nhân viên / bệnh nhân */}
                     <Box display="flex" alignItems="center" gap={1.5}>
-                        <Box
-                            component={Link}
-                            to="/kiosk"
-                            target="_blank"
-                            sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 0.5,
-                                color: "#D97706",
-                                textDecoration: "none",
-                                fontWeight: 600,
-                                fontSize: "0.75rem",
-                                "&:hover": { color: "#B45309" }
-                            }}
-                        >
-                            <QrCodeScannerIcon sx={{ fontSize: 14 }} />
-                            <span>Kiosk Sảnh</span>
-                        </Box>
-
-                        <Divider orientation="vertical" flexItem sx={{ height: 12, my: "auto" }} />
-
-                        <Box
-                            component={Link}
-                            to="/queue-display"
-                            target="_blank"
-                            sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 0.5,
-                                color: "#6366F1",
-                                textDecoration: "none",
-                                fontWeight: 600,
-                                fontSize: "0.75rem",
-                                "&:hover": { color: "#4F46E5" }
-                            }}
-                        >
-                            <TvIcon sx={{ fontSize: 14 }} />
-                            <span>Màn Hình LED TV</span>
-                        </Box>
 
                         {isAuthenticated && (
-                            <>
-                                <Divider orientation="vertical" flexItem sx={{ height: 12, my: "auto" }} />
-                                <Chip
-                                    label={
-                                        role === "ROLE_ADMIN" ? "Quản trị viên" :
-                                        role === "ROLE_DOCTOR" ? "Bác sĩ" :
-                                        role === "ROLE_HEAD_OF_DEPARTMENT" ? "Trưởng khoa" :
-                                        role === "ROLE_NURSE" ? "Điều dưỡng" :
-                                        role === "ROLE_LAB_TECHNICIAN" ? "Bác sĩ xét nghiệm" :
-                                        role === "ROLE_CASHIER" ? "Thu ngân" : "Bệnh nhân"
-                                    }
-                                    size="small"
-                                    sx={{
-                                        height: 20,
-                                        fontSize: "0.7rem",
-                                        fontWeight: 700,
-                                        bgcolor: "#E0F2FE",
-                                        color: "#0369A1"
-                                    }}
-                                />
-                            </>
+                            <Chip
+                                label={
+                                    role === "ROLE_ADMIN" ? "Quản trị viên" :
+                                    role === "ROLE_DOCTOR" ? "Bác sĩ" :
+                                    role === "ROLE_HEAD_OF_DEPARTMENT" ? "Trưởng khoa" :
+                                    role === "ROLE_NURSE" ? "Điều dưỡng" :
+                                    role === "ROLE_LAB_TECHNICIAN" ? "KTV Xét nghiệm" :
+                                    role === "ROLE_CASHIER" ? "Thu ngân" : "Bệnh nhân"
+                                }
+                                size="small"
+                                sx={{
+                                    height: 20,
+                                    fontSize: "0.7rem",
+                                    fontWeight: 700,
+                                    bgcolor: designTokens.brand.primaryLight,
+                                    color: designTokens.brand.primaryDark
+                                }}
+                            />
                         )}
                     </Box>
                 </Container>
             </Box>
 
-            {/* 2. MAIN NAVBAR */}
+            {/* 2. MAIN NAVBAR: Logo & Menu Bệnh Nhân Tinh Gọn */}
             <Container maxWidth="xl">
                 <Toolbar disableGutters sx={{ justifyContent: "space-between", py: 0.8, minHeight: "64px !important" }}>
                     {/* Brand Logo */}
@@ -193,11 +185,11 @@ export default function Navbar() {
                                 width: 40,
                                 height: 40,
                                 borderRadius: "10px",
-                                background: "linear-gradient(135deg, #0088D6 0%, #00C292 100%)",
+                                background: `linear-gradient(135deg, ${designTokens.brand.primary} 0%, ${designTokens.secondary.main} 100%)`,
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
-                                color: "white",
+                                color: "#FFFFFF",
                                 boxShadow: "0 4px 12px rgba(0, 136, 214, 0.2)"
                             }}
                         >
@@ -209,272 +201,118 @@ export default function Navbar() {
                                 fontWeight="800"
                                 sx={{
                                     letterSpacing: "-0.5px",
-                                    background: "linear-gradient(135deg, #0088D6 0%, #005A9C 100%)",
-                                    WebkitBackgroundClip: "text",
-                                    WebkitTextFillColor: "transparent",
+                                    color: designTokens.brand.primaryDark,
                                     lineHeight: 1.1,
                                     fontSize: "1.2rem"
                                 }}
                             >
                                 YouMed TNT
                             </Typography>
-                            <Typography variant="caption" sx={{ color: "#64748B", fontWeight: 600, fontSize: "0.7rem", display: "block" }}>
+                            <Typography variant="caption" sx={{ color: designTokens.neutral.textMuted, fontWeight: 600, fontSize: "0.7rem", display: "block" }}>
                                 Bệnh Viện Thông Minh
                             </Typography>
                         </Box>
                     </Box>
 
-                    {/* Navigation Links - Role Based */}
+                    {/* Navigation Links - Dành cho Bệnh nhân & Khách */}
                     <Box display="flex" alignItems="center" gap={0.5} sx={{ display: { xs: "none", md: "flex" } }}>
-                        {/* 1. KHÁCH HOẶC BỆNH NHÂN */}
-                        {(!isAuthenticated || role === "ROLE_PATIENT") && (
+                        <Button component={Link} to="/" sx={getNavBtnSx("/")}>
+                            Trang Chủ
+                        </Button>
+
+                        <Button component={Link} to="/booking" sx={getNavBtnSx("/booking")}>
+                            Đặt Lịch Khám
+                        </Button>
+
+                        <Button component={Link} to="/lookup" sx={getNavBtnSx("/lookup")}>
+                            Tra Cứu & Sơ Đồ
+                        </Button>
+
+                        <Button component={Link} to="/verify-prescription" sx={getNavBtnSx("/verify-prescription")}>
+                            Xác Thực Đơn Thuốc
+                        </Button>
+
+                        <Button component={Link} to="/chat" sx={getNavBtnSx("/chat")}>
+                            Tư Vấn Y Tế
+                        </Button>
+
+                        {/* Dropdown Sổ Khám Điện Tử (Chỉ dành riêng cho Bệnh nhân đã đăng nhập) */}
+                        {isAuthenticated && !isStaff && (
                             <>
                                 <Button
-                                    component={Link}
-                                    to="/"
-                                    sx={getNavBtnSx("/")}
+                                    onClick={handlePatientRecordsOpen}
+                                    endIcon={<KeyboardArrowDownIcon sx={{ fontSize: 16 }} />}
+                                    sx={{
+                                        ...getNavBtnSx("/patient-records"),
+                                        color: (isActive("/profiles") || isActive("/my-history") || isActive("/my-bills") || isActive("/payment") || isActive("/reminders"))
+                                            ? designTokens.brand.primary
+                                            : designTokens.neutral.textSecondary,
+                                        bgcolor: (isActive("/profiles") || isActive("/my-history") || isActive("/my-bills") || isActive("/payment") || isActive("/reminders"))
+                                            ? designTokens.brand.primaryLight
+                                            : "transparent"
+                                    }}
                                 >
-                                    Trang Chủ
+                                    Sổ Khám Điện Tử
                                 </Button>
-
-                                <Button
-                                    component={Link}
-                                    to="/booking"
-                                    sx={getNavBtnSx("/booking")}
+                                <Menu
+                                    anchorEl={patientRecordsAnchor}
+                                    open={Boolean(patientRecordsAnchor)}
+                                    onClose={handlePatientRecordsClose}
+                                    PaperProps={{
+                                        sx: {
+                                            borderRadius: 2.5,
+                                            minWidth: 220,
+                                            mt: 1,
+                                            boxShadow: "0 10px 25px rgba(0,0,0,0.08)",
+                                            p: 0.5
+                                        }
+                                    }}
                                 >
-                                    Đặt Lịch Khám
-                                </Button>
-
-                                {isAuthenticated && (
-                                    <>
-                                        <Button
-                                            component={Link}
-                                            to="/profiles"
-                                            sx={getNavBtnSx("/profiles")}
-                                        >
-                                            Hồ Sơ Bệnh Nhân
-                                        </Button>
-
-                                        <Button
-                                            component={Link}
-                                            to="/my-history"
-                                            sx={getNavBtnSx("/my-history")}
-                                        >
-                                            Phiếu Khám & Lịch Sử
-                                        </Button>
-                                    </>
-                                )}
-
-                                <Button
-                                    component={Link}
-                                    to="/lookup"
-                                    sx={getNavBtnSx("/lookup")}
-                                >
-                                    Tra Cứu & Sơ Đồ
-                                </Button>
-
-                                <Button
-                                    component={Link}
-                                    to="/chat"
-                                    sx={getNavBtnSx("/chat")}
-                                >
-                                    Tư Vấn Y Tế
-                                </Button>
-
-                                {isAuthenticated && (
-                                    <>
-                                        <Button
-                                            onClick={handleUtilityMenuOpen}
-                                            endIcon={<KeyboardArrowDownIcon sx={{ fontSize: 16 }} />}
-                                            sx={{
-                                                ...getNavBtnSx("/utilities"),
-                                                color: (isActive("/payment") || isActive("/reminders")) ? "#0088D6" : "#334155",
-                                                bgcolor: (isActive("/payment") || isActive("/reminders")) ? "#EBF6FE" : "transparent"
-                                            }}
-                                        >
-                                            Tiện Ích
-                                        </Button>
-                                        <Menu
-                                            anchorEl={utilityMenuAnchor}
-                                            open={Boolean(utilityMenuAnchor)}
-                                            onClose={handleUtilityMenuClose}
-                                            PaperProps={{
-                                                sx: {
-                                                    borderRadius: 2.5,
-                                                    minWidth: 200,
-                                                    mt: 1,
-                                                    boxShadow: "0 10px 25px rgba(0,0,0,0.08)",
-                                                    p: 0.5
-                                                }
-                                            }}
-                                        >
-                                            <MenuItem onClick={() => { handleUtilityMenuClose(); navigate("/payment"); }}>
-                                                <ListItemIcon><AccountBalanceWalletIcon fontSize="small" sx={{ color: "#F59E0B" }} /></ListItemIcon>
-                                                <ListItemText primary="Ví Viện Phí VNPay" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
-                                            </MenuItem>
-                                            <MenuItem onClick={() => { handleUtilityMenuClose(); navigate("/reminders"); }}>
-                                                <ListItemIcon><MedicationIcon fontSize="small" sx={{ color: "#EC4899" }} /></ListItemIcon>
-                                                <ListItemText primary="Nhắc Uống Thuốc" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
-                                            </MenuItem>
-                                        </Menu>
-                                    </>
-                                )}
+                                    <MenuItem onClick={() => { handlePatientRecordsClose(); navigate("/profiles"); }}>
+                                        <ListItemIcon><FolderSharedIcon fontSize="small" sx={{ color: designTokens.brand.primary }} /></ListItemIcon>
+                                        <ListItemText primary="Hồ Sơ Bệnh Nhân" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
+                                    </MenuItem>
+                                    <MenuItem onClick={() => { handlePatientRecordsClose(); navigate("/my-history"); }}>
+                                        <ListItemIcon><HistoryIcon fontSize="small" sx={{ color: designTokens.secondary.main }} /></ListItemIcon>
+                                        <ListItemText primary="Phiếu Khám & Lịch Sử" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
+                                    </MenuItem>
+                                    <MenuItem onClick={() => { handlePatientRecordsClose(); navigate("/my-bills"); }}>
+                                        <ListItemIcon><ReceiptLongIcon fontSize="small" sx={{ color: designTokens.status.info.main }} /></ListItemIcon>
+                                        <ListItemText primary="Hóa Đơn Viện Phí" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
+                                    </MenuItem>
+                                    <MenuItem onClick={() => { handlePatientRecordsClose(); navigate("/payment"); }}>
+                                        <ListItemIcon><AccountBalanceWalletIcon fontSize="small" sx={{ color: designTokens.status.warning.main }} /></ListItemIcon>
+                                        <ListItemText primary="Ví Viện Phí PayOS" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
+                                    </MenuItem>
+                                    <MenuItem onClick={() => { handlePatientRecordsClose(); navigate("/reminders"); }}>
+                                        <ListItemIcon><MedicationIcon fontSize="small" sx={{ color: "#EC4899" }} /></ListItemIcon>
+                                        <ListItemText primary="Nhắc Uống Thuốc" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
+                                    </MenuItem>
+                                </Menu>
                             </>
                         )}
 
-                        {/* 2. ĐIỀU DƯỠNG */}
-                        {role === "ROLE_NURSE" && (
-                            <>
-                                <Button
-                                    component={Link}
-                                    to="/nurse/reception"
-                                    startIcon={<HowToRegIcon sx={{ fontSize: 18 }} />}
-                                    sx={getNavBtnSx("/nurse/reception")}
-                                >
-                                    Tiếp Đón & Cấp STT
-                                </Button>
-                                <Button
-                                    component={Link}
-                                    to="/doctor/inpatient"
-                                    startIcon={<HotelIcon sx={{ fontSize: 18 }} />}
-                                    sx={getNavBtnSx("/doctor/inpatient")}
-                                >
-                                    Quản Lý Buồng Bệnh
-                                </Button>
-                                <Button
-                                    component={Link}
-                                    to="/profiles"
-                                    startIcon={<PersonIcon sx={{ fontSize: 18 }} />}
-                                    sx={getNavBtnSx("/profiles")}
-                                >
-                                    Hồ Sơ Bệnh Nhân
-                                </Button>
-                            </>
-                        )}
-
-                        {/* 3. BÁC SĨ & TRƯỞNG KHOA */}
-                        {(role === "ROLE_DOCTOR" || role === "ROLE_HEAD_OF_DEPARTMENT") && (
-                            <>
-                                <Button
-                                    component={Link}
-                                    to="/doctor/examinations"
-                                    startIcon={<MedicalServicesIcon sx={{ fontSize: 18 }} />}
-                                    sx={getNavBtnSx("/doctor/examinations")}
-                                >
-                                    Bàn Khám Lâm Sàng
-                                </Button>
-
-                                <Button
-                                    component={Link}
-                                    to="/doctor/inpatient"
-                                    startIcon={<HotelIcon sx={{ fontSize: 18 }} />}
-                                    sx={getNavBtnSx("/doctor/inpatient")}
-                                >
-                                    Nội Trú & Buồng Bệnh
-                                </Button>
-
-                                <Button
-                                    component={Link}
-                                    to="/doctor/lab-tests"
-                                    startIcon={<ScienceIcon sx={{ fontSize: 18 }} />}
-                                    sx={getNavBtnSx("/doctor/lab-tests")}
-                                >
-                                    Cận Lâm Sàng
-                                </Button>
-
-                                {role === "ROLE_HEAD_OF_DEPARTMENT" && (
-                                    <>
-                                        <Button
-                                            component={Link}
-                                            to="/admin/schedules"
-                                            startIcon={<EventNoteIcon sx={{ fontSize: 18 }} />}
-                                            sx={getNavBtnSx("/admin/schedules")}
-                                        >
-                                            Phân Lịch Trực
-                                        </Button>
-
-                                        <Button
-                                            component={Link}
-                                            to="/admin/departments"
-                                            startIcon={<LocalHospitalIcon sx={{ fontSize: 18 }} />}
-                                            sx={getNavBtnSx("/admin/departments")}
-                                        >
-                                            Phòng Khám
-                                        </Button>
-                                    </>
-                                )}
-
-                                <Button
-                                    component={Link}
-                                    to="/doctor/chat"
-                                    startIcon={<ChatIcon sx={{ fontSize: 18 }} />}
-                                    sx={getNavBtnSx("/doctor/chat")}
-                                >
-                                    Chat Tư Vấn
-                                </Button>
-                            </>
-                        )}
-
-                        {/* 4. BÁC SĨ XÉT NGHIỆM */}
-                        {role === "ROLE_LAB_TECHNICIAN" && (
+                        {/* Nút tác nghiệp nhanh nổi bật dành cho Nhân viên y tế / Admin */}
+                        {staffAction && (
                             <Button
                                 component={Link}
-                                to="/doctor/lab-tests"
-                                startIcon={<ScienceIcon sx={{ fontSize: 18 }} />}
-                                sx={getNavBtnSx("/doctor/lab-tests")}
+                                to={staffAction.path}
+                                variant="contained"
+                                color={staffAction.color}
+                                startIcon={staffAction.icon}
+                                sx={{
+                                    ml: 1,
+                                    textTransform: "none",
+                                    fontWeight: 700,
+                                    fontSize: "0.825rem",
+                                    borderRadius: 2,
+                                    px: 1.8,
+                                    py: 0.7,
+                                    boxShadow: "0 2px 8px rgba(0, 136, 214, 0.25)"
+                                }}
                             >
-                                Phòng Xét Nghiệm & KQ
+                                {staffAction.label}
                             </Button>
-                        )}
-
-                        {/* 5. THU NGÂN */}
-                        {role === "ROLE_CASHIER" && (
-                            <Button
-                                component={Link}
-                                to="/cashier"
-                                startIcon={<PointOfSaleIcon sx={{ fontSize: 18 }} />}
-                                sx={getNavBtnSx("/cashier")}
-                            >
-                                Thu Ngân Viện Phí
-                            </Button>
-                        )}
-
-                        {/* 6. QUẢN LÝ / ADMIN */}
-                        {role === "ROLE_ADMIN" && (
-                            <>
-                                <Button
-                                    component={Link}
-                                    to="/admin/dashboard"
-                                    startIcon={<AdminPanelSettingsIcon sx={{ fontSize: 18 }} />}
-                                    sx={getNavBtnSx("/admin/dashboard")}
-                                >
-                                    Quản Trị Hệ Thống
-                                </Button>
-                                <Button
-                                    component={Link}
-                                    to="/doctor/examinations"
-                                    startIcon={<MedicalServicesIcon sx={{ fontSize: 18 }} />}
-                                    sx={getNavBtnSx("/doctor/examinations")}
-                                >
-                                    Bàn Khám
-                                </Button>
-                                <Button
-                                    component={Link}
-                                    to="/doctor/inpatient"
-                                    startIcon={<HotelIcon sx={{ fontSize: 18 }} />}
-                                    sx={getNavBtnSx("/doctor/inpatient")}
-                                >
-                                    Nội Trú
-                                </Button>
-                                <Button
-                                    component={Link}
-                                    to="/nurse/reception"
-                                    startIcon={<HowToRegIcon sx={{ fontSize: 18 }} />}
-                                    sx={getNavBtnSx("/nurse/reception")}
-                                >
-                                    Tiếp Đón
-                                </Button>
-                            </>
                         )}
                     </Box>
 
@@ -491,16 +329,16 @@ export default function Navbar() {
                                         gap: 1,
                                         p: "4px 10px 4px 4px",
                                         borderRadius: "30px",
-                                        bgcolor: "#F1F5F9",
+                                        bgcolor: designTokens.neutral.hoverBg,
                                         cursor: "pointer",
-                                        border: "1px solid #E2E8F0",
+                                        border: `1px solid ${designTokens.neutral.border}`,
                                         transition: "0.2s",
-                                        "&:hover": { bgcolor: "#E2E8F0" }
+                                        "&:hover": { bgcolor: designTokens.neutral.borderLight }
                                     }}
                                 >
                                     <Avatar
                                         sx={{
-                                            bgcolor: "#0088D6",
+                                            bgcolor: designTokens.brand.primary,
                                             width: 32,
                                             height: 32,
                                             fontSize: "0.875rem",
@@ -509,10 +347,10 @@ export default function Navbar() {
                                     >
                                         {user?.fullName ? user.fullName.charAt(0).toUpperCase() : "U"}
                                     </Avatar>
-                                    <Typography variant="body2" fontWeight="700" color="#1E293B" sx={{ display: { xs: "none", sm: "block" }, fontSize: "0.85rem" }}>
+                                    <Typography variant="body2" fontWeight="700" color={designTokens.neutral.textPrimary} sx={{ display: { xs: "none", sm: "block" }, fontSize: "0.85rem" }}>
                                         {user?.fullName?.split(" ").slice(-2).join(" ") || "Tài khoản"}
                                     </Typography>
-                                    <KeyboardArrowDownIcon fontSize="small" sx={{ color: "#64748B", display: { xs: "none", sm: "block" } }} />
+                                    <KeyboardArrowDownIcon fontSize="small" sx={{ color: designTokens.neutral.textMuted, display: { xs: "none", sm: "block" } }} />
                                 </Box>
 
                                 <Menu
@@ -522,7 +360,7 @@ export default function Navbar() {
                                     PaperProps={{
                                         sx: {
                                             borderRadius: 3,
-                                            minWidth: 220,
+                                            minWidth: 230,
                                             mt: 1.5,
                                             boxShadow: "0 10px 30px rgba(0,0,0,0.1)",
                                             p: 1
@@ -530,43 +368,131 @@ export default function Navbar() {
                                     }}
                                 >
                                     <Box px={2} py={1}>
-                                        <Typography variant="subtitle2" fontWeight="bold" color="#0088D6">
+                                        <Typography variant="subtitle2" fontWeight="bold" color={designTokens.brand.primary}>
                                             {user?.fullName}
                                         </Typography>
                                         <Typography variant="caption" color="textSecondary">
-                                            {user?.phone || user?.username || "Thành viên"}
+                                            {user?.phoneNumber || user?.phone || user?.username || "Thành viên"}
                                         </Typography>
                                     </Box>
                                     <Divider sx={{ my: 0.5 }} />
 
-                                    {role === "ROLE_PATIENT" && (
+                                    {/* Phím tắt chức năng theo đúng phạm vi quyền hạn của từng vai trò */}
+                                    {isStaff ? (
                                         <>
+                                            {role === "ROLE_ADMIN" && (
+                                                <>
+                                                    <MenuItem onClick={() => { handleUserMenuClose(); navigate("/admin/dashboard"); }}>
+                                                        <ListItemIcon><AdminPanelSettingsIcon fontSize="small" sx={{ color: designTokens.brand.primary }} /></ListItemIcon>
+                                                        <ListItemText primary="Cổng Quản Trị Hệ Thống" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
+                                                    </MenuItem>
+                                                    <MenuItem onClick={() => { handleUserMenuClose(); navigate("/admin/accounts"); }}>
+                                                        <ListItemIcon><ManageAccountsIcon fontSize="small" sx={{ color: designTokens.secondary.main }} /></ListItemIcon>
+                                                        <ListItemText primary="Quản Lý Tài Khoản & Quyền" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
+                                                    </MenuItem>
+                                                </>
+                                            )}
+
+                                            {role === "ROLE_HEAD_OF_DEPARTMENT" && (
+                                                <>
+                                                    <MenuItem onClick={() => { handleUserMenuClose(); navigate("/admin/dashboard"); }}>
+                                                        <ListItemIcon><AdminPanelSettingsIcon fontSize="small" sx={{ color: designTokens.brand.primary }} /></ListItemIcon>
+                                                        <ListItemText primary="Cổng Điều Hành Trưởng Khoa" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
+                                                    </MenuItem>
+                                                    <MenuItem onClick={() => { handleUserMenuClose(); navigate("/doctor/examinations"); }}>
+                                                        <ListItemIcon><MedicalServicesIcon fontSize="small" sx={{ color: designTokens.brand.primary }} /></ListItemIcon>
+                                                        <ListItemText primary="Bàn Khám Lâm Sàng" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
+                                                    </MenuItem>
+                                                    <MenuItem onClick={() => { handleUserMenuClose(); navigate("/admin/schedules"); }}>
+                                                        <ListItemIcon><EventIcon fontSize="small" sx={{ color: designTokens.secondary.main }} /></ListItemIcon>
+                                                        <ListItemText primary="Phân Lịch Trực Ca Khoa" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
+                                                    </MenuItem>
+                                                </>
+                                            )}
+
+                                            {role === "ROLE_DOCTOR" && (
+                                                <>
+                                                    <MenuItem onClick={() => { handleUserMenuClose(); navigate("/doctor/examinations"); }}>
+                                                        <ListItemIcon><MedicalServicesIcon fontSize="small" sx={{ color: designTokens.brand.primary }} /></ListItemIcon>
+                                                        <ListItemText primary="Bàn Khám Lâm Sàng" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
+                                                    </MenuItem>
+                                                    <MenuItem onClick={() => { handleUserMenuClose(); navigate("/doctor/inpatient"); }}>
+                                                        <ListItemIcon><HotelIcon fontSize="small" sx={{ color: designTokens.secondary.main }} /></ListItemIcon>
+                                                        <ListItemText primary="Quản Lý Điều Trị Nội Trú" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
+                                                    </MenuItem>
+                                                </>
+                                            )}
+
+                                            {role === "ROLE_NURSE" && (
+                                                <>
+                                                    <MenuItem onClick={() => { handleUserMenuClose(); navigate("/nurse/reception"); }}>
+                                                        <ListItemIcon><HowToRegIcon fontSize="small" sx={{ color: designTokens.brand.primary }} /></ListItemIcon>
+                                                        <ListItemText primary="Bàn Tiếp Đón & Cấp STT" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
+                                                    </MenuItem>
+                                                    <MenuItem onClick={() => { handleUserMenuClose(); navigate("/doctor/inpatient"); }}>
+                                                        <ListItemIcon><HotelIcon fontSize="small" sx={{ color: designTokens.secondary.main }} /></ListItemIcon>
+                                                        <ListItemText primary="Quản Lý Buồng Bệnh Nội Trú" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
+                                                    </MenuItem>
+                                                </>
+                                            )}
+
+                                            {role === "ROLE_LAB_TECHNICIAN" && (
+                                                <MenuItem onClick={() => { handleUserMenuClose(); navigate("/doctor/lab-tests"); }}>
+                                                    <ListItemIcon><ScienceIcon fontSize="small" sx={{ color: "#B45309" }} /></ListItemIcon>
+                                                    <ListItemText primary="Phòng Xét Nghiệm & KQ" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
+                                                </MenuItem>
+                                            )}
+
+                                            {role === "ROLE_PHARMACIST" && (
+                                                <>
+                                                    <MenuItem onClick={() => { handleUserMenuClose(); navigate("/admin/pharmacy-inventory"); }}>
+                                                        <ListItemIcon><Inventory2Icon fontSize="small" sx={{ color: "#7C3AED" }} /></ListItemIcon>
+                                                        <ListItemText primary="Kho Dược Đa Cấp & FEFO" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
+                                                    </MenuItem>
+                                                    <MenuItem onClick={() => { handleUserMenuClose(); navigate("/admin/medicines"); }}>
+                                                        <ListItemIcon><MedicationIcon fontSize="small" sx={{ color: "#7C3AED" }} /></ListItemIcon>
+                                                        <ListItemText primary="Danh Mục Thuốc" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
+                                                    </MenuItem>
+                                                </>
+                                            )}
+
+                                            {role === "ROLE_CASHIER" && (
+                                                <MenuItem onClick={() => { handleUserMenuClose(); navigate("/cashier"); }}>
+                                                    <ListItemIcon><PointOfSaleIcon fontSize="small" sx={{ color: designTokens.status.success.main }} /></ListItemIcon>
+                                                    <ListItemText primary="Quầy Thu Ngân Viện Phí" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
+                                                </MenuItem>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <>
+                                            {/* Menu Sổ khám chỉ dành cho bệnh nhân */}
                                             <MenuItem onClick={() => { handleUserMenuClose(); navigate("/profiles"); }}>
-                                                <ListItemIcon><PersonIcon fontSize="small" /></ListItemIcon>
-                                                <ListItemText primary="Hồ sơ bệnh nhân" primaryTypographyProps={{ fontSize: "0.875rem" }} />
+                                                <ListItemIcon><PersonIcon fontSize="small" sx={{ color: designTokens.brand.primary }} /></ListItemIcon>
+                                                <ListItemText primary="Hồ Sơ Bệnh Nhân" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
                                             </MenuItem>
                                             <MenuItem onClick={() => { handleUserMenuClose(); navigate("/my-history"); }}>
-                                                <ListItemIcon><HistoryIcon fontSize="small" /></ListItemIcon>
-                                                <ListItemText primary="Phiếu khám & Lịch sử" primaryTypographyProps={{ fontSize: "0.875rem" }} />
+                                                <ListItemIcon><HistoryIcon fontSize="small" sx={{ color: designTokens.secondary.main }} /></ListItemIcon>
+                                                <ListItemText primary="Phiếu Khám & Lịch Sử" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
+                                            </MenuItem>
+                                            <MenuItem onClick={() => { handleUserMenuClose(); navigate("/my-bills"); }}>
+                                                <ListItemIcon><ReceiptLongIcon fontSize="small" sx={{ color: designTokens.status.info.main }} /></ListItemIcon>
+                                                <ListItemText primary="Hóa Đơn Viện Phí" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
                                             </MenuItem>
                                             <MenuItem onClick={() => { handleUserMenuClose(); navigate("/payment"); }}>
-                                                <ListItemIcon><AccountBalanceWalletIcon fontSize="small" /></ListItemIcon>
-                                                <ListItemText primary="Ví nạp tiền VNPay" primaryTypographyProps={{ fontSize: "0.875rem" }} />
+                                                <ListItemIcon><AccountBalanceWalletIcon fontSize="small" sx={{ color: designTokens.status.warning.main }} /></ListItemIcon>
+                                                <ListItemText primary="Ví Viện Phí PayOS" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
                                             </MenuItem>
                                             <MenuItem onClick={() => { handleUserMenuClose(); navigate("/reminders"); }}>
-                                                <ListItemIcon><MedicationIcon fontSize="small" /></ListItemIcon>
-                                                <ListItemText primary="Nhắc uống thuốc" primaryTypographyProps={{ fontSize: "0.875rem" }} />
+                                                <ListItemIcon><MedicationIcon fontSize="small" sx={{ color: "#EC4899" }} /></ListItemIcon>
+                                                <ListItemText primary="Nhắc Uống Thuốc" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
                                             </MenuItem>
-                                            <MenuItem onClick={() => { handleUserMenuClose(); navigate("/chat"); }}>
-                                                <ListItemIcon><SupportAgentIcon fontSize="small" /></ListItemIcon>
-                                                <ListItemText primary="Tư vấn y tế & Chat Bác sĩ" primaryTypographyProps={{ fontSize: "0.875rem" }} />
-                                            </MenuItem>
-                                            <Divider sx={{ my: 0.5 }} />
                                         </>
                                     )}
 
-                                    <MenuItem onClick={handleLogout} sx={{ color: "#EF4444" }}>
-                                        <ListItemIcon><LogoutIcon fontSize="small" sx={{ color: "#EF4444" }} /></ListItemIcon>
+                                    <Divider sx={{ my: 0.5 }} />
+
+                                    <MenuItem onClick={handleLogout} sx={{ color: designTokens.status.danger.main }}>
+                                        <ListItemIcon><LogoutIcon fontSize="small" sx={{ color: designTokens.status.danger.main }} /></ListItemIcon>
                                         <ListItemText primary="Đăng xuất" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 700 }} />
                                     </MenuItem>
                                 </Menu>
@@ -601,8 +527,8 @@ export default function Navbar() {
                             onClick={() => setMobileDrawerOpen(true)}
                             sx={{
                                 display: { xs: "flex", md: "none" },
-                                color: "#0088D6",
-                                bgcolor: "#F1F5F9",
+                                color: designTokens.brand.primary,
+                                bgcolor: designTokens.neutral.hoverBg,
                                 p: 0.8,
                                 borderRadius: 2
                             }}
@@ -614,7 +540,7 @@ export default function Navbar() {
                 </Toolbar>
             </Container>
 
-            {/* 3. MOBILE NAVIGATION DRAWER */}
+            {/* 3. MOBILE NAVIGATION DRAWER: Phân nhóm rõ ràng cho điện thoại */}
             <Drawer
                 anchor="left"
                 open={mobileDrawerOpen}
@@ -630,230 +556,146 @@ export default function Navbar() {
                 }}
             >
                 {/* Drawer Header */}
-                <Box display="flex" alignItems="center" justifyContent="space-between" pb={2} borderBottom="1px solid #E2E8F0">
+                <Box display="flex" alignItems="center" justifyContent="space-between" pb={2} borderBottom={`1px solid ${designTokens.neutral.border}`}>
                     <Box display="flex" alignItems="center" gap={1.2}>
                         <Box
                             sx={{
                                 width: 34,
                                 height: 34,
                                 borderRadius: "8px",
-                                background: "linear-gradient(135deg, #0088D6 0%, #00C292 100%)",
+                                background: `linear-gradient(135deg, ${designTokens.brand.primary} 0%, ${designTokens.secondary.main} 100%)`,
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
-                                color: "white"
+                                color: "#FFFFFF"
                             }}
                         >
                             <LocalHospitalIcon sx={{ fontSize: 20 }} />
                         </Box>
                         <Box>
-                            <Typography variant="subtitle2" fontWeight="800" color="#0088D6">
+                            <Typography variant="subtitle2" fontWeight="800" color={designTokens.brand.primary}>
                                 YouMed TNT
                             </Typography>
                             <Typography variant="caption" color="textSecondary" fontSize="0.7rem">
-                                Hospital Management
+                                Bệnh Viện Thông Minh
                             </Typography>
                         </Box>
                     </Box>
-                    <IconButton onClick={() => setMobileDrawerOpen(false)} size="small" sx={{ color: "#64748B" }}>
+                    <IconButton onClick={() => setMobileDrawerOpen(false)} size="small" sx={{ color: designTokens.neutral.textMuted }}>
                         <CloseIcon />
                     </IconButton>
                 </Box>
 
                 {/* Drawer Links */}
                 <Box sx={{ overflowY: "auto", flexGrow: 1, py: 1.5 }}>
-                    <List disablePadding>
-                        {(!isAuthenticated || role === "ROLE_PATIENT") && (
-                            <>
-                                <ListItem disablePadding sx={{ mb: 0.5 }}>
-                                    <ListItemButton component={Link} to="/" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
-                                        <ListItemIcon sx={{ color: "#0088D6", minWidth: 36 }}><HomeIcon fontSize="small" /></ListItemIcon>
-                                        <ListItemText primary="Trang Chủ" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
-                                    </ListItemButton>
-                                </ListItem>
-                                <ListItem disablePadding sx={{ mb: 0.5 }}>
-                                    <ListItemButton component={Link} to="/booking" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
-                                        <ListItemIcon sx={{ color: "#0088D6", minWidth: 36 }}><EventAvailableIcon fontSize="small" /></ListItemIcon>
-                                        <ListItemText primary="Đặt Lịch Khám" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
-                                    </ListItemButton>
-                                </ListItem>
-                                {isAuthenticated && (
-                                    <>
-                                        <ListItem disablePadding sx={{ mb: 0.5 }}>
-                                            <ListItemButton component={Link} to="/profiles" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
-                                                <ListItemIcon sx={{ color: "#0088D6", minWidth: 36 }}><PersonIcon fontSize="small" /></ListItemIcon>
-                                                <ListItemText primary="Hồ Sơ Bệnh Nhân" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
-                                            </ListItemButton>
-                                        </ListItem>
-                                        <ListItem disablePadding sx={{ mb: 0.5 }}>
-                                            <ListItemButton component={Link} to="/my-history" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
-                                                <ListItemIcon sx={{ color: "#00C292", minWidth: 36 }}><HistoryIcon fontSize="small" /></ListItemIcon>
-                                                <ListItemText primary="Phiếu Khám & Lịch Sử" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
-                                            </ListItemButton>
-                                        </ListItem>
-                                        <ListItem disablePadding sx={{ mb: 0.5 }}>
-                                            <ListItemButton component={Link} to="/payment" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
-                                                <ListItemIcon sx={{ color: "#F59E0B", minWidth: 36 }}><AccountBalanceWalletIcon fontSize="small" /></ListItemIcon>
-                                                <ListItemText primary="Ví Viện Phí VNPay" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
-                                            </ListItemButton>
-                                        </ListItem>
-                                        <ListItem disablePadding sx={{ mb: 0.5 }}>
-                                            <ListItemButton component={Link} to="/reminders" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
-                                                <ListItemIcon sx={{ color: "#EC4899", minWidth: 36 }}><MedicationIcon fontSize="small" /></ListItemIcon>
-                                                <ListItemText primary="Nhắc Uống Thuốc" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
-                                            </ListItemButton>
-                                        </ListItem>
-                                    </>
-                                )}
-                                <ListItem disablePadding sx={{ mb: 0.5 }}>
-                                    <ListItemButton component={Link} to="/lookup" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
-                                        <ListItemIcon sx={{ color: "#64748B", minWidth: 36 }}><SearchIcon fontSize="small" /></ListItemIcon>
-                                        <ListItemText primary="Tìm Hồ Sơ Đã Mất" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
-                                    </ListItemButton>
-                                </ListItem>
-                                <ListItem disablePadding sx={{ mb: 0.5 }}>
-                                    <ListItemButton component={Link} to="/chat" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
-                                        <ListItemIcon sx={{ color: "#0088D6", minWidth: 36 }}><SupportAgentIcon fontSize="small" /></ListItemIcon>
-                                        <ListItemText primary="Tư Vấn Y Tế & Chat Bác Sĩ" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
-                                    </ListItemButton>
-                                </ListItem>
-                            </>
-                        )}
-
-                        {role === "ROLE_NURSE" && (
-                            <>
-                                <ListItem disablePadding sx={{ mb: 0.5 }}>
-                                    <ListItemButton component={Link} to="/nurse/reception" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
-                                        <ListItemIcon sx={{ color: "#0088D6", minWidth: 36 }}><HowToRegIcon fontSize="small" /></ListItemIcon>
-                                        <ListItemText primary="Tiếp Đón & Cấp STT" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
-                                    </ListItemButton>
-                                </ListItem>
-                                <ListItem disablePadding sx={{ mb: 0.5 }}>
-                                    <ListItemButton component={Link} to="/doctor/inpatient" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
-                                        <ListItemIcon sx={{ color: "#0088D6", minWidth: 36 }}><HotelIcon fontSize="small" /></ListItemIcon>
-                                        <ListItemText primary="Quản Lý Buồng Bệnh" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
-                                    </ListItemButton>
-                                </ListItem>
-                                <ListItem disablePadding sx={{ mb: 0.5 }}>
-                                    <ListItemButton component={Link} to="/profiles" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
-                                        <ListItemIcon sx={{ color: "#0088D6", minWidth: 36 }}><PersonIcon fontSize="small" /></ListItemIcon>
-                                        <ListItemText primary="Hồ Sơ Bệnh Nhân" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
-                                    </ListItemButton>
-                                </ListItem>
-                            </>
-                        )}
-
-                        {(role === "ROLE_DOCTOR" || role === "ROLE_HEAD_OF_DEPARTMENT") && (
-                            <>
-                                <ListItem disablePadding sx={{ mb: 0.5 }}>
-                                    <ListItemButton component={Link} to="/doctor/examinations" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
-                                        <ListItemIcon sx={{ color: "#0088D6", minWidth: 36 }}><MedicalServicesIcon fontSize="small" /></ListItemIcon>
-                                        <ListItemText primary="Bàn Khám Lâm Sàng" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
-                                    </ListItemButton>
-                                </ListItem>
-                                <ListItem disablePadding sx={{ mb: 0.5 }}>
-                                    <ListItemButton component={Link} to="/doctor/inpatient" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
-                                        <ListItemIcon sx={{ color: "#0088D6", minWidth: 36 }}><HotelIcon fontSize="small" /></ListItemIcon>
-                                        <ListItemText primary="Nội Trú & Buồng Bệnh" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
-                                    </ListItemButton>
-                                </ListItem>
-                                <ListItem disablePadding sx={{ mb: 0.5 }}>
-                                    <ListItemButton component={Link} to="/doctor/lab-tests" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
-                                        <ListItemIcon sx={{ color: "#0088D6", minWidth: 36 }}><ScienceIcon fontSize="small" /></ListItemIcon>
-                                        <ListItemText primary="Cận Lâm Sàng" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
-                                    </ListItemButton>
-                                </ListItem>
-                                {role === "ROLE_HEAD_OF_DEPARTMENT" && (
-                                    <>
-                                        <ListItem disablePadding sx={{ mb: 0.5 }}>
-                                            <ListItemButton component={Link} to="/admin/schedules" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
-                                                <ListItemIcon sx={{ color: "#0088D6", minWidth: 36 }}><EventNoteIcon fontSize="small" /></ListItemIcon>
-                                                <ListItemText primary="Phân Lịch Trực Khoa" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
-                                            </ListItemButton>
-                                        </ListItem>
-                                        <ListItem disablePadding sx={{ mb: 0.5 }}>
-                                            <ListItemButton component={Link} to="/admin/departments" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
-                                                <ListItemIcon sx={{ color: "#0088D6", minWidth: 36 }}><LocalHospitalIcon fontSize="small" /></ListItemIcon>
-                                                <ListItemText primary="Quản Lý Phòng Khám" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
-                                            </ListItemButton>
-                                        </ListItem>
-                                    </>
-                                )}
-                                <ListItem disablePadding sx={{ mb: 0.5 }}>
-                                    <ListItemButton component={Link} to="/doctor/chat" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
-                                        <ListItemIcon sx={{ color: "#0088D6", minWidth: 36 }}><ChatIcon fontSize="small" /></ListItemIcon>
-                                        <ListItemText primary="Phòng Chat Tư Vấn Bệnh Nhân" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
-                                    </ListItemButton>
-                                </ListItem>
-                            </>
-                        )}
-
-                        {role === "ROLE_LAB_TECHNICIAN" && (
-                            <ListItem disablePadding sx={{ mb: 0.5 }}>
-                                <ListItemButton component={Link} to="/doctor/lab-tests" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
-                                    <ListItemIcon sx={{ color: "#0088D6", minWidth: 36 }}><ScienceIcon fontSize="small" /></ListItemIcon>
-                                    <ListItemText primary="Phòng Xét Nghiệm & KQ" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
+                    {/* Mục Tác Nghiệp Y Tế nếu là nhân viên */}
+                    {staffAction && (
+                        <Box mb={2}>
+                            <Typography variant="caption" fontWeight="bold" color={designTokens.neutral.textMuted} sx={{ px: 1, textTransform: "uppercase", fontSize: "0.7rem", letterSpacing: "0.5px" }}>
+                                Khu Vực Làm Việc Y Tế
+                            </Typography>
+                            <ListItem disablePadding sx={{ mt: 0.5 }}>
+                                <ListItemButton
+                                    component={Link}
+                                    to={staffAction.path}
+                                    onClick={() => setMobileDrawerOpen(false)}
+                                    sx={{
+                                        borderRadius: 2,
+                                        bgcolor: designTokens.brand.primaryLight,
+                                        color: designTokens.brand.primaryDark,
+                                        border: `1px solid ${designTokens.brand.primaryBorder}`
+                                    }}
+                                >
+                                    <ListItemIcon sx={{ color: designTokens.brand.primary, minWidth: 36 }}>{staffAction.icon}</ListItemIcon>
+                                    <ListItemText primary={staffAction.label} primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 700 }} />
                                 </ListItemButton>
                             </ListItem>
-                        )}
+                            <Divider sx={{ my: 1.5 }} />
+                        </Box>
+                    )}
 
-                        {role === "ROLE_CASHIER" && (
-                            <ListItem disablePadding sx={{ mb: 0.5 }}>
-                                <ListItemButton component={Link} to="/cashier" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
-                                    <ListItemIcon sx={{ color: "#0088D6", minWidth: 36 }}><PointOfSaleIcon fontSize="small" /></ListItemIcon>
-                                    <ListItemText primary="Quầy Thu Ngân Viện Phí" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
-                                </ListItemButton>
-                            </ListItem>
-                        )}
-
-                        {role === "ROLE_ADMIN" && (
-                            <>
-                                <ListItem disablePadding sx={{ mb: 0.5 }}>
-                                    <ListItemButton component={Link} to="/admin/dashboard" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
-                                        <ListItemIcon sx={{ color: "#0088D6", minWidth: 36 }}><AdminPanelSettingsIcon fontSize="small" /></ListItemIcon>
-                                        <ListItemText primary="Portal Quản Trị Hệ Thống" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
-                                    </ListItemButton>
-                                </ListItem>
-                                <ListItem disablePadding sx={{ mb: 0.5 }}>
-                                    <ListItemButton component={Link} to="/doctor/examinations" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
-                                        <ListItemIcon sx={{ color: "#0088D6", minWidth: 36 }}><MedicalServicesIcon fontSize="small" /></ListItemIcon>
-                                        <ListItemText primary="Bàn Khám Lâm Sàng" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
-                                    </ListItemButton>
-                                </ListItem>
-                                <ListItem disablePadding sx={{ mb: 0.5 }}>
-                                    <ListItemButton component={Link} to="/doctor/inpatient" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
-                                        <ListItemIcon sx={{ color: "#0088D6", minWidth: 36 }}><HotelIcon fontSize="small" /></ListItemIcon>
-                                        <ListItemText primary="Nội Trú & Buồng Bệnh" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
-                                    </ListItemButton>
-                                </ListItem>
-                                <ListItem disablePadding sx={{ mb: 0.5 }}>
-                                    <ListItemButton component={Link} to="/nurse/reception" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
-                                        <ListItemIcon sx={{ color: "#0088D6", minWidth: 36 }}><HowToRegIcon fontSize="small" /></ListItemIcon>
-                                        <ListItemText primary="Tiếp Đón & Cấp STT" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
-                                    </ListItemButton>
-                                </ListItem>
-                            </>
-                        )}
-
-                        {/* Tiện ích thiết bị sảnh */}
-                        <Divider sx={{ my: 1 }} />
+                    {/* Dịch vụ Khám chữa bệnh công khai */}
+                    <Typography variant="caption" fontWeight="bold" color={designTokens.neutral.textMuted} sx={{ px: 1, textTransform: "uppercase", fontSize: "0.7rem", letterSpacing: "0.5px" }}>
+                        Dịch Vụ Bệnh Viện
+                    </Typography>
+                    <List disablePadding sx={{ mt: 0.5 }}>
                         <ListItem disablePadding sx={{ mb: 0.5 }}>
-                            <ListItemButton component={Link} to="/kiosk" target="_blank" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
-                                <ListItemIcon sx={{ color: "#D97706", minWidth: 36 }}><QrCodeScannerIcon fontSize="small" /></ListItemIcon>
-                                <ListItemText primary="Kiosk Lấy Số Sảnh Tự Phục Vụ" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
+                            <ListItemButton component={Link} to="/" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
+                                <ListItemIcon sx={{ color: designTokens.brand.primary, minWidth: 36 }}><HomeIcon fontSize="small" /></ListItemIcon>
+                                <ListItemText primary="Trang Chủ" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
                             </ListItemButton>
                         </ListItem>
                         <ListItem disablePadding sx={{ mb: 0.5 }}>
-                            <ListItemButton component={Link} to="/queue-display" target="_blank" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
-                                <ListItemIcon sx={{ color: "#6366F1", minWidth: 36 }}><TvIcon fontSize="small" /></ListItemIcon>
-                                <ListItemText primary="Màn Hình LED TV Gọi Số" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
+                            <ListItemButton component={Link} to="/booking" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
+                                <ListItemIcon sx={{ color: designTokens.brand.primary, minWidth: 36 }}><EventAvailableIcon fontSize="small" /></ListItemIcon>
+                                <ListItemText primary="Đặt Lịch Khám" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
+                            </ListItemButton>
+                        </ListItem>
+                        <ListItem disablePadding sx={{ mb: 0.5 }}>
+                            <ListItemButton component={Link} to="/lookup" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
+                                <ListItemIcon sx={{ color: designTokens.neutral.textMuted, minWidth: 36 }}><SearchIcon fontSize="small" /></ListItemIcon>
+                                <ListItemText primary="Tra Cứu Hồ Sơ & Sơ Đồ" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
+                            </ListItemButton>
+                        </ListItem>
+                        <ListItem disablePadding sx={{ mb: 0.5 }}>
+                            <ListItemButton component={Link} to="/verify-prescription" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
+                                <ListItemIcon sx={{ color: designTokens.secondary.main, minWidth: 36 }}><VerifiedUserIcon fontSize="small" /></ListItemIcon>
+                                <ListItemText primary="Xác Thực Đơn Thuốc" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
+                            </ListItemButton>
+                        </ListItem>
+                        <ListItem disablePadding sx={{ mb: 0.5 }}>
+                            <ListItemButton component={Link} to="/chat" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
+                                <ListItemIcon sx={{ color: designTokens.brand.primary, minWidth: 36 }}><SupportAgentIcon fontSize="small" /></ListItemIcon>
+                                <ListItemText primary="Tư Vấn Y Tế Trực Tuyến" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
                             </ListItemButton>
                         </ListItem>
                     </List>
+
+                    {/* Sổ khám điện tử (Chỉ dành riêng cho Bệnh nhân) */}
+                    {isAuthenticated && !isStaff && (
+                        <>
+                            <Divider sx={{ my: 1.5 }} />
+                            <Typography variant="caption" fontWeight="bold" color={designTokens.neutral.textMuted} sx={{ px: 1, textTransform: "uppercase", fontSize: "0.7rem", letterSpacing: "0.5px" }}>
+                                Sổ Khám Điện Tử
+                            </Typography>
+                            <List disablePadding sx={{ mt: 0.5 }}>
+                                <ListItem disablePadding sx={{ mb: 0.5 }}>
+                                    <ListItemButton component={Link} to="/profiles" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
+                                        <ListItemIcon sx={{ color: designTokens.brand.primary, minWidth: 36 }}><FolderSharedIcon fontSize="small" /></ListItemIcon>
+                                        <ListItemText primary="Hồ Sơ Bệnh Nhân" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
+                                    </ListItemButton>
+                                </ListItem>
+                                <ListItem disablePadding sx={{ mb: 0.5 }}>
+                                    <ListItemButton component={Link} to="/my-history" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
+                                        <ListItemIcon sx={{ color: designTokens.secondary.main, minWidth: 36 }}><HistoryIcon fontSize="small" /></ListItemIcon>
+                                        <ListItemText primary="Phiếu Khám & Lịch Sử" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
+                                    </ListItemButton>
+                                </ListItem>
+                                <ListItem disablePadding sx={{ mb: 0.5 }}>
+                                    <ListItemButton component={Link} to="/my-bills" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
+                                        <ListItemIcon sx={{ color: designTokens.status.info.main, minWidth: 36 }}><ReceiptLongIcon fontSize="small" /></ListItemIcon>
+                                        <ListItemText primary="Hóa Đơn Viện Phí" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
+                                    </ListItemButton>
+                                </ListItem>
+                                <ListItem disablePadding sx={{ mb: 0.5 }}>
+                                    <ListItemButton component={Link} to="/payment" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
+                                        <ListItemIcon sx={{ color: designTokens.status.warning.main, minWidth: 36 }}><AccountBalanceWalletIcon fontSize="small" /></ListItemIcon>
+                                        <ListItemText primary="Ví Viện Phí PayOS" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
+                                    </ListItemButton>
+                                </ListItem>
+                                <ListItem disablePadding sx={{ mb: 0.5 }}>
+                                    <ListItemButton component={Link} to="/reminders" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
+                                        <ListItemIcon sx={{ color: "#EC4899", minWidth: 36 }}><MedicationIcon fontSize="small" /></ListItemIcon>
+                                        <ListItemText primary="Nhắc Uống Thuốc" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
+                                    </ListItemButton>
+                                </ListItem>
+                            </List>
+                        </>
+                    )}
                 </Box>
 
                 {/* Drawer Footer */}
-                <Box pt={2} borderTop="1px solid #E2E8F0">
+                <Box pt={2} borderTop={`1px solid ${designTokens.neutral.border}`}>
                     {isAuthenticated ? (
                         <Button
                             fullWidth

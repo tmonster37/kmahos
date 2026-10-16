@@ -27,6 +27,8 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import MedicalServicesIcon from "@mui/icons-material/MedicalServices";
 import PhoneIcon from "@mui/icons-material/Phone";
 import EmailIcon from "@mui/icons-material/Email";
+import BadgeIcon from "@mui/icons-material/Badge";
+import VerifiedIcon from "@mui/icons-material/Verified";
 import axiosInstance from "../../services/AxiosInstance";
 import { formatCurrency } from "../../utils/formatters";
 
@@ -60,6 +62,52 @@ export default function DoctorManagePage() {
     const [formData, setFormData] = useState(defaultForm);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+
+    // === QUẢN LÝ CHỨNG CHỈ HÀNH NGHỀ (CCHN) BÁC SĨ (THÔNG TƯ BỘ Y TẾ) ===
+    const [openLicenseModal, setOpenLicenseModal] = useState(false);
+    const [licenseForm, setLicenseForm] = useState({
+        doctorId: "",
+        doctorName: "",
+        doctorLicense: "",
+        licenseIssuedDate: "2020-05-15",
+        licenseScope: ""
+    });
+    const [licenseLoading, setLicenseLoading] = useState(false);
+
+    const handleOpenLicense = (doc) => {
+        setLicenseForm({
+            doctorId: doc.doctorId,
+            doctorName: doc.fullName || "Bác sĩ",
+            doctorLicense: doc.doctorLicense || "",
+            licenseIssuedDate: doc.licenseIssuedDate || "2020-05-15",
+            licenseScope: doc.licenseScope || "Khám bệnh, chữa bệnh chuyên khoa"
+        });
+        setOpenLicenseModal(true);
+    };
+
+    const handleSaveLicense = async (e) => {
+        if (e) e.preventDefault();
+        if (!licenseForm.doctorLicense || !licenseForm.doctorLicense.trim()) {
+            setError("Vui lòng nhập số chứng chỉ hành nghề (CCHN)!");
+            return;
+        }
+
+        setLicenseLoading(true);
+        try {
+            await axiosInstance.put(`/api/admin/doctors/${licenseForm.doctorId}/license`, {
+                doctorLicense: licenseForm.doctorLicense.trim(),
+                licenseIssuedDate: licenseForm.licenseIssuedDate || null,
+                licenseScope: licenseForm.licenseScope?.trim() || ""
+            });
+            setOpenLicenseModal(false);
+            loadData();
+        } catch (err) {
+            console.error("Lỗi cập nhật CCHN:", err);
+            setError(err.response?.data?.message || "Không thể cập nhật chứng chỉ hành nghề");
+        } finally {
+            setLicenseLoading(false);
+        }
+    };
 
     const loadData = async () => {
         try {
@@ -186,8 +234,26 @@ export default function DoctorManagePage() {
                                         <Typography variant="subtitle1" fontWeight="bold" color="primary.main">
                                             {doc.fullName}
                                         </Typography>
-                                        <Chip label={doc.degree} color="secondary" size="small" sx={{ fontWeight: "bold", mr: 0.5 }} />
-                                        <Chip label={doc.departmentName} size="small" variant="outlined" />
+                                        <Box display="flex" flexWrap="wrap" gap={0.5} mt={0.5}>
+                                            <Chip label={doc.degree} color="secondary" size="small" sx={{ fontWeight: "bold" }} />
+                                            <Chip label={doc.departmentName} size="small" variant="outlined" />
+                                            {doc.doctorLicense ? (
+                                                <Chip
+                                                    icon={<VerifiedIcon style={{ fontSize: 14 }} />}
+                                                    label={doc.doctorLicense}
+                                                    color="success"
+                                                    size="small"
+                                                    sx={{ fontWeight: "bold", fontSize: "0.7rem" }}
+                                                />
+                                            ) : (
+                                                <Chip
+                                                    label="Chưa có CCHN"
+                                                    color="warning"
+                                                    size="small"
+                                                    sx={{ fontWeight: "bold", fontSize: "0.7rem" }}
+                                                />
+                                            )}
+                                        </Box>
                                     </Box>
                                 </Box>
 
@@ -219,7 +285,12 @@ export default function DoctorManagePage() {
                                 </Box>
                             </CardContent>
 
-                            <Box display="flex" justifyContent="flex-end" p={1.5} bgcolor="#F9FBFD" sx={{ borderTop: "1px solid #ECEFF1" }}>
+                            <Box display="flex" justifyContent="flex-end" p={1.5} bgcolor="#F9FBFD" sx={{ borderTop: "1px solid #ECEFF1", gap: 0.5 }}>
+                                <Tooltip title="Cập nhật Chứng chỉ hành nghề (CCHN)">
+                                    <IconButton size="small" color="secondary" onClick={() => handleOpenLicense(doc)}>
+                                        <BadgeIcon fontSize="small" />
+                                    </IconButton>
+                                </Tooltip>
                                 <Tooltip title="Chỉnh sửa thông tin">
                                     <IconButton size="small" color="primary" onClick={() => handleOpenEdit(doc)}>
                                         <EditIcon fontSize="small" />
@@ -355,6 +426,65 @@ export default function DoctorManagePage() {
                     <Button onClick={() => setOpenModal(false)}>Hủy</Button>
                     <Button variant="contained" color="primary" onClick={handleSubmit} disabled={loading}>
                         {loading ? "Đang lưu..." : editingDoctorId ? "Cập Nhật" : "Tạo Bác Sĩ"}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+            {/* Modal Cập Nhật Chứng Chỉ Hành Nghề (CCHN) Bác Sĩ */}
+            <Dialog open={openLicenseModal} onClose={() => setOpenLicenseModal(false)} maxWidth="sm" fullWidth>
+                <DialogTitle fontWeight="bold" color="primary.main">
+                    📜 Cập Nhật Chứng Chỉ Hành Nghề (CCHN) Bác Sĩ
+                </DialogTitle>
+                <DialogContent dividers>
+                    {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+                    <Box sx={{ mb: 2, p: 1.5, bgcolor: "#E3F2FD", borderRadius: 2 }}>
+                        <Typography variant="body2" color="primary.dark">
+                            <strong>Bác sĩ:</strong> {licenseForm.doctorName} (Mã BS #{licenseForm.doctorId})
+                        </Typography>
+                        <Typography variant="caption" color="textSecondary">
+                            Căn cứ Luật Khám bệnh, chữa bệnh & Thông tư BYT về quản lý thông tin nhân viên y tế
+                        </Typography>
+                    </Box>
+
+                    <Grid container spacing={2}>
+                        <Grid item xs={12}>
+                            <TextField
+                                fullWidth
+                                label="Số Chứng Chỉ Hành Nghề (CCHN)"
+                                value={licenseForm.doctorLicense}
+                                onChange={(e) => setLicenseForm({ ...licenseForm, doctorLicense: e.target.value })}
+                                required
+                                placeholder="VD: 012345/BYT-CCHN hoặc 04567/HNO-CCHN"
+                                helperText="Mã định danh hành nghề do Bộ Y tế hoặc Sở Y tế cấp"
+                            />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <TextField
+                                fullWidth
+                                type="date"
+                                label="Ngày cấp CCHN"
+                                InputLabelProps={{ shrink: true }}
+                                value={licenseForm.licenseIssuedDate || ""}
+                                onChange={(e) => setLicenseForm({ ...licenseForm, licenseIssuedDate: e.target.value })}
+                            />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <TextField
+                                fullWidth
+                                multiline
+                                rows={3}
+                                label="Phạm vi hoạt động chuyên môn"
+                                value={licenseForm.licenseScope}
+                                onChange={(e) => setLicenseForm({ ...licenseForm, licenseScope: e.target.value })}
+                                placeholder="Khám bệnh, chữa bệnh chuyên khoa Nội tim mạch, Hồi sức cấp cứu..."
+                                helperText="Ghi theo phạm vi được ghi trên chứng chỉ hành nghề"
+                            />
+                        </Grid>
+                    </Grid>
+                </DialogContent>
+                <DialogActions sx={{ p: 2 }}>
+                    <Button onClick={() => setOpenLicenseModal(false)}>Hủy</Button>
+                    <Button variant="contained" color="secondary" onClick={handleSaveLicense} disabled={licenseLoading}>
+                        {licenseLoading ? "Đang lưu..." : "Lưu Chứng Chỉ"}
                     </Button>
                 </DialogActions>
             </Dialog>

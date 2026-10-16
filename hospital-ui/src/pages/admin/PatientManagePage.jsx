@@ -40,64 +40,10 @@ import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
 import axiosInstance from "../../services/AxiosInstance";
 import { formatDate, formatDateTime, formatCurrency } from "../../utils/formatters";
 
-const FALLBACK_PATIENTS = [
-    {
-        patientId: "BN-1001",
-        fullName: "Nguyễn Văn An",
-        phoneNumber: "0901234567",
-        identityCard: "079090001234",
-        dateOfBirth: "1988-05-14",
-        gender: "MALE",
-        address: "123 Hoàng Hoa Thám, Ba Đình, Hà Nội",
-        insuranceCode: "DN4790123456789",
-        totalVisits: 5,
-        totalSpent: 3450000,
-        lastVisit: "2026-09-26T08:30:00Z",
-        balance: 1500000,
-        history: [
-            { visitDate: "2026-09-26", doctor: "BS. CKI Trần Đình Trọng", department: "Khoa Nội Tổng Quát", diagnosis: "Viêm loét dạ dày tá tràng", cost: 450000 },
-            { visitDate: "2026-06-10", doctor: "PGS. TS Nguyễn Văn Minh", department: "Khoa Tai Mũi Họng", diagnosis: "Viêm xoang hàm cấp", cost: 680000 }
-        ]
-    },
-    {
-        patientId: "BN-1002",
-        fullName: "Trần Thị Mai",
-        phoneNumber: "0912345678",
-        identityCard: "079192005678",
-        dateOfBirth: "1995-10-22",
-        gender: "FEMALE",
-        address: "45 Lê Duẩn, Hải Châu, Đà Nẵng",
-        insuranceCode: "GD4790987654321",
-        totalVisits: 3,
-        totalSpent: 1890000,
-        lastVisit: "2026-09-25T14:15:00Z",
-        balance: 500000,
-        history: [
-            { visitDate: "2026-09-25", doctor: "BS. CKI Lê Hoàng Long", department: "Khoa Tim Mạch", diagnosis: "Rối loạn nhịp xoang nhẹ", cost: 890000 }
-        ]
-    },
-    {
-        patientId: "BN-1003",
-        fullName: "Lê Hoàng Long",
-        phoneNumber: "0987654321",
-        identityCard: "001095003344",
-        dateOfBirth: "1992-03-08",
-        gender: "MALE",
-        address: "88 Nguyễn Thị Minh Khai, Q.3, TP.HCM",
-        insuranceCode: "TE1790112233445",
-        totalVisits: 8,
-        totalSpent: 6200000,
-        lastVisit: "2026-09-20T09:00:00Z",
-        balance: 2100000,
-        history: [
-            { visitDate: "2026-09-20", doctor: "BS. Phạm Thu Hà", department: "Khoa Ngoại - Phẫu Thuật", diagnosis: "Chấn thương phần mềm khớp gối", cost: 1250000 }
-        ]
-    }
-];
-
 export default function PatientManagePage() {
     const [patients, setPatients] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [patientError, setPatientError] = useState("");
     const [searchKeyword, setSearchKeyword] = useState("");
     const [selectedPatient, setSelectedPatient] = useState(null);
     const [openDetailModal, setOpenDetailModal] = useState(false);
@@ -108,89 +54,66 @@ export default function PatientManagePage() {
 
     const loadPatients = async () => {
         setLoading(true);
+        setPatientError("");
         try {
             const [accRes, profRes] = await Promise.all([
-                axiosInstance.get("/api/admin/accounts?role=ROLE_PATIENT").catch(() => null),
-                axiosInstance.get("/api/patient-profiles").catch(() => null)
+                axiosInstance.get("/api/admin/accounts?role=ROLE_PATIENT"),
+                axiosInstance.get("/api/patient-profiles")
             ]);
 
-            const accounts = (accRes && Array.isArray(accRes.data)) ? accRes.data : [];
-            const profiles = (profRes && Array.isArray(profRes.data)) ? profRes.data : [];
+            const accounts = (accRes && Array.isArray(accRes.data)) ? accRes.data : (Array.isArray(accRes) ? accRes : []);
+            const profiles = (profRes && Array.isArray(profRes.data)) ? profRes.data : (Array.isArray(profRes) ? profRes : []);
 
-            if (accounts.length > 0 || profiles.length > 0) {
-                const mergedList = [];
+            const mergedList = [];
 
-                // Thêm từ tài khoản thật
-                accounts.forEach((acc, idx) => {
-                    const matchedProfile = profiles.find(p => p.phoneNumber === acc.phoneNumber);
+            // Thêm từ tài khoản thật
+            accounts.forEach((acc, idx) => {
+                const matchedProfile = profiles.find(p => p.phoneNumber === acc.phoneNumber);
+                mergedList.push({
+                    patientId: `BN-${1000 + idx + 1}`,
+                    userId: acc.userId,
+                    fullName: acc.fullName || matchedProfile?.fullName || "Bệnh nhân",
+                    phoneNumber: acc.phoneNumber || "---",
+                    email: acc.email || "---",
+                    identityCard: matchedProfile?.identityNumber || "Chưa cập nhật",
+                    dateOfBirth: matchedProfile?.dateOfBirth || "1990-01-01",
+                    gender: matchedProfile?.gender || "MALE",
+                    address: matchedProfile?.address || "Hồ sơ đăng ký điện tử",
+                    insuranceCode: matchedProfile?.insuranceCode || "Chưa đăng ký BHYT",
+                    totalVisits: 0,
+                    totalSpent: 0,
+                    balance: acc.balance || 0,
+                    lastVisit: acc.updatedAt || acc.createdAt || new Date().toISOString(),
+                    history: []
+                });
+            });
+
+            // Thêm các profile chưa có trong account
+            profiles.forEach((p, idx) => {
+                if (!mergedList.some(m => m.phoneNumber === p.phoneNumber)) {
                     mergedList.push({
-                        patientId: `BN-${1000 + idx + 1}`,
-                        userId: acc.userId,
-                        fullName: acc.fullName || matchedProfile?.fullName || "Bệnh nhân",
-                        phoneNumber: acc.phoneNumber || "---",
-                        email: acc.email || "---",
-                        identityCard: matchedProfile?.identityNumber || "Chưa cập nhật",
-                        dateOfBirth: matchedProfile?.dateOfBirth || "1990-01-01",
-                        gender: matchedProfile?.gender || "MALE",
-                        address: matchedProfile?.address || "Hồ sơ đăng ký điện tử",
-                        insuranceCode: matchedProfile?.insuranceCode || "Chưa đăng ký BHYT",
-                        totalVisits: 1,
-                        totalSpent: 300000,
-                        balance: acc.balance || 0,
-                        lastVisit: acc.updatedAt || acc.createdAt || new Date().toISOString(),
-                        history: [
-                            {
-                                visitDate: formatDate(acc.createdAt || new Date()),
-                                doctor: "BS. CKI Trần Đình Trọng",
-                                department: "Khoa Khám Bệnh Đa Khoa",
-                                diagnosis: "Đăng ký khám sức khỏe ban đầu",
-                                cost: 150000
-                            }
-                        ]
+                        patientId: `BN-${1050 + idx + 1}`,
+                        fullName: p.fullName,
+                        phoneNumber: p.phoneNumber || "---",
+                        email: "---",
+                        identityCard: p.identityNumber || "Chưa cập nhật",
+                        dateOfBirth: p.dateOfBirth || "1992-05-10",
+                        gender: p.gender || "MALE",
+                        address: p.address || "Việt Nam",
+                        insuranceCode: p.insuranceCode || "Chưa đăng ký",
+                        totalVisits: 0,
+                        totalSpent: 0,
+                        balance: 0,
+                        lastVisit: p.createdAt || new Date().toISOString(),
+                        history: []
                     });
-                });
-
-                // Thêm các profile chưa có trong account
-                profiles.forEach((p, idx) => {
-                    if (!mergedList.some(m => m.phoneNumber === p.phoneNumber)) {
-                        mergedList.push({
-                            patientId: `BN-${1050 + idx + 1}`,
-                            fullName: p.fullName,
-                            phoneNumber: p.phoneNumber || "---",
-                            email: "---",
-                            identityCard: p.identityNumber || "Chưa cập nhật",
-                            dateOfBirth: p.dateOfBirth || "1992-05-10",
-                            gender: p.gender || "MALE",
-                            address: p.address || "Việt Nam",
-                            insuranceCode: p.insuranceCode || "Chưa đăng ký",
-                            totalVisits: 2,
-                            totalSpent: 450000,
-                            balance: 0,
-                            lastVisit: p.createdAt || new Date().toISOString(),
-                            history: [
-                                {
-                                    visitDate: formatDate(p.createdAt || new Date()),
-                                    doctor: "ThS. BS Nguyễn Văn Minh",
-                                    department: "Khoa Khám Bệnh",
-                                    diagnosis: "Khám định kỳ & tư vấn",
-                                    cost: 200000
-                                }
-                            ]
-                        });
-                    }
-                });
-
-                if (mergedList.length > 0) {
-                    setPatients(mergedList);
-                } else {
-                    setPatients(FALLBACK_PATIENTS);
                 }
-            } else {
-                setPatients(FALLBACK_PATIENTS);
-            }
+            });
+
+            setPatients(mergedList);
         } catch (err) {
             console.error("Lỗi tải danh sách bệnh nhân:", err);
-            setPatients(FALLBACK_PATIENTS);
+            setPatientError(err.message || "Không thể đồng bộ danh sách bệnh nhân từ máy chủ.");
         } finally {
             setLoading(false);
         }
@@ -225,6 +148,21 @@ export default function PatientManagePage() {
                     {loading ? "Đang tải..." : "Làm mới"}
                 </Button>
             </Box>
+
+            {/* Error Banner */}
+            {patientError && (
+                <Alert
+                    severity="warning"
+                    sx={{ mb: 3, borderRadius: 2.5 }}
+                    action={
+                        <Button color="inherit" size="small" onClick={loadPatients}>
+                            Thử lại
+                        </Button>
+                    }
+                >
+                    {patientError}
+                </Alert>
+            )}
 
             <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: "1px solid #E2E8F0", bgcolor: "#FFFFFF" }}>
                 <Box mb={2.5} display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2}>

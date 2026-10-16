@@ -14,7 +14,9 @@ public interface ClinicalExaminationService {
     MedicalTestResponse updateTestResult(UUID testId, UpdateTestResultRequest request);
     MedicalRecordResponse makeDiagnosis(UUID recordId, DiagnosisRequest request);
     PrescriptionResponse createPrescription(UUID recordId, CreatePrescriptionRequest request);
+    DrugSafetyCheckResponse checkPrescriptionSafety(UUID recordId, CheckPrescriptionSafetyRequest request);
     MedicalRecordResponse getRecordById(UUID recordId);
+    MedicalRecordResponse getRecordById(UUID recordId, UUID currentUserId, boolean isStaff);
 
     // Bảng hàng đợi & khám bệnh
     List<DoctorQueueResponse> getDoctorQueue(UUID doctorAccountId, LocalDate date);
@@ -34,9 +36,15 @@ public interface ClinicalExaminationService {
 
     // Phân tích dữ liệu chuỗi thời gian (Biểu đồ tăng trưởng, huyết áp, tim thai...)
     List<MedicalObservationResponse> getPatientObservationTrend(UUID patientProfileId, String conceptCode);
+    List<MedicalObservationResponse> getPatientObservationTrend(UUID patientProfileId, String conceptCode, UUID currentUserId, boolean isStaff);
 
     // Danh mục dịch vụ & Dược phẩm
     List<MedicalServiceResponse> getAllServices();
     List<MedicineResponse> getAllMedicines();
+
+    // Quản lý Phụ lục Bệnh án điện tử (EMR Addendum - Thông tư 46/2018/TT-BYT)
+    AddendumResponse createAddendum(UUID recordId, UUID doctorAccountId, CreateAddendumRequest request);
+    List<AddendumResponse> getAddendums(UUID recordId);
+    List<AddendumResponse> getAddendums(UUID recordId, UUID currentUserId, boolean isStaff);
 }
 

@@ -55,11 +55,16 @@ import SpeedIcon from "@mui/icons-material/Speed";
 import MonitorHeartIcon from "@mui/icons-material/MonitorHeart";
 import ThermostatIcon from "@mui/icons-material/Thermostat";
 import FavoriteIcon from "@mui/icons-material/Favorite";
+import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
+import PaymentIcon from "@mui/icons-material/Payment";
+import TvIcon from "@mui/icons-material/Tv";
+import DevicesIcon from "@mui/icons-material/Devices";
 
 import axiosInstance from "../../services/AxiosInstance";
-import { formatDateTime, formatDate } from "../../utils/formatters";
-import { printThermalTicket } from "../../utils/printHelper";
+import { formatDateTime, formatDate, formatCurrency } from "../../utils/formatters";
+import { printThermalTicket, printReceipt } from "../../utils/printHelper";
 import { BarcodeView } from "../../utils/barcodeGenerator";
+import CounterManagementPanel from "../../components/nurse/CounterManagementPanel";
 
 // Cấu trúc buồng khám cố định theo từng Khoa chuyên môn phục vụ điều phối buồng khám thông minh
 const DEPARTMENT_ROOMS = {
@@ -209,6 +214,141 @@ export default function NurseReceptionPage() {
     // In phiếu số thứ tự
     const [printTicket, setPrintTicket] = useState(null);
 
+    // === GIAI ĐOẠN 3: CHECK-IN QR TIẾP ĐÓN 5 GIÂY & THU VIỆN PHÍ TẠI QUẦY (A5) ===
+    const [openQrCheckInDialog, setOpenQrCheckInDialog] = useState(false);
+    const [qrFormData, setQrFormData] = useState({
+        qrData: "",
+        height: "168",
+        weight: "62",
+        bloodPressure: "120/80",
+        temperature: "36.8",
+        heartRate: "76",
+        spo2: "98",
+        nurseNotes: ""
+    });
+    const [qrLoading, setQrLoading] = useState(false);
+
+    const [openPayDialog, setOpenPayDialog] = useState(false);
+    const [payFormData, setPayFormData] = useState({
+        bookingId: "",
+        bookingCode: "",
+        patientName: "",
+        amount: 200000,
+        paymentMethod: "CASH",
+        cashierNotes: ""
+    });
+    const [payLoading, setPayLoading] = useState(false);
+    const [recentReceipt, setRecentReceipt] = useState(null);
+    const [openReceiptPreviewDialog, setOpenReceiptPreviewDialog] = useState(false);
+
+    // Xử lý gửi Check-in QR
+    const handleQrCheckInSubmit = async (e) => {
+        if (e) e.preventDefault();
+        if (!qrFormData.qrData || !qrFormData.qrData.trim()) {
+            setFeedback({ type: "error", message: "Vui lòng nhập hoặc quét mã QR đặt khám!" });
+            return;
+        }
+
+        setQrLoading(true);
+        try {
+            const payload = {
+                qrData: qrFormData.qrData.trim(),
+                height: Number(qrFormData.height) || 168,
+                weight: Number(qrFormData.weight) || 62,
+                bloodPressure: qrFormData.bloodPressure || "120/80",
+                temperature: Number(qrFormData.temperature) || 36.8,
+                heartRate: Number(qrFormData.heartRate) || 76,
+                spo2: Number(qrFormData.spo2) || 98,
+                nurseNotes: qrFormData.nurseNotes || "Tiếp nhận check-in QR tại quầy"
+            };
+
+            const res = await axiosInstance.post("/api/nurse/check-in/qr", payload);
+            const data = res?.data?.data || res?.data;
+
+            setFeedback({
+                type: "success",
+                message: `✅ Tiếp đón thành công bệnh nhân [${data.patientName}] - STT: #${data.queueNumber} vào ${data.roomName}!`
+            });
+
+            // Mở phiếu in nhiệt K80
+            setPrintTicket({
+                bookingId: data.bookingCode,
+                queueNumber: data.queueNumber,
+                patientName: data.patientName,
+                departmentName: data.departmentName,
+                roomName: data.roomName,
+                doctorName: data.doctorName,
+                vitals: {
+                    bloodPressure: payload.bloodPressure,
+                    heartRate: payload.heartRate,
+                    temperature: payload.temperature,
+                    spO2: payload.spo2,
+                    weight: payload.weight,
+                    height: payload.height,
+                    allergies: "Đang cập nhật"
+                }
+            });
+
+            setOpenQrCheckInDialog(false);
+            setQrFormData({
+                qrData: "",
+                height: "168",
+                weight: "62",
+                bloodPressure: "120/80",
+                temperature: "36.8",
+                heartRate: "76",
+                spo2: "98",
+                nurseNotes: ""
+            });
+
+            fetchQueueOnly();
+        } catch (err) {
+            console.error("Lỗi check-in QR:", err);
+            const msg = err.response?.data?.message || err.message || "Không thể check-in với mã QR này";
+            setFeedback({ type: "error", message: msg });
+        } finally {
+            setQrLoading(false);
+        }
+    };
+
+    // Xử lý gửi Thu viện phí tại quầy
+    const handlePayAtClinicSubmit = async (e) => {
+        if (e) e.preventDefault();
+        if (!payFormData.bookingId) {
+            setFeedback({ type: "error", message: "Vui lòng chọn lượt khám cần thu viện phí!" });
+            return;
+        }
+
+        setPayLoading(true);
+        try {
+            const payload = {
+                bookingId: payFormData.bookingId,
+                amount: Number(payFormData.amount) || 200000,
+                paymentMethod: payFormData.paymentMethod || "CASH",
+                cashierNotes: payFormData.cashierNotes || "Thu viện phí tại quầy tiếp đón"
+            };
+
+            const res = await axiosInstance.post("/api/nurse/reception/pay-at-clinic", payload);
+            const receipt = res?.data?.data || res?.data;
+
+            setFeedback({
+                type: "success",
+                message: `✅ Thu viện phí thành công: Biên lai #${receipt.receiptCode} (${formatCurrency(receipt.paidAmount)})!`
+            });
+
+            setRecentReceipt(receipt);
+            setOpenPayDialog(false);
+            setOpenReceiptPreviewDialog(true);
+            fetchQueueOnly();
+        } catch (err) {
+            console.error("Lỗi thu viện phí tại quầy:", err);
+            const msg = err.response?.data?.message || err.message || "Thu viện phí thất bại";
+            setFeedback({ type: "error", message: msg });
+        } finally {
+            setPayLoading(false);
+        }
+    };
+
     useEffect(() => {
         loadData();
         const timer = setInterval(() => {
@@ -220,22 +360,26 @@ export default function NurseReceptionPage() {
     const fetchQueueOnly = async () => {
         try {
             const queueRes = await axiosInstance.get("/api/clinical/queue/public").catch(() => null);
-            if (queueRes && queueRes.data && Array.isArray(queueRes.data) && queueRes.data.length > 0) {
-                const mapped = queueRes.data.map((item, idx) => ({
-                    bookingId: item.bookingId || `BK-${item.queueCode || idx + 1}`,
-                    queueNumber: item.queueNumber || (idx + 1),
-                    queueCode: item.queueCode || `#${item.queueNumber || idx + 1}`,
-                    patientName: item.patientName || "Bệnh nhân",
-                    phone: item.patientPhone || item.phone || "09xxxx",
-                    departmentName: item.departmentName || "Khoa khám",
-                    departmentId: item.departmentId,
-                    roomName: item.roomName || "Phòng 101",
-                    doctorName: item.doctorName || "BS. Phụ trách",
-                    status: item.status === "IN_PROGRESS" ? "EXAMINING" : item.status,
-                    checkInTime: item.appointmentTime ? item.appointmentTime.slice(11, 16) : "08:00",
-                    symptoms: item.symptoms || "Khám theo chuyên khoa"
-                }));
-                setQueueList(mapped);
+            if (queueRes && queueRes.data && Array.isArray(queueRes.data)) {
+                if (queueRes.data.length === 0) {
+                    setQueueList([]);
+                } else {
+                    const mapped = queueRes.data.map((item, idx) => ({
+                        bookingId: item.bookingId || `BK-${item.queueCode || idx + 1}`,
+                        queueNumber: item.queueNumber || (idx + 1),
+                        queueCode: item.queueCode || `#${item.queueNumber || idx + 1}`,
+                        patientName: item.patientName || "Bệnh nhân",
+                        phone: item.patientPhone || item.phone || "09xxxx",
+                        departmentName: item.departmentName || "Khoa khám",
+                        departmentId: item.departmentId,
+                        roomName: item.roomName || "Phòng 101",
+                        doctorName: item.doctorName || "BS. Phụ trách",
+                        status: item.status === "IN_PROGRESS" ? "EXAMINING" : item.status,
+                        checkInTime: item.appointmentTime ? item.appointmentTime.slice(11, 16) : "08:00",
+                        symptoms: item.symptoms || "Khám theo chuyên khoa"
+                    }));
+                    setQueueList(mapped);
+                }
             }
         } catch (err) {
             console.error("Lỗi cập nhật hàng đợi:", err);
@@ -459,24 +603,20 @@ export default function NurseReceptionPage() {
                 symptoms: fullSymptoms
             };
 
-            const res = await axiosInstance.post("/api/bookings/kiosk", payload).catch(() => null);
+            // Gọi API máy chủ tiếp nhận lượt khám Kiosk/Quầy
+            const res = await axiosInstance.post("/api/bookings/kiosk", payload);
             
-            const nextQueueNum = res?.data?.queueNumber || (queueList.length + 1);
-            const queueCode = res?.data?.queueCode || `#${nextQueueNum}`;
-            const newBookingId = res?.data?.bookingId || `BK-${8800 + nextQueueNum}`;
-
-            // Lưu đồng bộ sinh hiệu vào localStorage để Bác sĩ lấy ngay
-            try {
-                const cleanPhone = newProfile.phoneNumber.trim();
-                const cleanName = newProfile.fullName.trim().toLowerCase();
-                localStorage.setItem(`vitals_phone_${cleanPhone}`, JSON.stringify(vitalsData));
-                localStorage.setItem(`vitals_name_${cleanName}`, JSON.stringify(vitalsData));
-                localStorage.setItem(`vitals_booking_${newBookingId}`, JSON.stringify(vitalsData));
-                localStorage.setItem(`vitals_code_${String(queueCode).replace('#', '')}`, JSON.stringify(vitalsData));
-                localStorage.setItem(`vitals_num_${nextQueueNum}`, JSON.stringify(vitalsData));
-            } catch (storageErr) {
-                console.error("Storage vitals error:", storageErr);
+            const bookingData = res?.data || res;
+            if (!bookingData || (!bookingData.bookingId && !bookingData.bookingCode && !bookingData.queueNumber)) {
+                throw new Error("Máy chủ không trả về thông tin phiếu khám hợp lệ.");
             }
+
+            const nextQueueNum = bookingData.queueNumber || (queueList.length + 1);
+            const queueCode = bookingData.queueCode || `#${nextQueueNum}`;
+            const newBookingId = bookingData.bookingId || bookingData.bookingCode;
+
+            // Dữ liệu sinh hiệu được gửi và lưu trữ bền vững tại backend thông qua trường symptoms của Booking.
+            // Loại bỏ hoàn toàn việc lưu dữ liệu sinh hiệu trong localStorage để đảm bảo an toàn thông tin y tế.
 
             const newEntry = {
                 bookingId: newBookingId,
@@ -489,7 +629,7 @@ export default function NurseReceptionPage() {
                 doctorName: activeDoctor,
                 status: "WAITING",
                 checkInTime: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-                symptoms: newProfile.symptoms || "Khám theo chuyên khoa",
+                symptoms: fullSymptoms,
                 vitals: vitalsData
             };
 
@@ -498,7 +638,7 @@ export default function NurseReceptionPage() {
             setPrintTicket(newEntry);
             setFeedback({
                 type: "success",
-                message: `Tiếp nhận & Sơ chẩn thành công [${newProfile.fullName}] - HA: ${vitalsData.bloodPressure}, Mạch: ${vitalsData.heartRate} bpm -> Chuyển vào ${activeRoom} (${activeDoctor})!`
+                message: `Tiếp nhận & Sơ chẩn thành công [${newProfile.fullName}] - STT: ${nextQueueNum} (${activeRoom})!`
             });
 
             // Reset form
@@ -523,11 +663,12 @@ export default function NurseReceptionPage() {
                 medicalHistory: ""
             });
 
-            // Re-fetch queue to sync
+            // Đồng bộ lại hàng đợi từ máy chủ
             setTimeout(fetchQueueOnly, 1000);
         } catch (err) {
-            console.error(err);
-            setFeedback({ type: "error", message: "Có lỗi khi kết nối tiếp nhận bệnh nhân." });
+            console.error("Lỗi tiếp nhận bệnh nhân:", err);
+            const errMsg = err?.message || err?.response?.data?.message || "Tiếp nhận bệnh nhân thất bại. Không thể kết nối hoặc máy chủ từ chối yêu cầu.";
+            setFeedback({ type: "error", message: errMsg });
         }
     };
 
@@ -592,7 +733,43 @@ export default function NurseReceptionPage() {
                     </Typography>
                 </Box>
 
-                <Box display="flex" gap={1.5}>
+                <Box display="flex" gap={1.2} flexWrap="wrap">
+                    {/* CỤM NÚT KHỞI CHẠY THIẾT BỊ SẢNH (KIOSK & TV) */}
+                    <Button
+                        variant="outlined"
+                        component="a"
+                        href="/kiosk"
+                        target="_blank"
+                        startIcon={<QrCodeScannerIcon sx={{ color: "#D97706" }} />}
+                        sx={{
+                            borderRadius: 2.5,
+                            fontWeight: 700,
+                            color: "#B45309",
+                            borderColor: "#FDE68A",
+                            bgcolor: "#FFFBEB",
+                            "&:hover": { bgcolor: "#FEF3C7", borderColor: "#F59E0B" }
+                        }}
+                    >
+                        Mở Kiosk Sảnh
+                    </Button>
+                    <Button
+                        variant="outlined"
+                        component="a"
+                        href="/queue-display"
+                        target="_blank"
+                        startIcon={<TvIcon sx={{ color: "#6366F1" }} />}
+                        sx={{
+                            borderRadius: 2.5,
+                            fontWeight: 700,
+                            color: "#4338CA",
+                            borderColor: "#C7D2FE",
+                            bgcolor: "#EEF2FF",
+                            "&:hover": { bgcolor: "#E0E7FF", borderColor: "#6366F1" }
+                        }}
+                    >
+                        Mở LED TV Gọi Số
+                    </Button>
+                    <Divider orientation="vertical" flexItem sx={{ height: 32, my: "auto" }} />
                     <Button
                         variant="outlined"
                         startIcon={<RefreshIcon />}
@@ -621,6 +798,48 @@ export default function NurseReceptionPage() {
                     >
                         Tiếp Nhận & Cấp STT Mới
                     </Button>
+
+                    {/* NÚT QUÉT QR TIẾP ĐÓN TRONG 5S (ROLE_NURSE / ROLE_ADMIN) */}
+                    <Button
+                        variant="contained"
+                        startIcon={<QrCodeScannerIcon />}
+                        onClick={() => setOpenQrCheckInDialog(true)}
+                        sx={{
+                            borderRadius: 2.5,
+                            fontWeight: 700,
+                            bgcolor: "#059669",
+                            boxShadow: "0 6px 16px rgba(5, 150, 105, 0.25)",
+                            "&:hover": { bgcolor: "#047857" }
+                        }}
+                    >
+                        Quét QR Tiếp Đón (5s)
+                    </Button>
+
+                    {/* NÚT THU VIỆN PHÍ TẠI QUẦY (PAY_AT_CLINIC) XUẤT HÓA ĐƠN A5 */}
+                    <Button
+                        variant="contained"
+                        startIcon={<ReceiptLongIcon />}
+                        onClick={() => {
+                            setPayFormData({
+                                bookingId: "",
+                                bookingCode: "",
+                                patientName: "",
+                                amount: 200000,
+                                paymentMethod: "CASH",
+                                cashierNotes: ""
+                            });
+                            setOpenPayDialog(true);
+                        }}
+                        sx={{
+                            borderRadius: 2.5,
+                            fontWeight: 700,
+                            bgcolor: "#7C3AED",
+                            boxShadow: "0 6px 16px rgba(124, 58, 237, 0.25)",
+                            "&:hover": { bgcolor: "#6D28D9" }
+                        }}
+                    >
+                        Thu Viện Phí Tại Quầy
+                    </Button>
                 </Box>
             </Box>
 
@@ -629,6 +848,11 @@ export default function NurseReceptionPage() {
                     {feedback.message}
                 </Alert>
             )}
+
+            {/* ========================================================================= */}
+            {/* QUẢN LÝ QUẦY TIẾP ĐÓN COUNTER & ĐIỀU PHỐI BỐC SỐ KIOSK TẠI SẢNH */}
+            {/* ========================================================================= */}
+            <CounterManagementPanel onPatientDispatched={fetchQueueOnly} />
 
             {/* ========================================================================= */}
             {/* MỤC 4: KHU VỰC TRA CỨU NHANH BỆNH NHÂN CŨ (TÁI KHÁM / ĐÃ TỪNG ĐẾN VIỆN) */}
@@ -1145,6 +1369,27 @@ export default function NurseReceptionPage() {
                                                     </IconButton>
                                                 </Tooltip>
 
+                                                {/* Nút Thu Viện Phí Tại Quầy (A5) */}
+                                                <Tooltip title="Thu viện phí tại quầy và xuất hóa đơn A5">
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() => {
+                                                            setPayFormData({
+                                                                bookingId: item.bookingId,
+                                                                bookingCode: item.queueCode || item.bookingId,
+                                                                patientName: item.patientName,
+                                                                amount: 200000,
+                                                                paymentMethod: "CASH",
+                                                                cashierNotes: `Thu viện phí khám tại quầy cho ${item.patientName}`
+                                                            });
+                                                            setOpenPayDialog(true);
+                                                        }}
+                                                        sx={{ bgcolor: "#F5F3FF", color: "#7C3AED", borderRadius: 1.5, "&:hover": { bgcolor: "#EDE9FE" } }}
+                                                    >
+                                                        <ReceiptLongIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+
                                                 {item.status === "WAITING" && (
                                                     <Tooltip title="Báo bệnh nhân vắng mặt">
                                                         <IconButton
@@ -1605,6 +1850,317 @@ export default function NurseReceptionPage() {
                             In Phiếu K80
                         </Button>
                     </Box>
+                </DialogActions>
+            </Dialog>
+
+            {/* ========================================================================= */}
+            {/* 1. DIALOG QUÉT QR TIẾP ĐÓN TRONG 5S & ĐO SINH HIỆU TỰ ĐỘNG TÍNH BMI */}
+            {/* ========================================================================= */}
+            <Dialog open={openQrCheckInDialog} onClose={() => setOpenQrCheckInDialog(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+                <DialogTitle sx={{ fontWeight: 800, bgcolor: "#ECFDF5", color: "#065F46", borderBottom: "1px solid #A7F3D0", display: "flex", alignItems: "center", gap: 1 }}>
+                    <QrCodeScannerIcon sx={{ color: "#059669" }} />
+                    <span>Quét QR Check-in Tiếp Đón Trong 5 Giây (TT 46/2018)</span>
+                </DialogTitle>
+                <form onSubmit={handleQrCheckInSubmit}>
+                    <DialogContent sx={{ pt: 2.5 }}>
+                        <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>
+                            Dùng súng quét mã vạch / camera quét mã QR trên phiếu hẹn hoặc ứng dụng của bệnh nhân. Hệ thống tự động tính chỉ số BMI và điều phối buồng khám tức thì!
+                        </Alert>
+
+                        <TextField
+                            fullWidth
+                            autoFocus
+                            label="Mã QR / Mã đặt khám (VD: BK2026... hoặc quét súng mã vạch)"
+                            value={qrFormData.qrData}
+                            onChange={(e) => setQrFormData(prev => ({ ...prev, qrData: e.target.value }))}
+                            placeholder="Quét mã QR hoặc dán mã vào đây..."
+                            sx={{ mb: 2 }}
+                            required
+                            InputProps={{
+                                startAdornment: (
+                                    <InputAdornment position="start">
+                                        <QrCodeScannerIcon sx={{ color: "#059669" }} />
+                                    </InputAdornment>
+                                )
+                            }}
+                        />
+
+                        <Typography variant="subtitle2" fontWeight="bold" color="#0F172A" sx={{ mb: 1 }}>
+                            Đo Sinh Hiệu Ban Đầu & Chỉ Số Thể Trạng (Triage Vitals):
+                        </Typography>
+
+                        <Grid container spacing={1.5}>
+                            <Grid item xs={6}>
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    type="number"
+                                    label="Chiều cao (cm)"
+                                    value={qrFormData.height}
+                                    onChange={(e) => setQrFormData(prev => ({ ...prev, height: e.target.value }))}
+                                />
+                            </Grid>
+                            <Grid item xs={6}>
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    type="number"
+                                    label="Cân nặng (kg)"
+                                    value={qrFormData.weight}
+                                    onChange={(e) => setQrFormData(prev => ({ ...prev, weight: e.target.value }))}
+                                />
+                            </Grid>
+
+                            {/* HIỂN THỊ TỰ ĐỘNG TÍNH CHỈ SỐ BMI */}
+                            <Grid item xs={12}>
+                                {(() => {
+                                    const bmiInfo = calculateNurseBMI(qrFormData.weight, qrFormData.height);
+                                    return (
+                                        <Box sx={{ p: 1.5, bgcolor: "#F8FAFC", borderRadius: 2, border: "1px dashed #CBD5E1", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                            <Typography variant="body2" color="#334155">
+                                                Chỉ số BMI tự động: <b style={{ fontSize: "1.05rem", color: bmiInfo.color }}>{bmiInfo.bmi}</b>
+                                            </Typography>
+                                            <Chip
+                                                label={bmiInfo.classification}
+                                                size="small"
+                                                sx={{ bgcolor: bmiInfo.color + "20", color: bmiInfo.color, fontWeight: "bold" }}
+                                            />
+                                        </Box>
+                                    );
+                                })()}
+                            </Grid>
+
+                            <Grid item xs={6}>
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    label="Huyết áp (mmHg)"
+                                    value={qrFormData.bloodPressure}
+                                    onChange={(e) => setQrFormData(prev => ({ ...prev, bloodPressure: e.target.value }))}
+                                    placeholder="120/80"
+                                />
+                            </Grid>
+                            <Grid item xs={6}>
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    type="number"
+                                    label="Mạch (bpm)"
+                                    value={qrFormData.heartRate}
+                                    onChange={(e) => setQrFormData(prev => ({ ...prev, heartRate: e.target.value }))}
+                                    placeholder="76"
+                                />
+                            </Grid>
+                            <Grid item xs={6}>
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    label="Nhiệt độ (°C)"
+                                    value={qrFormData.temperature}
+                                    onChange={(e) => setQrFormData(prev => ({ ...prev, temperature: e.target.value }))}
+                                    placeholder="36.8"
+                                />
+                            </Grid>
+                            <Grid item xs={6}>
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    label="Nồng độ SpO2 (%)"
+                                    value={qrFormData.spo2}
+                                    onChange={(e) => setQrFormData(prev => ({ ...prev, spo2: e.target.value }))}
+                                    placeholder="98"
+                                />
+                            </Grid>
+                            <Grid item xs={12}>
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    label="Ghi chú điều dưỡng tiếp đón"
+                                    value={qrFormData.nurseNotes}
+                                    onChange={(e) => setQrFormData(prev => ({ ...prev, nurseNotes: e.target.value }))}
+                                    placeholder="Bệnh nhân tỉnh táo, tiếp xúc tốt..."
+                                />
+                            </Grid>
+                        </Grid>
+                    </DialogContent>
+                    <DialogActions sx={{ p: 2, borderTop: "1px solid #E2E8F0" }}>
+                        <Button onClick={() => setOpenQrCheckInDialog(false)} color="inherit">
+                            Hủy Bỏ
+                        </Button>
+                        <Button
+                            type="submit"
+                            variant="contained"
+                            disabled={qrLoading}
+                            startIcon={qrLoading ? <CircularProgress size={18} color="inherit" /> : <FlashOnIcon />}
+                            sx={{ fontWeight: 800, bgcolor: "#059669", "&:hover": { bgcolor: "#047857" }, borderRadius: 2 }}
+                        >
+                            {qrLoading ? "Đang Tiếp Đón..." : "Check-in QR Tiếp Đón (5s)"}
+                        </Button>
+                    </DialogActions>
+                </form>
+            </Dialog>
+
+            {/* ========================================================================= */}
+            {/* 2. DIALOG THU VIỆN PHÍ TẠI QUẦY (PAY_AT_CLINIC) XUẤT HÓA ĐƠN A5 */}
+            {/* ========================================================================= */}
+            <Dialog open={openPayDialog} onClose={() => setOpenPayDialog(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+                <DialogTitle sx={{ fontWeight: 800, bgcolor: "#F5F3FF", color: "#5B21B6", borderBottom: "1px solid #DDD6FE", display: "flex", alignItems: "center", gap: 1 }}>
+                    <ReceiptLongIcon sx={{ color: "#7C3AED" }} />
+                    <span>Thu Viện Phí Tại Quầy Tiếp Đón (PAY_AT_CLINIC)</span>
+                </DialogTitle>
+                <form onSubmit={handlePayAtClinicSubmit}>
+                    <DialogContent sx={{ pt: 2.5 }}>
+                        <Box sx={{ mb: 2, p: 2, bgcolor: "#F8FAFC", borderRadius: 2, border: "1px solid #E2E8F0" }}>
+                            <Typography variant="body2" color="textSecondary">Mã lượt khám:</Typography>
+                            <Typography variant="subtitle1" fontWeight="bold" color="#0F172A">
+                                {payFormData.bookingCode || payFormData.bookingId || "Chưa chọn lượt khám"}
+                            </Typography>
+                            {payFormData.patientName && (
+                                <Typography variant="body2" color="#475569">
+                                    Bệnh nhân: <b>{payFormData.patientName}</b>
+                                </Typography>
+                            )}
+                        </Box>
+
+                        <TextField
+                            fullWidth
+                            type="number"
+                            label="Số tiền thu viện phí (VNĐ)"
+                            value={payFormData.amount}
+                            onChange={(e) => setPayFormData(prev => ({ ...prev, amount: e.target.value }))}
+                            sx={{ mb: 2 }}
+                            required
+                            InputProps={{
+                                endAdornment: <InputAdornment position="end">đ</InputAdornment>
+                            }}
+                        />
+
+                        <TextField
+                            select
+                            fullWidth
+                            label="Hình thức thanh toán"
+                            value={payFormData.paymentMethod}
+                            onChange={(e) => setPayFormData(prev => ({ ...prev, paymentMethod: e.target.value }))}
+                            sx={{ mb: 2 }}
+                        >
+                            <MenuItem value="CASH">💵 Tiền mặt tại quầy (Cash)</MenuItem>
+                            <MenuItem value="VIETQR">📱 Cổng PayOS (VietQR Napas 247)</MenuItem>
+                        </TextField>
+
+                        <TextField
+                            fullWidth
+                            label="Ghi chú thu ngân / người tiếp đón"
+                            value={payFormData.cashierNotes}
+                            onChange={(e) => setPayFormData(prev => ({ ...prev, cashierNotes: e.target.value }))}
+                            placeholder="Thu viện phí ban đầu / Khám chuyên khoa..."
+                        />
+                    </DialogContent>
+                    <DialogActions sx={{ p: 2, borderTop: "1px solid #E2E8F0" }}>
+                        <Button onClick={() => setOpenPayDialog(false)} color="inherit">
+                            Hủy Bỏ
+                        </Button>
+                        <Button
+                            type="submit"
+                            variant="contained"
+                            disabled={payLoading}
+                            startIcon={payLoading ? <CircularProgress size={18} color="inherit" /> : <PaymentIcon />}
+                            sx={{ fontWeight: 800, bgcolor: "#7C3AED", "&:hover": { bgcolor: "#6D28D9" }, borderRadius: 2 }}
+                        >
+                            {payLoading ? "Đang Ghi Nhận..." : "Xác Nhận Thu Viện Phí & In Hóa Đơn A5"}
+                        </Button>
+                    </DialogActions>
+                </form>
+            </Dialog>
+
+            {/* ========================================================================= */}
+            {/* 3. DIALOG XEM & IN BIÊN LAI / HÓA ĐƠN VIỆN PHÍ A5 CHUẨN BỘ Y TẾ */}
+            {/* ========================================================================= */}
+            <Dialog open={openReceiptPreviewDialog} onClose={() => setOpenReceiptPreviewDialog(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+                <DialogTitle sx={{ fontWeight: 800, borderBottom: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span>🧾 Biên Lai Thu Viện Phí Khổ A5 (Mã: {recentReceipt?.receiptCode})</span>
+                    <Chip label="Đã Xác Thực" color="success" size="small" sx={{ fontWeight: 800 }} />
+                </DialogTitle>
+                <DialogContent sx={{ pt: 2.5 }}>
+                    {recentReceipt && (
+                        <Box sx={{ p: 2.5, border: "1px solid #CBD5E1", borderRadius: 2, bgcolor: "#FFFFFF", fontFamily: "'Times New Roman', serif" }}>
+                            <Box textAlign="center" mb={2}>
+                                <Typography variant="subtitle1" fontWeight="bold" textTransform="uppercase">
+                                    BỆNH VIỆN ĐA KHOA QUỐC TẾ TNT
+                                </Typography>
+                                <Typography variant="caption" color="textSecondary" display="block">
+                                    141 Chiến Thắng, Thanh Liệt, Hà Nội • Hotline: 1900 8888
+                                </Typography>
+                                <Typography variant="h6" fontWeight="bold" sx={{ mt: 1, textTransform: "uppercase", color: "#1E293B" }}>
+                                    HÓA ĐƠN / BIÊN LAI THU VIỆN PHÍ
+                                </Typography>
+                                <Typography variant="caption" fontStyle="italic" color="#64748B">
+                                    (Bản thể hiện điện tử phục vụ lưu trữ bệnh nhân)
+                                </Typography>
+                            </Box>
+
+                            <Divider sx={{ my: 1.5 }} />
+
+                            <Grid container spacing={1} sx={{ fontSize: "0.95rem" }}>
+                                <Grid item xs={6}>
+                                    Số biên lai: <b>{recentReceipt.receiptCode}</b>
+                                </Grid>
+                                <Grid item xs={6} textAlign="right">
+                                    Mã phiếu: <b>{recentReceipt.bookingCode}</b>
+                                </Grid>
+                                <Grid item xs={12}>
+                                    Họ tên người bệnh: <b style={{ textTransform: "uppercase" }}>{recentReceipt.patientName}</b>
+                                </Grid>
+                                <Grid item xs={12}>
+                                    Khoa khám: <b>{recentReceipt.departmentName}</b> ({recentReceipt.doctorName})
+                                </Grid>
+                                <Grid item xs={6}>
+                                    Hình thức: <b>{recentReceipt.paymentMethod}</b>
+                                </Grid>
+                                <Grid item xs={6} textAlign="right">
+                                    Thời gian: <b>{recentReceipt.paidAt}</b>
+                                </Grid>
+                                <Grid item xs={12} sx={{ mt: 1.5, p: 1.5, bgcolor: "#F8FAFC", borderRadius: 1.5, textAlign: "right" }}>
+                                    <Typography variant="body1">
+                                        Tổng tiền đã thu: <b style={{ fontSize: "1.2rem", color: "#059669" }}>{formatCurrency(recentReceipt.paidAmount)}</b>
+                                    </Typography>
+                                </Grid>
+                                <Grid item xs={12} textAlign="right" sx={{ mt: 2 }}>
+                                    <Typography variant="body2" fontStyle="italic">Người thu tiền (Ký & ghi rõ họ tên)</Typography>
+                                    <Typography variant="subtitle2" fontWeight="bold" sx={{ mt: 3 }}>
+                                        {recentReceipt.cashierName}
+                                    </Typography>
+                                </Grid>
+                            </Grid>
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions sx={{ p: 2, borderTop: "1px solid #E2E8F0", justifyContent: "space-between" }}>
+                    <Button onClick={() => setOpenReceiptPreviewDialog(false)} color="inherit">
+                        Đóng
+                    </Button>
+                    <Button
+                        variant="contained"
+                        startIcon={<PrintIcon />}
+                        onClick={() => {
+                            if (recentReceipt) {
+                                printReceipt({
+                                    receiptCode: recentReceipt.receiptCode,
+                                    patientName: recentReceipt.patientName,
+                                    phoneNumber: recentReceipt.patientPhone,
+                                    departmentName: recentReceipt.departmentName,
+                                    doctorName: recentReceipt.doctorName,
+                                    totalAmount: recentReceipt.paidAmount,
+                                    paymentMethod: recentReceipt.paymentMethod,
+                                    cashierName: recentReceipt.cashierName,
+                                    paidAt: recentReceipt.paidAt,
+                                    description: "Thu viện phí tại quầy khám"
+                                });
+                            }
+                        }}
+                        sx={{ fontWeight: 800, bgcolor: "#0088D6", "&:hover": { bgcolor: "#0077BC" } }}
+                    >
+                        In Hóa Đơn A5 Ngay
+                    </Button>
                 </DialogActions>
             </Dialog>
         </Container>

@@ -14,7 +14,9 @@ import {
   Alert,
   CircularProgress,
   IconButton,
-  Tooltip
+  Tooltip,
+  Tabs,
+  Tab
 } from '@mui/material';
 import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
 import TouchAppIcon from '@mui/icons-material/TouchApp';
@@ -30,6 +32,11 @@ import ChildCareIcon from '@mui/icons-material/ChildCare';
 import PregnantWomanIcon from '@mui/icons-material/PregnantWoman';
 import ElderlyIcon from '@mui/icons-material/Elderly';
 import AccessibleIcon from '@mui/icons-material/Accessible';
+import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
+import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import MeetingRoomIcon from '@mui/icons-material/MeetingRoom';
 import axiosInstance from '../services/AxiosInstance';
 import ThermalTicketModal from '../components/kiosk/ThermalTicketModal';
 
@@ -61,12 +68,20 @@ export default function KioskPage() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [priorityType, setPriorityType] = useState('STANDARD');
   const [symptoms, setSymptoms] = useState('');
+  const [hasInsurance, setHasInsurance] = useState(false);
+  const [birthYear, setBirthYear] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
   // Ticket Modal state
   const [ticketResult, setTicketResult] = useState(null);
   const [openTicketModal, setOpenTicketModal] = useState(false);
+
+  // Kiosk Tab & Check-in state
+  const [kioskTab, setKioskTab] = useState(0); // 0: Lấy số vãng lai, 1: Check-in đặt trước
+  const [checkInCodeOrPhone, setCheckInCodeOrPhone] = useState('');
+  const [checkInSubmitting, setCheckInSubmitting] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
 
   // Clock timer
   useEffect(() => {
@@ -128,6 +143,8 @@ export default function KioskPage() {
     setPhoneNumber('');
     setPriorityType('STANDARD');
     setSymptoms('');
+    setHasInsurance(false);
+    setBirthYear('');
     setErrorMsg('');
   };
 
@@ -152,31 +169,99 @@ export default function KioskPage() {
       const selectedPrio = PRIORITY_OPTIONS.find(p => p.id === priorityType);
       const isPriority = priorityType !== 'STANDARD';
 
-      const payload = {
+      const dispatchPayload = {
         fullName: fullName.trim(),
         phoneNumber: phoneNumber.trim(),
         departmentId: selectedDept.departmentId,
         isPriority,
         priorityReason: selectedPrio?.reason || null,
-        symptoms: symptoms.trim() || undefined
+        hasInsurance,
+        birthYear: birthYear ? parseInt(birthYear) : undefined,
+        bookingCode: undefined
       };
 
-      const res = await axiosInstance.post('/api/bookings/kiosk', payload);
-
-      if (res.data) {
-        const data = res.data;
-        // Merge department name for ticket view
-        data.departmentName = selectedDept.name;
-        data.patientPhone = phoneNumber;
-        setTicketResult(data);
-        setOpenTicketModal(true);
-        handleResetForm();
+      try {
+        const res = await axiosInstance.post('/api/counters/kiosk/dispatch', dispatchPayload);
+        if (res.data) {
+          const data = res.data;
+          data.departmentName = selectedDept.name;
+          data.patientPhone = phoneNumber;
+          setTicketResult(data);
+          setOpenTicketModal(true);
+          handleResetForm();
+          return;
+        }
+      } catch (counterErr) {
+        console.warn("Lỗi khi điều phối quầy tiếp đón, chuyển sang fallback:", counterErr);
+        const legacyPayload = {
+          fullName: fullName.trim(),
+          phoneNumber: phoneNumber.trim(),
+          departmentId: selectedDept.departmentId,
+          isPriority,
+          priorityReason: selectedPrio?.reason || null,
+          symptoms: symptoms.trim() || undefined
+        };
+        const resLegacy = await axiosInstance.post('/api/bookings/kiosk', legacyPayload);
+        if (resLegacy.data) {
+          const data = resLegacy.data;
+          data.departmentName = selectedDept.name;
+          data.patientPhone = phoneNumber;
+          setTicketResult(data);
+          setOpenTicketModal(true);
+          handleResetForm();
+        }
       }
     } catch (err) {
       console.error("Lỗi cấp phiếu kiosk:", err);
       setErrorMsg(err.message || 'Có lỗi xảy ra khi cấp phiếu, vui lòng liên hệ nhân viên tiếp đón.');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // Handlers for Check-in Tab
+  const handleCheckInKeypadPress = (digit) => {
+    if (checkInCodeOrPhone.length < 20) {
+      setCheckInCodeOrPhone(prev => prev + digit);
+    }
+  };
+
+  const handleCheckInKeypadDelete = () => {
+    setCheckInCodeOrPhone(prev => prev.slice(0, -1));
+  };
+
+  const handleCheckInKeypadClear = () => {
+    setCheckInCodeOrPhone('');
+  };
+
+  const handleCheckInSubmit = async () => {
+    if (!checkInCodeOrPhone.trim()) {
+      setErrorMsg('Vui lòng nhập Mã đặt lịch hoặc Số điện thoại đã đặt hẹn!');
+      return;
+    }
+
+    try {
+      setCheckInSubmitting(true);
+      setErrorMsg('');
+      setSuccessMsg('');
+
+      const res = await axiosInstance.post('/api/bookings/kiosk/check-in', {
+        bookingCodeOrPhone: checkInCodeOrPhone.trim()
+      });
+
+      if (res.data) {
+        const data = res.data;
+        setTicketResult(data);
+        setOpenTicketModal(true);
+        setCheckInCodeOrPhone('');
+        setSuccessMsg(data.message || `Check-in thành công: Bệnh nhân ${data.patientName || ''} - STT: ${data.formattedQueueNumber || data.queueNumber}`);
+      }
+    } catch (err) {
+      console.error("Lỗi check-in kiosk:", err);
+      const msg = err.response?.data?.message || err.message || 'Lỗi khi check-in tại Kiosk. Vui lòng liên hệ nhân viên tiếp đón.';
+      setErrorMsg(msg);
+    } finally {
+      setCheckInSubmitting(false);
     }
   };
 
@@ -239,6 +324,35 @@ export default function KioskPage() {
         </Box>
       </Paper>
 
+      {/* Tabs Chuyển đổi: 1. Lấy số vãng lai / 2. Check-in đặt trước */}
+      <Paper square elevation={1} sx={{ bgcolor: '#ffffff', borderBottom: '2px solid #e0e0e0' }}>
+        <Container maxWidth="xl">
+          <Tabs
+            value={kioskTab}
+            onChange={(e, val) => {
+              setKioskTab(val);
+              setErrorMsg('');
+              setSuccessMsg('');
+            }}
+            textColor="primary"
+            indicatorColor="primary"
+            sx={{
+              '& .MuiTab-root': {
+                py: 2,
+                fontSize: { xs: '0.95rem', md: '1.1rem' },
+                fontWeight: 800,
+                textTransform: 'uppercase',
+                minHeight: 64,
+                gap: 1
+              }
+            }}
+          >
+            <Tab icon={<ConfirmationNumberIcon sx={{ fontSize: 26 }} />} iconPosition="start" label="1. Lấy số khám mới (Vãng lai)" />
+            <Tab icon={<QrCodeScannerIcon sx={{ fontSize: 26 }} />} iconPosition="start" label="2. Check-in lịch hẹn (Đã đặt trước)" />
+          </Tabs>
+        </Container>
+      </Paper>
+
       {/* Main Content Area */}
       <Container maxWidth="xl" sx={{ flexGrow: 1, py: 3, display: 'flex', flexDirection: 'column' }}>
         {errorMsg && (
@@ -246,10 +360,17 @@ export default function KioskPage() {
             {errorMsg}
           </Alert>
         )}
+        {successMsg && (
+          <Alert severity="success" sx={{ mb: 2, fontSize: '1.1rem', fontWeight: 600 }} onClose={() => setSuccessMsg('')}>
+            {successMsg}
+          </Alert>
+        )}
 
-        <Grid container spacing={3} sx={{ flexGrow: 1 }}>
-          {/* CỘT TRÁI: Chọn Chuyên Khoa */}
-          <Grid item xs={12} md={7}>
+        {/* TAB 0: LẤY SỐ KHÁM VÃNG LAI */}
+        {kioskTab === 0 && (
+          <Grid container spacing={3} sx={{ flexGrow: 1 }}>
+            {/* CỘT TRÁI: Chọn Chuyên Khoa */}
+            <Grid item xs={12} md={7}>
             <Paper
               elevation={2}
               sx={{
@@ -499,6 +620,207 @@ export default function KioskPage() {
             </Paper>
           </Grid>
         </Grid>
+        )}
+
+        {/* TAB 1: CHECK-IN LỊCH HẸN ĐÃ ĐẶT TRƯỚC (WINDOW GUARD) */}
+        {kioskTab === 1 && (
+          <Grid container spacing={3} sx={{ flexGrow: 1 }}>
+            {/* CỘT TRÁI: Hướng dẫn Khung giờ tiếp nhận (Check-in Window Guard) */}
+            <Grid item xs={12} md={6}>
+              <Paper
+                elevation={2}
+                sx={{
+                  p: 3,
+                  height: '100%',
+                  borderRadius: 3,
+                  bgcolor: '#ffffff',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 2.5
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, pb: 1, borderBottom: '2px solid #e3f2fd' }}>
+                  <ScheduleIcon sx={{ fontSize: 32, color: '#0d47a1' }} />
+                  <Box>
+                    <Typography variant="h6" sx={{ fontWeight: 800, color: '#0d47a1' }}>
+                      QUY ĐỊNH TIẾP NHẬN CHECK-IN TỰ ĐỘNG
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#666' }}>
+                      Áp dụng cho bệnh nhân đã đăng ký khám trước qua ứng dụng / website
+                    </Typography>
+                  </Box>
+                </Box>
+
+                <Alert severity="info" icon={<InfoOutlinedIcon fontSize="inherit" />} sx={{ fontSize: '0.95rem', fontWeight: 600 }}>
+                  Hệ thống Kiosk tự động xác thực thời gian đến khám và cấp số thứ tự ưu tiên vào thẳng phòng khám của Bác sĩ phụ trách.
+                </Alert>
+
+                {/* Các quy tắc khung giờ */}
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <Box sx={{ p: 2, bgcolor: '#e8f5e9', borderRadius: 2, borderLeft: '5px solid #2e7d32' }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#1b5e20', display: 'flex', alignItems: 'center', gap: 1 }}>
+                      🟢 KHUNG GIỜ MỞ TIẾP NHẬN (HỢP LỆ)
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#333', mt: 0.5 }}>
+                      Bắt đầu mở từ <strong>60 phút trước</strong> giờ khám cho đến tối đa <strong>15 phút sau</strong> ca khám đã đặt. Khi check-in thành công, máy sẽ in phiếu kèm số phòng khám ngay lập tức.
+                    </Typography>
+                  </Box>
+
+                  <Box sx={{ p: 2, bgcolor: '#fffde7', borderRadius: 2, borderLeft: '5px solid #fbc02d' }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#f57f17', display: 'flex', alignItems: 'center', gap: 1 }}>
+                      🟡 ĐẾN QUÁ SỚM (&gt; 60 PHÚT)
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#333', mt: 0.5 }}>
+                      Nếu đến trước ca khám trên 60 phút, hệ thống sẽ nhắc nhở và chưa cấp số nhằm hạn chế quá tải buồng chờ. Quý khách vui lòng nghỉ ngơi tại sảnh chờ đến khung giờ tiếp nhận.
+                    </Typography>
+                  </Box>
+
+                  <Box sx={{ p: 2, bgcolor: '#ffebee', borderRadius: 2, borderLeft: '5px solid #d32f2f' }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#b71c1c', display: 'flex', alignItems: 'center', gap: 1 }}>
+                      🔴 ĐẾN QUÁ TRỄ (&gt; 15 PHÚT)
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#333', mt: 0.5 }}>
+                      Nếu đến trễ quá 15 phút sau giờ khám, ca khám tự động đóng để nhường lượt cho bệnh nhân kế tiếp. Quý khách vui lòng liên hệ <strong>Quầy tiếp đón số 01</strong> để được hỗ trợ sắp xếp ca khám mới.
+                    </Typography>
+                  </Box>
+                </Box>
+
+                <Box sx={{ mt: 'auto', p: 2, bgcolor: '#f5f5f5', borderRadius: 2, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <MeetingRoomIcon sx={{ color: '#0d47a1', fontSize: 28 }} />
+                  <Typography variant="body2" sx={{ color: '#555' }}>
+                    <strong>Mẹo:</strong> Sau khi có phiếu in, quý khách di chuyển trực tiếp đến cửa phòng Bác sĩ ghi trên phiếu mà không cần qua quầy đăng ký.
+                  </Typography>
+                </Box>
+              </Paper>
+            </Grid>
+
+            {/* CỘT PHẢI: Ô nhập Mã đặt lịch / SĐT & Bàn phím số */}
+            <Grid item xs={12} md={6}>
+              <Paper
+                elevation={2}
+                sx={{
+                  p: 3,
+                  height: '100%',
+                  borderRadius: 3,
+                  bgcolor: '#ffffff',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 2.5
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, pb: 1, borderBottom: '2px solid #e3f2fd' }}>
+                  <QrCodeScannerIcon sx={{ fontSize: 32, color: '#0d47a1' }} />
+                  <Box>
+                    <Typography variant="h6" sx={{ fontWeight: 800, color: '#0d47a1' }}>
+                      NHẬP THÔNG TIN CHECK-IN
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#666' }}>
+                      Nhập Số điện thoại đăng ký hoặc Mã đặt hẹn (VD: BK-xxxx hoặc 09xxxxxxx)
+                    </Typography>
+                  </Box>
+                </Box>
+
+                {/* Input Text Field */}
+                <Box>
+                  <TextField
+                    fullWidth
+                    label="Mã đặt lịch hoặc Số điện thoại *"
+                    placeholder="VD: 0912345678 hoặc BK-1234..."
+                    value={checkInCodeOrPhone}
+                    onChange={(e) => setCheckInCodeOrPhone(e.target.value.toUpperCase())}
+                    inputProps={{
+                      style: { fontSize: '1.4rem', fontWeight: 800, letterSpacing: 1.5, textAlign: 'center' }
+                    }}
+                    helperText="Quý khách có thể bấm bàn phím số cảm ứng bên dưới hoặc dùng bàn phím máy tính"
+                  />
+                </Box>
+
+                {/* Bàn phím cảm ứng Kiosk */}
+                <Box sx={{ p: 2, bgcolor: '#f8f9fa', borderRadius: 2.5, border: '1px solid #e0e0e0' }}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#666', mb: 1, display: 'block', textAlign: 'center' }}>
+                    BÀN PHÍM CẢM ỨNG
+                  </Typography>
+                  <Grid container spacing={1.5}>
+                    {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(num => (
+                      <Grid item xs={4} key={num}>
+                        <Button
+                          fullWidth
+                          variant="outlined"
+                          onClick={() => handleCheckInKeypadPress(num)}
+                          sx={{
+                            fontSize: '1.6rem',
+                            fontWeight: 800,
+                            py: 1.5,
+                            borderRadius: 2,
+                            bgcolor: '#fff',
+                            color: '#1a237e'
+                          }}
+                        >
+                          {num}
+                        </Button>
+                      </Grid>
+                    ))}
+                    <Grid item xs={4}>
+                      <Button
+                        fullWidth
+                        variant="outlined"
+                        color="error"
+                        onClick={handleCheckInKeypadClear}
+                        sx={{ fontSize: '1rem', fontWeight: 800, py: 1.5, borderRadius: 2 }}
+                      >
+                        XÓA HẾT
+                      </Button>
+                    </Grid>
+                    <Grid item xs={4}>
+                      <Button
+                        fullWidth
+                        variant="outlined"
+                        onClick={() => handleCheckInKeypadPress('0')}
+                        sx={{ fontSize: '1.6rem', fontWeight: 800, py: 1.5, borderRadius: 2, bgcolor: '#fff', color: '#1a237e' }}
+                      >
+                        0
+                      </Button>
+                    </Grid>
+                    <Grid item xs={4}>
+                      <Button
+                        fullWidth
+                        variant="outlined"
+                        color="warning"
+                        onClick={handleCheckInKeypadDelete}
+                        sx={{ py: 1.5, borderRadius: 2 }}
+                      >
+                        <BackspaceIcon sx={{ fontSize: 28 }} />
+                      </Button>
+                    </Grid>
+                  </Grid>
+                </Box>
+
+                {/* Nút bấm XÁC NHẬN CHECK-IN */}
+                <Button
+                  fullWidth
+                  variant="contained"
+                  size="large"
+                  disabled={checkInSubmitting}
+                  onClick={handleCheckInSubmit}
+                  startIcon={checkInSubmitting ? <CircularProgress size={28} color="inherit" /> : <CheckCircleOutlineIcon sx={{ fontSize: 32 }} />}
+                  sx={{
+                    mt: 'auto',
+                    py: 2.2,
+                    fontSize: '1.35rem',
+                    fontWeight: 900,
+                    letterSpacing: 1,
+                    borderRadius: 3,
+                    bgcolor: '#0d47a1',
+                    '&:hover': { bgcolor: '#08306b' },
+                    boxShadow: '0 6px 20px rgba(13,71,161,0.35)'
+                  }}
+                >
+                  {checkInSubmitting ? 'ĐANG XÁC THỰC CHECK-IN...' : 'XÁC NHẬN CHECK-IN & IN PHIẾU'}
+                </Button>
+              </Paper>
+            </Grid>
+          </Grid>
+        )}
       </Container>
 
       {/* Footer Banner */}

@@ -44,4 +44,13 @@ public class Doctor extends BaseEntity {
     @Column(name = "rating_average")
     @Builder.Default
     private Double ratingAverage = 5.0;
+
+    @Column(name = "doctor_license", length = 50)
+    private String doctorLicense;
+
+    @Column(name = "license_issued_date")
+    private java.time.LocalDate licenseIssuedDate;
+
+    @Column(name = "license_scope", length = 255)
+    private String licenseScope;
 }

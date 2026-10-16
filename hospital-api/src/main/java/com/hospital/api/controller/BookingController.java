@@ -21,6 +21,24 @@ import java.util.UUID;
 public class BookingController {
 
     private final BookingService bookingService;
+    private final com.hospital.api.service.SlotReservationService slotReservationService;
+
+    // Giữ chỗ khung giờ tạm thời trong 10 phút (chống đặt trùng đồng thời)
+    @PostMapping("/reserve-slot")
+    public ResponseEntity<ApiResponse<com.hospital.api.dto.response.ReserveSlotResponse>> reserveSlot(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @Valid @RequestBody com.hospital.api.dto.request.ReserveSlotRequest request
+    ) {
+        UUID accountId = userPrincipal != null ? userPrincipal.getId() : null;
+        return ResponseEntity.ok(ApiResponse.ok(slotReservationService.reserveSlot(request, accountId), "Giữ chỗ khung giờ thành công"));
+    }
+
+    // Tự động hoặc chủ động giải phóng slot giữ chỗ khi bệnh nhân đổi ý
+    @PostMapping("/release-slot/{reservationId}")
+    public ResponseEntity<ApiResponse<Void>> releaseSlot(@PathVariable UUID reservationId) {
+        slotReservationService.releaseSlot(reservationId);
+        return ResponseEntity.ok(ApiResponse.ok(null, "Đã giải phóng slot giữ chỗ thành công"));
+    }
 
     // Bệnh nhân thực hiện đặt lịch khám
     @PostMapping
@@ -49,6 +67,12 @@ public class BookingController {
     public ResponseEntity<ApiResponse<BookingResponse>> createKioskBooking(@Valid @RequestBody com.hospital.api.dto.request.KioskBookingRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.ok(bookingService.createKioskBooking(request), "Cấp số khám Kiosk thành công"));
+    }
+
+    // Bệnh nhân đã đặt trước thực hiện Check-in tại cây Kiosk (có bảo vệ khung giờ tiếp nhận)
+    @PostMapping("/kiosk/check-in")
+    public ResponseEntity<ApiResponse<com.hospital.api.dto.response.KioskCheckInResponse>> checkInKiosk(@Valid @RequestBody com.hospital.api.dto.request.KioskCheckInRequest request) {
+        return ResponseEntity.ok(ApiResponse.ok(bookingService.checkInKiosk(request), "Check-in Kiosk thành công"));
     }
 
     // Bệnh nhân hủy lịch khám đã đặt

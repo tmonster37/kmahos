@@ -40,9 +40,10 @@ import { useLocation } from "react-router-dom";
 
 export default function QueueDisplayPage() {
     const [queue, setQueue] = useState([]);
+    const [counters, setCounters] = useState([]);
     const [departments, setDepartments] = useState([]);
     const [selectedDeptId, setSelectedDeptId] = useState("ALL");
-    const [viewMode, setViewMode] = useState("GRID"); // 'GRID': Lưới các buồng phòng, 'FOCUS': Tập trung phòng đơn
+    const [viewMode, setViewMode] = useState("GRID"); // 'GRID': Lưới các buồng phòng, 'FOCUS': Tập trung phòng đơn, 'COUNTERS': Quầy tiếp đón sảnh
     const [currentTime, setCurrentTime] = useState(new Date());
     const [audioEnabled, setAudioEnabled] = useState(false);
     const [myTicket, setMyTicket] = useState(null);
@@ -94,6 +95,12 @@ export default function QueueDisplayPage() {
             const res = await axiosInstance.get("/api/clinical/queue/public");
             const list = (res.data && Array.isArray(res.data)) ? res.data : (Array.isArray(res) ? res : []);
             setQueue(list);
+
+            // Tải trạng thái quầy tiếp đón thời gian thực
+            axiosInstance.get("/api/counters").then(counterRes => {
+                const cList = (counterRes.data && Array.isArray(counterRes.data)) ? counterRes.data : [];
+                setCounters(cList);
+            }).catch(() => {});
 
             // Tự động phát âm thanh khi có bệnh nhân mới được Bác sĩ / Điều dưỡng gọi vào khám
             const inProgressList = list.filter((p) => p.status === "IN_PROGRESS");
@@ -245,6 +252,7 @@ export default function QueueDisplayPage() {
                     >
                         <Tab value="GRID" label="Chia Buồng Phòng" />
                         <Tab value="FOCUS" label="Sảnh Tập Trung" />
+                        <Tab value="COUNTERS" label="Quầy Tiếp Đón Sảnh" />
                     </Tabs>
 
                     {!audioEnabled ? (
@@ -648,6 +656,178 @@ export default function QueueDisplayPage() {
                         </Paper>
                     </Grid>
                 </Grid>
+            )}
+
+            {/* Chế độ 3: COUNTERS MODE (Màn hình LED Quầy Tiếp Đón Sảnh Tầng 1) */}
+            {viewMode === "COUNTERS" && (
+                <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column", gap: 3 }}>
+                    <Paper
+                        elevation={6}
+                        sx={{
+                            p: 2.5,
+                            borderRadius: 3,
+                            bgcolor: "#111C3A",
+                            border: "1px solid rgba(56, 189, 248, 0.3)",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            flexWrap: "wrap",
+                            gap: 2
+                        }}
+                    >
+                        <Box display="flex" alignItems="center" gap={1.5}>
+                            <HowToRegIcon sx={{ color: "#38BDF8", fontSize: 32 }} />
+                            <Box>
+                                <Typography variant="h6" fontWeight="bold" sx={{ color: "#F8FAFC" }}>
+                                    HỆ THỐNG GỌI SỐ & ĐIỀU PHỐI QUẦY TIẾP ĐÓN TRUNG TÂM
+                                </Typography>
+                                <Typography variant="caption" sx={{ color: "#94A3B8" }}>
+                                    Khu vực Sảnh tầng 1 • Hỗ trợ tiếp nhận thường, BHYT, Ưu tiên và Đặt hẹn
+                                </Typography>
+                            </Box>
+                        </Box>
+
+                        <Stack direction="row" spacing={2}>
+                            <Chip
+                                label={`Quầy hoạt động: ${counters.filter(c => c.status === "SERVING" || c.status === "AVAILABLE").length}/${counters.length}`}
+                                sx={{ bgcolor: "rgba(16, 185, 129, 0.2)", color: "#34D399", fontWeight: 700 }}
+                            />
+                            <Chip
+                                label={`Tổng chờ tiếp đón: ${counters.reduce((acc, c) => acc + (c.waitingCount || 0), 0)} người`}
+                                sx={{ bgcolor: "rgba(245, 158, 11, 0.2)", color: "#FBBF24", fontWeight: 700 }}
+                            />
+                        </Stack>
+                    </Paper>
+
+                    <Grid container spacing={2.5}>
+                        {counters.map(counter => {
+                            const isServing = counter.status === "SERVING";
+                            const isAvailable = counter.status === "AVAILABLE";
+                            const isPaused = counter.status === "PAUSED";
+                            const isPriority = counter.type === "PRIORITY";
+                            const isInsurance = counter.type === "INSURANCE";
+
+                            let statusColor = "#64748B";
+                            let statusText = "ĐÃ ĐÓNG";
+                            if (isServing) {
+                                statusColor = "#10B981";
+                                statusText = "ĐANG PHỤC VỤ";
+                            } else if (isAvailable) {
+                                statusColor = "#0284C7";
+                                statusText = "SẴN SÀNG";
+                            } else if (isPaused) {
+                                statusColor = "#F59E0B";
+                                statusText = "TẠM NGHỈ";
+                            }
+
+                            return (
+                                <Grid item xs={12} sm={6} md={4} lg={2.4} key={counter.counterId}>
+                                    <Paper
+                                        elevation={6}
+                                        sx={{
+                                            borderRadius: 3,
+                                            overflow: "hidden",
+                                            bgcolor: "#111C3A",
+                                            border: isServing
+                                                ? "2px solid #10B981"
+                                                : isPriority
+                                                ? "2px solid #EF4444"
+                                                : "1px solid rgba(255,255,255,0.12)",
+                                            height: "100%",
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            transition: "all 0.3s ease",
+                                            boxShadow: isServing ? "0 0 20px rgba(16, 185, 129, 0.25)" : "none"
+                                        }}
+                                    >
+                                        {/* Card Header */}
+                                        <Box
+                                            sx={{
+                                                bgcolor: isPriority
+                                                    ? "#DC2626"
+                                                    : isInsurance
+                                                    ? "#0D9488"
+                                                    : "#0284C7",
+                                                p: 1.5,
+                                                textAlign: "center"
+                                            }}
+                                        >
+                                            <Typography variant="h6" fontWeight="900" color="white">
+                                                QUẦY 0{counter.counterNumber}
+                                            </Typography>
+                                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.85)", display: "block" }}>
+                                                {counter.name}
+                                            </Typography>
+                                        </Box>
+
+                                        {/* Serving Number Display */}
+                                        <Box p={3} textAlign="center" sx={{ bgcolor: "rgba(0,0,0,0.25)", flexGrow: 1 }}>
+                                            <Chip
+                                                size="small"
+                                                label={statusText}
+                                                sx={{
+                                                    bgcolor: `${statusColor}22`,
+                                                    color: statusColor,
+                                                    fontWeight: 800,
+                                                    border: `1px solid ${statusColor}`,
+                                                    mb: 1.5
+                                                }}
+                                            />
+
+                                            <Typography variant="caption" sx={{ color: "#94A3B8", display: "block", textTransform: "uppercase", letterSpacing: 1.5 }}>
+                                                SỐ ĐANG TIẾP ĐÓN
+                                            </Typography>
+
+                                            <Typography
+                                                variant="h2"
+                                                fontWeight="900"
+                                                sx={{
+                                                    color: isServing ? "#34D399" : (counter.currentTicketCode ? "#FBBF24" : "#475569"),
+                                                    fontFamily: "monospace",
+                                                    my: 1,
+                                                    textShadow: isServing ? "0 0 20px rgba(52, 211, 153, 0.6)" : "none"
+                                                }}
+                                            >
+                                                {counter.currentTicketCode || "--"}
+                                            </Typography>
+
+                                            <Typography variant="subtitle1" fontWeight="bold" noWrap color="white" sx={{ minHeight: 28 }}>
+                                                {counter.currentPatientName || (isAvailable ? "Sẵn sàng nhận khách" : "Chưa có lượt tiếp")}
+                                            </Typography>
+                                        </Box>
+
+                                        {/* Footer: Nurse & Waiting Count */}
+                                        <Box p={2} sx={{ borderTop: "1px solid rgba(255,255,255,0.08)", bgcolor: "rgba(255,255,255,0.02)" }}>
+                                            <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                                                <Typography variant="caption" sx={{ color: "#94A3B8" }}>
+                                                    Điều dưỡng trực:
+                                                </Typography>
+                                                <Typography variant="caption" fontWeight="bold" sx={{ color: "#E2E8F0" }}>
+                                                    {counter.currentNurseName || "Chưa gán"}
+                                                </Typography>
+                                            </Box>
+                                            <Box display="flex" justifyContent="space-between" alignItems="center">
+                                                <Typography variant="caption" sx={{ color: "#94A3B8" }}>
+                                                    Đang chờ tiếp đón:
+                                                </Typography>
+                                                <Chip
+                                                    size="small"
+                                                    label={`${counter.waitingCount || 0} người`}
+                                                    sx={{
+                                                        bgcolor: (counter.waitingCount || 0) > 0 ? "rgba(245, 158, 11, 0.2)" : "rgba(255,255,255,0.06)",
+                                                        color: (counter.waitingCount || 0) > 0 ? "#FBBF24" : "#94A3B8",
+                                                        fontWeight: 700,
+                                                        height: 22
+                                                    }}
+                                                />
+                                            </Box>
+                                        </Box>
+                                    </Paper>
+                                </Grid>
+                            );
+                        })}
+                    </Grid>
+                </Box>
             )}
         </Box>
     );

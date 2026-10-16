@@ -38,6 +38,8 @@ public class PharmacyInventoryServiceImpl implements PharmacyInventoryService {
     private final PrescriptionRepository prescriptionRepository;
     private final StaffRepository staffRepository;
     private final DepartmentRepository departmentRepository;
+    private final TransactionRepository transactionRepository;
+    private final com.hospital.api.service.AuditLogService auditLogService;
 
     // 1. Quản lý hệ thống Kho Dược đa cấp
     @Override
@@ -300,6 +302,38 @@ public class PharmacyInventoryServiceImpl implements PharmacyInventoryService {
         Prescription prescription = prescriptionRepository.findById(prescriptionId)
                 .orElseThrow(() -> new AppException("Không tìm thấy đơn thuốc với ID: " + prescriptionId, HttpStatus.NOT_FOUND));
 
+        // 1. Chống xuất kho lặp lại (Chống Double Dispense)
+        List<PrescriptionDispense> existingDispenses = dispenseRepository.findByPrescriptionPrescriptionId(prescriptionId);
+        if (!existingDispenses.isEmpty()) {
+            throw new AppException("Đơn thuốc này đã được cấp phát trước đó (Mã phiếu xuất: "
+                    + existingDispenses.get(0).getDispenseCode() + ") vào lúc "
+                    + existingDispenses.get(0).getDispensedAt(), HttpStatus.BAD_REQUEST);
+        }
+
+        // 2. Chốt chặn Quầy Thu Ngân (Pharmacy Payment Gatekeeper - BIZ-P1-01)
+        Booking booking = (prescription.getMedicalRecord() != null) ? prescription.getMedicalRecord().getBooking() : null;
+        if (booking != null && !Boolean.TRUE.equals(booking.getIsPriority())) {
+            String code = booking.getBookingCode();
+            List<Transaction> txns = transactionRepository.findAllByDescriptionContainingAndStatus(code, "SUCCESS");
+            BigDecimal totalPaid = txns.stream()
+                    .map(Transaction::getAmount)
+                    .filter(java.util.Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            BigDecimal examPrice = booking.getPrice() != null ? booking.getPrice() : BigDecimal.ZERO;
+            BigDecimal prescPrice = prescription.getTotalAmount() != null ? prescription.getTotalAmount() : BigDecimal.ZERO;
+
+            boolean hasPrescriptionTxn = txns.stream().anyMatch(t -> {
+                String desc = t.getDescription() != null ? t.getDescription() : "";
+                String ref = t.getVnpayTxnRef() != null ? t.getVnpayTxnRef() : "";
+                return desc.contains("TREATMENT") || desc.contains("PRESCRIPTION") || desc.contains("MEDICINE") || ref.contains("MED");
+            });
+
+            if (!hasPrescriptionTxn && totalPaid.compareTo(examPrice.add(prescPrice)) < 0) {
+                throw new AppException("Đơn thuốc [" + prescription.getPrescriptionCode() + "] chưa được thanh toán tiền thuốc tại quầy thu ngân! Vui lòng hướng dẫn bệnh nhân hoàn tất viện phí trước khi cấp phát.", HttpStatus.PAYMENT_REQUIRED);
+            }
+        }
+
         PharmacyWarehouse warehouse = warehouseRepository.findById(request.warehouseId())
                 .orElseThrow(() -> new AppException("Không tìm thấy kho cấp phát thuốc", HttpStatus.NOT_FOUND));
 
@@ -320,13 +354,13 @@ public class PharmacyInventoryServiceImpl implements PharmacyInventoryService {
         List<PrescriptionDispenseItem> dispenseItems = new ArrayList<>();
         LocalDate today = LocalDate.now();
 
-        // Duyệt từng mặt hàng trong đơn thuốc để cấp phát theo FEFO
+        // 3. Duyệt từng mặt hàng trong đơn thuốc để cấp phát theo FEFO có khóa bi quan PESSIMISTIC_WRITE
         for (PrescriptionItem prescItem : prescription.getPrescriptionItems()) {
             Medicine medicine = prescItem.getMedicine();
             int remainingNeeded = prescItem.getQuantity();
 
-            // THUẬT TOÁN FEFO: Lấy các lô còn hạn, sắp xếp hạn dùng gần nhất (expiryDate ASC)
-            List<WarehouseStock> fefoStocks = stockRepository.findAvailableStockByFefo(warehouse.getWarehouseId(), medicine.getMedicineId(), today);
+            // THUẬT TOÁN FEFO CÓ KHÓA BI QUAN: Tránh race-condition khi 2 dược sĩ cùng xuất cùng lô thuốc
+            List<WarehouseStock> fefoStocks = stockRepository.findAvailableStockByFefoForUpdate(warehouse.getWarehouseId(), medicine.getMedicineId(), today);
 
             int totalAvailable = fefoStocks.stream().mapToInt(WarehouseStock::getAvailableQuantity).sum();
             if (totalAvailable < remainingNeeded) {
@@ -372,6 +406,18 @@ public class PharmacyInventoryServiceImpl implements PharmacyInventoryService {
 
         dispense.setItems(dispenseItems);
         PrescriptionDispense savedDispense = dispenseRepository.save(dispense);
+
+        // 4. Ghi Audit Log theo quy định y tế
+        auditLogService.log(
+                dispenser != null ? dispenser.getStaffId() : null,
+                dispenser != null ? dispenser.getFullName() : "Dược Sĩ",
+                "ROLE_PHARMACIST",
+                "DISPENSE_PRESCRIPTION",
+                "PRESCRIPTION_DISPENSE",
+                savedDispense.getDispenseId().toString(),
+                "Xuất kho FEFO đơn thuốc " + prescription.getPrescriptionCode() + " với " + dispenseItems.size() + " mặt hàng từ kho " + warehouse.getWarehouseName(),
+                null
+        );
 
         return PrescriptionDispenseResponse.fromEntity(savedDispense);
     }

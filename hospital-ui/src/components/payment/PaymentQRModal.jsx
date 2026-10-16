@@ -21,11 +21,12 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import QrCode2Icon from "@mui/icons-material/QrCode2";
 import CloseIcon from "@mui/icons-material/Close";
-import PhoneAndroidIcon from "@mui/icons-material/PhoneAndroid";
 import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
 import DoneAllIcon from "@mui/icons-material/DoneAll";
 import DownloadIcon from "@mui/icons-material/Download";
 import SecurityIcon from "@mui/icons-material/Security";
+import SyncIcon from "@mui/icons-material/Sync";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import axiosInstance from "../../services/AxiosInstance";
 import { formatCurrency } from "../../utils/formatters";
 
@@ -33,10 +34,9 @@ export default function PaymentQRModal({ open, onClose, paymentData, onSuccess }
     const [copiedField, setCopiedField] = useState(null);
     const [status, setStatus] = useState("PENDING");
     const [confirming, setConfirming] = useState(false);
+    const [syncing, setSyncing] = useState(false);
 
     const txnRef = paymentData?.txnRef;
-    const isVietQR = paymentData?.paymentMethod === "VIETQR" || !paymentData?.paymentMethod;
-    const isMoMo = paymentData?.paymentMethod === "MOMO";
 
     useEffect(() => {
         if (!open || !txnRef) return;
@@ -79,13 +79,34 @@ export default function PaymentQRModal({ open, onClose, paymentData, onSuccess }
         document.body.removeChild(link);
     };
 
+    // Đồng bộ trực tiếp từ cổng PayOS
+    const handleSyncPayOS = async () => {
+        if (!paymentData?.orderCode) return;
+        setSyncing(true);
+        try {
+            const res = await axiosInstance.post(`/api/payment/payos/sync/${paymentData.orderCode}`);
+            const data = res?.data?.data || res?.data || res;
+            if (data && data.status === "SUCCESS") {
+                setStatus("SUCCESS");
+                if (onSuccess) {
+                    setTimeout(() => onSuccess(data), 800);
+                }
+            } else {
+                alert("PayOS báo giao dịch chưa hoàn tất hoặc đang chờ ngân hàng ghi có.");
+            }
+        } catch (err) {
+            alert(err.message || "Lỗi đồng bộ giao dịch từ PayOS");
+        } finally {
+            setSyncing(false);
+        }
+    };
+
     // Nút xác nhận thanh toán đã hoàn tất
     const handleConfirmSimulated = async () => {
         if (!txnRef) return;
         setConfirming(true);
         try {
-            const method = isMoMo ? "MOMO" : "VIETQR";
-            const res = await axiosInstance.post(`/api/payment/confirm/${txnRef}?method=${method}`);
+            const res = await axiosInstance.post(`/api/payment/confirm/${txnRef}?method=VIETQR`);
             const data = res?.data?.data || res?.data || res;
             setStatus("SUCCESS");
             if (onSuccess) {
@@ -106,7 +127,7 @@ export default function PaymentQRModal({ open, onClose, paymentData, onSuccess }
             <Box
                 sx={{
                     p: 2.5,
-                    bgcolor: isMoMo ? "#A50064" : "#005BAA",
+                    bgcolor: "#005BAA",
                     color: "white",
                     display: "flex",
                     justifyContent: "space-between",
@@ -114,11 +135,11 @@ export default function PaymentQRModal({ open, onClose, paymentData, onSuccess }
                 }}
             >
                 <Box display="flex" alignItems="center" gap={1.5}>
-                    {isMoMo ? <PhoneAndroidIcon sx={{ fontSize: 30 }} /> : <AccountBalanceIcon sx={{ fontSize: 30 }} />}
+                    <AccountBalanceIcon sx={{ fontSize: 32 }} />
                     <Box>
                         <Box display="flex" alignItems="center" gap={1}>
                             <Typography variant="h6" fontWeight="900" lineHeight={1.2}>
-                                {isMoMo ? "Thanh Toán Ví MoMo" : "Thanh Toán VietQR / PayOS"}
+                                Cổng Thanh Toán PayOS (VietQR)
                             </Typography>
                             <Chip
                                 label="Napas 247"
@@ -127,7 +148,7 @@ export default function PaymentQRModal({ open, onClose, paymentData, onSuccess }
                             />
                         </Box>
                         <Typography variant="caption" sx={{ opacity: 0.9 }}>
-                            {isMoMo ? "Quét mã MoMo QR hoặc Mở App MoMo" : "Chuyển khoản liên ngân hàng 24/7 tức thời (Miễn phí 100%)"}
+                            Chuyển khoản liên ngân hàng 24/7 tức thời • Khớp lệnh tự động
                         </Typography>
                     </Box>
                 </Box>
@@ -191,7 +212,7 @@ export default function PaymentQRModal({ open, onClose, paymentData, onSuccess }
                                         borderRadius: 3,
                                         bgcolor: "white",
                                         display: "inline-block",
-                                        border: isMoMo ? "2px solid #A50064" : "2px solid #005BAA"
+                                        border: "2px solid #005BAA"
                                     }}
                                 >
                                     <Box
@@ -226,16 +247,27 @@ export default function PaymentQRModal({ open, onClose, paymentData, onSuccess }
                                         Tải ảnh QR về máy
                                     </Button>
 
-                                    {isMoMo && (
+                                    {paymentData?.paymentUrl && (
                                         <Button
                                             variant="contained"
                                             size="small"
                                             component="a"
-                                            href={paymentData.deeplink || "https://me.momo.vn"}
+                                            href={paymentData.paymentUrl}
                                             target="_blank"
-                                            sx={{ bgcolor: "#A50064", "&:hover": { bgcolor: "#80004d" }, borderRadius: 2, fontWeight: "bold" }}
+                                            rel="noopener noreferrer"
+                                            startIcon={<OpenInNewIcon />}
+                                            sx={{
+                                                bgcolor: "#0284C7",
+                                                "&:hover": { bgcolor: "#0369A1" },
+                                                borderRadius: 2,
+                                                fontWeight: "bold",
+                                                fontSize: "0.8rem",
+                                                textTransform: "none",
+                                                boxShadow: "0 2px 8px rgba(2, 132, 199, 0.3)",
+                                                mt: 0.5
+                                            }}
                                         >
-                                            Mở App MoMo
+                                            Mở Cổng Thanh Toán PayOS
                                         </Button>
                                     )}
                                 </Box>
@@ -308,19 +340,34 @@ export default function PaymentQRModal({ open, onClose, paymentData, onSuccess }
                 )}
             </DialogContent>
 
-            <DialogActions sx={{ p: 2, bgcolor: "#F1F5F9", justifyContent: "space-between" }}>
+            <DialogActions sx={{ p: 2, bgcolor: "#F1F5F9", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 1 }}>
                 {status !== "SUCCESS" && (
-                    <Button
-                        variant="outlined"
-                        color="success"
-                        size="small"
-                        disabled={confirming}
-                        startIcon={<DoneAllIcon />}
-                        onClick={handleConfirmSimulated}
-                        sx={{ textTransform: "none", fontWeight: "bold" }}
-                    >
-                        {confirming ? "Đang kiểm tra..." : "Tôi đã chuyển khoản xong"}
-                    </Button>
+                    <Box display="flex" gap={1} flexWrap="wrap">
+                        {paymentData?.orderCode && (
+                            <Button
+                                variant="outlined"
+                                color="primary"
+                                size="small"
+                                disabled={syncing}
+                                startIcon={syncing ? <CircularProgress size={14} /> : <SyncIcon />}
+                                onClick={handleSyncPayOS}
+                                sx={{ textTransform: "none", fontWeight: "bold" }}
+                            >
+                                {syncing ? "Đang đồng bộ..." : "Đồng bộ từ PayOS"}
+                            </Button>
+                        )}
+                        <Button
+                            variant="outlined"
+                            color="success"
+                            size="small"
+                            disabled={confirming}
+                            startIcon={<DoneAllIcon />}
+                            onClick={handleConfirmSimulated}
+                            sx={{ textTransform: "none", fontWeight: "bold" }}
+                        >
+                            {confirming ? "Đang kiểm tra..." : "Tôi đã chuyển khoản xong"}
+                        </Button>
+                    </Box>
                 )}
                 <Button variant="contained" color="inherit" onClick={onClose} sx={{ fontWeight: "bold" }}>
                     Đóng

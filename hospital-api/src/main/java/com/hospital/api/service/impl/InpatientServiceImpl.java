@@ -36,6 +36,7 @@ public class InpatientServiceImpl implements InpatientService {
     private final InpatientNursingCareRepository nursingCareRepository;
     private final StaffRepository staffRepository;
     private final AccountRepository accountRepository;
+    private final com.hospital.api.service.AuditLogService auditLogService;
 
     @Override
     @Transactional
@@ -50,10 +51,10 @@ public class InpatientServiceImpl implements InpatientService {
                 .orElseGet(() -> roomRepository.findAll().stream().findFirst()
                         .orElseThrow(() -> new AppException("Không tìm thấy buồng bệnh phù hợp", HttpStatus.NOT_FOUND)));
 
-        // Xử lý phân bổ giường bệnh (Bed Allocation)
+        // Xử lý phân bổ giường bệnh có khóa bi quan PESSIMISTIC_WRITE (BIZ-P1-04)
         Bed assignedBed = null;
         if (request.bedId() != null) {
-            assignedBed = bedRepository.findById(request.bedId())
+            assignedBed = bedRepository.findByIdForUpdate(request.bedId())
                     .orElseThrow(() -> new AppException("Không tìm thấy giường bệnh với ID: " + request.bedId(), HttpStatus.NOT_FOUND));
             if (assignedBed.getStatus() != BedStatus.AVAILABLE) {
                 throw new AppException("Giường [" + assignedBed.getBedNumber() + "] hiện không khả dụng (Trạng thái: " + assignedBed.getStatus() + ")", HttpStatus.BAD_REQUEST);
@@ -61,11 +62,8 @@ public class InpatientServiceImpl implements InpatientService {
             assignedBed.setStatus(BedStatus.OCCUPIED);
             bedRepository.save(assignedBed);
         } else {
-            // Tự động tìm giường trống đầu tiên trong buồng bệnh
-            List<Bed> availableBeds = bedRepository.findByRoom_RoomIdOrderByBedNumberAsc(room.getRoomId())
-                    .stream()
-                    .filter(b -> b.getStatus() == BedStatus.AVAILABLE)
-                    .toList();
+            // Tự động tìm giường trống đầu tiên trong buồng bệnh có khóa bi quan PESSIMISTIC_WRITE
+            List<Bed> availableBeds = bedRepository.findByRoom_RoomIdAndStatusForUpdate(room.getRoomId(), BedStatus.AVAILABLE);
             if (!availableBeds.isEmpty()) {
                 assignedBed = availableBeds.get(0);
                 assignedBed.setStatus(BedStatus.OCCUPIED);
@@ -85,7 +83,22 @@ public class InpatientServiceImpl implements InpatientService {
                 .state(HospitalAdmissionState.ADMITTED)
                 .build();
 
-        return admissionRepository.save(admission);
+        HospitalAdmission savedAdmission = admissionRepository.save(admission);
+
+        // Ghi Audit Log tiếp nhận nội trú
+        auditLogService.log(
+                doctor.getAccount() != null ? doctor.getAccount().getUserId() : null,
+                doctor.getAccount() != null ? doctor.getAccount().getFullName() : "Bác sĩ",
+                "ROLE_DOCTOR",
+                "ADMIT_INPATIENT",
+                "HOSPITAL_ADMISSION",
+                savedAdmission.getAdmissionId().toString(),
+                "Tiếp nhận bệnh nhân " + profile.getFullName() + " vào nội trú buồng " + room.getRoomName()
+                        + (assignedBed != null ? " - Giường " + assignedBed.getBedNumber() : ""),
+                null
+        );
+
+        return savedAdmission;
     }
 
     @Override
@@ -146,13 +159,42 @@ public class InpatientServiceImpl implements InpatientService {
     @Override
     @Transactional(readOnly = true)
     public HospitalAdmission getAdmissionById(UUID admissionId) {
-        return admissionRepository.findById(admissionId)
+        return getAdmissionById(admissionId, null, true);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public HospitalAdmission getAdmissionById(UUID admissionId, UUID currentUserId, boolean isStaff) {
+        HospitalAdmission admission = admissionRepository.findById(admissionId)
                 .orElseThrow(() -> new AppException("Không tìm thấy hồ sơ nhập viện", HttpStatus.NOT_FOUND));
+
+        if (!isStaff) {
+            if (admission.getPatientProfile() == null
+                    || admission.getPatientProfile().getAccount() == null
+                    || !admission.getPatientProfile().getAccount().getUserId().equals(currentUserId)) {
+                throw new AppException("Bạn không có quyền truy cập hồ sơ nhập viện này", HttpStatus.FORBIDDEN);
+            }
+        }
+
+        return admission;
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<HospitalAdmission> getAdmissionsByPatient(UUID patientProfileId) {
+        return getAdmissionsByPatient(patientProfileId, null, true);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<HospitalAdmission> getAdmissionsByPatient(UUID patientProfileId, UUID currentUserId, boolean isStaff) {
+        if (!isStaff) {
+            PatientProfile profile = profileRepository.findById(patientProfileId)
+                    .orElseThrow(() -> new AppException("Không tìm thấy hồ sơ bệnh nhân", HttpStatus.NOT_FOUND));
+            if (profile.getAccount() == null || !profile.getAccount().getUserId().equals(currentUserId)) {
+                throw new AppException("Bạn không có quyền truy cập danh sách hồ sơ nhập viện của bệnh nhân khác", HttpStatus.FORBIDDEN);
+            }
+        }
         return admissionRepository.findAllByPatientProfile_PatientProfileId(patientProfileId);
     }
 
@@ -165,6 +207,21 @@ public class InpatientServiceImpl implements InpatientService {
     @Override
     @Transactional(readOnly = true)
     public List<HospitalizationDetail> getDailyRecords(UUID admissionId) {
+        return getDailyRecords(admissionId, null, true);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<HospitalizationDetail> getDailyRecords(UUID admissionId, UUID currentUserId, boolean isStaff) {
+        if (!isStaff) {
+            HospitalAdmission admission = admissionRepository.findById(admissionId)
+                    .orElseThrow(() -> new AppException("Không tìm thấy hồ sơ nhập viện", HttpStatus.NOT_FOUND));
+            if (admission.getPatientProfile() == null
+                    || admission.getPatientProfile().getAccount() == null
+                    || !admission.getPatientProfile().getAccount().getUserId().equals(currentUserId)) {
+                throw new AppException("Bạn không có quyền xem nhật ký theo dõi của hồ sơ này", HttpStatus.FORBIDDEN);
+            }
+        }
         return detailRepository.findAllByHospitalAdmission_AdmissionIdOrderByLogDateDesc(admissionId);
     }
 

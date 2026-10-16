@@ -35,15 +35,17 @@ import QrCodeIcon from "@mui/icons-material/QrCode";
 import axiosInstance from "../../services/AxiosInstance";
 import { formatCurrency, formatDate } from "../../utils/formatters";
 import { printReceipt } from "../../utils/printHelper";
+import PaymentQRModal from "../../components/payment/PaymentQRModal";
 
 export default function MedicalBillsPage() {
     const [tabIndex, setTabIndex] = useState(0);
     const [bookings, setBookings] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [billsError, setBillsError] = useState("");
     const [selectedBill, setSelectedBill] = useState(null);
     const [paymentModalOpen, setPaymentModalOpen] = useState(false);
-    const [vnpayUrl, setVnpayUrl] = useState("");
-    const [generatingUrl, setGeneratingUrl] = useState(false);
+    const [qrPaymentData, setQrPaymentData] = useState(null);
+    const [creatingPayment, setCreatingPayment] = useState(false);
 
     useEffect(() => {
         loadBills();
@@ -51,30 +53,36 @@ export default function MedicalBillsPage() {
 
     const loadBills = async () => {
         setLoading(true);
+        setBillsError("");
         try {
             const res = await axiosInstance.get("/api/bookings/my-bookings");
             const list = (res && Array.isArray(res.data)) ? res.data : (Array.isArray(res) ? res : []);
             setBookings(list);
         } catch (err) {
-            setBookings([]);
+            console.error("Lỗi tải hóa đơn:", err);
+            setBillsError(err.message || "Không thể đồng bộ danh sách hóa đơn viện phí từ máy chủ bệnh viện.");
         } finally {
             setLoading(false);
         }
     };
 
-    const handleCreateVNPayPayment = async (booking) => {
+    const handleCreatePayOSPayment = async (booking) => {
         setSelectedBill(booking);
-        setGeneratingUrl(true);
-        setPaymentModalOpen(true);
+        setCreatingPayment(true);
         try {
             const amount = booking.price || 200000;
-            const res = await axiosInstance.post(`/api/payment/vnpay/create-url?amount=${amount}&type=PAY_BOOKING`);
-            const url = typeof res === "string" ? res : (res.data || res.paymentUrl || "");
-            setVnpayUrl(url);
+            const res = await axiosInstance.post(`/api/payment/vietqr/create?amount=${amount}&type=PAY_BOOKING`);
+            const payload = res?.data?.data || res?.data || res;
+            if (payload && (payload.qrImageUrl || payload.paymentUrl)) {
+                setQrPaymentData(payload);
+                setPaymentModalOpen(true);
+            } else {
+                alert("Không thể tạo mã QR PayOS. Vui lòng thanh toán tiền mặt tại quầy tiếp đón.");
+            }
         } catch (err) {
-            setVnpayUrl("");
+            alert(err?.response?.data?.message || "Lỗi kết nối cổng thanh toán PayOS");
         } finally {
-            setGeneratingUrl(false);
+            setCreatingPayment(false);
         }
     };
 
@@ -88,9 +96,24 @@ export default function MedicalBillsPage() {
                     🧾 Hóa Đơn Viện Phí & Lịch Sử Giao Dịch
                 </Typography>
                 <Typography variant="body1" color="textSecondary">
-                    Quản lý toàn bộ chi phí khám chữa bệnh, tiền xét nghiệm cận lâm sàng, tiền thuốc và thanh toán trực tuyến qua cổng VNPay-QR.
+                    Quản lý toàn bộ chi phí khám chữa bệnh, tiền xét nghiệm cận lâm sàng, tiền thuốc và thanh toán trực tuyến qua Cổng PayOS (VietQR Napas 247).
                 </Typography>
             </Box>
+
+            {/* Error banner */}
+            {billsError && (
+                <Alert
+                    severity="warning"
+                    sx={{ mb: 3, borderRadius: 2 }}
+                    action={
+                        <Button color="inherit" size="small" onClick={loadBills}>
+                            Thử lại
+                        </Button>
+                    }
+                >
+                    {billsError}
+                </Alert>
+            )}
 
             {/* Quick KPI Cards */}
             <Grid container spacing={3} mb={4}>
@@ -131,10 +154,10 @@ export default function MedicalBillsPage() {
                     <Card sx={{ borderRadius: 3, border: "1px solid #E2E8F0", bgcolor: "#F8FAFC" }}>
                         <CardContent>
                             <Typography variant="caption" color="textSecondary" fontWeight="bold">CỔNG THANH TOÁN</Typography>
-                            <Typography variant="h5" fontWeight="900" color="#002D5A" my={0.5}>
-                                VNPay-QR 24/7
+                            <Typography variant="h5" fontWeight="900" color="#005BAA" my={0.5}>
+                                PayOS Open Banking
                             </Typography>
-                            <Typography variant="caption" color="textSecondary">Chiết khấu tức thì 0% phí GD</Typography>
+                            <Typography variant="caption" color="textSecondary">VietQR Napas 247 • 0% phí GD</Typography>
                         </CardContent>
                     </Card>
                 </Grid>
@@ -202,12 +225,12 @@ export default function MedicalBillsPage() {
                                                 <Button
                                                     size="small"
                                                     variant="contained"
-                                                    color="error"
                                                     startIcon={<PaymentIcon />}
-                                                    onClick={() => handleCreateVNPayPayment(b)}
-                                                    sx={{ borderRadius: 2, fontWeight: "bold" }}
+                                                    disabled={creatingPayment}
+                                                    onClick={() => handleCreatePayOSPayment(b)}
+                                                    sx={{ borderRadius: 2, fontWeight: "bold", bgcolor: "#005BAA", "&:hover": { bgcolor: "#004080" } }}
                                                 >
-                                                    VNPay
+                                                    PayOS
                                                 </Button>
                                                 <Button
                                                     size="small"
@@ -241,54 +264,16 @@ export default function MedicalBillsPage() {
                 )}
             </Paper>
 
-            {/* Modal Thanh toán VNPay */}
-            <Dialog open={paymentModalOpen} onClose={() => setPaymentModalOpen(false)} maxWidth="sm" fullWidth>
-                <DialogTitle fontWeight="bold" color="#002D5A">
-                    💳 Cổng Thanh Toán VNPay-QR Trực Tuyến
-                </DialogTitle>
-                <DialogContent dividers sx={{ textAlign: "center", py: 4 }}>
-                    {generatingUrl ? (
-                        <Box py={4}>
-                            <CircularProgress />
-                            <Typography mt={2}>Đang tạo liên kết thanh toán an toàn...</Typography>
-                        </Box>
-                    ) : (
-                        <Box>
-                            <Typography variant="h6" fontWeight="bold" color="#002D5A">
-                                Hóa đơn: {selectedBill?.bookingCode}
-                            </Typography>
-                            <Typography variant="h4" fontWeight="900" color="error.main" my={1.5}>
-                                {formatCurrency(selectedBill?.price || 200000)}
-                            </Typography>
-                            <Typography variant="body2" color="textSecondary" mb={3}>
-                                Quét mã QR bằng ứng dụng Ngân hàng (Vietcombank, MB, BIDV, Techcombank...) hoặc ví VNPAY để hoàn tất thanh toán.
-                            </Typography>
-
-                            {vnpayUrl ? (
-                                <Box display="flex" flexDirection="column" alignItems="center" gap={2}>
-                                    <Button
-                                        component="a"
-                                        href={vnpayUrl}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        variant="contained"
-                                        color="error"
-                                        size="large"
-                                        sx={{ py: 1.5, px: 4, borderRadius: 3, fontWeight: "bold" }}
-                                    >
-                                        👉 Chuyển Đến Cổng VNPay Để Thanh Toán
-                                    </Button>
-                                </Box>
-                            ) : (
-                                <Alert severity="info">Không thể kết nối cổng VNPay Sandbox. Vui lòng thanh toán trực tiếp tại quầy tiếp đón.</Alert>
-                            )}
-                        </Box>
-                    )}
-                </DialogContent>
-                <DialogActions sx={{ p: 2 }}>
-                    <Button onClick={() => setPaymentModalOpen(false)}>Đóng</Button>
-                </DialogActions>
-            </Dialog>
+            {/* Modal Thanh toán Cổng PayOS */}
+            <PaymentQRModal
+                open={paymentModalOpen}
+                onClose={() => setPaymentModalOpen(false)}
+                paymentData={qrPaymentData}
+                onSuccess={() => {
+                    loadBills();
+                    setPaymentModalOpen(false);
+                }}
+            />
         </Container>
     );
 }

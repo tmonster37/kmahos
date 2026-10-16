@@ -23,7 +23,10 @@ public record MedicalRecordResponse(
         List<MedicalTestResponse> tests,
         List<MedicalObservationResponse> observations,
         List<MedicalConditionResponse> conditions,
-        PrescriptionResponse prescription
+        PrescriptionResponse prescription,
+        java.time.LocalDateTime completedAt,
+        Boolean isLocked,
+        Integer addendumCount
 ) {
     public static MedicalRecordResponse fromEntity(MedicalExaminationRecord r) {
         return new MedicalRecordResponse(
@@ -42,7 +45,10 @@ public record MedicalRecordResponse(
                 r.getMedicalTests() != null ? r.getMedicalTests().stream().map(MedicalTestResponse::fromEntity).toList() : List.of(),
                 r.getMedicalObservations() != null ? r.getMedicalObservations().stream().map(MedicalObservationResponse::fromEntity).toList() : List.of(),
                 r.getMedicalConditions() != null ? r.getMedicalConditions().stream().map(MedicalConditionResponse::fromEntity).toList() : List.of(),
-                r.getPrescription() != null ? PrescriptionResponse.fromEntity(r.getPrescription()) : null
+                r.getPrescription() != null ? PrescriptionResponse.fromEntity(r.getPrescription()) : null,
+                r.getCompletedAt(),
+                r.isLockedRecord(),
+                r.getAddendums() != null ? r.getAddendums().size() : 0
         );
     }
 }

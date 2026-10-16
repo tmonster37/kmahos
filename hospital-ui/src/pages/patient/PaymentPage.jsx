@@ -33,6 +33,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
 import PhoneAndroidIcon from "@mui/icons-material/PhoneAndroid";
 import CreditCardIcon from "@mui/icons-material/CreditCard";
+import PointOfSaleIcon from "@mui/icons-material/PointOfSale";
 import { useLocation, useNavigate } from "react-router-dom";
 import axiosInstance from "../../services/AxiosInstance";
 import { formatCurrency, formatDateTime } from "../../utils/formatters";
@@ -46,20 +47,27 @@ export default function PaymentPage() {
     const [transactions, setTransactions] = useState([]);
     const [loading, setLoading] = useState(false);
     const [loadingHistory, setLoadingHistory] = useState(true);
-    const [depositChannel, setDepositChannel] = useState("VIETQR"); // 'VIETQR', 'MOMO', 'VNPAY'
+    const [depositChannel, setDepositChannel] = useState("PAYOS"); // 'PAYOS', 'CASH'
     const [paymentModalData, setPaymentModalData] = useState(null);
     const [openQRModal, setOpenQRModal] = useState(false);
+    const [walletError, setWalletError] = useState("");
 
     const queryParams = new URLSearchParams(location.search);
-    const responseCode = queryParams.get("vnp_ResponseCode");
-    const txnRef = queryParams.get("vnp_TxnRef");
+    const payosOrderCode = queryParams.get("orderCode");
+    const payosStatus = queryParams.get("status");
 
     useEffect(() => {
         loadWalletData();
-    }, []);
+        if (payosOrderCode) {
+            axiosInstance.post(`/api/payment/payos/sync/${payosOrderCode}`)
+                .then(() => loadWalletData())
+                .catch(() => {});
+        }
+    }, [payosOrderCode]);
 
     const loadWalletData = async () => {
         setLoadingHistory(true);
+        setWalletError("");
         try {
             const meRes = await axiosInstance.get("/api/auth/me").catch(() => null);
             const user = meRes?.data?.data || meRes?.data || meRes;
@@ -78,12 +86,18 @@ export default function PaymentPage() {
             }
         } catch (err) {
             console.error("Lỗi tải dữ liệu ví:", err);
+            setWalletError(err.message || "Không thể đồng bộ số dư ví và lịch sử giao dịch từ máy chủ.");
         } finally {
             setLoadingHistory(false);
         }
     };
 
     const handleDeposit = async () => {
+        if (depositChannel === "CASH") {
+            alert("Quý khách vui lòng đến trực tiếp Quầy Thu Ngân tầng 1 để nộp tiền mặt vào ví.");
+            return;
+        }
+
         if (amount < 10000) {
             alert("Số tiền nạp tối thiểu là 10.000 VNĐ");
             return;
@@ -91,27 +105,12 @@ export default function PaymentPage() {
 
         setLoading(true);
         try {
-            if (depositChannel === "VIETQR") {
-                const res = await axiosInstance.post(`/api/payment/vietqr/create?amount=${amount}&type=DEPOSIT_WALLET`);
-                const data = res?.data?.data || res?.data || res;
-                setPaymentModalData(data);
-                setOpenQRModal(true);
-            } else if (depositChannel === "MOMO") {
-                const res = await axiosInstance.post(`/api/payment/momo/create?amount=${amount}&type=DEPOSIT_WALLET`);
-                const data = res?.data?.data || res?.data || res;
-                setPaymentModalData(data);
-                setOpenQRModal(true);
-            } else if (depositChannel === "VNPAY") {
-                const res = await axiosInstance.post(`/api/payment/vnpay/create-url?amount=${amount}&type=DEPOSIT_WALLET`);
-                const paymentUrl = typeof res === "string" ? res : (res?.data?.data || res?.data || res?.paymentUrl || "");
-                if (paymentUrl) {
-                    window.location.href = paymentUrl;
-                } else {
-                    alert("Không thể khởi tạo cổng thanh toán VNPay");
-                }
-            }
+            const res = await axiosInstance.post(`/api/payment/vietqr/create?amount=${amount}&type=DEPOSIT_WALLET`);
+            const data = res?.data?.data || res?.data || res;
+            setPaymentModalData(data);
+            setOpenQRModal(true);
         } catch (err) {
-            alert(err.message || "Lỗi khởi tạo thanh toán nạp tiền!");
+            alert(err.message || "Lỗi khởi tạo thanh toán PayOS!");
         } finally {
             setLoading(false);
         }
@@ -124,7 +123,7 @@ export default function PaymentPage() {
 
     return (
         <Container maxWidth="md" sx={{ py: 4 }}>
-            {/* Modal Quét mã VietQR / MoMo */}
+            {/* Modal Cổng Thanh Toán PayOS (VietQR) */}
             <PaymentQRModal
                 open={openQRModal}
                 onClose={() => { setOpenQRModal(false); loadWalletData(); }}
@@ -132,10 +131,11 @@ export default function PaymentPage() {
                 onSuccess={handlePaymentSuccess}
             />
 
-            {/* VNPay Callback Notification */}
-            {responseCode && (
+
+            {/* PayOS Callback Notification */}
+            {payosOrderCode && (
                 <Box mb={3}>
-                    {responseCode === "00" ? (
+                    {payosStatus === "PAID" || payosStatus === "SUCCESS" ? (
                         <Alert
                             severity="success"
                             icon={<CheckCircleIcon fontSize="medium" />}
@@ -147,12 +147,12 @@ export default function PaymentPage() {
                             }
                         >
                             <Typography variant="body2" fontWeight="bold">
-                                Nạp tiền VNPay thành công! Số dư đã được cập nhật (Mã GD: {txnRef}).
+                                Nạp tiền thành công qua Cổng PayOS Open Banking! (Mã đơn: {payosOrderCode}).
                             </Typography>
                         </Alert>
                     ) : (
                         <Alert
-                            severity="error"
+                            severity="warning"
                             icon={<ErrorIcon fontSize="medium" />}
                             sx={{ borderRadius: 2 }}
                             action={
@@ -162,7 +162,7 @@ export default function PaymentPage() {
                             }
                         >
                             <Typography variant="body2" fontWeight="bold">
-                                Giao dịch VNPay không thành công hoặc đã bị hủy (Mã: {responseCode}).
+                                Giao dịch PayOS đã kết thúc hoặc đang chờ xử lý (Trạng thái: {payosStatus || "PENDING"}, Mã đơn: {payosOrderCode}).
                             </Typography>
                         </Alert>
                     )}
@@ -172,12 +172,26 @@ export default function PaymentPage() {
             {/* Header */}
             <Box mb={3}>
                 <Typography variant="h5" fontWeight="bold" color="#0f172a">
-                    💳 Ví Viện Phí & Nạp Tiền Đa Kênh
+                    💳 Ví Viện Phí & Nạp Tiền
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                    Hỗ trợ chuyển khoản VietQR Napas 247, Ví MoMo, VNPay-QR và Tiền mặt tại quầy
+                    Hỗ trợ Cổng thanh toán PayOS (Chuyển khoản Open Banking / VietQR Napas 247) và nộp Tiền mặt tại Quầy Thu ngân
                 </Typography>
             </Box>
+
+            {walletError && (
+                <Alert
+                    severity="warning"
+                    sx={{ mb: 2.5, borderRadius: 2 }}
+                    action={
+                        <Button color="inherit" size="small" onClick={loadWalletData}>
+                            Thử lại
+                        </Button>
+                    }
+                >
+                    {walletError}
+                </Alert>
+            )}
 
             <Grid container spacing={2.5} mb={4}>
                 {/* Balance Card */}
@@ -217,139 +231,134 @@ export default function PaymentPage() {
                 <Grid item xs={12} sm={7}>
                     <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: "1px solid #e2e8f0", bgcolor: "white" }}>
                         <Typography variant="subtitle2" fontWeight="bold" color="#0f172a" mb={1.5}>
-                            Chọn kênh nạp tiền vào ví:
+                            Chọn phương thức nạp tiền:
                         </Typography>
 
-                        {/* Channel selector tabs */}
-                        <Grid container spacing={1} mb={2}>
-                            <Grid item xs={4}>
+                        {/* Channel selector tabs: Chỉ PayOS và Tiền mặt */}
+                        <Grid container spacing={1.5} mb={2.5}>
+                            <Grid item xs={6}>
                                 <Button
                                     fullWidth
                                     size="small"
-                                    variant={depositChannel === "VIETQR" ? "contained" : "outlined"}
+                                    variant={depositChannel === "PAYOS" ? "contained" : "outlined"}
                                     startIcon={<AccountBalanceIcon />}
-                                    onClick={() => setDepositChannel("VIETQR")}
+                                    onClick={() => setDepositChannel("PAYOS")}
                                     sx={{
-                                        py: 0.8,
+                                        py: 1,
                                         borderRadius: 2,
                                         textTransform: "none",
                                         fontWeight: "700",
-                                        fontSize: "0.78rem",
-                                        bgcolor: depositChannel === "VIETQR" ? "#0284c7" : "transparent"
+                                        fontSize: "0.82rem",
+                                        bgcolor: depositChannel === "PAYOS" ? "#0284c7" : "transparent"
                                     }}
                                 >
-                                    VietQR (0%)
+                                    📱 Cổng PayOS (0% phí)
                                 </Button>
                             </Grid>
-                            <Grid item xs={4}>
+                            <Grid item xs={6}>
                                 <Button
                                     fullWidth
                                     size="small"
-                                    variant={depositChannel === "MOMO" ? "contained" : "outlined"}
-                                    startIcon={<PhoneAndroidIcon />}
-                                    onClick={() => setDepositChannel("MOMO")}
+                                    variant={depositChannel === "CASH" ? "contained" : "outlined"}
+                                    startIcon={<PointOfSaleIcon />}
+                                    onClick={() => setDepositChannel("CASH")}
                                     sx={{
-                                        py: 0.8,
+                                        py: 1,
                                         borderRadius: 2,
                                         textTransform: "none",
                                         fontWeight: "700",
-                                        fontSize: "0.78rem",
-                                        bgcolor: depositChannel === "MOMO" ? "#A50064" : "transparent",
-                                        borderColor: "#A50064",
-                                        color: depositChannel === "MOMO" ? "#fff" : "#A50064",
-                                        "&:hover": { bgcolor: "#80004d", color: "#fff" }
+                                        fontSize: "0.82rem",
+                                        bgcolor: depositChannel === "CASH" ? "#10b981" : "transparent",
+                                        borderColor: "#10b981",
+                                        color: depositChannel === "CASH" ? "#fff" : "#10b981",
+                                        "&:hover": { bgcolor: "#059669", color: "#fff" }
                                     }}
                                 >
-                                    Ví MoMo
-                                </Button>
-                            </Grid>
-                            <Grid item xs={4}>
-                                <Button
-                                    fullWidth
-                                    size="small"
-                                    variant={depositChannel === "VNPAY" ? "contained" : "outlined"}
-                                    startIcon={<CreditCardIcon />}
-                                    onClick={() => setDepositChannel("VNPAY")}
-                                    sx={{
-                                        py: 0.8,
-                                        borderRadius: 2,
-                                        textTransform: "none",
-                                        fontWeight: "700",
-                                        fontSize: "0.78rem",
-                                        bgcolor: depositChannel === "VNPAY" ? "#dc2626" : "transparent",
-                                        borderColor: "#dc2626",
-                                        color: depositChannel === "VNPAY" ? "#fff" : "#dc2626",
-                                        "&:hover": { bgcolor: "#b91c1c", color: "#fff" }
-                                    }}
-                                >
-                                    VNPay-QR
+                                    💵 Tiền mặt tại Quầy
                                 </Button>
                             </Grid>
                         </Grid>
 
-                        {/* Fast Amount Selectors */}
-                        <Grid container spacing={1} mb={2}>
-                            {[100000, 200000, 500000, 1000000].map((val) => (
-                                <Grid item xs={6} sm={3} key={val}>
-                                    <Button
-                                        fullWidth
-                                        size="small"
-                                        variant={amount === val ? "contained" : "outlined"}
-                                        onClick={() => setAmount(val)}
-                                        sx={{
-                                            py: 0.6,
-                                            borderRadius: 2,
-                                            textTransform: "none",
-                                            fontWeight: "600",
-                                            fontSize: "0.78rem",
-                                            bgcolor: amount === val ? "#334155" : "transparent",
-                                            borderColor: "#cbd5e1"
-                                        }}
-                                    >
-                                        {val >= 1000000 ? `${val / 1000000} Triệu` : `${val / 1000}k`}
-                                    </Button>
+                        {depositChannel === "CASH" ? (
+                            <Box>
+                                <Alert severity="info" sx={{ borderRadius: 2, mb: 2 }}>
+                                    <Typography variant="body2" fontWeight="bold" gutterBottom>
+                                        Nộp tiền mặt trực tiếp vào ví viện phí:
+                                    </Typography>
+                                    <Typography variant="caption" display="block">
+                                        • Quý khách vui lòng đến trực tiếp <b>Quầy Thu Ngân (Tầng 1)</b> hoặc <b>Bàn Tiếp Đón</b>.
+                                    </Typography>
+                                    <Typography variant="caption" display="block">
+                                        • Đọc <b>Số điện thoại</b> hoặc xuất trình <b>Mã Bệnh Nhân</b> cho nhân viên tiếp đón.
+                                    </Typography>
+                                    <Typography variant="caption" display="block">
+                                        • Nộp số tiền mặt mong muốn, nhân viên sẽ gạch nợ và nạp vào ví tức thì.
+                                    </Typography>
+                                </Alert>
+                            </Box>
+                        ) : (
+                            <Box>
+                                {/* Fast Amount Selectors */}
+                                <Grid container spacing={1} mb={2}>
+                                    {[100000, 200000, 500000, 1000000].map((val) => (
+                                        <Grid item xs={6} sm={3} key={val}>
+                                            <Button
+                                                fullWidth
+                                                size="small"
+                                                variant={amount === val ? "contained" : "outlined"}
+                                                onClick={() => setAmount(val)}
+                                                sx={{
+                                                    py: 0.6,
+                                                    borderRadius: 2,
+                                                    textTransform: "none",
+                                                    fontWeight: "600",
+                                                    fontSize: "0.78rem",
+                                                    bgcolor: amount === val ? "#334155" : "transparent",
+                                                    borderColor: "#cbd5e1"
+                                                }}
+                                            >
+                                                {val >= 1000000 ? `${val / 1000000} Triệu` : `${val / 1000}k`}
+                                            </Button>
+                                        </Grid>
+                                    ))}
                                 </Grid>
-                            ))}
-                        </Grid>
 
-                        <TextField
-                            fullWidth
-                            size="small"
-                            type="number"
-                            label="Số tiền nạp (VNĐ)"
-                            value={amount}
-                            onChange={(e) => setAmount(Number(e.target.value))}
-                            sx={{ mb: 2 }}
-                        />
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    type="number"
+                                    label="Số tiền nạp (VNĐ)"
+                                    value={amount}
+                                    onChange={(e) => setAmount(Number(e.target.value))}
+                                    sx={{ mb: 2 }}
+                                />
 
-                        <Button
-                            fullWidth
-                            variant="contained"
-                            size="medium"
-                            startIcon={<QrCodeScannerIcon />}
-                            disabled={loading}
-                            onClick={handleDeposit}
-                            sx={{
-                                py: 1.1,
-                                borderRadius: 2,
-                                fontWeight: "bold",
-                                textTransform: "none",
-                                bgcolor: depositChannel === "MOMO" ? "#A50064" : depositChannel === "VNPAY" ? "#dc2626" : "#0284c7",
-                                "&:hover": {
-                                    bgcolor: depositChannel === "MOMO" ? "#80004d" : depositChannel === "VNPAY" ? "#b91c1c" : "#0369a1"
-                                }
-                            }}
-                        >
-                            {loading ? (
-                                <CircularProgress size={20} color="inherit" />
-                            ) : depositChannel === "VIETQR" ? (
-                                "Tạo mã VietQR Chuyển Khoản"
-                            ) : depositChannel === "MOMO" ? (
-                                "Mở Thanh Toán MoMo"
-                            ) : (
-                                "Nạp tiền qua VNPAY-QR"
-                            )}
-                        </Button>
+                                <Button
+                                    fullWidth
+                                    variant="contained"
+                                    size="medium"
+                                    startIcon={<QrCodeScannerIcon />}
+                                    disabled={loading}
+                                    onClick={handleDeposit}
+                                    sx={{
+                                        py: 1.1,
+                                        borderRadius: 2,
+                                        fontWeight: "bold",
+                                        textTransform: "none",
+                                        bgcolor: "#0284c7",
+                                        "&:hover": {
+                                            bgcolor: "#0369a1"
+                                        }
+                                    }}
+                                >
+                                    {loading ? (
+                                        <CircularProgress size={20} color="inherit" />
+                                    ) : (
+                                        "Tạo mã PayOS / VietQR Chuyển Khoản"
+                                    )}
+                                </Button>
+                            </Box>
+                        )}
                     </Paper>
                 </Grid>
             </Grid>
@@ -393,15 +402,13 @@ export default function PaymentPage() {
                                 {transactions.map((t, idx) => {
                                     const isDeposit = t.transactionType === "DEPOSIT_WALLET";
                                     const isSuccess = t.status === "SUCCESS";
-                                    const methodLabel = t.paymentMethod === "VIETQR"
-                                        ? "VietQR Napas 247"
-                                        : t.paymentMethod === "MOMO"
-                                        ? "Ví MoMo"
-                                        : t.paymentMethod === "VNPAY"
-                                        ? "VNPay-QR"
+                                    const methodLabel = (t.paymentMethod === "VIETQR" || t.paymentMethod === "PAYOS")
+                                        ? "Cổng PayOS (VietQR)"
+                                        : (t.paymentMethod === "CASH" || t.paymentMethod === "COUNTER_CASH")
+                                        ? "Tiền mặt tại quầy"
                                         : t.paymentMethod === "INTERNAL_WALLET"
-                                        ? "Ví nội bộ"
-                                        : "Tiền mặt quầy";
+                                        ? "Ví viện phí"
+                                        : "Tiền mặt";
 
                                     return (
                                         <TableRow key={t.transactionId || idx} hover>

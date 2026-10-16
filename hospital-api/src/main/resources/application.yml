@@ -10,7 +10,7 @@ spring:
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/kmahos}
     username: ${SPRING_DATASOURCE_USERNAME:postgres}
-    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:taizz0537}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 15
@@ -19,10 +19,10 @@ spring:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
-    show-sql: true
+    show-sql: ${SPRING_JPA_SHOW_SQL:true}
     properties:
       hibernate:
-        format_sql: true
+        format_sql: ${SPRING_JPA_FORMAT_SQL:true}
   jackson:
     time-zone: Asia/Ho_Chi_Minh
     serialization:
@@ -34,7 +34,7 @@ jwt:
 
 app:
   cors:
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000,http://localhost:8080,http://127.0.0.1:5173,http://127.0.0.1:3000,https://hospital.kma.edu.vn,https://kiosk.hospital.kma.edu.vn,https://admin.hospital.kma.edu.vn}
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000,http://localhost:3001,http://localhost:8080,http://127.0.0.1:5173,http://127.0.0.1:3000,http://127.0.0.1:3001,https://hospital.kma.edu.vn,https://kiosk.hospital.kma.edu.vn,https://admin.hospital.kma.edu.vn}
 
 vnpay:
   tmn-code: ${VNPAY_TMN_CODE:P48XA8RI}
@@ -50,4 +50,26 @@ payos:
   bank-name: ${PAYOS_BANK_NAME:MBBank - Ngân hàng TMCP Quân Đội}
   bank-account: ${PAYOS_BANK_ACCOUNT:0987654321}
   account-holder: ${PAYOS_ACCOUNT_HOLDER:BENH VIEN DA KHOA QUOC TE TNT}
+  return-url: ${PAYOS_RETURN_URL:http://localhost:3000/payment}
+  cancel-url: ${PAYOS_CANCEL_URL:http://localhost:3000/payment}
 
+---
+# Cấu hình an toàn dành riêng cho môi trường Production
+spring:
+  config:
+    activate:
+      on-profile: prod,production
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+logging:
+  level:
+    root: INFO
+    org.hibernate.SQL: WARN
+    org.hibernate.type.descriptor.sql: WARN
+    com.hospital.api: INFO

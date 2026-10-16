@@ -26,6 +26,7 @@ public class ClinicalGatewayController {
 
     // 1. DICOM Modality Worklist (MWL) cho máy X-Quang, CT, MRI
     @GetMapping("/ris/worklist")
+    @PreAuthorize("hasAnyRole('LAB_TECHNICIAN', 'DOCTOR', 'HEAD_OF_DEPARTMENT', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<DicomWorklistItemResponse>>> getDicomWorklist(
             @RequestParam(required = false) String modality,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
@@ -38,6 +39,7 @@ public class ClinicalGatewayController {
 
     // 2. Tiếp nhận Webhook từ PACS Server (dcm4chee) & Tích hợp OHIF Web Viewer
     @PostMapping("/pacs/callback")
+    @PreAuthorize("hasAnyRole('LAB_TECHNICIAN', 'DOCTOR', 'ADMIN')")
     public ResponseEntity<ApiResponse<MedicalTestResponse>> handlePacsCallback(
             @Valid @RequestBody PacsCallbackRequest request
     ) {
@@ -49,6 +51,7 @@ public class ClinicalGatewayController {
 
     // 3. Cổng tiếp nhận kết quả tự động từ máy xét nghiệm (LIS Gateway / OpenELIS)
     @PostMapping("/lis/results")
+    @PreAuthorize("hasAnyRole('LAB_TECHNICIAN', 'ADMIN')")
     public ResponseEntity<ApiResponse<LabTestDetailResponse>> handleLisResults(
             @Valid @RequestBody LisAutomatedResultRequest request
     ) {

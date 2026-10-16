@@ -11,6 +11,7 @@ import java.util.UUID;
 @Repository
 public interface MedicalExaminationRecordRepository extends JpaRepository<MedicalExaminationRecord, UUID> {
     Optional<MedicalExaminationRecord> findByBooking_BookingCode(String bookingCode);
+    Optional<MedicalExaminationRecord> findByBooking_BookingId(UUID bookingId);
     List<MedicalExaminationRecord> findAllByPatientProfile_PatientProfileIdAndDeletedFalseOrderByCreatedAtDesc(UUID profileId);
 }
 

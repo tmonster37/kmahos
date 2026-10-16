@@ -52,6 +52,8 @@ export default function LoginPage() {
                     navigate("/admin/dashboard");
                 } else if (res.data.role === "ROLE_LAB_TECHNICIAN") {
                     navigate("/doctor/lab-tests");
+                } else if (res.data.role === "ROLE_NURSE") {
+                    navigate("/nurse/reception");
                 } else if (res.data.role === "ROLE_CASHIER") {
                     navigate("/cashier");
                 } else {

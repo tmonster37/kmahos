@@ -6,7 +6,24 @@ export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
+    // Dọn dẹp an toàn các khóa dữ liệu sinh hiệu cũ trong localStorage để bảo vệ quyền riêng tư y tế
+    const clearLegacyVitals = () => {
+        try {
+            const keysToRemove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith("vitals_")) {
+                    keysToRemove.push(key);
+                }
+            }
+            keysToRemove.forEach((k) => localStorage.removeItem(k));
+        } catch {
+            // Không log thông tin nhạy cảm của bệnh nhân
+        }
+    };
+
     useEffect(() => {
+        clearLegacyVitals();
         const storedUser = localStorage.getItem("user");
         const token = localStorage.getItem("accessToken");
         if (storedUser && token) {
@@ -23,6 +40,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     const logout = () => {
+        clearLegacyVitals();
         localStorage.removeItem("accessToken");
         localStorage.removeItem("user");
         setUser(null);

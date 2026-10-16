@@ -32,6 +32,36 @@ public class PayOSConfig {
     @Value("${payos.account-holder:BENH VIEN DA KHOA QUOC TE TNT}")
     public String accountHolder;
 
+    @Value("${payos.return-url:http://localhost:3000/payment}")
+    public String returnUrl;
+
+    @Value("${payos.cancel-url:http://localhost:3000/payment}")
+    public String cancelUrl;
+
+    /**
+     * Kiểm tra xem cấu hình PayOS thật từ tài khoản cá nhân đã được cung cấp chưa
+     */
+    public boolean isRealPayOSConfigured() {
+        return clientId != null && !clientId.isBlank() && !"demo-client-id".equalsIgnoreCase(clientId.trim())
+                && apiKey != null && !apiKey.isBlank() && !"demo-api-key".equalsIgnoreCase(apiKey.trim())
+                && checksumKey != null && !checksumKey.isBlank() && !"demo-checksum-key".equalsIgnoreCase(checksumKey.trim());
+    }
+
+    /**
+     * Tạo chữ ký HMAC-SHA256 chuẩn đặc tả PayOS khi tạo Payment Link
+     * Chuỗi ký: amount={amount}&cancelUrl={cancelUrl}&description={description}&orderCode={orderCode}&returnUrl={returnUrl}
+     */
+    public String createPaymentLinkSignature(long amount, String cancelUrlStr, String desc, long orderCode, String returnUrlStr) {
+        String data = String.format("amount=%d&cancelUrl=%s&description=%s&orderCode=%d&returnUrl=%s",
+                amount,
+                cancelUrlStr != null ? cancelUrlStr : "",
+                desc != null ? desc : "",
+                orderCode,
+                returnUrlStr != null ? returnUrlStr : ""
+        );
+        return hmacSHA256(checksumKey, data);
+    }
+
     /**
      * Sinh đường dẫn ảnh VietQR chuẩn Napas 247 quốc gia (QuickLink / VietQR API)
      */

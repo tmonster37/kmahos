@@ -36,20 +36,47 @@ public record PatientProfileLookupResponse(
         return new PatientProfileLookupResponse(
                 p.getPatientProfileId(),
                 p.getFullName(),
-                p.getPhoneNumber(),
-                p.getIdentityNumber(),
-                p.getHealthInsuranceNumber(),
+                maskPhone(p.getPhoneNumber()),
+                maskIdentity(p.getIdentityNumber()),
+                maskInsurance(p.getHealthInsuranceNumber()),
                 p.getGender(),
                 p.getDateOfBirth(),
-                p.getStreetAddress(),
+                p.getStreetAddress() != null && !p.getStreetAddress().isBlank() ? "***" : "",
                 p.getProvince(),
                 p.getDistrict(),
                 p.getWard(),
                 lastVisitDate,
                 lastDepartmentName,
                 lastDoctorName,
-                lastDiagnosis,
+                maskDiagnosis(lastDiagnosis),
                 totalVisits
         );
+    }
+
+    private static String maskPhone(String phone) {
+        if (phone == null || phone.isBlank()) return "";
+        String clean = phone.trim();
+        if (clean.length() <= 5) return "***";
+        return clean.substring(0, 3) + "****" + clean.substring(clean.length() - 3);
+    }
+
+    private static String maskIdentity(String id) {
+        if (id == null || id.isBlank()) return "";
+        String clean = id.trim();
+        if (clean.length() <= 6) return "******";
+        return clean.substring(0, 3) + "******" + clean.substring(clean.length() - 3);
+    }
+
+    private static String maskInsurance(String bhyt) {
+        if (bhyt == null || bhyt.isBlank()) return "";
+        String clean = bhyt.trim();
+        if (clean.length() <= 6) return "******";
+        return clean.substring(0, 4) + "******" + clean.substring(clean.length() - 3);
+    }
+
+    private static String maskDiagnosis(String diag) {
+        if (diag == null || diag.isBlank()) return null;
+        // Rút gọn chẩn đoán để tránh lộ bệnh án chi tiết trong tra cứu nhanh
+        return "Đã hoàn thành khám chuyên khoa";
     }
 }

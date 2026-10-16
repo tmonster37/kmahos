@@ -38,6 +38,7 @@ import MedicalServicesIcon from "@mui/icons-material/MedicalServices";
 import LocalPharmacyIcon from "@mui/icons-material/LocalPharmacy";
 import BiotechIcon from "@mui/icons-material/Biotech";
 import PrintIcon from "@mui/icons-material/Print";
+import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import CancelIcon from "@mui/icons-material/Cancel";
@@ -97,6 +98,8 @@ export default function MedicalHistoryPage() {
     // Toast feedback
     const [toast, setToast] = useState({ open: false, message: "", severity: "success" });
 
+    const [historyError, setHistoryError] = useState("");
+
     useEffect(() => {
         loadBookings();
     }, []);
@@ -110,12 +113,13 @@ export default function MedicalHistoryPage() {
     const loadBookings = async () => {
         setLoading(true);
         try {
+            setHistoryError("");
             const res = await axiosInstance.get("/api/bookings/my-history");
             const list = (res && Array.isArray(res.data)) ? res.data : (Array.isArray(res) ? res : []);
             setBookings(list);
         } catch (err) {
             console.error("Lỗi tải lịch sử khám:", err);
-            setBookings([]);
+            setHistoryError(err.message || "Không thể đồng bộ hồ sơ khám bệnh từ máy chủ.");
         } finally {
             setLoading(false);
         }
@@ -238,24 +242,20 @@ export default function MedicalHistoryPage() {
     const getDetailedRecordData = (booking) => {
         const isCompleted = booking?.status === "COMPLETED";
         return {
-            diagnosis: isCompleted ? "Viêm đường hô hấp trên cấp tính (ICD-10: J06.9)" : "Chưa có chẩn đoán (Lịch khám chưa diễn ra)",
-            doctorAdvice: isCompleted ? "Uống thuốc đúng liều, uống nhiều nước ấm, nghỉ ngơi hợp lý. Tái khám sau 7 ngày nếu còn sốt hoặc ho nhiều." : "Vui lòng có mặt trước 15 phút tại phòng khám.",
-            medicines: isCompleted ? [
-                { id: 1, name: "Augmentin 1g", form: "Viên nén", quantity: "14 viên", dosage: "Sáng 1 - Tối 1 (Sau ăn no)", note: "Uống đủ 7 ngày" },
-                { id: 2, name: "Panadol Extra 500mg", form: "Viên sủi", quantity: "10 viên", dosage: "1 viên khi sốt > 38.5°C", note: "Cách nhau 4-6 giờ" },
-                { id: 3, name: "Siro ho Bổ Phế", form: "Chai 125ml", quantity: "1 chai", dosage: "15ml x 3 lần/ngày", note: "Sau ăn" }
-            ] : [],
-            labTests: isCompleted ? [
-                { testName: "Tổng phân tích tế bào máu ngoại vi", result: "WBC: 7.8 G/L | RBC: 4.6 T/L", reference: "Bình thường", isNormal: true },
-                { testName: "Định lượng Glucose máu lúc đói", result: "5.4 mmol/L", reference: "3.9 - 6.4 mmol/L", isNormal: true },
-                { testName: "Chụp X-quang ngực thẳng (DR)", result: "Hình ảnh tim phổi bình thường", reference: "Không tổn thương", isNormal: true }
-            ] : [],
+            diagnosis: isCompleted
+                ? (booking?.symptoms ? `Ghi nhận triệu chứng lâm sàng: ${booking.symptoms}` : "Đã hoàn tất khám ngoại trú")
+                : "Chưa có chẩn đoán (Lịch khám chưa diễn ra hoặc đang trong phiên khám)",
+            doctorAdvice: isCompleted
+                ? "Bệnh nhân tuân thủ phác đồ điều trị và hướng dẫn trực tiếp của bác sĩ chuyên khoa. Tái khám đúng hẹn nếu có chỉ định."
+                : "Vui lòng có mặt trước 15 phút tại phòng khám chuyên khoa.",
+            medicines: [],
+            labTests: [],
             billing: {
-                consultationFee: booking.price || 200000,
-                labTestsFee: isCompleted ? 350000 : 0,
-                medicineFee: isCompleted ? 245000 : 0,
-                insuranceDiscount: isCompleted ? 210000 : 0,
-                totalPaid: isCompleted ? ((booking.price || 200000) + 350000 + 245000 - 210000) : (booking.price || 200000)
+                consultationFee: booking?.price || 200000,
+                labTestsFee: 0,
+                medicineFee: 0,
+                insuranceDiscount: 0,
+                totalPaid: booking?.price || 200000
             }
         };
     };
@@ -276,6 +276,21 @@ export default function MedicalHistoryPage() {
                     + Đặt Lịch Khám Mới
                 </Button>
             </Box>
+
+            {/* Error Banner */}
+            {historyError && (
+                <Alert
+                    severity="warning"
+                    sx={{ mb: 3, borderRadius: 2 }}
+                    action={
+                        <Button color="inherit" size="small" onClick={loadBookings}>
+                            Thử lại
+                        </Button>
+                    }
+                >
+                    {historyError}
+                </Alert>
+            )}
 
             {/* Main Tabs: Ngoại Trú vs Nội Trú */}
             <Paper elevation={0} sx={{ mb: 3, borderRadius: 2.5, border: "1px solid #e2e8f0", bgcolor: "white", p: 0.5 }}>
@@ -724,18 +739,34 @@ export default function MedicalHistoryPage() {
                         </DialogContent>
 
                         <DialogActions sx={{ p: 2, justifyContent: "space-between" }}>
-                            <Button
-                                size="small"
-                                variant="outlined"
-                                startIcon={<PrintIcon fontSize="small" />}
-                                onClick={() => {
-                                    setPrintRecordData(recordData);
-                                    setPrintModalOpen(true);
-                                }}
-                                sx={{ textTransform: "none", fontWeight: "bold" }}
-                            >
-                                In Bản Bệnh Án A4/A5
-                            </Button>
+                            <Box display="flex" gap={1}>
+                                <Button
+                                    size="small"
+                                    variant="outlined"
+                                    startIcon={<PrintIcon fontSize="small" />}
+                                    onClick={() => {
+                                        setPrintRecordData(recordData);
+                                        setPrintModalOpen(true);
+                                    }}
+                                    sx={{ textTransform: "none", fontWeight: "bold" }}
+                                >
+                                    In Bản Bệnh Án
+                                </Button>
+                                {selectedBooking?.status === "COMPLETED" && (
+                                    <Button
+                                        size="small"
+                                        variant="contained"
+                                        color="error"
+                                        startIcon={<PictureAsPdfIcon fontSize="small" />}
+                                        href={`http://localhost:8080/api/prescriptions/${selectedBooking.bookingCode}/pdf`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        sx={{ textTransform: "none", fontWeight: "bold" }}
+                                    >
+                                        Tải Đơn Thuốc PDF (A5)
+                                    </Button>
+                                )}
+                            </Box>
                             <Button size="small" variant="contained" onClick={() => setSelectedBooking(null)} sx={{ textTransform: "none", bgcolor: "#0284c7" }}>
                                 Đóng
                             </Button>

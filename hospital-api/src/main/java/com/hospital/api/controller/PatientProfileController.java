@@ -25,6 +25,7 @@ public class PatientProfileController {
 
     // Tra cứu nhanh hồ sơ bệnh nhân cũ theo SĐT hoặc CCCD (Kèm lịch sử khám gần nhất)
     @GetMapping("/lookup")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'HEAD_OF_DEPARTMENT', 'NURSE', 'CASHIER', 'STAFF', 'PHARMACIST', 'LAB_TECHNICIAN')")
     public ResponseEntity<ApiResponse<List<PatientProfileLookupResponse>>> lookupPatients(
             @RequestParam(value = "keyword", required = false, defaultValue = "") String keyword
     ) {
@@ -38,6 +39,27 @@ public class PatientProfileController {
     @GetMapping
     public ResponseEntity<ApiResponse<List<PatientProfileResponse>>> getMyProfiles(@AuthenticationPrincipal UserPrincipal userPrincipal) {
         return ResponseEntity.ok(ApiResponse.ok(profileService.getMyProfiles(userPrincipal.getId()), "Lấy danh sách hồ sơ thành công"));
+    }
+
+    // Lấy chi tiết hồ sơ bệnh nhân (Bảo vệ chống IDOR)
+    @GetMapping("/{profileId}")
+    public ResponseEntity<ApiResponse<PatientProfileResponse>> getProfileById(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @PathVariable UUID profileId
+    ) {
+        boolean isStaff = userPrincipal != null && userPrincipal.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().contains("ADMIN") ||
+                               a.getAuthority().contains("DOCTOR") ||
+                               a.getAuthority().contains("HEAD_OF_DEPARTMENT") ||
+                               a.getAuthority().contains("NURSE") ||
+                               a.getAuthority().contains("CASHIER") ||
+                               a.getAuthority().contains("PHARMACIST") ||
+                               a.getAuthority().contains("LAB_TECHNICIAN") ||
+                               a.getAuthority().contains("STAFF"));
+        return ResponseEntity.ok(ApiResponse.ok(
+                profileService.getProfileById(userPrincipal.getId(), profileId, isStaff),
+                "Lấy chi tiết hồ sơ bệnh nhân thành công"
+        ));
     }
 
     // Tạo hồ sơ bệnh nhân mới

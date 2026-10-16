@@ -76,50 +76,96 @@ public class PaymentController {
 
     // 5. Kiểm tra trạng thái giao dịch theo thời gian thực (Polling status)
     @GetMapping("/status/{txnRef}")
-    public ResponseEntity<ApiResponse<Transaction>> checkTransactionStatus(@PathVariable String txnRef) {
-        Transaction transaction = paymentService.checkTransactionStatus(txnRef);
+    public ResponseEntity<ApiResponse<com.hospital.api.dto.response.TransactionResponse>> checkTransactionStatus(
+            @PathVariable String txnRef,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        UUID accountId = userPrincipal != null ? userPrincipal.getId() : null;
+        boolean isPrivileged = userPrincipal != null && userPrincipal.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().contains("ADMIN") || a.getAuthority().contains("CASHIER"));
+        com.hospital.api.dto.response.TransactionResponse transaction = paymentService.checkTransactionStatus(txnRef, accountId, isPrivileged);
         return ResponseEntity.ok(ApiResponse.ok(transaction, "Kiểm tra trạng thái giao dịch thành công"));
     }
 
     // 6. Xác nhận thanh toán thành công (Chỉ dành cho Quầy thu ngân & Quản trị viên)
     @PostMapping("/confirm/{txnRef}")
     @PreAuthorize("hasAnyRole('ADMIN', 'CASHIER')")
-    public ResponseEntity<ApiResponse<Transaction>> confirmPaymentSuccess(
+    public ResponseEntity<ApiResponse<com.hospital.api.dto.response.TransactionResponse>> confirmPaymentSuccess(
             @PathVariable String txnRef,
             @RequestParam(required = false, defaultValue = "VIETQR") PaymentMethod method
     ) {
-        Transaction transaction = paymentService.confirmPaymentSuccess(txnRef, method);
+        com.hospital.api.dto.response.TransactionResponse transaction = paymentService.confirmPaymentSuccess(txnRef, method);
         return ResponseEntity.ok(ApiResponse.ok(transaction, "Xác nhận thanh toán thành công"));
     }
 
     // 7. Webhook tiếp nhận biến động số dư / thanh toán tự động từ PayOS Open Banking
     @PostMapping("/payos/webhook")
-    public ResponseEntity<ApiResponse<Transaction>> payOSWebhook(@RequestBody com.hospital.api.dto.request.PayOSWebhookRequest request) {
-        Transaction transaction = paymentService.processPayOSWebhook(request);
+    public ResponseEntity<ApiResponse<com.hospital.api.dto.response.TransactionResponse>> payOSWebhook(
+            @RequestBody com.hospital.api.dto.request.PayOSWebhookRequest request
+    ) {
+        com.hospital.api.dto.response.TransactionResponse transaction = paymentService.processPayOSWebhook(request);
         return ResponseEntity.ok(ApiResponse.ok(transaction, "Xử lý PayOS webhook thành công"));
     }
 
-    // 8. Callback xử lý kết quả từ VNPay
+    // 7.1. Đồng bộ trạng thái giao dịch trực tiếp từ cổng PayOS Open Banking
+    @PostMapping("/payos/sync/{orderCode}")
+    public ResponseEntity<ApiResponse<com.hospital.api.dto.response.TransactionResponse>> syncPayOSPayment(
+            @PathVariable Long orderCode
+    ) {
+        com.hospital.api.dto.response.TransactionResponse transaction = paymentService.syncPayOSPayment(orderCode);
+        return ResponseEntity.ok(ApiResponse.ok(transaction, "Đồng bộ giao dịch từ PayOS thành công"));
+    }
+
+    // 7.2. Khởi tạo link thanh toán PayOS chuyên dụng với Checkout URL chính thức
+    @PostMapping("/payos/create-link")
+    public ResponseEntity<ApiResponse<PaymentGatewayResponse>> createPayOSPaymentLink(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @RequestParam BigDecimal amount,
+            @RequestParam TransactionType type,
+            @RequestParam(required = false) String description
+    ) {
+        UUID accountId = userPrincipal != null ? userPrincipal.getId() : null;
+        PaymentGatewayResponse response = paymentService.createPayOSPaymentLink(accountId, amount, type, description);
+        return ResponseEntity.ok(ApiResponse.ok(response, "Khởi tạo link thanh toán PayOS thành công"));
+    }
+
+    // 8. Callback xử lý kết quả từ VNPay (Return URL cho trình duyệt)
     @GetMapping("/vnpay/callback")
-    public ResponseEntity<ApiResponse<Transaction>> vnpayCallback(@RequestParam Map<String, String> queryParams) {
-        Transaction transaction = paymentService.processVNPayCallback(queryParams);
+    public ResponseEntity<ApiResponse<com.hospital.api.dto.response.TransactionResponse>> vnpayCallback(
+            @RequestParam Map<String, String> queryParams
+    ) {
+        com.hospital.api.dto.response.TransactionResponse transaction = paymentService.processVNPayCallback(queryParams);
         return ResponseEntity.ok(ApiResponse.ok(transaction, "Xử lý kết quả thanh toán VNPay thành công"));
     }
 
-    // 8. Lịch sử giao dịch của người dùng
-    @GetMapping("/history")
-    public ResponseEntity<ApiResponse<List<Transaction>>> getTransactionHistory(
-            @AuthenticationPrincipal UserPrincipal userPrincipal
+    // 8.1. IPN Callback nhận thông báo tức thì từ cổng VNPay (Server-to-Server Instant Payment Notification)
+    @GetMapping({"/vnpay/ipn", "/vnpay-ipn"})
+    public ResponseEntity<com.hospital.api.dto.response.VnpayIpnResponse> vnpayIpn(
+            @RequestParam Map<String, String> queryParams
     ) {
-        List<Transaction> history = paymentService.getTransactionHistory(userPrincipal.getId());
+        com.hospital.api.dto.response.VnpayIpnResponse response = paymentService.processVNPayIpn(queryParams);
+        return ResponseEntity.ok(response);
+    }
+
+    // 9. Lịch sử giao dịch của người dùng
+    @GetMapping("/history")
+    public ResponseEntity<ApiResponse<List<com.hospital.api.dto.response.TransactionResponse>>> getTransactionHistory(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size
+    ) {
+        List<com.hospital.api.dto.response.TransactionResponse> history = paymentService.getTransactionHistory(userPrincipal.getId(), page, size);
         return ResponseEntity.ok(ApiResponse.ok(history, "Lấy lịch sử giao dịch thành công"));
     }
 
-    // 9. Danh sách toàn bộ giao dịch đối soát dành cho Quản trị viên & Kế toán
+    // 10. Danh sách toàn bộ giao dịch đối soát dành cho Quản trị viên & Kế toán
     @GetMapping("/admin/transactions")
     @PreAuthorize("hasAnyRole('ADMIN', 'CASHIER')")
-    public ResponseEntity<ApiResponse<List<Transaction>>> getAllTransactions() {
-        List<Transaction> all = paymentService.getAllTransactions();
+    public ResponseEntity<ApiResponse<List<com.hospital.api.dto.response.TransactionResponse>>> getAllTransactions(
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size
+    ) {
+        List<com.hospital.api.dto.response.TransactionResponse> all = paymentService.getAllTransactions(page, size);
         return ResponseEntity.ok(ApiResponse.ok(all, "Lấy danh sách đối soát giao dịch thành công"));
     }
 }

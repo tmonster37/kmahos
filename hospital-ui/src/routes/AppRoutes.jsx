@@ -31,9 +31,21 @@ import TransactionManagePage from "../pages/admin/TransactionManagePage";
 import CashierPage from "../pages/cashier/CashierPage";
 import NurseReceptionPage from "../pages/nurse/NurseReceptionPage";
 import PatientManagePage from "../pages/admin/PatientManagePage";
+import VerifyPrescriptionPage from "../pages/patient/VerifyPrescriptionPage";
 import ForbiddenPage from "../pages/error/ForbiddenPage";
 import NotFoundPage from "../pages/error/NotFoundPage";
 import ProtectedRoute from "./ProtectedRoute";
+import { useAuth } from "../context/AuthContext";
+
+import ClinicalLayout from "../layouts/ClinicalLayout";
+
+function AdminIndexRedirect() {
+    const { user } = useAuth();
+    if (user?.role === "ROLE_PHARMACIST") {
+        return <Navigate to="/admin/pharmacy-inventory" replace />;
+    }
+    return <Navigate to="/admin/dashboard" replace />;
+}
 
 export default function AppRoutes() {
     return (
@@ -48,10 +60,12 @@ export default function AppRoutes() {
             <Route path="/403" element={<ForbiddenPage />} />
             <Route path="/403-forbidden" element={<ForbiddenPage />} />
 
-            {/* 1. Phân hệ Bệnh nhân & Công khai */}
+            {/* 1. Phân hệ Bệnh nhân & Cổng Dịch vụ Công khai (MainLayout: có footer, hỗ trợ hotline & tư vấn) */}
             <Route element={<MainLayout />}>
                 <Route path="/" element={<HomePage />} />
                 <Route path="/booking" element={<BookingPage />} />
+                <Route path="/verify-prescription" element={<VerifyPrescriptionPage />} />
+                <Route path="/xac-thuc-don-thuoc" element={<VerifyPrescriptionPage />} />
                 <Route path="/lookup" element={<PatientLookupPage />} />
                 <Route path="/tra-cuu" element={<PatientLookupPage />} />
                 <Route path="/login" element={<LoginPage />} />
@@ -66,50 +80,65 @@ export default function AppRoutes() {
                     <Route path="/reminders" element={<MedicineReminderPage />} />
                     <Route path="/chat" element={<ChatConsultationPage />} />
                 </Route>
+            </Route>
 
-                {/* 2. Phân hệ Điều Dưỡng (Tiếp nhận tại quầy, tạo hồ sơ, cấp và điều phối STT) */}
+            {/* 2. Phân hệ Bàn Tác Nghiệp Y Tế (ClinicalLayout: Tối ưu 100vh, zero distraction, không footer quảng bá, không chat AI) */}
+            <Route element={<ClinicalLayout />}>
+                {/* 2.1 Phân hệ Điều Dưỡng (Tiếp nhận tại quầy, tạo hồ sơ, cấp và điều phối STT) */}
                 <Route element={<ProtectedRoute allowedRoles={["ROLE_NURSE", "ROLE_ADMIN"]} />}>
                     <Route path="/nurse/reception" element={<NurseReceptionPage />} />
                 </Route>
 
-                {/* 3. Phân hệ Bác sĩ & Trưởng Khoa (Khám lâm sàng, chẩn đoán, kê đơn, chỉ định CLS) */}
+                {/* 2.2 Phân hệ Bác sĩ & Trưởng Khoa (Khám lâm sàng, chẩn đoán, kê đơn, chỉ định CLS) */}
                 <Route element={<ProtectedRoute allowedRoles={["ROLE_DOCTOR", "ROLE_HEAD_OF_DEPARTMENT", "ROLE_ADMIN"]} />}>
                     <Route path="/doctor/examinations" element={<ExaminationPage />} />
                     <Route path="/doctor/chat" element={<ChatConsultationPage />} />
                 </Route>
 
-                {/* 4. Phân hệ Nội Trú & Buồng Bệnh (Bác Sĩ + Điều Dưỡng + Admin) */}
+                {/* 2.3 Phân hệ Nội Trú & Buồng Bệnh (Bác Sĩ + Điều Dưỡng + Admin) */}
                 <Route element={<ProtectedRoute allowedRoles={["ROLE_DOCTOR", "ROLE_HEAD_OF_DEPARTMENT", "ROLE_NURSE", "ROLE_ADMIN"]} />}>
                     <Route path="/doctor/inpatient" element={<InpatientPage />} />
                 </Route>
 
-                {/* 5. Phân hệ Bác Sĩ Xét Nghiệm / KTV Phòng Lab (Tiếp nhận & Trả kết quả CLS) */}
+                {/* 2.4 Phân hệ Bác Sĩ Xét Nghiệm / KTV Phòng Lab (Tiếp nhận & Trả kết quả CLS) */}
                 <Route element={<ProtectedRoute allowedRoles={["ROLE_LAB_TECHNICIAN", "ROLE_DOCTOR", "ROLE_HEAD_OF_DEPARTMENT", "ROLE_ADMIN"]} />}>
                     <Route path="/doctor/lab-tests" element={<LabTestResultsPage />} />
                 </Route>
 
-                {/* 6. Phân hệ Quầy Thu Ngân & Viện Phí Tại Chỗ */}
+                {/* 2.5 Phân hệ Quầy Thu Ngân & Viện Phí Tại Chỗ */}
                 <Route element={<ProtectedRoute allowedRoles={["ROLE_CASHIER", "ROLE_ADMIN"]} />}>
                     <Route path="/cashier" element={<CashierPage />} />
                 </Route>
             </Route>
 
-            {/* 7. Phân hệ Quản Lý / Admin Portal & Phân Lịch Trưởng Khoa */}
-            <Route element={<ProtectedRoute allowedRoles={["ROLE_ADMIN", "ROLE_HEAD_OF_DEPARTMENT"]} />}>
+            {/* 7. Phân hệ Quản Lý / Admin Portal, Trưởng Khoa & Dược Sĩ */}
+            <Route element={<ProtectedRoute allowedRoles={["ROLE_ADMIN", "ROLE_HEAD_OF_DEPARTMENT", "ROLE_PHARMACIST"]} />}>
                 <Route element={<AdminLayout />}>
-                    <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
-                    <Route path="/admin/dashboard" element={<DashboardPage />} />
-                    <Route path="/admin/patients" element={<PatientManagePage />} />
-                    <Route path="/admin/accounts" element={<AccountManagePage />} />
-                    <Route path="/admin/transactions" element={<TransactionManagePage />} />
-                    <Route path="/admin/doctors" element={<DoctorManagePage />} />
-                    <Route path="/admin/schedules" element={<ScheduleManagePage />} />
-                    <Route path="/admin/departments" element={<DepartmentManagePage />} />
-                    <Route path="/admin/rooms" element={<DepartmentManagePage />} />
-                    <Route path="/admin/medicines" element={<MedicineManagePage />} />
-                    <Route path="/admin/pharmacy-inventory" element={<PharmacyInventoryPage />} />
-                    <Route path="/admin/ehr-gateway" element={<EhrAndGatewayPage />} />
-                    <Route path="/admin/services" element={<MedicalServiceManagePage />} />
+                    <Route path="/admin" element={<AdminIndexRedirect />} />
+
+                    {/* Nhóm 7.1 Quản Lý Thuốc & Kho Dược (Admin, Trưởng Khoa, Dược Sĩ) */}
+                    <Route element={<ProtectedRoute allowedRoles={["ROLE_ADMIN", "ROLE_HEAD_OF_DEPARTMENT", "ROLE_PHARMACIST"]} />}>
+                        <Route path="/admin/medicines" element={<MedicineManagePage />} />
+                        <Route path="/admin/pharmacy-inventory" element={<PharmacyInventoryPage />} />
+                    </Route>
+
+                    {/* Nhóm 7.2 Quản Lý Điều Hành & Khoa Phòng (Admin, Trưởng Khoa) */}
+                    <Route element={<ProtectedRoute allowedRoles={["ROLE_ADMIN", "ROLE_HEAD_OF_DEPARTMENT"]} />}>
+                        <Route path="/admin/dashboard" element={<DashboardPage />} />
+                        <Route path="/admin/patients" element={<PatientManagePage />} />
+                        <Route path="/admin/doctors" element={<DoctorManagePage />} />
+                        <Route path="/admin/schedules" element={<ScheduleManagePage />} />
+                        <Route path="/admin/departments" element={<DepartmentManagePage />} />
+                        <Route path="/admin/rooms" element={<DepartmentManagePage />} />
+                        <Route path="/admin/ehr-gateway" element={<EhrAndGatewayPage />} />
+                        <Route path="/admin/services" element={<MedicalServiceManagePage />} />
+                    </Route>
+
+                    {/* Nhóm 7.3 Quản Trị Tài Khoản & Tài Chính Doanh Thu Đối Soát (Chỉ ADMIN) */}
+                    <Route element={<ProtectedRoute allowedRoles={["ROLE_ADMIN"]} />}>
+                        <Route path="/admin/accounts" element={<AccountManagePage />} />
+                        <Route path="/admin/transactions" element={<TransactionManagePage />} />
+                    </Route>
                 </Route>
             </Route>
 

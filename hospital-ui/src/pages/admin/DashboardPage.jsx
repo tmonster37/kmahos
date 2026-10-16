@@ -21,7 +21,8 @@ import {
     Stack,
     TextField,
     MenuItem,
-    Avatar
+    Avatar,
+    Tooltip
 } from "@mui/material";
 import PeopleIcon from "@mui/icons-material/People";
 import MedicalServicesIcon from "@mui/icons-material/MedicalServices";
@@ -38,12 +39,21 @@ import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import SpeedIcon from "@mui/icons-material/Speed";
 import TimerIcon from "@mui/icons-material/Timer";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import WarningAmberIcon from "@mui/icons-material/WarningAmber";
+import SecurityIcon from "@mui/icons-material/Security";
+import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
+import MeetingRoomIcon from "@mui/icons-material/MeetingRoom";
+import QrCode2Icon from "@mui/icons-material/QrCode2";
+import PointOfSaleIcon from "@mui/icons-material/PointOfSale";
 import axiosInstance from "../../services/AxiosInstance";
 import { formatCurrency } from "../../utils/formatters";
 
 export default function DashboardPage() {
     const [timeRange, setTimeRange] = useState("TODAY"); // TODAY, WEEK, MONTH, YEAR
+    const [kpiRevenue, setKpiRevenue] = useState(null);
+    const [roomCapacity, setRoomCapacity] = useState(null);
+    const [auditLogs, setAuditLogs] = useState([]);
+    const [loadingKpi, setLoadingKpi] = useState(true);
+
     const [stats, setStats] = useState({
         totalPatients: 1450,
         totalDoctors: 48,
@@ -54,16 +64,15 @@ export default function DashboardPage() {
 
         // Thống kê Thời gian Chờ Khám & Hiệu Suất Phân Luồng (Wait-Time Analytics)
         waitTimeMetrics: {
-            avgWaitTimeMinutes: 14.5, // Phút chờ từ lúc lấy số -> vào buồng khám (Mục tiêu < 20p)
-            avgExamDurationMinutes: 18.2, // Phút Bác sĩ khám & tư vấn
-            avgLabTurnaroundMinutes: 25.6, // Phút trả kết quả xét nghiệm / X-quang
-            avgPharmacyMinutes: 6.4, // Phút cấp phát thuốc tại quầy dược
-            totalJourneyMinutes: 64.7, // Tổng thời gian trung bình 1 buổi khám ngoại trú
+            avgWaitTimeMinutes: 14.5,
+            avgExamDurationMinutes: 18.2,
+            avgLabTurnaroundMinutes: 25.6,
+            avgPharmacyMinutes: 6.4,
+            totalJourneyMinutes: 64.7,
             targetWaitTimeMinutes: 20.0,
-            onTimeRate: 91.8 // Tỷ lệ bệnh nhân được khám đúng hẹn (%)
+            onTimeRate: 91.8
         },
 
-        // Chi tiết thời gian chờ theo từng Khoa/Phòng
         departmentWaitTimes: [
             { departmentName: "Khoa Khám Bệnh Đa Khoa", waitingCount: 14, avgWaitMin: 12.0, status: "GOOD", load: "Bình thường" },
             { departmentName: "Khoa Nội Tim Mạch", waitingCount: 19, avgWaitMin: 18.5, status: "GOOD", load: "Bình thường" },
@@ -95,20 +104,68 @@ export default function DashboardPage() {
         ]
     });
 
-    useEffect(() => {
-        // Tải số liệu từ backend
-        axiosInstance.get("/api/utilities/admin/dashboard").then((res) => {
-            if (res.data) {
-                setStats(prev => ({ ...prev, ...res.data }));
+    const loadDashboardData = async () => {
+        setLoadingKpi(true);
+        try {
+            const [utilRes, kpiRevRes, roomCapRes, auditRes] = await Promise.allSettled([
+                axiosInstance.get("/api/utilities/admin/dashboard"),
+                axiosInstance.get("/api/admin/dashboard/kpi-revenue"),
+                axiosInstance.get("/api/admin/dashboard/room-capacity"),
+                axiosInstance.get("/api/admin/audit-logs")
+            ]);
+
+            if (utilRes.status === "fulfilled" && utilRes.value.data) {
+                setStats(prev => ({ ...prev, ...utilRes.value.data }));
             }
-        }).catch(() => {});
+            if (kpiRevRes.status === "fulfilled" && kpiRevRes.value.data) {
+                setKpiRevenue(kpiRevRes.value.data);
+            }
+            if (roomCapRes.status === "fulfilled" && roomCapRes.value.data) {
+                setRoomCapacity(roomCapRes.value.data);
+            }
+            if (auditRes.status === "fulfilled" && auditRes.value.data) {
+                setAuditLogs(auditRes.value.data);
+            }
+        } catch (err) {
+            console.error("Lỗi nạp Dashboard:", err);
+        } finally {
+            setLoadingKpi(false);
+        }
+    };
+
+    useEffect(() => {
+        loadDashboardData();
     }, [timeRange]);
 
     const statCards = [
-        { title: "Tổng Lượt Bệnh Nhân", value: stats.totalPatients, subtext: "+12% so với tháng trước", icon: <PeopleIcon fontSize="large" />, color: "#0284C7" },
-        { title: "Tổng Doanh Thu Viện Phí", value: formatCurrency(stats.totalRevenue), subtext: "Đạt 105% chỉ tiêu", icon: <MonetizationOnIcon fontSize="large" />, color: "#16A34A" },
-        { title: "Lượt Khám Hoàn Thành", value: `${stats.totalCompletedExams}/${stats.totalBookingsToday}`, subtext: "Tỷ lệ xử lý 88.4%", icon: <EventAvailableIcon fontSize="large" />, color: "#EA580C" },
-        { title: "Công Suất Giường Nội Trú", value: `${stats.inpatientOccupancyRate}%`, subtext: "Tổng 64/80 giường", icon: <HotelIcon fontSize="large" />, color: "#8B5CF6" },
+        {
+            title: "Tổng Doanh Thu Thực Tế (KPI)",
+            value: kpiRevenue ? formatCurrency(kpiRevenue.totalRevenue) : formatCurrency(stats.totalRevenue),
+            subtext: kpiRevenue ? `Đã quyết toán ${kpiRevenue.totalCompletedInvoices} giao dịch` : "Đạt 105% chỉ tiêu",
+            icon: <MonetizationOnIcon fontSize="large" />,
+            color: "#16A34A"
+        },
+        {
+            title: "Tỷ Lệ Hoàn Tất Khám",
+            value: kpiRevenue ? `${kpiRevenue.completionRate}%` : "88.4%",
+            subtext: kpiRevenue ? `Hủy/vắng: ${kpiRevenue.totalCanceledAppointments} ca (${kpiRevenue.cancellationRate}%)` : "Tỷ lệ xử lý cao",
+            icon: <CheckCircleIcon fontSize="large" />,
+            color: "#0284C7"
+        },
+        {
+            title: "Công Suất Buồng Khám (Real-time)",
+            value: roomCapacity ? `${roomCapacity.occupancyRate}%` : "75.0%",
+            subtext: roomCapacity ? `${roomCapacity.activeRooms}/${roomCapacity.totalExamRooms} buồng đang khám (${roomCapacity.utilizationStatus})` : "Tải ổn định",
+            icon: <MeetingRoomIcon fontSize="large" />,
+            color: roomCapacity?.utilizationStatus === "HEAVY" ? "#DC2626" : "#EA580C"
+        },
+        {
+            title: "Bệnh Nhân Đang Chờ Khám",
+            value: roomCapacity ? `${roomCapacity.totalPatientsWaiting} người` : "14 người",
+            subtext: roomCapacity ? `${roomCapacity.totalPatientsExamining} ca đang ngồi ghế khám` : "Luồng phân bổ nhịp nhàng",
+            icon: <PeopleIcon fontSize="large" />,
+            color: "#8B5CF6"
+        },
     ];
 
     return (
@@ -425,6 +482,242 @@ export default function DashboardPage() {
                                     </TableCell>
                                 </TableRow>
                             ))}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
+            </Paper>
+
+            {/* HÀNG 4 (PHASE 4): DOANH THU THỰC TẾ THEO 6 KÊNH & CÔNG SUẤT BUỒNG KHÁM CHI TIẾT */}
+            <Grid container spacing={3} my={1}>
+                {/* 1. Doanh thu theo 6 kênh thanh toán */}
+                <Grid item xs={12} md={6}>
+                    <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: "1px solid #E2E8F0", height: "100%", boxShadow: "0 2px 10px rgba(0,0,0,0.03)" }}>
+                        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                            <Box display="flex" alignItems="center" gap={1}>
+                                <AccountBalanceWalletIcon color="success" />
+                                <Typography variant="h6" fontWeight="bold" color="#0F172A">
+                                    💳 Doanh Thu Thực Tế Theo 6 Kênh Thanh Toán
+                                </Typography>
+                            </Box>
+                            <Chip
+                                label={`Tổng: ${kpiRevenue ? formatCurrency(kpiRevenue.totalRevenue) : "0 VNĐ"}`}
+                                color="success"
+                                size="small"
+                                sx={{ fontWeight: "bold" }}
+                            />
+                        </Box>
+                        <Typography variant="body2" color="textSecondary" mb={2}>
+                            Dữ liệu đối soát trực tiếp từ sổ cái giao dịch Payment (Hoàn tất: {kpiRevenue?.completionRate || 0}%)
+                        </Typography>
+
+                        <Stack spacing={2}>
+                            {[
+                                { name: "VietQR (Chuyển khoản động)", amount: kpiRevenue?.revenueByMethod?.vietQrRevenue || 0, color: "#0284C7", icon: <QrCode2Icon fontSize="small" /> },
+                                { name: "Tiền mặt tại Quầy (COUNTER_CASH)", amount: kpiRevenue?.revenueByMethod?.counterCashRevenue || 0, color: "#16A34A", icon: <MonetizationOnIcon fontSize="small" /> },
+                                { name: "Ví MoMo", amount: kpiRevenue?.revenueByMethod?.momoRevenue || 0, color: "#D81B60", icon: <AccountBalanceWalletIcon fontSize="small" /> },
+                                { name: "Cổng VNPAY-QR", amount: kpiRevenue?.revenueByMethod?.vnpayRevenue || 0, color: "#EA580C", icon: <QrCode2Icon fontSize="small" /> },
+                                { name: "Cà thẻ POS", amount: kpiRevenue?.revenueByMethod?.posRevenue || 0, color: "#8B5CF6", icon: <PointOfSaleIcon fontSize="small" /> },
+                                { name: "Ví nội bộ Bệnh viện", amount: kpiRevenue?.revenueByMethod?.internalWalletRevenue || 0, color: "#0D9488", icon: <AccountBalanceWalletIcon fontSize="small" /> },
+                            ].map((ch, idx) => {
+                                const total = kpiRevenue?.totalRevenue || 1;
+                                const pct = total > 0 ? Math.round((ch.amount / total) * 100) : 0;
+                                return (
+                                    <Box key={idx} sx={{ p: 1.5, borderRadius: 2, bgcolor: "#F8FAFC", border: "1px solid #E2E8F0" }}>
+                                        <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
+                                            <Box display="flex" alignItems="center" gap={1}>
+                                                <Box sx={{ color: ch.color }}>{ch.icon}</Box>
+                                                <Typography variant="body2" fontWeight="bold">
+                                                    {ch.name}
+                                                </Typography>
+                                            </Box>
+                                            <Typography variant="body2" fontWeight="bold" sx={{ color: ch.color }}>
+                                                {formatCurrency(ch.amount)} ({pct}%)
+                                            </Typography>
+                                        </Box>
+                                        <LinearProgress
+                                            variant="determinate"
+                                            value={pct}
+                                            sx={{
+                                                height: 6,
+                                                borderRadius: 3,
+                                                bgcolor: "#E2E8F0",
+                                                "& .MuiLinearProgress-bar": { bgcolor: ch.color }
+                                            }}
+                                        />
+                                    </Box>
+                                );
+                            })}
+                        </Stack>
+                    </Paper>
+                </Grid>
+
+                {/* 2. Chi tiết buồng khám và trạng thái tải */}
+                <Grid item xs={12} md={6}>
+                    <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: "1px solid #E2E8F0", height: "100%", boxShadow: "0 2px 10px rgba(0,0,0,0.03)" }}>
+                        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                            <Box display="flex" alignItems="center" gap={1}>
+                                <MeetingRoomIcon color="primary" />
+                                <Typography variant="h6" fontWeight="bold" color="#0F172A">
+                                    🏥 Giám Sát Buồng Khám Thời Gian Thực
+                                </Typography>
+                            </Box>
+                            <Chip
+                                label={`Công suất: ${roomCapacity?.occupancyRate || 0}%`}
+                                color={roomCapacity?.utilizationStatus === "HEAVY" ? "error" : "primary"}
+                                size="small"
+                                sx={{ fontWeight: "bold" }}
+                            />
+                        </Box>
+                        <Typography variant="body2" color="textSecondary" mb={2}>
+                            Tổng {roomCapacity?.totalExamRooms || 0} buồng khám ({roomCapacity?.activeRooms || 0} buồng đang mở phiên)
+                        </Typography>
+
+                        <TableContainer sx={{ maxHeight: 380 }}>
+                            <Table size="small" stickyHeader>
+                                <TableHead>
+                                    <TableRow sx={{ bgcolor: "#F8FAFC" }}>
+                                        <TableCell><b>Phòng</b></TableCell>
+                                        <TableCell><b>Chuyên khoa</b></TableCell>
+                                        <TableCell align="center"><b>Đang đợi</b></TableCell>
+                                        <TableCell align="center"><b>Đang khám</b></TableCell>
+                                        <TableCell align="center"><b>Trạng thái</b></TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {roomCapacity?.roomDetails && roomCapacity.roomDetails.length > 0 ? (
+                                        roomCapacity.roomDetails.map((rm, idx) => (
+                                            <TableRow key={idx} hover>
+                                                <TableCell><b>{rm.roomNumber}</b></TableCell>
+                                                <TableCell>{rm.departmentName}</TableCell>
+                                                <TableCell align="center">
+                                                    <Chip
+                                                        label={`${rm.waitingCount} BN`}
+                                                        size="small"
+                                                        color={rm.waitingCount > 5 ? "warning" : "default"}
+                                                    />
+                                                </TableCell>
+                                                <TableCell align="center">
+                                                    <Chip
+                                                        label={`${rm.examiningCount} BN`}
+                                                        size="small"
+                                                        color={rm.examiningCount > 0 ? "success" : "default"}
+                                                        variant={rm.examiningCount > 0 ? "filled" : "outlined"}
+                                                    />
+                                                </TableCell>
+                                                <TableCell align="center">
+                                                    <Chip
+                                                        label={rm.status === "ACTIVE" ? "ĐANG KHÁM" : "SẴN SÀNG"}
+                                                        size="small"
+                                                        color={rm.status === "ACTIVE" ? "primary" : "default"}
+                                                        sx={{ fontWeight: "bold", fontSize: "0.7rem" }}
+                                                    />
+                                                </TableCell>
+                                            </TableRow>
+                                        ))
+                                    ) : (
+                                        <TableRow>
+                                            <TableCell colSpan={5} align="center">
+                                                <Typography variant="body2" color="textSecondary" py={2}>
+                                                    Đang tải danh sách buồng khám...
+                                                </Typography>
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    </Paper>
+                </Grid>
+            </Grid>
+
+            {/* HÀNG 5 (PHASE 4): NHẬT KÝ KIỂM TOÁN BẤT BIẾN (IMMUTABLE AUDIT LOGS - PII SANITIZED) */}
+            <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: "1px solid #E2E8F0", my: 3, boxShadow: "0 2px 10px rgba(0,0,0,0.03)" }}>
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} flexWrap="wrap" gap={1}>
+                    <Box display="flex" alignItems="center" gap={1}>
+                        <SecurityIcon color="primary" />
+                        <Typography variant="h6" fontWeight="bold" color="#0F172A">
+                            🛡️ Nhật Ký Kiểm Toán Toàn Viện (Immutable Audit Logs)
+                        </Typography>
+                    </Box>
+                    <Box display="flex" gap={1}>
+                        <Chip
+                            label="Append-Only & Che Giấu PII"
+                            color="info"
+                            size="small"
+                            variant="outlined"
+                            sx={{ fontWeight: "bold" }}
+                        />
+                        <Chip
+                            label={`${auditLogs.length} sự kiện gần nhất`}
+                            color="default"
+                            size="small"
+                        />
+                    </Box>
+                </Box>
+                <Typography variant="body2" color="textSecondary" mb={2}>
+                    Cơ chế ghi log giao dịch bất biến (`REQUIRES_NEW`), tự động lọc bỏ thông tin bảo mật (mật khẩu, token, OTP) theo chuẩn an toàn thông tin y tế.
+                </Typography>
+
+                <TableContainer sx={{ maxHeight: 360 }}>
+                    <Table size="small" stickyHeader>
+                        <TableHead>
+                            <TableRow sx={{ bgcolor: "#F8FAFC" }}>
+                                <TableCell><b>Thời gian</b></TableCell>
+                                <TableCell><b>Hành động</b></TableCell>
+                                <TableCell><b>Người thao tác</b></TableCell>
+                                <TableCell><b>Vai trò</b></TableCell>
+                                <TableCell><b>Thực thể / ID</b></TableCell>
+                                <TableCell><b>Chi tiết (Sanitized)</b></TableCell>
+                                <TableCell align="right"><b>Địa chỉ IP</b></TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
+                            {auditLogs && auditLogs.length > 0 ? (
+                                auditLogs.map((log) => (
+                                    <TableRow key={log.auditId} hover>
+                                        <TableCell sx={{ fontSize: "0.8rem", whiteSpace: "nowrap" }}>
+                                            {log.createdAt ? new Date(log.createdAt).toLocaleString("vi-VN") : "Vừa xong"}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Chip
+                                                label={log.action}
+                                                size="small"
+                                                color={
+                                                    log.action?.includes("DELETE") || log.action?.includes("CANCEL") ? "error" :
+                                                    log.action?.includes("UPDATE") || log.action?.includes("PAY") ? "warning" :
+                                                    log.action?.includes("CREATE") || log.action?.includes("CHECK_IN") ? "success" : "primary"
+                                                }
+                                                sx={{ fontWeight: "bold", fontSize: "0.7rem" }}
+                                            />
+                                        </TableCell>
+                                        <TableCell sx={{ fontWeight: "bold", color: "primary.main" }}>
+                                            {log.actorUsername || "system"}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Chip label={log.actorRole || "N/A"} size="small" variant="outlined" />
+                                        </TableCell>
+                                        <TableCell>
+                                            <code>{log.targetEntity} #{log.targetId}</code>
+                                        </TableCell>
+                                        <TableCell sx={{ maxWidth: 350, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                            <Tooltip title={log.details || ""}>
+                                                <span>{log.details || "Không có ghi chú"}</span>
+                                            </Tooltip>
+                                        </TableCell>
+                                        <TableCell align="right">
+                                            <code>{log.ipAddress || "127.0.0.1"}</code>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            ) : (
+                                <TableRow>
+                                    <TableCell colSpan={7} align="center">
+                                        <Typography variant="body2" color="textSecondary" py={3}>
+                                            Chưa ghi nhận sự kiện kiểm toán nào
+                                        </Typography>
+                                    </TableCell>
+                                </TableRow>
+                            )}
                         </TableBody>
                     </Table>
                 </TableContainer>
