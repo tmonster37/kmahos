@@ -13,7 +13,7 @@
 
 const crypto = require('crypto');
 
-const BASE_URL = 'http://localhost:8080';
+const BASE_URL = (process.env.BASE_URL || 'http://localhost:8080').replace(/\/$/, '');
 const HASH_SECRET = 'BRYEEDJIJFAGUSDLEPIOPDMDYEMLDCAX';
 const TMN_CODE = 'P48XA8RI';
 
