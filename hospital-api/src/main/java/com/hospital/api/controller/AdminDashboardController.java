@@ -23,7 +23,7 @@ public class AdminDashboardController {
      * KPI Doanh thu tổng hợp theo phương thức thanh toán và biểu đồ 7 ngày (Chỉ ADMIN)
      */
     @GetMapping({"/kpi-revenue", "/revenue"})
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_OF_DEPARTMENT')")
     public ResponseEntity<ApiResponse<RevenueKpiResponse>> getRevenueKpi(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate

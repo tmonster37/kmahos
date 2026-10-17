@@ -210,7 +210,7 @@ public class CashierServiceImpl implements CashierService {
         // 2. Xác thực phương thức thanh toán tại quầy
         PaymentMethod method = request.paymentMethod();
         if (method != PaymentMethod.CASH && method != PaymentMethod.COUNTER_CASH
-                && method != PaymentMethod.POS && method != PaymentMethod.VIETQR) {
+                && method != PaymentMethod.POS && method != PaymentMethod.VIETQR && method != PaymentMethod.PAYOS) {
             throw new AppException("Phương thức thanh toán " + method + " không được hỗ trợ tại quầy thu ngân!", HttpStatus.BAD_REQUEST);
         }
 
@@ -238,33 +238,47 @@ public class CashierServiceImpl implements CashierService {
         String billId;
         String invoiceTitle;
 
+        boolean isDigitalQr = (method == PaymentMethod.PAYOS || method == PaymentMethod.VIETQR);
+
         if ("EXAM".equalsIgnoreCase(invoiceTarget)) {
-            if (totalPaid.compareTo(examPrice) >= 0) {
-                throw new AppException("Hóa đơn công khám [BILL-" + bookingCode + "-EXAM] đã được thanh toán trước đó!", HttpStatus.CONFLICT);
-            }
             itemsToBill = examItems;
-            billAmount = examPrice.subtract(totalPaid);
             billId = "BILL-" + bookingCode + "-EXAM";
             invoiceTitle = "công khám ban đầu";
+            if (totalPaid.compareTo(examPrice) >= 0) {
+                if (!isDigitalQr) {
+                    throw new AppException("Hóa đơn công khám [BILL-" + bookingCode + "-EXAM] đã được thanh toán trước đó!", HttpStatus.CONFLICT);
+                }
+                return buildExistingReceipt(booking, cashierUsername, billId, bookingCode, examPrice, method, itemsToBill, request.notes(), txns);
+            }
+            billAmount = examPrice.subtract(totalPaid);
         } else if ("TREATMENT".equalsIgnoreCase(invoiceTarget)) {
             if (treatmentPrice.compareTo(BigDecimal.ZERO) <= 0) {
                 throw new AppException("Ca khám [" + bookingCode + "] chưa có chỉ định cận lâm sàng hoặc đơn thuốc phát sinh!", HttpStatus.BAD_REQUEST);
             }
+            itemsToBill = treatmentItems;
+            billId = "BILL-" + bookingCode + "-TREATMENT";
+            invoiceTitle = "xét nghiệm & thuốc phát sinh";
             BigDecimal remainingTreatment = (totalPaid.compareTo(examPrice) <= 0)
                     ? treatmentPrice
                     : totalBill.subtract(totalPaid);
             if (remainingTreatment.compareTo(BigDecimal.ZERO) <= 0) {
-                throw new AppException("Hóa đơn cận lâm sàng & đơn thuốc [BILL-" + bookingCode + "-TREATMENT] đã được thanh toán trước đó!", HttpStatus.CONFLICT);
+                if (!isDigitalQr) {
+                    throw new AppException("Hóa đơn cận lâm sàng & đơn thuốc [BILL-" + bookingCode + "-TREATMENT] đã được thanh toán trước đó!", HttpStatus.CONFLICT);
+                }
+                return buildExistingReceipt(booking, cashierUsername, billId, bookingCode, treatmentPrice, method, itemsToBill, request.notes(), txns);
             }
-            itemsToBill = treatmentItems;
             billAmount = remainingTreatment;
-            billId = "BILL-" + bookingCode + "-TREATMENT";
-            invoiceTitle = "xét nghiệm & thuốc phát sinh";
         } else {
             // ALL or AUTO
             BigDecimal remaining = totalBill.subtract(totalPaid);
             if (remaining.compareTo(BigDecimal.ZERO) <= 0) {
-                throw new AppException("Toàn bộ viện phí cho ca khám [" + bookingCode + "] đã được thanh toán đầy đủ!", HttpStatus.CONFLICT);
+                if (!isDigitalQr) {
+                    throw new AppException("Toàn bộ viện phí cho ca khám [" + bookingCode + "] đã được thanh toán đầy đủ!", HttpStatus.CONFLICT);
+                }
+                itemsToBill = new ArrayList<>(examItems);
+                itemsToBill.addAll(treatmentItems);
+                billId = "BILL-" + bookingCode + "-ALL";
+                return buildExistingReceipt(booking, cashierUsername, billId, bookingCode, totalBill, method, itemsToBill, request.notes(), txns);
             }
             if (totalPaid.compareTo(examPrice) >= 0 && treatmentPrice.compareTo(BigDecimal.ZERO) > 0) {
                 itemsToBill = treatmentItems;
@@ -299,7 +313,7 @@ public class CashierServiceImpl implements CashierService {
             }
             amountChange = amountGiven.subtract(billAmount);
         } else {
-            // POS, VIETQR: Số tiền đưa khớp chính xác với hóa đơn
+            // POS, VIETQR, PAYOS: Số tiền đưa khớp chính xác với hóa đơn
             amountGiven = billAmount;
             amountChange = BigDecimal.ZERO;
         }
@@ -614,5 +628,62 @@ public class CashierServiceImpl implements CashierService {
             }
         }
         return null;
+    }
+
+    private CashierReceiptResponse buildExistingReceipt(
+            Booking booking,
+            String cashierUsername,
+            String billId,
+            String bookingCode,
+            BigDecimal billAmount,
+            PaymentMethod method,
+            List<CashierBillItemDto> itemsToBill,
+            String notes,
+            List<Transaction> txns
+    ) {
+        Transaction existingTxn = txns.stream()
+                .filter(t -> "SUCCESS".equalsIgnoreCase(t.getStatus()))
+                .findFirst()
+                .orElse(null);
+
+        String receiptCode = (existingTxn != null && existingTxn.getVnpayTxnRef() != null && !existingTxn.getVnpayTxnRef().isBlank())
+                ? (existingTxn.getVnpayTxnRef().startsWith("RC-") ? existingTxn.getVnpayTxnRef() : "RC-" + existingTxn.getVnpayTxnRef())
+                : ("RC-" + bookingCode + "-" + (System.currentTimeMillis() % 1000000L));
+
+        String cashierName = (cashierUsername != null && !cashierUsername.isBlank()) ? cashierUsername : "Thu ngân quầy";
+        PatientProfile p = booking.getPatientProfile();
+        Doctor doc = booking.getDoctor();
+        String deptName = (doc != null && doc.getDepartment() != null)
+                ? doc.getDepartment().getDepartmentName()
+                : "Khoa Khám Bệnh";
+
+        // Cập nhật trạng thái Booking nếu đang ở trạng thái chờ thanh toán
+        if (booking.getStatus() == BookingStatus.PENDING_PAYMENT) {
+            booking.setStatus(BookingStatus.CONFIRMED);
+            bookingRepository.save(booking);
+        }
+
+        return new CashierReceiptResponse(
+                receiptCode,
+                billId,
+                bookingCode,
+                existingTxn != null ? existingTxn.getTransactionId() : null,
+                p != null ? p.getFullName() : "Khách hàng",
+                p != null ? p.getPhoneNumber() : "",
+                p != null && p.getIdentityNumber() != null ? p.getIdentityNumber() : "",
+                deptName,
+                (doc != null && doc.getAccount() != null && doc.getAccount().getFullName() != null) ? doc.getAccount().getFullName() : "Bác sĩ phụ trách",
+                itemsToBill,
+                billAmount,
+                method,
+                billAmount,
+                BigDecimal.ZERO,
+                "SUCCESS",
+                existingTxn != null && existingTxn.getCreatedAt() != null
+                        ? LocalDateTime.ofInstant(existingTxn.getCreatedAt(), ZoneId.systemDefault())
+                        : LocalDateTime.now(),
+                cashierName,
+                notes
+        );
     }
 }

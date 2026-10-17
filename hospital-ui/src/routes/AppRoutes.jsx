@@ -69,6 +69,8 @@ export default function AppRoutes() {
                 <Route path="/lookup" element={<PatientLookupPage />} />
                 <Route path="/tra-cuu" element={<PatientLookupPage />} />
                 <Route path="/login" element={<LoginPage />} />
+                <Route path="/register" element={<RegisterPage />} />
+                <Route path="/dang-ky" element={<RegisterPage />} />
                 <Route path="/payment" element={<PaymentPage />} />
                 <Route path="/payment/return" element={<PaymentPage />} />
                 <Route path="/payment/cancel" element={<PaymentPage />} />

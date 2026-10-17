@@ -48,7 +48,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**", "/api/payment/vnpay/**", "/api/payment/vnpay-ipn", "/api/payment/payos/**", "/api/payment/status/**", "/api/payment/vietqr/**", "/api/payment/momo/**", "/error").permitAll()
                 .requestMatchers("/api/prescriptions/verify", "/api/prescriptions/*/verify", "/api/prescriptions/*/pdf", "/api/prescriptions/*/hash").permitAll()
-                .requestMatchers("/api/bookings/kiosk", "/api/bookings/kiosk/**", "/api/bookings/code/**", "/api/bookings/reserve-slot", "/api/bookings/release-slot/**", "/api/clinical/queue/public").permitAll()
+                .requestMatchers("/api/bookings/kiosk", "/api/bookings/kiosk/**", "/api/bookings/code/**", "/api/bookings/reserve-slot", "/api/bookings/release-slot/**", "/api/clinical/queue/public", "/api/patient-profiles/lookup").permitAll()
                 .requestMatchers("/api/counters", "/api/counters/kiosk/**", "/api/counters/*/queue").permitAll()
                 .requestMatchers("/api/ai/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/departments/**").permitAll()
@@ -58,7 +58,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/admin/doctors/**", "/api/doctors/**").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/inpatient/patient/**", "/api/inpatient/*/daily-records").authenticated()
                 .requestMatchers("/api/admin/doctors/**").hasAnyRole("ADMIN", "HEAD_OF_DEPARTMENT")
-                .requestMatchers("/api/admin/dashboard/room-capacity", "/api/admin/dashboard/capacity").hasAnyRole("ADMIN", "HEAD_OF_DEPARTMENT")
+                .requestMatchers("/api/admin/dashboard/**").hasAnyRole("ADMIN", "HEAD_OF_DEPARTMENT")
                 .requestMatchers("/api/admin/ehr/**").hasAnyRole("ADMIN", "HEAD_OF_DEPARTMENT")
                 .requestMatchers("/api/gateway/**").hasAnyRole("LAB_TECHNICIAN", "DOCTOR", "HEAD_OF_DEPARTMENT", "ADMIN")
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")

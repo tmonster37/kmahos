@@ -120,12 +120,21 @@ public class PaymentController {
     @PostMapping("/payos/create-link")
     public ResponseEntity<ApiResponse<PaymentGatewayResponse>> createPayOSPaymentLink(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
-            @RequestParam BigDecimal amount,
-            @RequestParam TransactionType type,
-            @RequestParam(required = false) String description
+            @RequestParam(required = false) BigDecimal amount,
+            @RequestParam(required = false) TransactionType type,
+            @RequestParam(required = false) String description,
+            @RequestBody(required = false) com.hospital.api.dto.request.CreatePayOSLinkRequest requestBody
     ) {
+        BigDecimal finalAmount = (requestBody != null && requestBody.amount() != null) ? requestBody.amount() : amount;
+        TransactionType finalType = (requestBody != null && requestBody.type() != null) ? requestBody.type() : type;
+        String finalDescription = (requestBody != null && requestBody.description() != null) ? requestBody.description() : description;
+
+        if (finalAmount == null || finalType == null) {
+            throw new com.hospital.api.exception.AppException("Số tiền (amount) và loại giao dịch (type) là bắt buộc", org.springframework.http.HttpStatus.BAD_REQUEST);
+        }
+
         UUID accountId = userPrincipal != null ? userPrincipal.getId() : null;
-        PaymentGatewayResponse response = paymentService.createPayOSPaymentLink(accountId, amount, type, description);
+        PaymentGatewayResponse response = paymentService.createPayOSPaymentLink(accountId, finalAmount, finalType, finalDescription);
         return ResponseEntity.ok(ApiResponse.ok(response, "Khởi tạo link thanh toán PayOS thành công"));
     }
 

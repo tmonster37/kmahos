@@ -105,15 +105,60 @@ export default function PatientLookupPage() {
 
     const handleSearch = async (e) => {
         if (e) e.preventDefault();
-        if (!searchKeyword.trim()) {
-            alert("Vui lòng nhập Số điện thoại hoặc Số CCCD!");
+        const cleanKw = searchKeyword.trim();
+        if (!cleanKw) {
+            alert("Vui lòng nhập Số điện thoại, CCCD, Mã BHYT hoặc Mã phiếu khám!");
             return;
         }
 
         setLoading(true);
         setHasSearched(true);
         try {
-            const res = await axiosInstance.get(`/api/patient-profiles/lookup?keyword=${encodeURIComponent(searchKeyword)}`).catch(() => null);
+            // 1. Kiểm tra nếu keyword có định dạng mã phiếu đặt khám (BK... hoặc có dấu gạch ngang)
+            const isBookingCode = /^BK/i.test(cleanKw) || (cleanKw.length >= 8 && cleanKw.toUpperCase().includes("BK"));
+
+            let foundFromBooking = null;
+            if (isBookingCode) {
+                const bkRes = await axiosInstance.get(`/api/bookings/code/${encodeURIComponent(cleanKw)}`).catch(() => null);
+                const bkData = bkRes?.data?.data || bkRes?.data || bkRes;
+                if (bkData && (bkData.bookingCode || bkData.bookingId)) {
+                    foundFromBooking = bkData;
+                }
+            }
+
+            if (foundFromBooking) {
+                setSearchResult({
+                    fullName: foundFromBooking.patientName || "Bệnh nhân",
+                    phoneNumber: "Đã liên kết phiếu khám",
+                    identityNumber: "Bảo mật thông tin",
+                    healthInsuranceNumber: "Theo phiếu đăng ký",
+                    gender: "OTHER",
+                    dateOfBirth: null,
+                    address: "Đăng ký khám tại Bệnh viện TNT",
+                    latestBooking: {
+                        bookingCode: foundFromBooking.bookingCode,
+                        queueNumber: foundFromBooking.queueCode || (foundFromBooking.queueNumber ? `#${foundFromBooking.queueNumber}` : "-"),
+                        departmentName: foundFromBooking.departmentName || "Khoa Khám Bệnh",
+                        doctorName: foundFromBooking.doctorName || "Bác sĩ phụ trách",
+                        roomName: foundFromBooking.roomName || "Phòng khám chuyên khoa",
+                        timeSlot: foundFromBooking.startTime ? `${String(foundFromBooking.startTime).substring(0, 5)} - ${foundFromBooking.endTime ? String(foundFromBooking.endTime).substring(0, 5) : ""}` : "Hôm nay",
+                        bookingDate: foundFromBooking.bookingDate,
+                        status: foundFromBooking.status || "CONFIRMED"
+                    },
+                    medicalHistory: foundFromBooking.symptoms ? [
+                        {
+                            date: foundFromBooking.bookingDate || "Hôm nay",
+                            diagnosis: foundFromBooking.symptoms,
+                            doctor: foundFromBooking.doctorName || "Bác sĩ phụ trách",
+                            result: `Trạng thái phiếu: ${foundFromBooking.status || "CONFIRMED"}`
+                        }
+                    ] : []
+                });
+                return;
+            }
+
+            // 2. Tra cứu hồ sơ bệnh nhân qua /api/patient-profiles/lookup
+            const res = await axiosInstance.get(`/api/patient-profiles/lookup?keyword=${encodeURIComponent(cleanKw)}`).catch(() => null);
             const list = Array.isArray(res?.data) ? res.data : (Array.isArray(res?.data?.data) ? res.data.data : (Array.isArray(res) ? res : []));
 
             if (list.length > 0) {
@@ -140,6 +185,41 @@ export default function PatientLookupPage() {
                     ] : []
                 });
             } else {
+                // 3. Fallback: Nếu không tìm thấy hồ sơ, thử tìm theo mã phiếu khám nếu chưa tìm
+                if (!isBookingCode && cleanKw.length >= 4) {
+                    const bkRes = await axiosInstance.get(`/api/bookings/code/${encodeURIComponent(cleanKw)}`).catch(() => null);
+                    const bkData = bkRes?.data?.data || bkRes?.data || bkRes;
+                    if (bkData && (bkData.bookingCode || bkData.bookingId)) {
+                        setSearchResult({
+                            fullName: bkData.patientName || "Bệnh nhân",
+                            phoneNumber: "Đã liên kết phiếu khám",
+                            identityNumber: "Bảo mật thông tin",
+                            healthInsuranceNumber: "Theo phiếu đăng ký",
+                            gender: "OTHER",
+                            dateOfBirth: null,
+                            address: "Đăng ký khám tại Bệnh viện TNT",
+                            latestBooking: {
+                                bookingCode: bkData.bookingCode,
+                                queueNumber: bkData.queueCode || (bkData.queueNumber ? `#${bkData.queueNumber}` : "-"),
+                                departmentName: bkData.departmentName || "Khoa Khám Bệnh",
+                                doctorName: bkData.doctorName || "Bác sĩ phụ trách",
+                                roomName: bkData.roomName || "Phòng khám chuyên khoa",
+                                timeSlot: bkData.startTime ? `${String(bkData.startTime).substring(0, 5)} - ${bkData.endTime ? String(bkData.endTime).substring(0, 5) : ""}` : "Hôm nay",
+                                bookingDate: bkData.bookingDate,
+                                status: bkData.status || "CONFIRMED"
+                            },
+                            medicalHistory: bkData.symptoms ? [
+                                {
+                                    date: bkData.bookingDate || "Hôm nay",
+                                    diagnosis: bkData.symptoms,
+                                    doctor: bkData.doctorName || "Bác sĩ phụ trách",
+                                    result: `Trạng thái phiếu: ${bkData.status || "CONFIRMED"}`
+                                }
+                            ] : []
+                        });
+                        return;
+                    }
+                }
                 setSearchResult(null);
             }
         } catch (err) {
@@ -230,7 +310,7 @@ export default function PatientLookupPage() {
                         <Box component="form" onSubmit={handleSearch} display="flex" gap={2} flexWrap="wrap">
                             <TextField
                                 fullWidth
-                                placeholder="Nhập Số điện thoại (ví dụ: 0912345678) hoặc Số CCCD/Định danh..."
+                                placeholder="Nhập Số điện thoại (09...), Số CCCD/Định danh, Mã thẻ BHYT hoặc Mã phiếu khám (BK...)"
                                 value={searchKeyword}
                                 onChange={(e) => setSearchKeyword(e.target.value)}
                                 sx={{ flexGrow: 1, bgcolor: "white" }}
@@ -361,10 +441,10 @@ export default function PatientLookupPage() {
                     {hasSearched && !searchResult && !loading && (
                         <Paper elevation={1} sx={{ p: 4, textAlign: "center", borderRadius: 3, bgcolor: "#FFFBEB", border: "1px dashed #F59E0B" }}>
                             <Typography variant="h6" fontWeight="bold" color="#B45309" mb={1}>
-                                ⚠️ Không tìm thấy hồ sơ bệnh nhân
+                                ⚠️ Không tìm thấy hồ sơ hoặc phiếu khám
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
-                                Không có hồ sơ bệnh nhân nào khớp với từ khóa "{searchKeyword}". Vui lòng kiểm tra lại số điện thoại (tối thiểu 9 chữ số) hoặc số CCCD chính xác.
+                                Không có hồ sơ hoặc phiếu khám nào khớp với từ khóa "{searchKeyword}". Vui lòng kiểm tra lại Số điện thoại, CCCD, Mã thẻ BHYT hoặc Mã phiếu khám (ví dụ: BK...).
                             </Typography>
                         </Paper>
                     )}

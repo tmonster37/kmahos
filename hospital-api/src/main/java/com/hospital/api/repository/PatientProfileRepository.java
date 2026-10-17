@@ -19,6 +19,7 @@ public interface PatientProfileRepository extends JpaRepository<PatientProfile, 
     @Query("SELECT p FROM PatientProfile p WHERE p.deleted = false AND (" +
            "p.phoneNumber LIKE %:kw% OR " +
            "p.identityNumber LIKE %:kw% OR " +
+           "p.healthInsuranceNumber LIKE %:kw% OR " +
            "LOWER(p.fullName) LIKE LOWER(CONCAT('%', :kw, '%')))")
     List<PatientProfile> searchProfiles(@Param("kw") String keyword);
 }

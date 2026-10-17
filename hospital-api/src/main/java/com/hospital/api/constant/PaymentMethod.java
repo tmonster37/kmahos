@@ -4,6 +4,7 @@ public enum PaymentMethod {
     INTERNAL_WALLET,
     VNPAY,
     VIETQR,
+    PAYOS,
     MOMO,
     CASH,
     COUNTER_CASH,

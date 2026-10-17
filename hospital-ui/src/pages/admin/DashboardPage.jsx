@@ -114,17 +114,27 @@ export default function DashboardPage() {
                 axiosInstance.get("/api/admin/audit-logs")
             ]);
 
-            if (utilRes.status === "fulfilled" && utilRes.value.data) {
-                setStats(prev => ({ ...prev, ...utilRes.value.data }));
+            const extractData = (resVal) => {
+                if (!resVal) return null;
+                const d = resVal.data !== undefined ? resVal.data : resVal;
+                return (d && d.data !== undefined) ? d.data : d;
+            };
+
+            if (utilRes.status === "fulfilled" && utilRes.value) {
+                const d = extractData(utilRes.value);
+                if (d) setStats(prev => ({ ...prev, ...d }));
             }
-            if (kpiRevRes.status === "fulfilled" && kpiRevRes.value.data) {
-                setKpiRevenue(kpiRevRes.value.data);
+            if (kpiRevRes.status === "fulfilled" && kpiRevRes.value) {
+                const d = extractData(kpiRevRes.value);
+                if (d) setKpiRevenue(d);
             }
-            if (roomCapRes.status === "fulfilled" && roomCapRes.value.data) {
-                setRoomCapacity(roomCapRes.value.data);
+            if (roomCapRes.status === "fulfilled" && roomCapRes.value) {
+                const d = extractData(roomCapRes.value);
+                if (d) setRoomCapacity(d);
             }
-            if (auditRes.status === "fulfilled" && auditRes.value.data) {
-                setAuditLogs(auditRes.value.data);
+            if (auditRes.status === "fulfilled" && auditRes.value) {
+                const d = extractData(auditRes.value);
+                if (d) setAuditLogs(d);
             }
         } catch (err) {
             console.error("Lỗi nạp Dashboard:", err);
@@ -137,32 +147,36 @@ export default function DashboardPage() {
         loadDashboardData();
     }, [timeRange]);
 
+    const roomList = roomCapacity?.rooms || roomCapacity?.roomDetails || [];
+    const totalWaitingBN = roomList.reduce((acc, r) => acc + (r.waitingCount || 0), 0) || roomCapacity?.totalPatientsWaiting || 0;
+    const totalExaminingBN = roomList.reduce((acc, r) => acc + (r.examiningCount || 0), 0) || roomCapacity?.totalPatientsExamining || 0;
+
     const statCards = [
         {
             title: "Tổng Doanh Thu Thực Tế (KPI)",
             value: kpiRevenue ? formatCurrency(kpiRevenue.totalRevenue) : formatCurrency(stats.totalRevenue),
-            subtext: kpiRevenue ? `Đã quyết toán ${kpiRevenue.totalCompletedInvoices} giao dịch` : "Đạt 105% chỉ tiêu",
+            subtext: kpiRevenue ? `Đã quyết toán ${kpiRevenue.totalTransactions ?? kpiRevenue.totalCompletedInvoices ?? 0} giao dịch` : "Đạt 105% chỉ tiêu",
             icon: <MonetizationOnIcon fontSize="large" />,
             color: "#16A34A"
         },
         {
             title: "Tỷ Lệ Hoàn Tất Khám",
-            value: kpiRevenue ? `${kpiRevenue.completionRate}%` : "88.4%",
-            subtext: kpiRevenue ? `Hủy/vắng: ${kpiRevenue.totalCanceledAppointments} ca (${kpiRevenue.cancellationRate}%)` : "Tỷ lệ xử lý cao",
+            value: kpiRevenue ? `${kpiRevenue.completionRate ?? 0}%` : "88.4%",
+            subtext: kpiRevenue ? `Hủy/vắng: ${kpiRevenue.cancelledAppointments ?? kpiRevenue.totalCanceledAppointments ?? 0} ca (${kpiRevenue.cancellationRate ?? 0}%)` : "Tỷ lệ xử lý cao",
             icon: <CheckCircleIcon fontSize="large" />,
             color: "#0284C7"
         },
         {
             title: "Công Suất Buồng Khám (Real-time)",
-            value: roomCapacity ? `${roomCapacity.occupancyRate}%` : "75.0%",
-            subtext: roomCapacity ? `${roomCapacity.activeRooms}/${roomCapacity.totalExamRooms} buồng đang khám (${roomCapacity.utilizationStatus})` : "Tải ổn định",
+            value: roomCapacity ? `${roomCapacity.overallUtilizationRate ?? roomCapacity.occupancyRate ?? 0}%` : "75.0%",
+            subtext: roomCapacity ? `${roomCapacity.activeRooms || 0}/${roomCapacity.totalRooms ?? roomCapacity.totalExamRooms ?? 0} buồng đang khám` : "Tải ổn định",
             icon: <MeetingRoomIcon fontSize="large" />,
-            color: roomCapacity?.utilizationStatus === "HEAVY" ? "#DC2626" : "#EA580C"
+            color: ((roomCapacity?.overallUtilizationRate ?? 0) > 80 || roomCapacity?.utilizationStatus === "HEAVY") ? "#DC2626" : "#EA580C"
         },
         {
             title: "Bệnh Nhân Đang Chờ Khám",
-            value: roomCapacity ? `${roomCapacity.totalPatientsWaiting} người` : "14 người",
-            subtext: roomCapacity ? `${roomCapacity.totalPatientsExamining} ca đang ngồi ghế khám` : "Luồng phân bổ nhịp nhàng",
+            value: roomCapacity ? `${totalWaitingBN} người` : "14 người",
+            subtext: roomCapacity ? `${totalExaminingBN} ca đang ngồi ghế khám` : "Luồng phân bổ nhịp nhàng",
             icon: <PeopleIcon fontSize="large" />,
             color: "#8B5CF6"
         },
@@ -512,12 +526,12 @@ export default function DashboardPage() {
 
                         <Stack spacing={2}>
                             {[
-                                { name: "VietQR (Chuyển khoản động)", amount: kpiRevenue?.revenueByMethod?.vietQrRevenue || 0, color: "#0284C7", icon: <QrCode2Icon fontSize="small" /> },
-                                { name: "Tiền mặt tại Quầy (COUNTER_CASH)", amount: kpiRevenue?.revenueByMethod?.counterCashRevenue || 0, color: "#16A34A", icon: <MonetizationOnIcon fontSize="small" /> },
-                                { name: "Ví MoMo", amount: kpiRevenue?.revenueByMethod?.momoRevenue || 0, color: "#D81B60", icon: <AccountBalanceWalletIcon fontSize="small" /> },
-                                { name: "Cổng VNPAY-QR", amount: kpiRevenue?.revenueByMethod?.vnpayRevenue || 0, color: "#EA580C", icon: <QrCode2Icon fontSize="small" /> },
-                                { name: "Cà thẻ POS", amount: kpiRevenue?.revenueByMethod?.posRevenue || 0, color: "#8B5CF6", icon: <PointOfSaleIcon fontSize="small" /> },
-                                { name: "Ví nội bộ Bệnh viện", amount: kpiRevenue?.revenueByMethod?.internalWalletRevenue || 0, color: "#0D9488", icon: <AccountBalanceWalletIcon fontSize="small" /> },
+                                { name: "VietQR (Chuyển khoản động)", amount: kpiRevenue?.vietQrRevenue ?? kpiRevenue?.revenueByMethod?.vietQrRevenue ?? 0, color: "#0284C7", icon: <QrCode2Icon fontSize="small" /> },
+                                { name: "Tiền mặt tại Quầy (COUNTER_CASH)", amount: kpiRevenue?.cashRevenue ?? kpiRevenue?.revenueByMethod?.counterCashRevenue ?? 0, color: "#16A34A", icon: <MonetizationOnIcon fontSize="small" /> },
+                                { name: "Ví MoMo", amount: kpiRevenue?.momoRevenue ?? kpiRevenue?.revenueByMethod?.momoRevenue ?? 0, color: "#D81B60", icon: <AccountBalanceWalletIcon fontSize="small" /> },
+                                { name: "Cổng VNPAY-QR", amount: kpiRevenue?.vnpayRevenue ?? kpiRevenue?.revenueByMethod?.vnpayRevenue ?? 0, color: "#EA580C", icon: <QrCode2Icon fontSize="small" /> },
+                                { name: "Cà thẻ POS", amount: kpiRevenue?.posRevenue ?? kpiRevenue?.revenueByMethod?.posRevenue ?? 0, color: "#8B5CF6", icon: <PointOfSaleIcon fontSize="small" /> },
+                                { name: "Ví nội bộ Bệnh viện", amount: kpiRevenue?.internalWalletRevenue ?? kpiRevenue?.revenueByMethod?.internalWalletRevenue ?? 0, color: "#0D9488", icon: <AccountBalanceWalletIcon fontSize="small" /> },
                             ].map((ch, idx) => {
                                 const total = kpiRevenue?.totalRevenue || 1;
                                 const pct = total > 0 ? Math.round((ch.amount / total) * 100) : 0;
@@ -562,14 +576,14 @@ export default function DashboardPage() {
                                 </Typography>
                             </Box>
                             <Chip
-                                label={`Công suất: ${roomCapacity?.occupancyRate || 0}%`}
-                                color={roomCapacity?.utilizationStatus === "HEAVY" ? "error" : "primary"}
+                                label={`Công suất: ${roomCapacity?.overallUtilizationRate ?? roomCapacity?.occupancyRate ?? 0}%`}
+                                color={((roomCapacity?.overallUtilizationRate ?? 0) > 80 || roomCapacity?.utilizationStatus === "HEAVY") ? "error" : "primary"}
                                 size="small"
                                 sx={{ fontWeight: "bold" }}
                             />
                         </Box>
                         <Typography variant="body2" color="textSecondary" mb={2}>
-                            Tổng {roomCapacity?.totalExamRooms || 0} buồng khám ({roomCapacity?.activeRooms || 0} buồng đang mở phiên)
+                            Tổng {roomCapacity?.totalRooms ?? roomCapacity?.totalExamRooms ?? roomList.length} buồng khám ({roomCapacity?.activeRooms ?? roomList.filter(r => r.examiningCount > 0).length} buồng đang mở phiên)
                         </Typography>
 
                         <TableContainer sx={{ maxHeight: 380 }}>
@@ -580,35 +594,43 @@ export default function DashboardPage() {
                                         <TableCell><b>Chuyên khoa</b></TableCell>
                                         <TableCell align="center"><b>Đang đợi</b></TableCell>
                                         <TableCell align="center"><b>Đang khám</b></TableCell>
-                                        <TableCell align="center"><b>Trạng thái</b></TableCell>
+                                        <TableCell align="center"><b>Trạng thái tải</b></TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
-                                    {roomCapacity?.roomDetails && roomCapacity.roomDetails.length > 0 ? (
-                                        roomCapacity.roomDetails.map((rm, idx) => (
+                                    {loadingKpi ? (
+                                        <TableRow>
+                                            <TableCell colSpan={5} align="center">
+                                                <Typography variant="body2" color="textSecondary" py={2}>
+                                                    Đang tải danh sách buồng khám...
+                                                </Typography>
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : roomList.length > 0 ? (
+                                        roomList.map((rm, idx) => (
                                             <TableRow key={idx} hover>
-                                                <TableCell><b>{rm.roomNumber}</b></TableCell>
-                                                <TableCell>{rm.departmentName}</TableCell>
+                                                <TableCell><b>{rm.roomName || rm.roomNumber || `Phòng ${rm.roomId}`}</b></TableCell>
+                                                <TableCell>{rm.departmentName || "Khoa khám"}</TableCell>
                                                 <TableCell align="center">
                                                     <Chip
-                                                        label={`${rm.waitingCount} BN`}
+                                                        label={`${rm.waitingCount ?? 0} BN`}
                                                         size="small"
-                                                        color={rm.waitingCount > 5 ? "warning" : "default"}
+                                                        color={(rm.waitingCount || 0) > 5 ? "warning" : "default"}
                                                     />
                                                 </TableCell>
                                                 <TableCell align="center">
                                                     <Chip
-                                                        label={`${rm.examiningCount} BN`}
+                                                        label={`${rm.examiningCount ?? 0} BN`}
                                                         size="small"
-                                                        color={rm.examiningCount > 0 ? "success" : "default"}
-                                                        variant={rm.examiningCount > 0 ? "filled" : "outlined"}
+                                                        color={(rm.examiningCount || 0) > 0 ? "success" : "default"}
+                                                        variant={(rm.examiningCount || 0) > 0 ? "filled" : "outlined"}
                                                     />
                                                 </TableCell>
                                                 <TableCell align="center">
                                                     <Chip
-                                                        label={rm.status === "ACTIVE" ? "ĐANG KHÁM" : "SẴN SÀNG"}
+                                                        label={rm.loadLevel === "HEAVY" ? "QUÁ TẢI" : rm.loadLevel === "LIGHT" ? "THOÁNG" : (rm.examiningCount > 0 ? "ĐANG KHÁM" : "SẴN SÀNG")}
                                                         size="small"
-                                                        color={rm.status === "ACTIVE" ? "primary" : "default"}
+                                                        color={rm.loadLevel === "HEAVY" ? "error" : (rm.examiningCount > 0 ? "primary" : "success")}
                                                         sx={{ fontWeight: "bold", fontSize: "0.7rem" }}
                                                     />
                                                 </TableCell>
@@ -618,7 +640,7 @@ export default function DashboardPage() {
                                         <TableRow>
                                             <TableCell colSpan={5} align="center">
                                                 <Typography variant="body2" color="textSecondary" py={2}>
-                                                    Đang tải danh sách buồng khám...
+                                                    Chưa có buồng khám nào được ghi nhận hôm nay.
                                                 </Typography>
                                             </TableCell>
                                         </TableRow>

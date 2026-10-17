@@ -51,9 +51,12 @@ export default function RegisterPage() {
                 role: "ROLE_PATIENT",
             });
 
-            if (res.success || res.data?.accessToken) {
-                login(res.data); // Tự động đăng nhập
+            const authData = res?.data || res;
+            if (authData?.accessToken) {
+                login(authData); // Tự động đăng nhập
                 navigate("/profiles"); // Chuyển tới tạo hồ sơ y tế
+            } else {
+                navigate("/login");
             }
         } catch (err) {
             const errorMsg = err?.message || (typeof err === "string" ? err : "Đăng ký thất bại. Số điện thoại hoặc email đã tồn tại!");

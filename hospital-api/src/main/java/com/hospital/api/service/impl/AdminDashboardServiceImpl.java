@@ -66,7 +66,7 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
             if (method != null) {
                 switch (method) {
                     case CASH, COUNTER_CASH -> cash = cash.add(amt);
-                    case VIETQR -> vietQr = vietQr.add(amt);
+                    case VIETQR, PAYOS -> vietQr = vietQr.add(amt);
                     case MOMO -> momo = momo.add(amt);
                     case VNPAY -> vnpay = vnpay.add(amt);
                     case POS -> pos = pos.add(amt);
