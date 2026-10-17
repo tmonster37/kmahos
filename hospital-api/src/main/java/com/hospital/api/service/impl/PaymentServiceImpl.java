@@ -136,10 +136,21 @@ public class PaymentServiceImpl implements PaymentService {
                 payOSItems
         );
 
-        String qrImageUrl = (payOSLink != null && payOSLink.qrCode() != null && !payOSLink.qrCode().isBlank())
+        String rawQrCode = (payOSLink != null && payOSLink.qrCode() != null && !payOSLink.qrCode().isBlank())
                 ? payOSLink.qrCode()
-                : payOSConfig.generateVietQRUrl(amount.longValue(), txnRef);
+                : null;
 
+        String bin = (payOSLink != null && payOSLink.bin() != null && !payOSLink.bin().isBlank())
+                ? payOSLink.bin()
+                : payOSConfig.bankBin;
+        String accountNumber = (payOSLink != null && payOSLink.accountNumber() != null && !payOSLink.accountNumber().isBlank())
+                ? payOSLink.accountNumber()
+                : payOSConfig.bankAccount;
+        String accountHolder = (payOSLink != null && payOSLink.accountName() != null && !payOSLink.accountName().isBlank())
+                ? payOSLink.accountName()
+                : payOSConfig.accountHolder;
+
+        String qrImageUrl = payOSConfig.generateVietQRUrl(bin, accountNumber, accountHolder, amount.longValue(), txnRef);
         String checkoutUrl = (payOSLink != null) ? payOSLink.checkoutUrl() : null;
 
         return new PaymentGatewayResponse(
@@ -150,11 +161,12 @@ public class PaymentServiceImpl implements PaymentService {
                 amount,
                 "PENDING",
                 qrImageUrl,
+                rawQrCode,
                 checkoutUrl,
                 null,
                 payOSConfig.bankName,
-                payOSConfig.bankAccount,
-                payOSConfig.accountHolder,
+                accountNumber,
+                accountHolder,
                 txnRef,
                 "Quét mã VietQR Napas 247 hoặc bấm Mở Cổng PayOS để thanh toán tức thì 0% phí",
                 orderCode
@@ -199,6 +211,7 @@ public class PaymentServiceImpl implements PaymentService {
                 amount,
                 "PENDING",
                 momoQrUrl,
+                momoPayload,
                 "https://me.momo.vn/benhvientnt",
                 "momo://?action=payWithApp",
                 "Ví điện tử MoMo",
@@ -669,10 +682,21 @@ public class PaymentServiceImpl implements PaymentService {
                 payOSItems
         );
 
-        String qrImageUrl = (payOSLink != null && payOSLink.qrCode() != null && !payOSLink.qrCode().isBlank())
+        String rawQrCode = (payOSLink != null && payOSLink.qrCode() != null && !payOSLink.qrCode().isBlank())
                 ? payOSLink.qrCode()
-                : payOSConfig.generateVietQRUrl(amount.longValue(), txnRef);
+                : null;
 
+        String bin = (payOSLink != null && payOSLink.bin() != null && !payOSLink.bin().isBlank())
+                ? payOSLink.bin()
+                : payOSConfig.bankBin;
+        String accountNumber = (payOSLink != null && payOSLink.accountNumber() != null && !payOSLink.accountNumber().isBlank())
+                ? payOSLink.accountNumber()
+                : payOSConfig.bankAccount;
+        String accountHolder = (payOSLink != null && payOSLink.accountName() != null && !payOSLink.accountName().isBlank())
+                ? payOSLink.accountName()
+                : payOSConfig.accountHolder;
+
+        String qrImageUrl = payOSConfig.generateVietQRUrl(bin, accountNumber, accountHolder, amount.longValue(), txnRef);
         String checkoutUrl = (payOSLink != null) ? payOSLink.checkoutUrl() : null;
 
         return new PaymentGatewayResponse(
@@ -683,11 +707,12 @@ public class PaymentServiceImpl implements PaymentService {
                 amount,
                 "PENDING",
                 qrImageUrl,
+                rawQrCode,
                 checkoutUrl,
                 null,
                 payOSConfig.bankName,
-                payOSConfig.bankAccount,
-                payOSConfig.accountHolder,
+                accountNumber,
+                accountHolder,
                 txnRef,
                 "Mở Cổng PayOS để thanh toán Open Banking hoặc quét mã VietQR Napas 247",
                 orderCode

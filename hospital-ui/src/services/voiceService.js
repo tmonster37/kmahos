@@ -65,7 +65,7 @@ export const playChime = () => {
   }
 };
 
-export const speakPatientCall = async ({ queueCode, queueNumber, patientName, roomName, departmentName, isPriority }) => {
+export const speakPatientCall = async ({ queueCode, queueNumber, patientName, roomName, departmentName, isPriority, isReturnAfterResult }) => {
   await playChime();
 
   if (typeof window === "undefined" || !('speechSynthesis' in window)) {
@@ -76,15 +76,29 @@ export const speakPatientCall = async ({ queueCode, queueNumber, patientName, ro
   try {
     window.speechSynthesis.cancel(); // Dừng câu đang đọc dở nếu có
 
-    let numberSpoken = queueCode || (isPriority ? `Ưu tiên ${queueNumber}` : `số ${queueNumber}`);
-    let text = `Xin mời bệnh nhân ${isPriority ? "ưu tiên" : ""} ${patientName || ""}, số thứ tự ${numberSpoken}`;
-    if (roomName) {
-      text += `, vào phòng ${roomName}`;
+    const isKQ = isReturnAfterResult || (queueCode && queueCode.toUpperCase().startsWith("KQ"));
+    let numberSpoken = queueCode ? queueCode.replace("-", " ") : (isPriority ? `Ưu tiên ${queueNumber}` : `số ${queueNumber}`);
+
+    let text = "";
+    if (isKQ) {
+      text = `Xin mời bệnh nhân trả kết quả xét nghiệm, ${patientName || ""}, mã số ${numberSpoken}`;
+      if (roomName) {
+        text += `, vào phòng ${roomName}`;
+      }
+      if (departmentName) {
+        text += `, khoa ${departmentName}`;
+      }
+      text += `, để bác sĩ kết luận điều trị.`;
+    } else {
+      text = `Xin mời bệnh nhân ${isPriority ? "ưu tiên" : ""} ${patientName || ""}, số thứ tự ${numberSpoken}`;
+      if (roomName) {
+        text += `, vào phòng ${roomName}`;
+      }
+      if (departmentName) {
+        text += `, khoa ${departmentName}`;
+      }
+      text += `, để khám bệnh.`;
     }
-    if (departmentName) {
-      text += `, khoa ${departmentName}`;
-    }
-    text += `, để khám bệnh.`;
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'vi-VN';

@@ -53,6 +53,7 @@ import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedIn";
 
 import pharmacyApi from "../../services/pharmacyApi";
 import { formatCurrency, formatDate, formatDateTime } from "../../utils/formatters";
+import { printDispenseSlip } from "../../utils/printHelper";
 
 // Định nghĩa nhãn loại kho
 const WAREHOUSE_TYPE_MAP = {
@@ -83,6 +84,11 @@ export default function PharmacyInventoryPage() {
     const [dispenses, setDispenses] = useState([]);
     const [expiringAlerts, setExpiringAlerts] = useState([]);
     const [lowStockAlerts, setLowStockAlerts] = useState([]);
+
+    // Hàng đợi đơn thuốc cấp phát
+    const [prescriptions, setPrescriptions] = useState([]);
+    const [rxFilter, setRxFilter] = useState("PENDING"); // ALL, PENDING, DISPENSED, PAID
+    const [selectedPrescription, setSelectedPrescription] = useState(null);
 
     // Tìm kiếm & bộ lọc
     const [searchKeyword, setSearchKeyword] = useState("");
@@ -168,6 +174,15 @@ export default function PharmacyInventoryPage() {
 
             const lowRes = await pharmacyApi.getLowStockAlerts();
             setLowStockAlerts(lowRes?.data || lowRes || []);
+
+            // 7. Lấy danh sách hàng đợi đơn thuốc từ Bác sĩ
+            try {
+                const rxRes = await pharmacyApi.getPrescriptions();
+                const rxList = rxRes?.data?.data || rxRes?.data || rxRes || [];
+                setPrescriptions(Array.isArray(rxList) ? rxList : []);
+            } catch (rxErr) {
+                console.error("Lỗi tải danh sách đơn thuốc:", rxErr);
+            }
 
         } catch (err) {
             console.error("Lỗi tải dữ liệu kho dược:", err);
@@ -299,20 +314,57 @@ export default function PharmacyInventoryPage() {
     // ==========================================
     // 5. XỬ LÝ NGHIỆP VỤ: CẤP PHÁT THUỐC FEFO
     // ==========================================
+    const handleOpenDispense = (p) => {
+        setSelectedPrescription(p);
+        const defaultWhId = warehouses.find(w => w.warehouseType === "OUTPATIENT_PHARMACY")?.warehouseId || warehouses[0]?.warehouseId || "";
+        setDispenseData({
+            prescriptionId: p.prescriptionId,
+            warehouseId: defaultWhId,
+            notes: `Cấp phát thuốc theo đơn ${p.prescriptionCode} cho người bệnh ${p.patientName}`
+        });
+        setDispenseResult(null);
+        setOpenDispenseDialog(true);
+    };
+
     const handleDispenseFefo = async () => {
         if (!dispenseData.warehouseId || !dispenseData.prescriptionId) {
-            setFeedback({ type: "warning", message: "Vui lòng chọn Kho cấp phát và nhập Mã đơn thuốc." });
+            setFeedback({ type: "warning", message: "Vui lòng chọn Kho cấp phát và kiểm tra mã đơn thuốc." });
             return;
         }
         try {
             const res = await pharmacyApi.dispensePrescription(dispenseData);
-            setDispenseResult(res?.data || res);
-            setFeedback({ type: "success", message: "Đã tự động trích xuất thuốc theo chuẩn FEFO thành công!" });
+            const data = res?.data?.data || res?.data || res;
+            setDispenseResult(data);
+            setFeedback({ type: "success", message: `Đã tự động trích xuất thuốc theo chuẩn FEFO thành công! Mã phiếu xuất: ${data.dispenseCode}` });
             loadAllData();
         } catch (err) {
-            setFeedback({ type: "error", message: err.message || "Không thể cấp phát đơn thuốc." });
+            const msg = err.response?.data?.message || err.message || "Không thể cấp phát đơn thuốc.";
+            setFeedback({ type: "error", message: msg });
         }
     };
+
+    // Lọc hàng đợi đơn thuốc
+    const filteredPrescriptions = useMemo(() => {
+        let list = prescriptions;
+        if (rxFilter === "PENDING") {
+            list = list.filter(p => !p.isDispensed);
+        } else if (rxFilter === "DISPENSED") {
+            list = list.filter(p => p.isDispensed);
+        } else if (rxFilter === "PAID") {
+            list = list.filter(p => p.isPaid && !p.isDispensed);
+        }
+
+        if (!searchKeyword.trim()) return list;
+        const kw = searchKeyword.toLowerCase();
+        return list.filter(p =>
+            p.prescriptionCode?.toLowerCase().includes(kw) ||
+            p.bookingCode?.toLowerCase().includes(kw) ||
+            p.patientName?.toLowerCase().includes(kw) ||
+            p.patientPhone?.includes(kw) ||
+            (p.identityNumber && p.identityNumber.includes(kw)) ||
+            p.doctorName?.toLowerCase().includes(kw)
+        );
+    }, [prescriptions, rxFilter, searchKeyword]);
 
     // Lọc tồn kho theo từ khóa
     const filteredStocks = useMemo(() => {
@@ -442,14 +494,15 @@ export default function PharmacyInventoryPage() {
                         "& .Mui-selected": { color: "#0088D6" }
                     }}
                 >
-                    <Tab icon={<Inventory2Icon />} iconPosition="start" label="1. Sơ Đồ Kho & Tồn Kho Từng Cấp" />
-                    <Tab icon={<MedicationIcon />} iconPosition="start" label={`2. Quản Lý Lô Thuốc (${batches.length})`} />
-                    <Tab icon={<LocalShippingIcon />} iconPosition="start" label={`3. Điều Chuyển Kho (${transfers.length})`} />
-                    <Tab icon={<AssignmentTurnedInIcon />} iconPosition="start" label={`4. Lịch Sử Cấp Phát (${dispenses.length})`} />
+                    <Tab icon={<AssignmentTurnedInIcon />} iconPosition="start" label={`1. Hàng Đợi Cấp Phát (${prescriptions.filter(p => !p.isDispensed).length})`} />
+                    <Tab icon={<Inventory2Icon />} iconPosition="start" label="2. Sơ Đồ Kho & Tồn Kho Từng Cấp" />
+                    <Tab icon={<MedicationIcon />} iconPosition="start" label={`3. Quản Lý Lô Thuốc (${batches.length})`} />
+                    <Tab icon={<LocalShippingIcon />} iconPosition="start" label={`4. Điều Chuyển Kho (${transfers.length})`} />
+                    <Tab icon={<DoneAllIcon />} iconPosition="start" label={`5. Lịch Sử Cấp Phát (${dispenses.length})`} />
                     <Tab
                         icon={<WarningAmberIcon />}
                         iconPosition="start"
-                        label={`5. Cảnh Báo Dược (${expiringAlerts.length + lowStockAlerts.length})`}
+                        label={`6. Cảnh Báo Dược (${expiringAlerts.length + lowStockAlerts.length})`}
                         sx={{ color: (expiringAlerts.length + lowStockAlerts.length) > 0 ? "#E11D48 !important" : "inherit" }}
                     />
                 </Tabs>
@@ -458,9 +511,227 @@ export default function PharmacyInventoryPage() {
             {loading && <LinearProgress sx={{ mb: 2, borderRadius: 1 }} />}
 
             {/* ============================================================== */}
-            {/* TAB 0: SƠ ĐỒ KHO & TỒN KHO TỪNG CẤP                           */}
+            {/* TAB 0: HÀNG ĐỢI ĐƠN THUỐC CẦN CẤP PHÁT (PRESCRIPTION QUEUE)    */}
             {/* ============================================================== */}
             {currentTab === 0 && (
+                <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: "1px solid #E2E8F0" }}>
+                    <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2} mb={2.5}>
+                        <Box>
+                            <Typography variant="h6" fontWeight="800" color="#1E293B">
+                                Hàng Đợi Cấp Phát Thuốc Ngoại Trú (Prescription Dispensing Queue)
+                            </Typography>
+                            <Typography variant="caption" color="#64748B">
+                                Tiếp nhận đơn thuốc điện tử từ Bác sĩ, kiểm soát thanh toán viện phí & tự động trích xuất theo lô FEFO
+                            </Typography>
+                        </Box>
+
+                        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                            <Button
+                                size="small"
+                                variant={rxFilter === "PENDING" ? "contained" : "outlined"}
+                                color="error"
+                                onClick={() => setRxFilter("PENDING")}
+                                sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none" }}
+                            >
+                                Chờ Cấp Phát ({prescriptions.filter(p => !p.isDispensed).length})
+                            </Button>
+                            <Button
+                                size="small"
+                                variant={rxFilter === "PAID" ? "contained" : "outlined"}
+                                color="success"
+                                onClick={() => setRxFilter("PAID")}
+                                sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none" }}
+                            >
+                                Đã Thu Viện Phí ({prescriptions.filter(p => p.isPaid && !p.isDispensed).length})
+                            </Button>
+                            <Button
+                                size="small"
+                                variant={rxFilter === "DISPENSED" ? "contained" : "outlined"}
+                                color="primary"
+                                onClick={() => setRxFilter("DISPENSED")}
+                                sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none" }}
+                            >
+                                Đã Phát Thuốc ({prescriptions.filter(p => p.isDispensed).length})
+                            </Button>
+                            <Button
+                                size="small"
+                                variant={rxFilter === "ALL" ? "contained" : "outlined"}
+                                color="inherit"
+                                onClick={() => setRxFilter("ALL")}
+                                sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none" }}
+                            >
+                                Tất Cả ({prescriptions.length})
+                            </Button>
+                        </Stack>
+                    </Box>
+
+                    {/* Thanh tìm kiếm */}
+                    <Box mb={2}>
+                        <TextField
+                            fullWidth
+                            size="small"
+                            placeholder="Tìm kiếm theo Tên người bệnh, SĐT, Mã đơn thuốc (RX-...), Mã ca khám (BK-...), Bác sĩ..."
+                            value={searchKeyword}
+                            onChange={(e) => setSearchKeyword(e.target.value)}
+                            InputProps={{
+                                startAdornment: (
+                                    <InputAdornment position="start">
+                                        <SearchIcon color="action" />
+                                    </InputAdornment>
+                                ),
+                                endAdornment: searchKeyword && (
+                                    <InputAdornment position="end">
+                                        <IconButton size="small" onClick={() => setSearchKeyword("")}>
+                                            <RefreshIcon fontSize="small" />
+                                        </IconButton>
+                                    </InputAdornment>
+                                )
+                            }}
+                            sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "#F8FAFC" } }}
+                        />
+                    </Box>
+
+                    {/* Bảng danh sách đơn thuốc */}
+                    <TableContainer>
+                        <Table size="small">
+                            <TableHead>
+                                <TableRow sx={{ "& th": { bgcolor: "#F8FAFC", fontWeight: 800, color: "#334155" } }}>
+                                    <TableCell>Mã Đơn / Mã Khám</TableCell>
+                                    <TableCell>Người Bệnh</TableCell>
+                                    <TableCell>Bác Sĩ & Chẩn Đoán</TableCell>
+                                    <TableCell>Số Mặt Hàng</TableCell>
+                                    <TableCell align="right">Tiền Thuốc</TableCell>
+                                    <TableCell align="center">Viện Phí</TableCell>
+                                    <TableCell align="center">Trạng Thái</TableCell>
+                                    <TableCell align="center">Thao Tác</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {filteredPrescriptions.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={8} align="center" sx={{ py: 4, color: "#64748B" }}>
+                                            Không tìm thấy đơn thuốc nào phù hợp với bộ lọc hiện tại.
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    filteredPrescriptions.map((p) => {
+                                        return (
+                                            <TableRow key={p.prescriptionId} hover>
+                                                <TableCell>
+                                                    <Typography variant="body2" fontWeight="800" color="#0088D6">
+                                                        {p.prescriptionCode}
+                                                    </Typography>
+                                                    <Typography variant="caption" color="#64748B">
+                                                        {p.bookingCode} • {formatDateTime(p.prescribedAt)}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Typography variant="body2" fontWeight="700" color="#1E293B">
+                                                        {p.patientName}
+                                                    </Typography>
+                                                    <Typography variant="caption" color="#64748B">
+                                                        {p.patientPhone || "---"} • {p.gender === "MALE" ? "Nam" : p.gender === "FEMALE" ? "Nữ" : ""}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell sx={{ maxWidth: 220 }}>
+                                                    <Typography variant="body2" fontWeight="600" color="#334155" noWrap>
+                                                        {p.doctorName}
+                                                    </Typography>
+                                                    <Typography variant="caption" color="#64748B" noWrap display="block">
+                                                        {p.diagnosis || p.doctorNotes || "Khám nội tổng quát"}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Chip
+                                                        label={`${p.items?.length || 0} thuốc`}
+                                                        size="small"
+                                                        variant="outlined"
+                                                        sx={{ fontWeight: 700 }}
+                                                    />
+                                                </TableCell>
+                                                <TableCell align="right" sx={{ fontWeight: 800, color: "#059669" }}>
+                                                    {formatCurrency(p.totalAmount)}
+                                                </TableCell>
+                                                <TableCell align="center">
+                                                    {p.isPaid ? (
+                                                        <Chip
+                                                            icon={<CheckCircleIcon />}
+                                                            label="ĐÃ NỘP TIỀN"
+                                                            size="small"
+                                                            color="success"
+                                                            sx={{ fontWeight: 800 }}
+                                                        />
+                                                    ) : (
+                                                        <Chip
+                                                            icon={<WarningAmberIcon />}
+                                                            label="CHƯA NỘP TIỀN"
+                                                            size="small"
+                                                            color="warning"
+                                                            sx={{ fontWeight: 800 }}
+                                                        />
+                                                    )}
+                                                </TableCell>
+                                                <TableCell align="center">
+                                                    {p.isDispensed ? (
+                                                        <Chip
+                                                            label={`ĐÃ CẤP (${p.dispenseCode || "FEFO"})`}
+                                                            size="small"
+                                                            color="info"
+                                                            sx={{ fontWeight: 800 }}
+                                                        />
+                                                    ) : (
+                                                        <Chip
+                                                            label="CHỜ PHÁT"
+                                                            size="small"
+                                                            color="error"
+                                                            sx={{ fontWeight: 800 }}
+                                                        />
+                                                    )}
+                                                </TableCell>
+                                                <TableCell align="center">
+                                                    {p.isDispensed ? (
+                                                        <Button
+                                                            size="small"
+                                                            variant="outlined"
+                                                            color="primary"
+                                                            startIcon={<PrintIcon />}
+                                                            onClick={() => printDispenseSlip(p)}
+                                                            sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                                                        >
+                                                            In Phiếu
+                                                        </Button>
+                                                    ) : (
+                                                        <Button
+                                                            size="small"
+                                                            variant="contained"
+                                                            color="success"
+                                                            startIcon={<MedicationIcon />}
+                                                            onClick={() => handleOpenDispense(p)}
+                                                            sx={{
+                                                                textTransform: "none",
+                                                                fontWeight: 700,
+                                                                borderRadius: 2,
+                                                                boxShadow: "0 2px 6px rgba(16, 185, 129, 0.3)"
+                                                            }}
+                                                        >
+                                                            Cấp Phát FEFO
+                                                        </Button>
+                                                    )}
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })
+                                )}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                </Paper>
+            )}
+
+            {/* ============================================================== */}
+            {/* TAB 1: SƠ ĐỒ KHO & TỒN KHO TỪNG CẤP                           */}
+            {/* ============================================================== */}
+            {currentTab === 1 && (
                 <Box>
                     {/* Thẻ 4 cấp độ kho */}
                     <Typography variant="subtitle1" fontWeight="800" color="#1E293B" mb={1.5}>
@@ -657,9 +928,9 @@ export default function PharmacyInventoryPage() {
             )}
 
             {/* ============================================================== */}
-            {/* TAB 1: QUẢN LÝ LÔ THUỐC & NHẬP HÀNG MỚI                        */}
+            {/* TAB 2: QUẢN LÝ LÔ THUỐC & NHẬP HÀNG MỚI                        */}
             {/* ============================================================== */}
-            {currentTab === 1 && (
+            {currentTab === 2 && (
                 <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: "1px solid #E2E8F0" }}>
                     <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                         <Box>
@@ -736,9 +1007,9 @@ export default function PharmacyInventoryPage() {
             )}
 
             {/* ============================================================== */}
-            {/* TAB 2: ĐIỀU CHUYỂN KHO NỘI BỘ (STOCK TRANSFERS)                */}
+            {/* TAB 3: ĐIỀU CHUYỂN KHO NỘI BỘ (STOCK TRANSFERS)                */}
             {/* ============================================================== */}
-            {currentTab === 2 && (
+            {currentTab === 3 && (
                 <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: "1px solid #E2E8F0" }}>
                     <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                         <Box>
@@ -854,9 +1125,9 @@ export default function PharmacyInventoryPage() {
             )}
 
             {/* ============================================================== */}
-            {/* TAB 3: LỊCH SỬ CẤP PHÁT THUỐC FEFO                             */}
+            {/* TAB 4: LỊCH SỬ CẤP PHÁT THUỐC FEFO                             */}
             {/* ============================================================== */}
-            {currentTab === 3 && (
+            {currentTab === 4 && (
                 <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: "1px solid #E2E8F0" }}>
                     <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                         <Box>
@@ -940,9 +1211,9 @@ export default function PharmacyInventoryPage() {
             )}
 
             {/* ============================================================== */}
-            {/* TAB 4: TRUNG TÂM CẢNH BÁO DƯỢC                                  */}
+            {/* TAB 5: TRUNG TÂM CẢNH BÁO DƯỢC                                  */}
             {/* ============================================================== */}
-            {currentTab === 4 && (
+            {currentTab === 5 && (
                 <Grid container spacing={3}>
                     {/* Cảnh báo thuốc cận date */}
                     <Grid item xs={12} md={6}>
@@ -1364,6 +1635,87 @@ export default function PharmacyInventoryPage() {
                     Cấp Phát Đơn Thuốc Tự Động Theo Thuật Toán FEFO
                 </DialogTitle>
                 <DialogContent dividers>
+                    {/* Thông tin bệnh nhân & Toa thuốc nếu chọn từ danh sách */}
+                    {selectedPrescription && (
+                        <Box mb={2.5} p={2} sx={{ bgcolor: "#F8FAFC", borderRadius: 2, border: "1px solid #E2E8F0" }}>
+                            <Grid container spacing={1.5}>
+                                <Grid item xs={12} sm={6}>
+                                    <Typography variant="body2" color="#64748B">Người bệnh:</Typography>
+                                    <Typography variant="subtitle2" fontWeight="800" color="#1E293B">
+                                        {selectedPrescription.patientName} ({selectedPrescription.gender === "MALE" ? "Nam" : selectedPrescription.gender === "FEMALE" ? "Nữ" : ""}) - {selectedPrescription.patientPhone || "---"}
+                                    </Typography>
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <Typography variant="body2" color="#64748B">Mã đơn / Mã khám:</Typography>
+                                    <Typography variant="subtitle2" fontWeight="800" color="#0088D6">
+                                        {selectedPrescription.prescriptionCode} • {selectedPrescription.bookingCode}
+                                    </Typography>
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <Typography variant="body2" color="#64748B">Bác sĩ kê đơn:</Typography>
+                                    <Typography variant="body2" fontWeight="700">
+                                        {selectedPrescription.doctorName} ({selectedPrescription.departmentName})
+                                    </Typography>
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <Typography variant="body2" color="#64748B">Chẩn đoán:</Typography>
+                                    <Typography variant="body2" fontWeight="700" color="#059669">
+                                        {selectedPrescription.diagnosis || "Khám nội tổng quát"}
+                                    </Typography>
+                                </Grid>
+                            </Grid>
+                        </Box>
+                    )}
+
+                    {/* Banner cảnh báo viện phí */}
+                    {selectedPrescription && (
+                        selectedPrescription.isPaid ? (
+                            <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }}>
+                                ✅ Bệnh nhân đã hoàn tất viện phí tại quầy thu ngân ({formatCurrency(selectedPrescription.totalAmount)}). Đơn thuốc đủ điều kiện xuất kho an toàn.
+                            </Alert>
+                        ) : (
+                            <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>
+                                ⚠️ Đơn thuốc này CHƯA được ghi nhận thanh toán tiền thuốc tại quầy thu ngân ({formatCurrency(selectedPrescription.totalAmount)}). Nếu người bệnh thuộc diện ưu tiên/BHYT, hệ thống vẫn cho phép xuất kho; ngược lại, vui lòng hướng dẫn người bệnh đóng viện phí trước khi cấp thuốc.
+                            </Alert>
+                        )
+                    )}
+
+                    {/* Danh sách thuốc trong đơn cần cấp */}
+                    {selectedPrescription && selectedPrescription.items && selectedPrescription.items.length > 0 && (
+                        <Box mb={2.5}>
+                            <Typography variant="subtitle2" fontWeight="800" color="#1E293B" mb={1}>
+                                Danh mục thuốc trong đơn ({selectedPrescription.items.length} loại):
+                            </Typography>
+                            <TableContainer sx={{ border: "1px solid #E2E8F0", borderRadius: 1.5 }}>
+                                <Table size="small">
+                                    <TableHead>
+                                        <TableRow sx={{ "& th": { bgcolor: "#F1F5F9", fontWeight: 700 } }}>
+                                            <TableCell>Tên thuốc & Hoạt chất</TableCell>
+                                            <TableCell align="center">Đơn vị</TableCell>
+                                            <TableCell align="center">Số lượng</TableCell>
+                                            <TableCell>Liều dùng & Hướng dẫn</TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {selectedPrescription.items.map((it, idx) => (
+                                            <TableRow key={idx}>
+                                                <TableCell>
+                                                    <Typography variant="body2" fontWeight="700">{it.medicineName}</Typography>
+                                                    {it.activeIngredient && (
+                                                        <Typography variant="caption" color="#64748B">{it.activeIngredient}</Typography>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell align="center">{it.unit}</TableCell>
+                                                <TableCell align="center"><strong>{it.quantity}</strong></TableCell>
+                                                <TableCell sx={{ fontSize: "0.85rem" }}>{it.dosageInstruction || "Theo đơn bác sĩ"}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        </Box>
+                    )}
+
                     <Grid container spacing={2} sx={{ pt: 1 }}>
                         <Grid item xs={12} sm={6}>
                             <TextField
@@ -1383,11 +1735,10 @@ export default function PharmacyInventoryPage() {
                         <Grid item xs={12} sm={6}>
                             <TextField
                                 fullWidth
-                                type="number"
-                                label="Mã Đơn Thuốc Cần Cấp (Prescription ID)"
+                                label="Mã Đơn Thuốc Cần Cấp (Prescription ID / Code)"
                                 value={dispenseData.prescriptionId}
-                                onChange={(e) => setDispenseData({ ...dispenseData, prescriptionId: Number(e.target.value) })}
-                                helperText="Hệ thống sẽ tự động quét danh sách thuốc trong đơn và trích xuất từ lô có date gần nhất còn hạn"
+                                onChange={(e) => setDispenseData({ ...dispenseData, prescriptionId: e.target.value })}
+                                helperText="Hệ thống tự động quét danh sách thuốc trong đơn và trích xuất từ lô có date gần nhất còn hạn theo FEFO"
                             />
                         </Grid>
                     </Grid>
@@ -1442,13 +1793,19 @@ export default function PharmacyInventoryPage() {
 
                             <Box display="flex" justifyContent="flex-end" mt={2}>
                                 <Button
-                                    variant="outlined"
+                                    variant="contained"
                                     color="success"
                                     startIcon={<PrintIcon />}
-                                    onClick={() => window.print()}
-                                    sx={{ fontWeight: 700, textTransform: "none" }}
+                                    onClick={() => printDispenseSlip({
+                                        ...dispenseResult,
+                                        bookingCode: selectedPrescription?.bookingCode,
+                                        prescriptionCode: selectedPrescription?.prescriptionCode,
+                                        patientPhone: selectedPrescription?.patientPhone,
+                                        notes: selectedPrescription?.doctorNotes || dispenseData.notes
+                                    })}
+                                    sx={{ fontWeight: 700, textTransform: "none", borderRadius: 2 }}
                                 >
-                                    In Phiếu Cấp Phát Thuốc
+                                    In Phiếu Cấp Phát Thuốc (A5)
                                 </Button>
                             </Box>
                         </Box>

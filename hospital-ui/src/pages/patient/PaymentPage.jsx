@@ -53,17 +53,32 @@ export default function PaymentPage() {
     const [walletError, setWalletError] = useState("");
 
     const queryParams = new URLSearchParams(location.search);
-    const payosOrderCode = queryParams.get("orderCode");
+    const payosCode = queryParams.get("code");
+    const payosId = queryParams.get("id");
+    const payosCancel = queryParams.get("cancel");
     const payosStatus = queryParams.get("status");
+    const payosOrderCode = queryParams.get("orderCode");
+    const [syncingReturn, setSyncingReturn] = useState(false);
 
     useEffect(() => {
         loadWalletData();
-        if (payosOrderCode) {
-            axiosInstance.post(`/api/payment/payos/sync/${payosOrderCode}`)
-                .then(() => loadWalletData())
-                .catch(() => {});
+        if (payosOrderCode && payosCancel !== "true") {
+            handleSyncReturnOrder(payosOrderCode);
         }
-    }, [payosOrderCode]);
+    }, [payosOrderCode, payosCancel]);
+
+    const handleSyncReturnOrder = async (orderCode) => {
+        if (!orderCode) return;
+        setSyncingReturn(true);
+        try {
+            await axiosInstance.post(`/api/payment/payos/sync/${orderCode}`);
+            await loadWalletData();
+        } catch (e) {
+            console.warn("PayOS sync error:", e);
+        } finally {
+            setSyncingReturn(false);
+        }
+    };
 
     const loadWalletData = async () => {
         setLoadingHistory(true);
@@ -132,37 +147,75 @@ export default function PaymentPage() {
             />
 
 
-            {/* PayOS Callback Notification */}
+            {/* PayOS Return URL Notification (Theo đặc tả https://payos.vn/docs/du-lieu-tra-ve/return-url/) */}
             {payosOrderCode && (
                 <Box mb={3}>
-                    {payosStatus === "PAID" || payosStatus === "SUCCESS" ? (
+                    {payosCancel === "true" || payosStatus === "CANCELLED" ? (
                         <Alert
-                            severity="success"
-                            icon={<CheckCircleIcon fontSize="medium" />}
-                            sx={{ borderRadius: 2 }}
+                            severity="info"
+                            icon={<ErrorIcon fontSize="medium" />}
+                            sx={{ borderRadius: 3, border: "1px solid #BAE6FD", bgcolor: "#F0F9FF" }}
                             action={
                                 <Button color="inherit" size="small" onClick={() => navigate("/payment", { replace: true })}>
                                     Đóng
                                 </Button>
                             }
                         >
-                            <Typography variant="body2" fontWeight="bold">
-                                Nạp tiền thành công qua Cổng PayOS Open Banking! (Mã đơn: {payosOrderCode}).
+                            <Typography variant="subtitle2" fontWeight="bold" color="#0369A1">
+                                Giao dịch đã được hủy trên Cổng PayOS
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                                Bạn đã chọn hủy thanh toán cho đơn hàng <b>#{payosOrderCode}</b> {payosId ? `(Mã link: ${payosId})` : ""}. Tài khoản ngân hàng của bạn không bị trừ tiền. Quý khách có thể nạp tiền lại bất cứ lúc nào.
+                            </Typography>
+                        </Alert>
+                    ) : (payosCode === "00" || payosStatus === "PAID" || payosStatus === "SUCCESS") ? (
+                        <Alert
+                            severity="success"
+                            icon={<CheckCircleIcon fontSize="medium" />}
+                            sx={{ borderRadius: 3, border: "1px solid #BBF7D0", bgcolor: "#F0FDF4" }}
+                            action={
+                                <Button color="inherit" size="small" onClick={() => navigate("/payment", { replace: true })}>
+                                    Đóng
+                                </Button>
+                            }
+                        >
+                            <Typography variant="subtitle2" fontWeight="bold" color="#15803D">
+                                🎉 Thanh toán thành công qua Cổng PayOS Open Banking!
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                                Đơn hàng <b>#{payosOrderCode}</b> {payosId ? `(Mã PayOS: ${payosId})` : ""} đã được ghi nhận thanh toán thành công (Mã: {payosCode || "00"} - Trạng thái: PAID).
+                                Số dư ví viện phí của bạn đã được cập nhật tự động.
                             </Typography>
                         </Alert>
                     ) : (
                         <Alert
                             severity="warning"
                             icon={<ErrorIcon fontSize="medium" />}
-                            sx={{ borderRadius: 2 }}
+                            sx={{ borderRadius: 3, border: "1px solid #FED7AA", bgcolor: "#FFFBEB" }}
                             action={
-                                <Button color="inherit" size="small" onClick={() => navigate("/payment", { replace: true })}>
-                                    Đóng
-                                </Button>
+                                <Stack direction="row" spacing={1}>
+                                    <Button
+                                        color="warning"
+                                        size="small"
+                                        variant="outlined"
+                                        disabled={syncingReturn}
+                                        onClick={() => handleSyncReturnOrder(payosOrderCode)}
+                                        sx={{ textTransform: "none", fontWeight: "bold" }}
+                                    >
+                                        {syncingReturn ? "Đang đồng bộ..." : "Đồng bộ lại"}
+                                    </Button>
+                                    <Button color="inherit" size="small" onClick={() => navigate("/payment", { replace: true })}>
+                                        Đóng
+                                    </Button>
+                                </Stack>
                             }
                         >
-                            <Typography variant="body2" fontWeight="bold">
-                                Giao dịch PayOS đã kết thúc hoặc đang chờ xử lý (Trạng thái: {payosStatus || "PENDING"}, Mã đơn: {payosOrderCode}).
+                            <Typography variant="subtitle2" fontWeight="bold" color="#B45309">
+                                Giao dịch PayOS đang chờ xử lý hoặc chưa hoàn tất
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                                Đơn hàng <b>#{payosOrderCode}</b> - Trạng thái: <b>{payosStatus || "PENDING"}</b> (Mã: {payosCode || "Chờ xử lý"}).
+                                Nếu bạn đã chuyển khoản trên App ngân hàng, vui lòng bấm nút <b>"Đồng bộ lại"</b> bên cạnh để hệ thống đối soát trực tiếp với PayOS.
                             </Typography>
                         </Alert>
                     )}

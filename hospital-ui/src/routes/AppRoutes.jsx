@@ -69,8 +69,9 @@ export default function AppRoutes() {
                 <Route path="/lookup" element={<PatientLookupPage />} />
                 <Route path="/tra-cuu" element={<PatientLookupPage />} />
                 <Route path="/login" element={<LoginPage />} />
-                <Route path="/register" element={<RegisterPage />} />
                 <Route path="/payment" element={<PaymentPage />} />
+                <Route path="/payment/return" element={<PaymentPage />} />
+                <Route path="/payment/cancel" element={<PaymentPage />} />
 
                 {/* Sổ khám điện tử (Bệnh nhân & Nhân viên y tế) */}
                 <Route element={<ProtectedRoute allowedRoles={["ROLE_PATIENT", "ROLE_DOCTOR", "ROLE_HEAD_OF_DEPARTMENT", "ROLE_NURSE", "ROLE_LAB_TECHNICIAN", "ROLE_CASHIER", "ROLE_ADMIN"]} />}>

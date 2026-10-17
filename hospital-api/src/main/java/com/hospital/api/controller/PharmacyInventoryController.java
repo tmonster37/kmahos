@@ -100,9 +100,17 @@ public class PharmacyInventoryController {
     @PostMapping("/prescriptions/{prescriptionId}/dispense")
     @PreAuthorize("hasAnyRole('PHARMACIST', 'ADMIN', 'HEAD_OF_DEPARTMENT', 'NURSE')")
     public ResponseEntity<ApiResponse<PrescriptionDispenseResponse>> dispensePrescription(
-            @PathVariable UUID prescriptionId,
+            @PathVariable String prescriptionId,
             @Valid @RequestBody DispensePrescriptionRequest request) {
-        return ResponseEntity.ok(ApiResponse.ok(inventoryService.dispensePrescription(prescriptionId, request), "Cấp phát thuốc theo đơn (FEFO) thành công"));
+        return ResponseEntity.ok(ApiResponse.ok(inventoryService.dispensePrescriptionByCodeOrId(prescriptionId, request), "Cấp phát thuốc theo đơn (FEFO) thành công"));
+    }
+
+    @GetMapping("/prescriptions")
+    @PreAuthorize("hasAnyRole('PHARMACIST', 'ADMIN', 'HEAD_OF_DEPARTMENT', 'NURSE', 'DOCTOR')")
+    public ResponseEntity<ApiResponse<List<PharmacyPrescriptionResponse>>> getPrescriptions(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String keyword) {
+        return ResponseEntity.ok(ApiResponse.ok(inventoryService.getPrescriptions(status, keyword), "Lấy danh sách đơn thuốc thành công"));
     }
 
     @GetMapping({"/prescriptions/{prescriptionId}/dispenses", "/dispenses"})

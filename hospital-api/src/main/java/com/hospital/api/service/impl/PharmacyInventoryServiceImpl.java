@@ -18,8 +18,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -439,6 +441,150 @@ public class PharmacyInventoryServiceImpl implements PharmacyInventoryService {
         return dispenseRepository.findAll().stream()
                 .map(PrescriptionDispenseResponse::fromEntity)
                 .toList();
+    }
+
+    @Override
+    @Transactional
+    public PrescriptionDispenseResponse dispensePrescriptionByCodeOrId(String idOrCode, DispensePrescriptionRequest request) {
+        if (idOrCode == null || idOrCode.trim().isEmpty()) {
+            throw new AppException("Vui lòng cung cấp mã đơn thuốc", HttpStatus.BAD_REQUEST);
+        }
+        String trimmed = idOrCode.trim();
+        UUID targetId;
+        try {
+            targetId = UUID.fromString(trimmed);
+        } catch (IllegalArgumentException e) {
+            Prescription p = prescriptionRepository.findByPrescriptionCode(trimmed)
+                    .orElseThrow(() -> new AppException("Không tìm thấy đơn thuốc với mã: " + trimmed, HttpStatus.NOT_FOUND));
+            targetId = p.getPrescriptionId();
+        }
+        return dispensePrescription(targetId, request);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PharmacyPrescriptionResponse> getPrescriptions(String status, String keyword) {
+        List<Prescription> allPrescriptions = prescriptionRepository.findAll();
+        List<PharmacyPrescriptionResponse> result = new ArrayList<>();
+        String kw = (keyword != null && !keyword.trim().isEmpty()) ? keyword.trim().toLowerCase() : null;
+
+        for (Prescription p : allPrescriptions) {
+            var record = p.getMedicalRecord();
+            var booking = record != null ? record.getBooking() : null;
+            var patient = record != null ? record.getPatientProfile() : null;
+            var doctor = booking != null ? booking.getDoctor() : null;
+            var dept = (doctor != null && doctor.getDepartment() != null) ? doctor.getDepartment().getDepartmentName() : "Khoa Khám Bệnh";
+            var doctorName = (doctor != null && doctor.getAccount() != null) ? doctor.getAccount().getFullName() : "Bác sĩ điều trị";
+
+            List<PrescriptionDispense> dispenses = dispenseRepository.findByPrescriptionPrescriptionId(p.getPrescriptionId());
+            boolean isDispensed = !dispenses.isEmpty();
+            String dispenseCode = isDispensed ? dispenses.get(0).getDispenseCode() : null;
+
+            // Kiểm tra trạng thái thanh toán viện phí
+            boolean isPaid = false;
+            if (booking != null) {
+                if (Boolean.TRUE.equals(booking.getIsPriority())) {
+                    isPaid = true;
+                } else {
+                    String code = booking.getBookingCode();
+                    List<Transaction> txns = transactionRepository.findAllByDescriptionContainingAndStatus(code, "SUCCESS");
+                    BigDecimal totalPaid = txns.stream()
+                            .map(Transaction::getAmount)
+                            .filter(Objects::nonNull)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                    BigDecimal examPrice = booking.getPrice() != null ? booking.getPrice() : BigDecimal.ZERO;
+                    BigDecimal prescPrice = p.getTotalAmount() != null ? p.getTotalAmount() : BigDecimal.ZERO;
+
+                    boolean hasPrescriptionTxn = txns.stream().anyMatch(t -> {
+                        String desc = t.getDescription() != null ? t.getDescription() : "";
+                        String ref = t.getVnpayTxnRef() != null ? t.getVnpayTxnRef() : "";
+                        return desc.contains("TREATMENT") || desc.contains("PRESCRIPTION") || desc.contains("MEDICINE") || ref.contains("MED");
+                    });
+
+                    isPaid = hasPrescriptionTxn || totalPaid.compareTo(examPrice.add(prescPrice)) >= 0;
+                }
+            }
+
+            // Lọc theo status
+            if ("PENDING".equalsIgnoreCase(status) && isDispensed) {
+                continue;
+            }
+            if ("DISPENSED".equalsIgnoreCase(status) && !isDispensed) {
+                continue;
+            }
+            if ("PAID".equalsIgnoreCase(status) && (!isPaid || isDispensed)) {
+                continue;
+            }
+
+            String patientName = patient != null ? patient.getFullName() : "Khách hàng";
+            String patientPhone = patient != null ? patient.getPhoneNumber() : "";
+            String identityNum = (patient != null && patient.getIdentityNumber() != null) ? patient.getIdentityNumber() : "";
+            String gender = (patient != null && patient.getGender() != null) ? patient.getGender().name() : "";
+            String bookingCode = booking != null ? booking.getBookingCode() : "";
+            String diagnosis = (record != null && record.getFinalDiagnosis() != null) ? record.getFinalDiagnosis() : "";
+
+            // Lọc theo keyword
+            if (kw != null) {
+                boolean match = p.getPrescriptionCode().toLowerCase().contains(kw)
+                        || bookingCode.toLowerCase().contains(kw)
+                        || patientName.toLowerCase().contains(kw)
+                        || patientPhone.contains(kw)
+                        || identityNum.contains(kw)
+                        || doctorName.toLowerCase().contains(kw);
+                if (!match) {
+                    continue;
+                }
+            }
+
+            LocalDateTime prescribedAt = p.getCreatedAt() != null
+                    ? LocalDateTime.ofInstant(p.getCreatedAt(), ZoneId.systemDefault())
+                    : LocalDateTime.now();
+
+            List<PharmacyPrescriptionResponse.PrescriptionItemDetail> itemDetails = p.getPrescriptionItems().stream()
+                    .map(it -> new PharmacyPrescriptionResponse.PrescriptionItemDetail(
+                            it.getMedicine() != null ? it.getMedicine().getMedicineId() : null,
+                            it.getMedicine() != null ? it.getMedicine().getMedicineName() : "Thuốc",
+                            it.getMedicine() != null ? it.getMedicine().getActiveIngredient() : "",
+                            it.getMedicine() != null && it.getMedicine().getUnit() != null ? it.getMedicine().getUnit().name() : "Viên",
+                            it.getQuantity(),
+                            it.getUnitPrice(),
+                            it.getTotalPrice(),
+                            it.getMorningAmount(),
+                            it.getNoonAmount(),
+                            it.getAfternoonAmount(),
+                            it.getEveningAmount(),
+                            it.getDosageInstruction()
+                    )).toList();
+
+            result.add(new PharmacyPrescriptionResponse(
+                    p.getPrescriptionId(),
+                    p.getPrescriptionCode(),
+                    bookingCode,
+                    patientName,
+                    patientPhone,
+                    identityNum,
+                    gender,
+                    doctorName,
+                    dept,
+                    diagnosis,
+                    p.getTotalAmount(),
+                    p.getDoctorNotes(),
+                    isPaid,
+                    isDispensed,
+                    dispenseCode,
+                    prescribedAt,
+                    itemDetails
+            ));
+        }
+
+        // Sắp xếp đơn mới nhất lên đầu
+        result.sort((a, b) -> {
+            if (a.prescribedAt() == null || b.prescribedAt() == null) return 0;
+            return b.prescribedAt().compareTo(a.prescribedAt());
+        });
+
+        return result;
     }
 
     // 5. Hệ thống Cảnh báo Dược

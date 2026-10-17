@@ -132,6 +132,16 @@ public class ClinicalExaminationController {
         return ResponseEntity.ok(ApiResponse.ok(clinicalService.makeDiagnosis(recordId, request), "Ghi nhận chẩn đoán thành công"));
     }
 
+    // 7.1. Bác sĩ hoàn tất ca khám (cho trường hợp không kê đơn, tư vấn/hướng dẫn hoặc đã có chẩn đoán)
+    @PostMapping({"/records/{recordId}/complete", "/records/{recordId}/finish"})
+    @PreAuthorize("hasAnyRole('DOCTOR', 'HEAD_OF_DEPARTMENT', 'ADMIN')")
+    public ResponseEntity<ApiResponse<MedicalRecordResponse>> completeExamination(
+            @PathVariable UUID recordId,
+            @RequestBody(required = false) com.hospital.api.dto.request.CompleteExaminationRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(clinicalService.completeExamination(recordId, request), "Hoàn tất ca khám bệnh thành công"));
+    }
+
     // 8. Bác sĩ kê đơn thuốc (Tự động trừ kho thuốc & hoàn tất buổi khám)
     @PostMapping({"/records/{recordId}/prescriptions", "/records/{recordId}/prescription"})
     @PreAuthorize("hasAnyRole('DOCTOR', 'HEAD_OF_DEPARTMENT', 'ADMIN')")

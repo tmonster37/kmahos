@@ -87,3 +87,10 @@ tnt_automation/bao_cao_test.html
 scratch/
 .agents/
 .sharkrebel-antigravity/
+
+# ------------------------------------------------------------------------------
+# 9. Local Integration & Verification Test Scripts
+# ------------------------------------------------------------------------------
+test_payos_real_integration.js
+*.local.js
+

@@ -48,6 +48,8 @@ export const pharmacyApi = {
     approveTransfer: (id) => axiosInstance.post(`/api/pharmacy/transfers/${id}/approve`),
 
     // 4. Cấp phát thuốc theo đơn chuẩn FEFO (Prescription Dispense)
+    getPrescriptions: (params) =>
+        axiosInstance.get("/api/pharmacy/prescriptions", { params }),
     dispensePrescription: (data) => {
         const pId = data.prescriptionId;
         const payload = {

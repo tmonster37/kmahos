@@ -34,6 +34,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
 import HowToRegIcon from "@mui/icons-material/HowToReg";
+import ScienceIcon from "@mui/icons-material/Science";
 import axiosInstance from "../services/AxiosInstance";
 import { speakPatientCall, playChime } from "../services/voiceService";
 import { useLocation } from "react-router-dom";
@@ -115,7 +116,8 @@ export default function QueueDisplayPage() {
                             patientName: latestCalled.patientName,
                             roomName: latestCalled.roomName || "01",
                             departmentName: latestCalled.departmentName || "Khám Bệnh",
-                            isPriority: latestCalled.isPriority
+                            isPriority: latestCalled.isPriority,
+                            isReturnAfterResult: Boolean(latestCalled.isReturnAfterResult || (latestCalled.queueCode && latestCalled.queueCode.startsWith("KQ")))
                         });
                     }
                 }
@@ -400,7 +402,10 @@ export default function QueueDisplayPage() {
             {viewMode === "GRID" && (
                 <Grid container spacing={2.5} sx={{ flexGrow: 1 }}>
                     {roomList.length > 0 ? (
-                        roomList.map((room, idx) => (
+                        roomList.map((room, idx) => {
+                            const isCurrentReturn = Boolean(room.current?.isReturnAfterResult || (room.current?.queueCode && room.current.queueCode.startsWith("KQ")));
+                            const isCurrentPri = Boolean(room.current?.isPriority);
+                            return (
                             <Grid item xs={12} sm={6} md={4} lg={3} key={idx}>
                                 <Paper
                                     elevation={4}
@@ -408,7 +413,8 @@ export default function QueueDisplayPage() {
                                         borderRadius: 3,
                                         overflow: "hidden",
                                         bgcolor: "#111C3A",
-                                        border: room.current?.isPriority ? "2px solid #EF4444" : "1px solid rgba(255,255,255,0.15)",
+                                        border: isCurrentReturn ? "2px solid #10B981" : (isCurrentPri ? "2px solid #EF4444" : "1px solid rgba(255,255,255,0.15)"),
+                                        boxShadow: isCurrentReturn ? "0 0 18px rgba(16, 185, 129, 0.35)" : (isCurrentPri ? "0 0 15px rgba(239, 68, 68, 0.3)" : "none"),
                                         height: "100%",
                                         display: "flex",
                                         flexDirection: "column"
@@ -417,7 +423,7 @@ export default function QueueDisplayPage() {
                                     {/* Room Header */}
                                     <Box
                                         sx={{
-                                            bgcolor: room.current?.isPriority ? "#DC2626" : "#0284C7",
+                                            bgcolor: isCurrentReturn ? "#059669" : (isCurrentPri ? "#DC2626" : "#0284C7"),
                                             p: 1.2,
                                             textAlign: "center",
                                             display: "flex",
@@ -431,24 +437,39 @@ export default function QueueDisplayPage() {
                                                 {room.roomName}
                                             </Typography>
                                         </Box>
-                                        <Typography variant="caption" sx={{ opacity: 0.9, fontSize: "0.7rem" }}>
-                                            {room.departmentName}
-                                        </Typography>
+                                        <Box display="flex" alignItems="center" gap={0.6}>
+                                            {isCurrentReturn && (
+                                                <Chip
+                                                    size="small"
+                                                    label="🔬 TRẢ KẾT QUẢ"
+                                                    sx={{
+                                                        bgcolor: "#064E3B",
+                                                        color: "#6EE7B7",
+                                                        fontWeight: 800,
+                                                        fontSize: "0.62rem",
+                                                        height: 20
+                                                    }}
+                                                />
+                                            )}
+                                            <Typography variant="caption" sx={{ opacity: 0.9, fontSize: "0.7rem" }}>
+                                                {room.departmentName}
+                                            </Typography>
+                                        </Box>
                                     </Box>
 
                                     {/* Big Calling Number */}
                                     <Box p={2.5} textAlign="center" sx={{ bgcolor: "rgba(0,0,0,0.2)" }}>
-                                        <Typography variant="caption" sx={{ color: "#94A3B8", textTransform: "uppercase", letterSpacing: 1 }}>
-                                            ĐANG KHÁM
+                                        <Typography variant="caption" sx={{ color: isCurrentReturn ? "#6EE7B7" : "#94A3B8", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700 }}>
+                                            {isCurrentReturn ? "🔬 ĐANG TRẢ KẾT QUẢ" : "ĐANG KHÁM"}
                                         </Typography>
                                         <Typography
                                             variant="h2"
                                             fontWeight="900"
                                             sx={{
-                                                color: room.current?.isPriority ? "#F87171" : "#FBBF24",
+                                                color: isCurrentReturn ? "#34D399" : (isCurrentPri ? "#F87171" : "#FBBF24"),
                                                 fontFamily: "monospace",
                                                 my: 0.5,
-                                                textShadow: "0 0 15px rgba(251, 191, 36, 0.4)"
+                                                textShadow: isCurrentReturn ? "0 0 15px rgba(52, 211, 153, 0.5)" : (isCurrentPri ? "0 0 15px rgba(248, 113, 113, 0.4)" : "0 0 15px rgba(251, 191, 36, 0.4)")
                                             }}
                                         >
                                             {room.current ? (room.current.queueCode || String(room.current.queueNumber).padStart(2, "0")) : "--"}
@@ -465,26 +486,38 @@ export default function QueueDisplayPage() {
                                         </Typography>
                                         {room.waiting.length > 0 ? (
                                             <Stack spacing={0.8}>
-                                                {room.waiting.slice(0, 4).map((w, wIdx) => (
-                                                    <Box
-                                                        key={wIdx}
-                                                        sx={{
-                                                            display: "flex",
-                                                            justifyContent: "space-between",
-                                                            alignItems: "center",
-                                                            p: "4px 8px",
-                                                            bgcolor: w.isPriority ? "rgba(239, 68, 68, 0.15)" : "rgba(255,255,255,0.05)",
-                                                            borderRadius: 1.5
-                                                        }}
-                                                    >
-                                                        <Typography variant="body2" fontWeight="bold" color={w.isPriority ? "#F87171" : "#FBBF24"}>
-                                                            STT #{w.queueCode || w.queueNumber}
-                                                        </Typography>
-                                                        <Typography variant="body2" noWrap sx={{ maxWidth: 120 }}>
-                                                            {w.patientName}
-                                                        </Typography>
-                                                    </Box>
-                                                ))}
+                                                {room.waiting.slice(0, 4).map((w, wIdx) => {
+                                                    const isWReturn = Boolean(w.isReturnAfterResult || (w.queueCode && w.queueCode.startsWith("KQ")));
+                                                    const isWPri = Boolean(w.isPriority);
+                                                    return (
+                                                        <Box
+                                                            key={wIdx}
+                                                            sx={{
+                                                                display: "flex",
+                                                                justifyContent: "space-between",
+                                                                alignItems: "center",
+                                                                p: "4px 8px",
+                                                                bgcolor: isWReturn ? "rgba(16, 185, 129, 0.18)" : (isWPri ? "rgba(239, 68, 68, 0.15)" : "rgba(255,255,255,0.05)"),
+                                                                border: isWReturn ? "1px solid rgba(16, 185, 129, 0.4)" : "none",
+                                                                borderRadius: 1.5
+                                                            }}
+                                                        >
+                                                            <Box display="flex" alignItems="center" gap={0.5}>
+                                                                <Typography variant="body2" fontWeight="bold" color={isWReturn ? "#34D399" : (isWPri ? "#F87171" : "#FBBF24")}>
+                                                                    #{w.queueCode || w.queueNumber}
+                                                                </Typography>
+                                                                {isWReturn && (
+                                                                    <Typography variant="caption" sx={{ fontSize: "0.65rem", color: "#6EE7B7", fontWeight: 700 }}>
+                                                                        (CLS)
+                                                                    </Typography>
+                                                                )}
+                                                            </Box>
+                                                            <Typography variant="body2" noWrap sx={{ maxWidth: 120 }}>
+                                                                {w.patientName}
+                                                            </Typography>
+                                                        </Box>
+                                                    );
+                                                })}
                                             </Stack>
                                         ) : (
                                             <Typography variant="caption" color="#64748B" sx={{ fontStyle: "italic" }}>
@@ -494,7 +527,8 @@ export default function QueueDisplayPage() {
                                     </Box>
                                 </Paper>
                             </Grid>
-                        ))
+                            );
+                        })
                     ) : (
                         <Grid item xs={12}>
                             <Paper sx={{ p: 6, textAlign: "center", bgcolor: "#111C3A", borderRadius: 3 }}>
@@ -508,7 +542,10 @@ export default function QueueDisplayPage() {
             )}
 
             {/* Chế độ 2: FOCUS MODE (Màn hình lớn tập trung sảnh) */}
-            {viewMode === "FOCUS" && (
+            {viewMode === "FOCUS" && (() => {
+                const isCurrentReturn = Boolean(currentCalling?.isReturnAfterResult || (currentCalling?.queueCode && currentCalling.queueCode.startsWith("KQ")));
+                const isCurrentPri = Boolean(currentCalling?.isPriority);
+                return (
                 <Grid container spacing={3} sx={{ flexGrow: 1 }}>
                     {/* BIG CALLING BOX */}
                     <Grid item xs={12} lg={6}>
@@ -518,7 +555,8 @@ export default function QueueDisplayPage() {
                                 p: 4,
                                 borderRadius: 4,
                                 bgcolor: "#111C3A",
-                                border: currentCalling?.isPriority ? "3px solid #EF4444" : "2px solid #38BDF8",
+                                border: isCurrentReturn ? "3px solid #10B981" : (isCurrentPri ? "3px solid #EF4444" : "2px solid #38BDF8"),
+                                boxShadow: isCurrentReturn ? "0 0 25px rgba(16, 185, 129, 0.4)" : (isCurrentPri ? "0 0 25px rgba(239, 68, 68, 0.4)" : "none"),
                                 height: "100%",
                                 display: "flex",
                                 flexDirection: "column",
@@ -535,7 +573,7 @@ export default function QueueDisplayPage() {
                                     top: 0,
                                     left: 0,
                                     right: 0,
-                                    bgcolor: currentCalling?.isPriority ? "#DC2626" : "#0284C7",
+                                    bgcolor: isCurrentReturn ? "#059669" : (isCurrentPri ? "#DC2626" : "#0284C7"),
                                     py: 1.2,
                                     fontWeight: "bold",
                                     letterSpacing: 2,
@@ -546,23 +584,25 @@ export default function QueueDisplayPage() {
                                     gap: 1
                                 }}
                             >
-                                <VolumeUpIcon />
-                                {currentCalling?.isPriority ? "MỜI BỆNH NHÂN ƯU TIÊN VÀO PHÒNG KHÁM" : "MỜI BỆNH NHÂN VÀO PHÒNG KHÁM"}
+                                {isCurrentReturn ? <ScienceIcon /> : <VolumeUpIcon />}
+                                {isCurrentReturn
+                                    ? "🔬 MỜI BỆNH NHÂN TRẢ KẾT QUẢ CLS VÀO PHÒNG KHÁM"
+                                    : (isCurrentPri ? "MỜI BỆNH NHÂN ƯU TIÊN VÀO PHÒNG KHÁM" : "MỜI BỆNH NHÂN VÀO PHÒNG KHÁM")}
                             </Box>
 
                             <Box mt={3}>
-                                <Typography variant="subtitle1" sx={{ color: "#94A3B8", letterSpacing: 2, textTransform: "uppercase" }}>
-                                    SỐ THỨ TỰ ĐANG KHÁM
+                                <Typography variant="subtitle1" sx={{ color: isCurrentReturn ? "#6EE7B7" : "#94A3B8", letterSpacing: 2, textTransform: "uppercase", fontWeight: 700 }}>
+                                    {isCurrentReturn ? "🔬 SỐ THỨ TỰ TRẢ KẾT QUẢ CLS" : "SỐ THỨ TỰ ĐANG KHÁM"}
                                 </Typography>
                                 <Typography
                                     variant="h1"
                                     fontWeight="900"
                                     sx={{
                                         fontSize: { xs: "5rem", md: "7.5rem" },
-                                        color: currentCalling?.isPriority ? "#F87171" : "#FBBF24",
+                                        color: isCurrentReturn ? "#34D399" : (isCurrentPri ? "#F87171" : "#FBBF24"),
                                         lineHeight: 1.1,
                                         my: 1.5,
-                                        textShadow: "0 0 25px rgba(251, 191, 36, 0.5)",
+                                        textShadow: isCurrentReturn ? "0 0 25px rgba(52, 211, 153, 0.6)" : (isCurrentPri ? "0 0 25px rgba(248, 113, 113, 0.5)" : "0 0 25px rgba(251, 191, 36, 0.5)"),
                                         fontFamily: "monospace"
                                     }}
                                 >
@@ -623,9 +663,12 @@ export default function QueueDisplayPage() {
                                     </TableHead>
                                     <TableBody>
                                         {upcomingQueue.length > 0 ? (
-                                            upcomingQueue.slice(0, 10).map((p, pIdx) => (
-                                                <TableRow key={pIdx} hover sx={{ bgcolor: p.isPriority ? "rgba(239, 68, 68, 0.1)" : "transparent" }}>
-                                                    <TableCell sx={{ color: p.isPriority ? "#F87171" : "#FBBF24", fontWeight: 900, fontSize: "1.1rem" }}>
+                                            upcomingQueue.slice(0, 10).map((p, pIdx) => {
+                                                const isPReturn = Boolean(p.isReturnAfterResult || (p.queueCode && p.queueCode.startsWith("KQ")));
+                                                const isPPri = Boolean(p.isPriority);
+                                                return (
+                                                <TableRow key={pIdx} hover sx={{ bgcolor: isPReturn ? "rgba(16, 185, 129, 0.12)" : (isPPri ? "rgba(239, 68, 68, 0.1)" : "transparent") }}>
+                                                    <TableCell sx={{ color: isPReturn ? "#34D399" : (isPPri ? "#F87171" : "#FBBF24"), fontWeight: 900, fontSize: "1.1rem" }}>
                                                         {p.queueCode || String(p.queueNumber).padStart(2, "0")}
                                                     </TableCell>
                                                     <TableCell sx={{ color: "white", fontWeight: "bold" }}>
@@ -635,14 +678,17 @@ export default function QueueDisplayPage() {
                                                         {p.roomName || "Phòng khám"}
                                                     </TableCell>
                                                     <TableCell>
-                                                        {p.isPriority ? (
+                                                        {isPReturn ? (
+                                                            <Chip size="small" icon={<ScienceIcon sx={{ fontSize: "14px !important", color: "#6EE7B7 !important" }} />} label="TRẢ KẾT QUẢ" sx={{ bgcolor: "#065F46", color: "#A7F3D0", fontWeight: 800, border: "1px solid #10B981" }} />
+                                                        ) : isPPri ? (
                                                             <Chip size="small" label="ƯU TIÊN" sx={{ bgcolor: "#DC2626", color: "#fff", fontWeight: 700 }} />
                                                         ) : (
                                                             <Typography variant="caption" sx={{ color: "#94A3B8" }}>Thường</Typography>
                                                         )}
                                                     </TableCell>
                                                 </TableRow>
-                                            ))
+                                                );
+                                            })
                                         ) : (
                                             <TableRow>
                                                 <TableCell colSpan={4} align="center" sx={{ color: "#64748B", py: 4 }}>
@@ -656,7 +702,8 @@ export default function QueueDisplayPage() {
                         </Paper>
                     </Grid>
                 </Grid>
-            )}
+                );
+            })()}
 
             {/* Chế độ 3: COUNTERS MODE (Màn hình LED Quầy Tiếp Đón Sảnh Tầng 1) */}
             {viewMode === "COUNTERS" && (

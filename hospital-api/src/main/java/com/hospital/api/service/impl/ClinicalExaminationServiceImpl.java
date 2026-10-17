@@ -331,6 +331,79 @@ public class ClinicalExaminationServiceImpl implements ClinicalExaminationServic
 
     @Override
     @Transactional
+    public MedicalRecordResponse completeExamination(UUID recordId, CompleteExaminationRequest request) {
+        MedicalExaminationRecord record = recordRepository.findById(recordId)
+                .orElseThrow(() -> new AppException("Không tìm thấy hồ sơ khám bệnh", HttpStatus.NOT_FOUND));
+
+        if (record.isLockedRecord()) {
+            throw new AppException("Hồ sơ bệnh án đã bị khóa sau 24h theo Thông tư 46/2018/TT-BYT. Mọi chỉnh sửa bổ sung phải thông qua Phụ lục bệnh án (Addendum).", HttpStatus.BAD_REQUEST);
+        }
+
+        if (request != null) {
+            if (request.finalDiagnosis() != null && !request.finalDiagnosis().isBlank()) {
+                record.setFinalDiagnosis(request.finalDiagnosis().trim());
+            }
+            if (request.treatmentPlan() != null && !request.treatmentPlan().isBlank()) {
+                record.setTreatmentPlan(request.treatmentPlan().trim());
+            }
+            if (request.reExaminationDate() != null) {
+                record.setReExaminationDate(request.reExaminationDate());
+            }
+            if (request.conditions() != null && !request.conditions().isEmpty()) {
+                for (ConditionInputRequest condReq : request.conditions()) {
+                    if (condReq.diseaseName() != null && !condReq.diseaseName().isBlank()) {
+                        MedicalCondition cond = MedicalCondition.builder()
+                                .medicalRecord(record)
+                                .icd10Code(condReq.icd10Code() != null ? condReq.icd10Code().trim().toUpperCase() : null)
+                                .diseaseName(condReq.diseaseName().trim())
+                                .conditionType(condReq.conditionType() != null ? condReq.conditionType() : ConditionType.PRIMARY)
+                                .clinicalStatus(condReq.clinicalStatus() != null ? condReq.clinicalStatus() : "ACTIVE")
+                                .notes(condReq.notes())
+                                .build();
+                        conditionRepository.save(cond);
+                        record.getMedicalConditions().add(cond);
+                    }
+                }
+            }
+        }
+
+        if (record.getFinalDiagnosis() == null || record.getFinalDiagnosis().isBlank()) {
+            record.setFinalDiagnosis("Khám nội tổng quát - Không phát hiện bất thường cần can thiệp thuốc");
+        }
+
+        // Chuyển trạng thái hồ sơ sang DONE và booking sang COMPLETED
+        record.setState(MedicalExamState.DONE);
+        record.setCompletedAt(LocalDateTime.now());
+        if (record.getBooking() != null) {
+            record.getBooking().setStatus(BookingStatus.COMPLETED);
+        }
+
+        MedicalExaminationRecord saved = recordRepository.save(record);
+
+        // Gửi thông báo hoàn tất ca khám cho bệnh nhân
+        sendNotificationToPatient(
+                record.getBooking(),
+                "🎉 Buổi khám bệnh đã hoàn tất",
+                "Buổi khám bệnh của bạn đã hoàn tất với chẩn đoán: [" + saved.getFinalDiagnosis() + "]. Chúc bạn luôn dồi dào sức khỏe!",
+                "EXAM_COMPLETED"
+        );
+
+        auditLogService.log(
+                record.getDoctor() != null && record.getDoctor().getAccount() != null ? record.getDoctor().getAccount().getUserId() : null,
+                record.getDoctor() != null && record.getDoctor().getAccount() != null ? record.getDoctor().getAccount().getFullName() : "Bác sĩ",
+                "ROLE_DOCTOR",
+                "COMPLETE_EXAMINATION",
+                "MEDICAL_RECORD",
+                saved.getRecordId().toString(),
+                "Hoàn tất ca khám cho bệnh nhân " + (saved.getPatientProfile() != null ? saved.getPatientProfile().getFullName() : "") + " (Chẩn đoán: " + saved.getFinalDiagnosis() + ")",
+                null
+        );
+
+        return MedicalRecordResponse.fromEntity(saved);
+    }
+
+    @Override
+    @Transactional
     public PrescriptionResponse createPrescription(UUID recordId, CreatePrescriptionRequest request) {
         MedicalExaminationRecord record = recordRepository.findById(recordId)
                 .orElseThrow(() -> new AppException("Không tìm thấy hồ sơ khám bệnh", HttpStatus.NOT_FOUND));

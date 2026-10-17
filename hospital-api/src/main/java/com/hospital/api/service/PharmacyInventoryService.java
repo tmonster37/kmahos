@@ -27,8 +27,10 @@ public interface PharmacyInventoryService {
 
     // 4. Cấp phát thuốc theo đơn áp dụng Thuật toán FEFO (First Expired, First Out)
     PrescriptionDispenseResponse dispensePrescription(UUID prescriptionId, DispensePrescriptionRequest request);
+    PrescriptionDispenseResponse dispensePrescriptionByCodeOrId(String idOrCode, DispensePrescriptionRequest request);
     List<PrescriptionDispenseResponse> getDispensesByPrescription(UUID prescriptionId);
     List<PrescriptionDispenseResponse> getAllDispenses();
+    List<PharmacyPrescriptionResponse> getPrescriptions(String status, String keyword);
 
     // 5. Hệ thống Cảnh báo Dược (Safety Alerts)
     List<ExpiryAlertResponse> getNearExpiryAlerts(int daysAhead);

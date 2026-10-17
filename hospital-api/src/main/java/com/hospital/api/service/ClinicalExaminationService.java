@@ -13,6 +13,7 @@ public interface ClinicalExaminationService {
     List<MedicalTestResponse> assignMedicalTests(UUID recordId, AssignMedicalTestRequest request);
     MedicalTestResponse updateTestResult(UUID testId, UpdateTestResultRequest request);
     MedicalRecordResponse makeDiagnosis(UUID recordId, DiagnosisRequest request);
+    MedicalRecordResponse completeExamination(UUID recordId, CompleteExaminationRequest request);
     PrescriptionResponse createPrescription(UUID recordId, CreatePrescriptionRequest request);
     DrugSafetyCheckResponse checkPrescriptionSafety(UUID recordId, CheckPrescriptionSafetyRequest request);
     MedicalRecordResponse getRecordById(UUID recordId);

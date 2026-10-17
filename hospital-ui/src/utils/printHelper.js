@@ -673,3 +673,341 @@ export function printBedsideCard(data) {
     printWindow.document.close();
 }
 
+/**
+ * In Biên Bản Bàn Giao & Đối Soát Viện Phí Ca Trực (Khổ A4 Chuẩn)
+ */
+export function printShiftReconciliation(data) {
+    if (!data) return;
+
+    const cashierName = data.cashierName || "Thu ngân ca trực";
+    const shiftName = data.shiftName || "Toàn bộ ca";
+    const printedAt = formatDateTime(new Date().toISOString());
+    const totalCollected = Number(data.totalCollected || 0);
+    const cashTotal = Number(data.cashTotal || 0);
+    const cashCount = Number(data.cashCount || 0);
+    const digitalTotal = Number(data.digitalTotal || 0);
+    const digitalCount = Number(data.digitalCount || 0);
+    const posTotal = Number(data.posTotal || 0);
+    const posCount = Number(data.posCount || 0);
+    const totalTransactions = Number(data.transactionCount || 0);
+    const transactions = Array.isArray(data.transactions) ? data.transactions : [];
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+        alert("Vui lòng cho phép mở popup để in biên bản đối soát!");
+        return;
+    }
+
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>Biên Bản Đối Soát Viện Phí - ${shiftName}</title>
+            <style>
+                @page { size: A4 portrait; margin: 15mm; }
+                body {
+                    font-family: 'Times New Roman', Times, serif;
+                    color: #000;
+                    margin: 0;
+                    padding: 0;
+                    font-size: 11pt;
+                    line-height: 1.4;
+                }
+                .header-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+                .title { text-align: center; font-size: 16pt; font-weight: bold; margin: 12px 0 4px 0; text-transform: uppercase; }
+                .subtitle { text-align: center; font-style: italic; font-size: 10pt; margin-bottom: 15px; }
+                .summary-table, .detail-table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+                .summary-table th, .summary-table td, .detail-table th, .detail-table td {
+                    border: 1px solid #333;
+                    padding: 6px 8px;
+                    font-size: 10pt;
+                }
+                .summary-table th, .detail-table th { background: #f2f2f2; text-align: center; font-weight: bold; }
+                .sign-table { width: 100%; margin-top: 30px; border-collapse: collapse; }
+                .sign-cell { text-align: center; vertical-align: top; width: 33.3%; }
+                .sign-space { height: 60px; }
+            </style>
+        </head>
+        <body>
+            <table class="header-table">
+                <tr>
+                    <td style="width: 55%; vertical-align: top;">
+                        <div style="font-weight: bold; font-size: 11pt;">BỆNH VIỆN ĐA KHOA QUỐC TẾ TNT</div>
+                        <div style="font-size: 9.5pt;">PHÒNG TÀI CHÍNH - KẾ TOÁN VIỆN PHÍ</div>
+                    </td>
+                    <td style="width: 45%; text-align: center; vertical-align: top;">
+                        <div style="font-weight: bold; font-size: 10pt;">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
+                        <div style="font-size: 9pt; font-style: italic;">Độc lập - Tự do - Hạnh phúc</div>
+                    </td>
+                </tr>
+            </table>
+
+            <div class="title">BIÊN BẢN ĐỐI SOÁT & KẾT CA THU VIỆN PHÍ</div>
+            <div class="subtitle">(Áp dụng đối chiếu tiền mặt két và giao dịch chuyển khoản VietQR/POS)</div>
+
+            <p style="margin: 6px 0;">
+                - <b>Thu ngân phụ trách:</b> ${cashierName}<br>
+                - <b>Ca làm việc:</b> ${shiftName}<br>
+                - <b>Thời gian kết sổ:</b> ${printedAt}
+            </p>
+
+            <div style="font-weight: bold; margin-top: 10px;">I. BẢNG TỔNG HỢP NGUỒN TIỀN THU ĐƯỢC:</div>
+            <table class="summary-table">
+                <thead>
+                    <tr>
+                        <th style="width: 8%;">STT</th>
+                        <th style="width: 42%;">Phương thức thanh toán</th>
+                        <th style="width: 20%;">Số lượng giao dịch</th>
+                        <th style="width: 30%;">Tổng số tiền (VNĐ)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td align="center">1</td>
+                        <td><b>Tiền mặt tại két (CASH)</b></td>
+                        <td align="center">${cashCount} lượt</td>
+                        <td align="right"><b>${formatCurrency(cashTotal)}</b></td>
+                    </tr>
+                    <tr>
+                        <td align="center">2</td>
+                        <td><b>Cổng PayOS (VietQR Napas 247)</b></td>
+                        <td align="center">${digitalCount} lượt</td>
+                        <td align="right"><b>${formatCurrency(digitalTotal)}</b></td>
+                    </tr>
+                    <tr>
+                        <td align="center">3</td>
+                        <td><b>Quẹt thẻ qua máy POS</b></td>
+                        <td align="center">${posCount} lượt</td>
+                        <td align="right"><b>${formatCurrency(posTotal)}</b></td>
+                    </tr>
+                    <tr style="background: #fafafa;">
+                        <td colspan="2" align="right"><b>TỔNG CỘNG THỰC THU TRONG CA:</b></td>
+                        <td align="center"><b>${totalTransactions} lượt</b></td>
+                        <td align="right"><b style="font-size: 11pt; color: #b91c1c;">${formatCurrency(totalCollected)}</b></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div style="font-weight: bold; margin-top: 15px;">II. DANH SÁCH BẢNG KÊ BIÊN LAI (RÚT GỌN):</div>
+            <table class="detail-table">
+                <thead>
+                    <tr>
+                        <th style="width: 6%;">STT</th>
+                        <th style="width: 22%;">Mã biên lai</th>
+                        <th style="width: 26%;">Bệnh nhân</th>
+                        <th style="width: 20%;">Phương thức</th>
+                        <th style="width: 26%;">Số tiền (VNĐ)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${transactions.slice(0, 25).map((t, i) => `
+                        <tr>
+                            <td align="center">${i + 1}</td>
+                            <td>${t.receiptCode || t.billId || '---'}</td>
+                            <td>${t.patientName || 'Khách hàng'}</td>
+                            <td align="center">${t.paymentMethod === 'CASH' ? 'Tiền mặt' : (t.paymentMethod === 'POS' ? 'Thẻ POS' : 'VietQR')}</td>
+                            <td align="right">${formatCurrency(t.totalAmount || t.amount || 0)}</td>
+                        </tr>
+                    `).join('')}
+                    ${transactions.length > 25 ? `
+                        <tr>
+                            <td colspan="5" align="center" style="font-style: italic; color: #555;">
+                                ... Và còn ${transactions.length - 25} giao dịch khác được lưu trong hệ thống HIS.
+                            </td>
+                        </tr>
+                    ` : ''}
+                </tbody>
+            </table>
+
+            <table class="sign-table">
+                <tr>
+                    <td class="sign-cell">
+                        <b>NGƯỜI NỘP TIỀN (THU NGÂN)</b><br>
+                        <i>(Ký và ghi rõ họ tên)</i>
+                        <div class="sign-space"></div>
+                        <b>${cashierName}</b>
+                    </td>
+                    <td class="sign-cell">
+                        <b>KẾ TOÁN VIỆN PHÍ</b><br>
+                        <i>(Ký và ghi rõ họ tên)</i>
+                        <div class="sign-space"></div>
+                        ..........................................
+                    </td>
+                    <td class="sign-cell">
+                        <b>TRƯỞNG PHÒNG TÀI CHÍNH</b><br>
+                        <i>(Ký và ghi rõ họ tên)</i>
+                        <div class="sign-space"></div>
+                        ..........................................
+                    </td>
+                </tr>
+            </table>
+
+            <script>
+                window.onload = function() {
+                    window.print();
+                    window.onafterprint = function() { window.close(); };
+                };
+            </script>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+}
+
+/**
+ * In Phiếu Cấp Phát Thuốc / Hướng Dẫn Sử Dụng Thuốc (Khổ A5 Chuẩn BHYT / Bộ Y Tế)
+ */
+export function printDispenseSlip(data) {
+    if (!data) return;
+
+    const dispenseCode = data.dispenseCode || "DISP-" + Math.floor(100000 + Math.random() * 900000);
+    const prescriptionCode = data.prescriptionCode || "---";
+    const patientName = data.patientName || "Khách hàng";
+    const patientPhone = data.patientPhone || "---";
+    const bookingCode = data.bookingCode || "---";
+    const warehouseName = data.warehouseName || "Kho Ngoại Trú";
+    const dispensedByName = data.dispensedByName || "Dược sĩ cấp phát";
+    const dispensedAt = data.dispensedAt ? formatDateTime(data.dispensedAt) : formatDateTime(new Date().toISOString());
+    const totalAmount = Number(data.totalAmount || 0);
+    const notes = data.notes || "Uống thuốc đúng theo hướng dẫn, bảo quản nơi khô ráo thoáng mát.";
+    const items = data.items || [];
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+        alert("Vui lòng cho phép mở cửa sổ popup để in phiếu cấp phát thuốc!");
+        return;
+    }
+
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>Phiếu Xuất Thuốc - ${dispenseCode}</title>
+            <style>
+                @page { size: A5 portrait; margin: 8mm; }
+                body {
+                    font-family: 'Times New Roman', Times, serif;
+                    color: #000;
+                    background: #fff;
+                    margin: 0;
+                    padding: 0;
+                    font-size: 10.5pt;
+                    line-height: 1.35;
+                }
+                .header-table { width: 100%; margin-bottom: 8px; border-collapse: collapse; }
+                .header-left { width: 60%; vertical-align: top; }
+                .header-right { width: 40%; text-align: center; vertical-align: top; }
+                .title { text-align: center; font-size: 14pt; font-weight: bold; margin: 8px 0 2px 0; text-transform: uppercase; }
+                .subtitle { text-align: center; font-style: italic; font-size: 8.5pt; margin-bottom: 10px; }
+                .info-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+                .info-table td { padding: 2px 0; vertical-align: top; font-size: 10pt; }
+                .item-table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+                .item-table th, .item-table td { border: 1px solid #333; padding: 4px 5px; font-size: 9.5pt; }
+                .item-table th { background-color: #f2f2f2; text-align: center; font-weight: bold; }
+                .total-box { margin-top: 6px; font-weight: bold; font-size: 10.5pt; text-align: right; }
+                .sign-table { width: 100%; margin-top: 15px; border-collapse: collapse; }
+                .sign-cell { text-align: center; vertical-align: top; width: 50%; font-size: 10pt; }
+                .sign-space { height: 45px; }
+                .note-box { border: 1px dashed #666; padding: 6px; margin-top: 8px; font-size: 9pt; border-radius: 4px; }
+                @media print {
+                    .no-print { display: none !important; }
+                }
+            </style>
+        </head>
+        <body>
+            <table class="header-table">
+                <tr>
+                    <td class="header-left">
+                        <div style="font-weight: bold; font-size: 10.5pt;">BỆNH VIỆN ĐA KHOA QUỐC TẾ TNT</div>
+                        <div style="font-size: 8.5pt;">Khoa Dược - ${warehouseName}</div>
+                        <div style="font-size: 8.5pt;">Hotline Dược Lâm Sàng: 1900 8888</div>
+                    </td>
+                    <td class="header-right">
+                        <div style="font-size: 8.5pt;">Mã phiếu: <b>${dispenseCode}</b></div>
+                        <div style="font-size: 8.5pt;">Đơn thuốc: <b>${prescriptionCode}</b></div>
+                        <div style="font-size: 8pt; color: #555;">Mã khám: ${bookingCode}</div>
+                    </td>
+                </tr>
+            </table>
+
+            <div class="title">PHIẾU XUẤT THUỐC BỆNH NHÂN (FEFO)</div>
+            <div class="subtitle">(Kiểm nghiệm dược lâm sàng & Bàn giao thuốc ngoại trú)</div>
+
+            <table class="info-table">
+                <tr>
+                    <td style="width: 60%;">Họ và tên người bệnh: <b>${patientName}</b></td>
+                    <td style="width: 40%;">Điện thoại: <b>${patientPhone}</b></td>
+                </tr>
+                <tr>
+                    <td>Kho cấp phát: <b>${warehouseName}</b></td>
+                    <td>Thời gian xuất: ${dispensedAt}</td>
+                </tr>
+            </table>
+
+            <table class="item-table">
+                <thead>
+                    <tr>
+                        <th style="width: 6%;">STT</th>
+                        <th style="width: 32%;">Tên thuốc & Hoạt chất</th>
+                        <th style="width: 16%;">Số lô xuất</th>
+                        <th style="width: 14%;">Hạn dùng</th>
+                        <th style="width: 10%;">SL</th>
+                        <th style="width: 22%;">Hướng dẫn dùng</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${items.map((it, idx) => `
+                        <tr>
+                            <td align="center">${idx + 1}</td>
+                            <td><b>${it.medicineName || '---'}</b></td>
+                            <td align="center"><code>${it.batchNumber || '---'}</code></td>
+                            <td align="center">${it.expiryDate ? it.expiryDate : '---'}</td>
+                            <td align="center"><b>${it.quantityDispensed || it.quantity || 1}</b></td>
+                            <td style="font-size: 8.5pt;">${it.dosageInstruction || 'Uống theo đơn'}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+
+            ${totalAmount > 0 ? `
+                <div class="total-box">
+                    Tổng giá trị tiền thuốc: ${formatCurrency(totalAmount)}
+                </div>
+            ` : ''}
+
+            <div class="note-box">
+                <b>Lời dặn của Bác sĩ / Dược sĩ:</b> ${notes}<br>
+                <i>* Lưu ý: Kiểm tra kỹ tên thuốc, số lượng trước khi rời quầy. Bảo quản nơi thoáng mát (&lt; 30°C). Tái khám ngay nếu có dấu hiệu dị ứng bất thường.</i>
+            </div>
+
+            <table class="sign-table">
+                <tr>
+                    <td class="sign-cell">
+                        <b>NGƯỜI NHẬN THUỐC</b><br>
+                        <i>(Ký và ghi rõ họ tên)</i>
+                        <div class="sign-space"></div>
+                        <b>${patientName}</b>
+                    </td>
+                    <td class="sign-cell">
+                        <b>DƯỢC SĨ CẤP PHÁT</b><br>
+                        <i>(Ký và ghi rõ họ tên)</i>
+                        <div class="sign-space"></div>
+                        <b>${dispensedByName}</b>
+                    </td>
+                </tr>
+            </table>
+
+            <script>
+                window.onload = function() {
+                    window.print();
+                    window.onafterprint = function() { window.close(); };
+                };
+            </script>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+}
+
