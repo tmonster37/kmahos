@@ -220,34 +220,15 @@ export default function EhrAndGatewayPage() {
             {/* Header Tiêu Đề */}
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={2}>
                 <Box>
-                    <Box display="flex" alignItems="center" gap={1.5}>
-                        <Box
-                            sx={{
-                                width: 44,
-                                height: 44,
-                                borderRadius: "12px",
-                                background: "linear-gradient(135deg, #0284C7 0%, #0D9488 100%)",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                color: "white",
-                                boxShadow: "0 6px 16px rgba(2, 132, 199, 0.3)"
-                            }}
-                        >
-                            <HubIcon sx={{ fontSize: 26 }} />
-                        </Box>
-                        <Box>
-                            <Typography variant="h5" fontWeight="800" color="#1E293B">
-                                Cổng Tích Hợp LIS/RIS Gateway & EHR Concept Dictionary
-                            </Typography>
-                            <Typography variant="body2" color="#64748B">
-                                Kiến trúc Middleware tích hợp máy cận lâm sàng (Bahmni) & Bệnh án điện tử cấu trúc (OpenMRS Core & HAPI FHIR)
-                            </Typography>
-                        </Box>
-                    </Box>
+                    <Typography variant="h5" fontWeight={800} sx={{ color: "#0088D6", display: "flex", alignItems: "center", gap: 1 }}>
+                        <HubIcon sx={{ fontSize: 28, color: "#0088D6" }} /> Cổng Tích Hợp LIS/RIS Gateway & EHR Concept Dictionary
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: "#64748B", mt: 0.5 }}>
+                        Kiến trúc Middleware tích hợp máy cận lâm sàng & Bệnh án điện tử cấu trúc theo chuẩn OpenMRS & HAPI FHIR
+                    </Typography>
                 </Box>
 
-                <Stack direction="row" spacing={1.5}>
+                <Stack direction="row" spacing={1.5} flexWrap="wrap">
                     <Button
                         variant="outlined"
                         startIcon={<RefreshIcon />}
@@ -340,14 +321,36 @@ export default function EhrAndGatewayPage() {
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
-                                    {concepts.map((c) => (
-                                        <TableRow key={c.conceptId} hover>
-                                            <TableCell>
-                                                <Chip label={c.uuid} size="small" variant="outlined" sx={{ fontWeight: 800 }} />
+                                    {concepts.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={8} align="center" sx={{ py: 6, color: "#64748B" }}>
+                                                <MenuBookIcon sx={{ fontSize: 44, color: "#94A3B8", mb: 1 }} />
+                                                <Typography variant="subtitle1" fontWeight={700} sx={{ color: "#334155" }}>
+                                                    Chưa có Concept y tế nào trong từ điển
+                                                </Typography>
+                                                <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+                                                    Bấm "Thêm Concept Mới" để thiết lập chỉ số cận lâm sàng đầu tiên.
+                                                </Typography>
+                                                <Button
+                                                    variant="outlined"
+                                                    size="small"
+                                                    startIcon={<AddCircleIcon />}
+                                                    onClick={() => setOpenAddConcept(true)}
+                                                    sx={{ borderRadius: 2 }}
+                                                >
+                                                    Thêm Concept Mới
+                                                </Button>
                                             </TableCell>
-                                            <TableCell sx={{ fontWeight: 800, color: "#0284C7" }}>
-                                                {c.conceptName}
-                                            </TableCell>
+                                        </TableRow>
+                                    ) : (
+                                        concepts.map((c) => (
+                                            <TableRow key={c.conceptId} hover>
+                                                <TableCell>
+                                                    <Chip label={c.uuid} size="small" variant="outlined" sx={{ fontWeight: 800 }} />
+                                                </TableCell>
+                                                <TableCell sx={{ fontWeight: 800, color: "#0088D6" }}>
+                                                    {c.conceptName}
+                                                </TableCell>
                                             <TableCell>
                                                 <Chip
                                                     label={c.conceptClass}
@@ -366,7 +369,8 @@ export default function EhrAndGatewayPage() {
                                                 <Chip label="ACTIVE" size="small" color="success" sx={{ fontWeight: 800 }} />
                                             </TableCell>
                                         </TableRow>
-                                    ))}
+                                    ))
+                                )}
                                 </TableBody>
                             </Table>
                         </TableContainer>
@@ -549,8 +553,14 @@ POST /api/gateway/lis/results
                                 <TableBody>
                                     {worklist.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={7} align="center" sx={{ py: 3, color: "#64748B" }}>
-                                                Không có ca chụp nào đang chờ máy {selectedModality}.
+                                            <TableCell colSpan={7} align="center" sx={{ py: 6, color: "#64748B" }}>
+                                                <CameraAltIcon sx={{ fontSize: 44, color: "#94A3B8", mb: 1 }} />
+                                                <Typography variant="subtitle1" fontWeight={700} sx={{ color: "#334155" }}>
+                                                    Không có ca chụp nào đang chờ máy {selectedModality}
+                                                </Typography>
+                                                <Typography variant="body2" color="textSecondary">
+                                                    Danh sách MWL sẽ tự động cập nhật khi có bác sĩ lâm sàng chỉ định chụp cho người bệnh.
+                                                </Typography>
                                             </TableCell>
                                         </TableRow>
                                     ) : (

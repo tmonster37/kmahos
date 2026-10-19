@@ -20,6 +20,17 @@ import {
     IconButton,
     Alert,
     Tooltip,
+    Stack,
+    InputAdornment,
+    CircularProgress,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    ToggleButton,
+    ToggleButtonGroup
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
@@ -29,6 +40,11 @@ import PhoneIcon from "@mui/icons-material/Phone";
 import EmailIcon from "@mui/icons-material/Email";
 import BadgeIcon from "@mui/icons-material/Badge";
 import VerifiedIcon from "@mui/icons-material/Verified";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import SearchIcon from "@mui/icons-material/Search";
+import ViewListIcon from "@mui/icons-material/ViewList";
+import ViewModuleIcon from "@mui/icons-material/ViewModule";
+import FilterAltIcon from "@mui/icons-material/FilterAlt";
 import axiosInstance from "../../services/AxiosInstance";
 import { formatCurrency } from "../../utils/formatters";
 
@@ -57,13 +73,15 @@ export default function DoctorManagePage() {
     const [doctors, setDoctors] = useState([]);
     const [departments, setDepartments] = useState([]);
     const [selectedDeptFilter, setSelectedDeptFilter] = useState("ALL");
+    const [licenseFilter, setLicenseFilter] = useState("ALL"); // ALL, LICENSED, UNLICENSED
+    const [viewMode, setViewMode] = useState("table"); // "table" or "grid"
     const [openModal, setOpenModal] = useState(false);
     const [editingDoctorId, setEditingDoctorId] = useState(null);
     const [formData, setFormData] = useState(defaultForm);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
 
-    // === QUẢN LÝ CHỨNG CHỈ HÀNH NGHỀ (CCHN) BÁC SĨ (THÔNG TƯ BỘ Y TẾ) ===
+    // Quản lý CCHN
     const [openLicenseModal, setOpenLicenseModal] = useState(false);
     const [licenseForm, setLicenseForm] = useState({
         doctorId: "",
@@ -73,6 +91,11 @@ export default function DoctorManagePage() {
         licenseScope: ""
     });
     const [licenseLoading, setLicenseLoading] = useState(false);
+
+    // Tìm kiếm, feedback, xóa
+    const [searchKeyword, setSearchKeyword] = useState("");
+    const [feedback, setFeedback] = useState({ type: "", message: "" });
+    const [deleteConfirm, setDeleteConfirm] = useState({ open: false, doctor: null });
 
     const handleOpenLicense = (doc) => {
         setLicenseForm({
@@ -100,6 +123,7 @@ export default function DoctorManagePage() {
                 licenseScope: licenseForm.licenseScope?.trim() || ""
             });
             setOpenLicenseModal(false);
+            setFeedback({ type: "success", message: `Đã cập nhật CCHN cho bác sĩ [${licenseForm.doctorName}] thành công!` });
             loadData();
         } catch (err) {
             console.error("Lỗi cập nhật CCHN:", err);
@@ -110,15 +134,21 @@ export default function DoctorManagePage() {
     };
 
     const loadData = async () => {
+        setLoading(true);
         try {
             const [docRes, deptRes] = await Promise.all([
                 axiosInstance.get("/api/admin/doctors"),
                 axiosInstance.get("/api/departments"),
             ]);
-            if (docRes.data) setDoctors(docRes.data);
-            if (deptRes.data) setDepartments(deptRes.data);
+            const docList = Array.isArray(docRes?.data) ? docRes.data : (Array.isArray(docRes) ? docRes : []);
+            const deptList = Array.isArray(deptRes?.data) ? deptRes.data : (Array.isArray(deptRes) ? deptRes : []);
+            setDoctors(docList);
+            setDepartments(deptList);
         } catch (err) {
             console.error("Lỗi tải danh sách bác sĩ:", err);
+            setFeedback({ type: "error", message: "Không thể tải danh sách bác sĩ từ máy chủ." });
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -149,15 +179,17 @@ export default function DoctorManagePage() {
         setOpenModal(true);
     };
 
-    const handleDelete = async (doctorId, name) => {
-        if (!window.confirm(`Bạn có chắc chắn muốn xóa/vô hiệu hóa Bác sĩ "${name}" không?`)) {
-            return;
-        }
+    const handleConfirmDelete = async () => {
+        const doc = deleteConfirm.doctor;
+        if (!doc) return;
         try {
-            await axiosInstance.delete(`/api/admin/doctors/${doctorId}`);
+            await axiosInstance.delete(`/api/admin/doctors/${doc.doctorId}`);
+            setFeedback({ type: "success", message: `Đã vô hiệu hóa bác sĩ [${doc.fullName}] thành công!` });
+            setDeleteConfirm({ open: false, doctor: null });
             loadData();
         } catch (err) {
-            alert(err.message || "Lỗi xóa bác sĩ!");
+            setFeedback({ type: "error", message: err.message || "Lỗi xóa bác sĩ!" });
+            setDeleteConfirm({ open: false, doctor: null });
         }
     };
 
@@ -168,8 +200,10 @@ export default function DoctorManagePage() {
         try {
             if (editingDoctorId) {
                 await axiosInstance.put(`/api/admin/doctors/${editingDoctorId}`, formData);
+                setFeedback({ type: "success", message: `Đã cập nhật thông tin bác sĩ [${formData.fullName}] thành công!` });
             } else {
                 await axiosInstance.post("/api/admin/doctors", formData);
+                setFeedback({ type: "success", message: `Đã thêm mới bác sĩ [${formData.fullName}] thành công!` });
             }
             setOpenModal(false);
             loadData();
@@ -180,142 +214,438 @@ export default function DoctorManagePage() {
         }
     };
 
-    const filteredDoctors = selectedDeptFilter === "ALL"
-        ? doctors
-        : doctors.filter((d) => d.departmentId === Number(selectedDeptFilter));
+    const filteredDoctors = doctors.filter((d) => {
+        const matchesDept = selectedDeptFilter === "ALL" || d.departmentId === Number(selectedDeptFilter);
+        const matchesLicense = licenseFilter === "ALL" ||
+            (licenseFilter === "LICENSED" && Boolean(d.doctorLicense && d.doctorLicense.trim())) ||
+            (licenseFilter === "UNLICENSED" && (!d.doctorLicense || !d.doctorLicense.trim()));
+
+        const kw = searchKeyword.toLowerCase().trim();
+        const matchesKw = !kw ||
+            (d.fullName && d.fullName.toLowerCase().includes(kw)) ||
+            (d.phoneNumber && d.phoneNumber.includes(kw)) ||
+            (d.doctorLicense && d.doctorLicense.toLowerCase().includes(kw)) ||
+            (d.departmentName && d.departmentName.toLowerCase().includes(kw));
+
+        return matchesDept && matchesLicense && matchesKw;
+    });
+
+    const totalDocs = doctors.length;
+    const licensedDocs = doctors.filter(d => Boolean(d.doctorLicense && d.doctorLicense.trim())).length;
+    const unlicensedDocs = totalDocs - licensedDocs;
 
     return (
-        <Container maxWidth="xl">
-            {/* Header */}
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Container maxWidth="xl" sx={{ py: 3 }}>
+            {/* 1. Header Tinh Gọn */}
+            <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2} mb={2.5}>
                 <Box>
-                    <Typography variant="h5" fontWeight="bold" color="primary.main">
-                        🩺 Quản Lý Đội Ngũ Y Bác Sĩ
-                    </Typography>
-                    <Typography variant="body2" color="textSecondary">
-                        Danh sách chuyên gia, bác sĩ chuyên khoa, học vị và phân khoa trực thuộc
+                    <Box display="flex" alignItems="center" gap={1.5}>
+                        <Typography variant="h5" fontWeight="800" color="#0F172A" sx={{ letterSpacing: "-0.5px" }}>
+                            Quản Lý Bác Sĩ
+                        </Typography>
+                        <Chip
+                            label={`${totalDocs} bác sĩ`}
+                            size="small"
+                            sx={{ fontWeight: 700, bgcolor: "#EBF6FE", color: "#0088D6" }}
+                        />
+                    </Box>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.3 }}>
+                        Quản lý đội ngũ bác sĩ chuyên khoa, học vị, giá khám và chứng chỉ hành nghề y tế (CCHN)
                     </Typography>
                 </Box>
-                <Button variant="contained" color="primary" startIcon={<AddIcon />} onClick={handleOpenAdd} sx={{ py: 1.2, px: 3, borderRadius: 2 }}>
-                    Thêm Bác Sĩ Mới
-                </Button>
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                    <Button
+                        variant="outlined"
+                        size="medium"
+                        startIcon={<RefreshIcon />}
+                        onClick={loadData}
+                        disabled={loading}
+                        sx={{ borderRadius: 2, fontWeight: 600, textTransform: "none", color: "#475569", borderColor: "#CBD5E1" }}
+                    >
+                        Làm mới
+                    </Button>
+                    <Button
+                        variant="contained"
+                        size="medium"
+                        startIcon={<AddIcon />}
+                        onClick={handleOpenAdd}
+                        sx={{
+                            borderRadius: 2,
+                            fontWeight: 700,
+                            textTransform: "none",
+                            bgcolor: "#0088D6",
+                            "&:hover": { bgcolor: "#006FA8" }
+                        }}
+                    >
+                        + Thêm Bác Sĩ Mới
+                    </Button>
+                </Stack>
             </Box>
 
-            {/* Bộ lọc theo Chuyên khoa */}
-            <Box display="flex" gap={1.5} mb={3} flexWrap="wrap">
-                <Chip
-                    label="Tất cả Chuyên khoa"
-                    color={selectedDeptFilter === "ALL" ? "primary" : "default"}
-                    onClick={() => setSelectedDeptFilter("ALL")}
-                    clickable
-                />
-                {departments.map((dept) => (
-                    <Chip
-                        key={dept.departmentId}
-                        label={dept.departmentName}
-                        color={selectedDeptFilter === dept.departmentId ? "primary" : "default"}
-                        onClick={() => setSelectedDeptFilter(dept.departmentId)}
-                        clickable
-                    />
-                ))}
-            </Box>
+            {/* Thông báo Feedback */}
+            {feedback.message && (
+                <Alert
+                    severity={feedback.type || "info"}
+                    sx={{ mb: 2.5, borderRadius: 2 }}
+                    onClose={() => setFeedback({ type: "", message: "" })}
+                >
+                    {feedback.message}
+                </Alert>
+            )}
 
-            {/* Danh sách Bác sĩ (Cards Grid) */}
-            <Grid container spacing={3}>
-                {filteredDoctors.map((doc) => (
-                    <Grid item xs={12} sm={6} md={4} key={doc.doctorId}>
-                        <Card elevation={2} sx={{ height: "100%", borderRadius: 3, display: "flex", flexDirection: "column", transition: "0.3s", "&:hover": { transform: "translateY(-4px)", boxShadow: 4 } }}>
-                            <CardContent sx={{ flexGrow: 1 }}>
-                                <Box display="flex" alignItems="center" gap={2} mb={2}>
-                                    <Avatar sx={{ width: 56, height: 56, bgcolor: "primary.main", fontWeight: "bold" }}>
-                                        {doc.fullName ? doc.fullName.charAt(0) : "BS"}
-                                    </Avatar>
-                                    <Box>
-                                        <Typography variant="subtitle1" fontWeight="bold" color="primary.main">
-                                            {doc.fullName}
+            {/* 2. Thanh lọc và thống kê tóm tắt 1 dòng siêu gọn */}
+            <Paper
+                elevation={0}
+                sx={{
+                    p: 2,
+                    mb: 2.5,
+                    borderRadius: 2.5,
+                    border: "1px solid #E2E8F0",
+                    bgcolor: "#FFFFFF"
+                }}
+            >
+                <Grid container spacing={2} alignItems="center">
+                    {/* Ô Tìm kiếm */}
+                    <Grid item xs={12} sm={4} md={4}>
+                        <TextField
+                            fullWidth
+                            size="small"
+                            placeholder="Tìm kiếm theo Tên, SĐT, CCHN..."
+                            value={searchKeyword}
+                            onChange={(e) => setSearchKeyword(e.target.value)}
+                            InputProps={{
+                                startAdornment: (
+                                    <InputAdornment position="start">
+                                        <SearchIcon sx={{ color: "#94A3B8", fontSize: 20 }} />
+                                    </InputAdornment>
+                                ),
+                                sx: { borderRadius: 2, bgcolor: "#F8FAFC" }
+                            }}
+                        />
+                    </Grid>
+
+                    {/* Dropdown Chuyên khoa */}
+                    <Grid item xs={6} sm={3} md={3}>
+                        <TextField
+                            fullWidth
+                            select
+                            size="small"
+                            label="Chuyên khoa"
+                            value={selectedDeptFilter}
+                            onChange={(e) => setSelectedDeptFilter(e.target.value)}
+                            sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+                        >
+                            <MenuItem value="ALL">Tất cả chuyên khoa ({totalDocs})</MenuItem>
+                            {departments.map((d) => (
+                                <MenuItem key={d.departmentId} value={d.departmentId}>
+                                    {d.departmentName}
+                                </MenuItem>
+                            ))}
+                        </TextField>
+                    </Grid>
+
+                    {/* Dropdown Chứng chỉ CCHN */}
+                    <Grid item xs={6} sm={2.5} md={2.5}>
+                        <TextField
+                            fullWidth
+                            select
+                            size="small"
+                            label="Chứng chỉ CCHN"
+                            value={licenseFilter}
+                            onChange={(e) => setLicenseFilter(e.target.value)}
+                            sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+                        >
+                            <MenuItem value="ALL">Tất cả CCHN</MenuItem>
+                            <MenuItem value="LICENSED">Đã có CCHN ({licensedDocs})</MenuItem>
+                            <MenuItem value="UNLICENSED">Chờ cấp ({unlicensedDocs})</MenuItem>
+                        </TextField>
+                    </Grid>
+
+                    {/* Nút chuyển chế độ xem: Bảng (Table) / Thẻ (Grid) */}
+                    <Grid item xs={12} sm={2.5} md={2.5} sx={{ display: "flex", justifyContent: { xs: "flex-start", sm: "flex-end" }, alignItems: "center", gap: 1 }}>
+                        <ToggleButtonGroup
+                            value={viewMode}
+                            exclusive
+                            size="small"
+                            onChange={(_, newMode) => newMode && setViewMode(newMode)}
+                            sx={{ borderRadius: 2, bgcolor: "#F8FAFC" }}
+                        >
+                            <ToggleButton value="table" sx={{ px: 1.5, py: 0.5, textTransform: "none", fontWeight: 600 }}>
+                                <ViewListIcon sx={{ fontSize: 18, mr: 0.5 }} /> Bảng
+                            </ToggleButton>
+                            <ToggleButton value="grid" sx={{ px: 1.5, py: 0.5, textTransform: "none", fontWeight: 600 }}>
+                                <ViewModuleIcon sx={{ fontSize: 18, mr: 0.5 }} /> Thẻ
+                            </ToggleButton>
+                        </ToggleButtonGroup>
+                    </Grid>
+                </Grid>
+
+                {/* Thanh tóm tắt trạng thái nhỏ gọn bên dưới */}
+                <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1} mt={1.5} pt={1.5} sx={{ borderTop: "1px dashed #E2E8F0" }}>
+                    <Typography variant="body2" color="text.secondary">
+                        Hiển thị <b>{filteredDoctors.length}</b> / {totalDocs} bác sĩ
+                    </Typography>
+                    <Box display="flex" gap={2}>
+                        <Typography variant="caption" sx={{ color: "#16A34A", fontWeight: 600 }}>
+                            ● Đã có CCHN: <b>{licensedDocs}</b>
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "#D97706", fontWeight: 600 }}>
+                            ● Chờ bổ sung: <b>{unlicensedDocs}</b>
+                        </Typography>
+                    </Box>
+                </Box>
+            </Paper>
+
+            {/* 3. Nội dung Danh Sách: DẠNG BẢNG (MẶC ĐỊNH - ĐƠN GIẢN, RÕ RÀNG) */}
+            {loading ? (
+                <Box textAlign="center" py={8}>
+                    <CircularProgress size={32} />
+                    <Typography variant="body2" color="text.secondary" mt={1}>
+                        Đang đồng bộ dữ liệu bác sĩ...
+                    </Typography>
+                </Box>
+            ) : filteredDoctors.length === 0 ? (
+                <Paper elevation={0} sx={{ p: 5, borderRadius: 2.5, border: "1px dashed #CBD5E1", textAlign: "center" }}>
+                    <Typography variant="body1" color="text.secondary" fontWeight={600}>
+                        Không tìm thấy bác sĩ nào phù hợp với bộ lọc hiện tại.
+                    </Typography>
+                    {(searchKeyword || selectedDeptFilter !== "ALL" || licenseFilter !== "ALL") && (
+                        <Button
+                            size="small"
+                            onClick={() => { setSearchKeyword(""); setSelectedDeptFilter("ALL"); setLicenseFilter("ALL"); }}
+                            sx={{ mt: 1, textTransform: "none", fontWeight: 700 }}
+                        >
+                            Đặt lại bộ lọc
+                        </Button>
+                    )}
+                </Paper>
+            ) : viewMode === "table" ? (
+                /* === VIEW 1: DẠNG BẢNG CHUẨN QUẢN TRỊ === */
+                <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 2.5, border: "1px solid #E2E8F0" }}>
+                    <Table sx={{ minWidth: 750 }}>
+                        <TableHead sx={{ bgcolor: "#F8FAFC" }}>
+                            <TableRow>
+                                <TableCell sx={{ fontWeight: 700, color: "#475569", width: 50 }}>#</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: "#475569" }}>Bác Sĩ & Học Vị</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: "#475569" }}>Chuyên Khoa</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: "#475569" }}>Chứng Chỉ Hành Nghề (CCHN)</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: "#475569" }}>Liên Hệ</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: "#475569" }}>Giá Khám</TableCell>
+                                <TableCell align="right" sx={{ fontWeight: 700, color: "#475569", pr: 3 }}>Thao Tác</TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
+                            {filteredDoctors.map((doc, idx) => (
+                                <TableRow
+                                    key={doc.doctorId}
+                                    hover
+                                    sx={{ "&:last-child td, &:last-child th": { border: 0 } }}
+                                >
+                                    <TableCell sx={{ color: "text.secondary", fontWeight: 600 }}>
+                                        {idx + 1}
+                                    </TableCell>
+                                    <TableCell>
+                                        <Box display="flex" alignItems="center" gap={1.5}>
+                                            <Avatar sx={{ width: 38, height: 38, bgcolor: "#EBF6FE", color: "#0088D6", fontWeight: 700, fontSize: "0.9rem" }}>
+                                                {doc.fullName ? doc.fullName.charAt(0) : "BS"}
+                                            </Avatar>
+                                            <Box>
+                                                <Typography variant="subtitle2" fontWeight={700} color="#0F172A">
+                                                    {doc.fullName}
+                                                </Typography>
+                                                <Chip
+                                                    label={doc.degree || "BS"}
+                                                    size="small"
+                                                    sx={{ height: 20, fontSize: "0.7rem", fontWeight: 700, bgcolor: "#F1F5F9", color: "#475569", mt: 0.3 }}
+                                                />
+                                            </Box>
+                                        </Box>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Chip
+                                            label={doc.departmentName || "Khoa khám"}
+                                            size="small"
+                                            variant="outlined"
+                                            sx={{ fontWeight: 600, color: "#0088D6", borderColor: "#BAE6FD", bgcolor: "#F0F9FF" }}
+                                        />
+                                    </TableCell>
+                                    <TableCell>
+                                        {doc.doctorLicense ? (
+                                            <Box display="flex" alignItems="center" gap={0.5}>
+                                                <VerifiedIcon sx={{ color: "#16A34A", fontSize: 16 }} />
+                                                <Typography variant="body2" fontWeight={600} color="#15803D">
+                                                    {doc.doctorLicense}
+                                                </Typography>
+                                            </Box>
+                                        ) : (
+                                            <Chip
+                                                label="Chưa cấp CCHN"
+                                                size="small"
+                                                sx={{ height: 22, fontSize: "0.75rem", fontWeight: 600, bgcolor: "#FFFBEB", color: "#B45309" }}
+                                            />
+                                        )}
+                                    </TableCell>
+                                    <TableCell>
+                                        <Typography variant="body2" fontWeight={500} color="#334155">
+                                            {doc.phoneNumber}
                                         </Typography>
-                                        <Box display="flex" flexWrap="wrap" gap={0.5} mt={0.5}>
-                                            <Chip label={doc.degree} color="secondary" size="small" sx={{ fontWeight: "bold" }} />
-                                            <Chip label={doc.departmentName} size="small" variant="outlined" />
-                                            {doc.doctorLicense ? (
-                                                <Chip
-                                                    icon={<VerifiedIcon style={{ fontSize: 14 }} />}
-                                                    label={doc.doctorLicense}
-                                                    color="success"
+                                        {doc.email && (
+                                            <Typography variant="caption" color="text.secondary" display="block">
+                                                {doc.email}
+                                            </Typography>
+                                        )}
+                                    </TableCell>
+                                    <TableCell>
+                                        <Typography variant="subtitle2" fontWeight={700} color="#0088D6">
+                                            {formatCurrency(doc.consultationFee)}
+                                        </Typography>
+                                    </TableCell>
+                                    <TableCell align="right" sx={{ pr: 2 }}>
+                                        <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                                            <Tooltip title="Cấp / Sửa CCHN Bộ Y Tế">
+                                                <IconButton
                                                     size="small"
-                                                    sx={{ fontWeight: "bold", fontSize: "0.7rem" }}
-                                                />
-                                            ) : (
-                                                <Chip
-                                                    label="Chưa có CCHN"
-                                                    color="warning"
+                                                    onClick={() => handleOpenLicense(doc)}
+                                                    sx={{ color: "#0088D6", bgcolor: "#EBF6FE", "&:hover": { bgcolor: "#D7EEFD" } }}
+                                                >
+                                                    <BadgeIcon fontSize="small" />
+                                                </IconButton>
+                                            </Tooltip>
+                                            <Tooltip title="Chỉnh sửa thông tin">
+                                                <IconButton
                                                     size="small"
-                                                    sx={{ fontWeight: "bold", fontSize: "0.7rem" }}
-                                                />
-                                            )}
+                                                    onClick={() => handleOpenEdit(doc)}
+                                                    sx={{ color: "#16A34A", bgcolor: "#F0FDF4", "&:hover": { bgcolor: "#DCFCE7" } }}
+                                                >
+                                                    <EditIcon fontSize="small" />
+                                                </IconButton>
+                                            </Tooltip>
+                                            <Tooltip title="Vô hiệu hóa">
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={() => setDeleteConfirm({ open: true, doctor: doc })}
+                                                    sx={{ color: "#DC2626", bgcolor: "#FEF2F2", "&:hover": { bgcolor: "#FEE2E2" } }}
+                                                >
+                                                    <DeleteIcon fontSize="small" />
+                                                </IconButton>
+                                            </Tooltip>
+                                        </Stack>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
+            ) : (
+                /* === VIEW 2: DẠNG THẺ (GRID) GỌN GÀNG === */
+                <Grid container spacing={2}>
+                    {filteredDoctors.map((doc) => (
+                        <Grid item xs={12} sm={6} md={4} key={doc.doctorId}>
+                            <Card
+                                elevation={0}
+                                sx={{
+                                    height: "100%",
+                                    borderRadius: 2.5,
+                                    border: "1px solid #E2E8F0",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    transition: "all 0.15s ease",
+                                    "&:hover": { borderColor: "#0088D6", boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }
+                                }}
+                            >
+                                <CardContent sx={{ flexGrow: 1, p: 2 }}>
+                                    <Box display="flex" alignItems="center" gap={1.5} mb={1.2}>
+                                        <Avatar sx={{ width: 44, height: 44, bgcolor: "#EBF6FE", color: "#0088D6", fontWeight: 700 }}>
+                                            {doc.fullName ? doc.fullName.charAt(0) : "BS"}
+                                        </Avatar>
+                                        <Box flexGrow={1} minWidth={0}>
+                                            <Typography variant="subtitle2" fontWeight={800} noWrap color="#0F172A">
+                                                {doc.fullName}
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary" display="block">
+                                                {doc.degree} • {doc.departmentName}
+                                            </Typography>
                                         </Box>
                                     </Box>
-                                </Box>
 
-                                <Typography variant="body2" color="textSecondary" sx={{ mb: 1.5, minHeight: 40, fontStyle: "italic" }}>
-                                    "{doc.biography || "Chuyên gia giàu kinh nghiệm tại Bệnh viện TNT."}"
-                                </Typography>
-
-                                <Box display="flex" alignItems="center" gap={1} mb={0.5}>
-                                    <PhoneIcon fontSize="small" color="action" />
-                                    <Typography variant="body2">{doc.phoneNumber}</Typography>
-                                </Box>
-                                {doc.email && (
-                                    <Box display="flex" alignItems="center" gap={1} mb={1}>
-                                        <EmailIcon fontSize="small" color="action" />
-                                        <Typography variant="body2">{doc.email}</Typography>
+                                    <Box mb={1}>
+                                        {doc.doctorLicense ? (
+                                            <Chip
+                                                icon={<VerifiedIcon style={{ fontSize: 13 }} />}
+                                                label={`CCHN: ${doc.doctorLicense}`}
+                                                size="small"
+                                                color="success"
+                                                sx={{ height: 22, fontSize: "0.725rem", fontWeight: 600 }}
+                                            />
+                                        ) : (
+                                            <Chip
+                                                label="Chưa cấp CCHN"
+                                                size="small"
+                                                sx={{ height: 22, fontSize: "0.725rem", bgcolor: "#FFFBEB", color: "#B45309", fontWeight: 600 }}
+                                            />
+                                        )}
                                     </Box>
-                                )}
 
-                                <Box display="flex" justifyContent="space-between" alignItems="center" mt={2} pt={1} sx={{ borderTop: "1px dashed #E0E0E0" }}>
-                                    <Box>
-                                        <Typography variant="caption" color="textSecondary">Giá khám</Typography>
-                                        <Typography variant="subtitle2" fontWeight="bold" color="primary.main">
+                                    <Box display="flex" justifyContent="space-between" alignItems="center" mt={1.5} pt={1} sx={{ borderTop: "1px dashed #E2E8F0" }}>
+                                        <Typography variant="caption" color="text.secondary">{doc.phoneNumber}</Typography>
+                                        <Typography variant="subtitle2" fontWeight={700} color="#0088D6">
                                             {formatCurrency(doc.consultationFee)}
                                         </Typography>
                                     </Box>
-                                    <Box textAlign="right">
-                                        <Rating value={doc.ratingAverage || 5} precision={0.5} size="small" readOnly />
-                                    </Box>
-                                </Box>
-                            </CardContent>
+                                </CardContent>
 
-                            <Box display="flex" justifyContent="flex-end" p={1.5} bgcolor="#F9FBFD" sx={{ borderTop: "1px solid #ECEFF1", gap: 0.5 }}>
-                                <Tooltip title="Cập nhật Chứng chỉ hành nghề (CCHN)">
-                                    <IconButton size="small" color="secondary" onClick={() => handleOpenLicense(doc)}>
-                                        <BadgeIcon fontSize="small" />
-                                    </IconButton>
-                                </Tooltip>
-                                <Tooltip title="Chỉnh sửa thông tin">
-                                    <IconButton size="small" color="primary" onClick={() => handleOpenEdit(doc)}>
-                                        <EditIcon fontSize="small" />
-                                    </IconButton>
-                                </Tooltip>
-                                <Tooltip title="Xóa bác sĩ">
-                                    <IconButton size="small" color="error" onClick={() => handleDelete(doc.doctorId, doc.fullName)}>
-                                        <DeleteIcon fontSize="small" />
-                                    </IconButton>
-                                </Tooltip>
-                            </Box>
-                        </Card>
-                    </Grid>
-                ))}
-            </Grid>
+                                <Box display="flex" justifyContent="flex-end" p={1} bgcolor="#F8FAFC" sx={{ borderTop: "1px solid #E2E8F0", gap: 0.5 }}>
+                                    <Tooltip title="Cấp CCHN">
+                                        <IconButton size="small" onClick={() => handleOpenLicense(doc)} sx={{ color: "#0088D6" }}>
+                                            <BadgeIcon fontSize="small" />
+                                        </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Sửa">
+                                        <IconButton size="small" onClick={() => handleOpenEdit(doc)} sx={{ color: "#16A34A" }}>
+                                            <EditIcon fontSize="small" />
+                                        </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Xóa">
+                                        <IconButton size="small" onClick={() => setDeleteConfirm({ open: true, doctor: doc })} sx={{ color: "#DC2626" }}>
+                                            <DeleteIcon fontSize="small" />
+                                        </IconButton>
+                                    </Tooltip>
+                                </Box>
+                            </Card>
+                        </Grid>
+                    ))}
+                </Grid>
+            )}
+
+            {/* Dialog xác nhận xóa bác sĩ */}
+            <Dialog open={deleteConfirm.open} onClose={() => setDeleteConfirm({ open: false, doctor: null })} PaperProps={{ sx: { borderRadius: 3 } }}>
+                <DialogTitle sx={{ fontWeight: 800, color: "#DC2626" }}>
+                    Xác nhận vô hiệu hóa bác sĩ?
+                </DialogTitle>
+                <DialogContent>
+                    <Typography variant="body1">
+                        Bạn có chắc chắn muốn vô hiệu hóa bác sĩ <b>{deleteConfirm.doctor?.fullName}</b> khỏi danh sách hoạt động không?
+                    </Typography>
+                </DialogContent>
+                <DialogActions sx={{ p: 2 }}>
+                    <Button onClick={() => setDeleteConfirm({ open: false, doctor: null })} sx={{ textTransform: "none", borderRadius: 2 }}>
+                        Hủy bỏ
+                    </Button>
+                    <Button onClick={handleConfirmDelete} color="error" variant="contained" sx={{ textTransform: "none", borderRadius: 2, fontWeight: 700 }}>
+                        Vô hiệu hóa
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
             {/* Modal Thêm / Sửa Bác sĩ */}
-            <Dialog open={openModal} onClose={() => setOpenModal(false)} maxWidth="sm" fullWidth>
-                <DialogTitle fontWeight="bold" color="primary.main">
-                    {editingDoctorId ? "✏️ Cập Nhật Thông Tin Bác Sĩ" : "➕ Thêm Bác Sĩ Mới"}
+            <Dialog open={openModal} onClose={() => setOpenModal(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+                <DialogTitle fontWeight="800" sx={{ borderBottom: "1px solid #E2E8F0", color: "#0088D6" }}>
+                    {editingDoctorId ? "Cập Nhật Thông Tin Bác Sĩ" : "Thêm Bác Sĩ Mới"}
                 </DialogTitle>
-                <DialogContent dividers>
-                    {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+                <DialogContent sx={{ pt: 2.5 }}>
+                    {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
 
-                    <Box component="form" onSubmit={handleSubmit}>
+                    <Box component="form" onSubmit={handleSubmit} id="doctor-form">
                         <Grid container spacing={2}>
                             <Grid item xs={12}>
                                 <TextField
@@ -430,18 +760,18 @@ export default function DoctorManagePage() {
                 </DialogActions>
             </Dialog>
             {/* Modal Cập Nhật Chứng Chỉ Hành Nghề (CCHN) Bác Sĩ */}
-            <Dialog open={openLicenseModal} onClose={() => setOpenLicenseModal(false)} maxWidth="sm" fullWidth>
-                <DialogTitle fontWeight="bold" color="primary.main">
-                    📜 Cập Nhật Chứng Chỉ Hành Nghề (CCHN) Bác Sĩ
+            <Dialog open={openLicenseModal} onClose={() => setOpenLicenseModal(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+                <DialogTitle fontWeight="800" sx={{ borderBottom: "1px solid #E2E8F0", color: "#0088D6" }}>
+                    Cập Nhật Chứng Chỉ Hành Nghề (CCHN) Bác Sĩ
                 </DialogTitle>
-                <DialogContent dividers>
-                    {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-                    <Box sx={{ mb: 2, p: 1.5, bgcolor: "#E3F2FD", borderRadius: 2 }}>
-                        <Typography variant="body2" color="primary.dark">
-                            <strong>Bác sĩ:</strong> {licenseForm.doctorName} (Mã BS #{licenseForm.doctorId})
+                <DialogContent sx={{ pt: 2.5 }}>
+                    {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
+                    <Box sx={{ mb: 2.5, p: 2, bgcolor: "#EBF6FE", borderRadius: 2.5, border: "1px solid #BAE6FD" }}>
+                        <Typography variant="body2" color="#0062A3" fontWeight={700}>
+                            Bác sĩ: {licenseForm.doctorName} (Mã BS #{licenseForm.doctorId})
                         </Typography>
-                        <Typography variant="caption" color="textSecondary">
-                            Căn cứ Luật Khám bệnh, chữa bệnh & Thông tư BYT về quản lý thông tin nhân viên y tế
+                        <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
+                            Căn cứ Luật Khám bệnh, chữa bệnh & Thông tư Bộ Y Tế về chuẩn hóa hồ sơ nhân viên y tế
                         </Typography>
                     </Box>
 
@@ -481,9 +811,9 @@ export default function DoctorManagePage() {
                         </Grid>
                     </Grid>
                 </DialogContent>
-                <DialogActions sx={{ p: 2 }}>
-                    <Button onClick={() => setOpenLicenseModal(false)}>Hủy</Button>
-                    <Button variant="contained" color="secondary" onClick={handleSaveLicense} disabled={licenseLoading}>
+                <DialogActions sx={{ p: 2, borderTop: "1px solid #E2E8F0" }}>
+                    <Button onClick={() => setOpenLicenseModal(false)} sx={{ textTransform: "none", borderRadius: 2 }}>Hủy bỏ</Button>
+                    <Button variant="contained" onClick={handleSaveLicense} disabled={licenseLoading} sx={{ textTransform: "none", borderRadius: 2, fontWeight: 700 }}>
                         {licenseLoading ? "Đang lưu..." : "Lưu Chứng Chỉ"}
                     </Button>
                 </DialogActions>

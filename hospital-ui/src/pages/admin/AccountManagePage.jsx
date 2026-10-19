@@ -311,15 +311,15 @@ export default function AccountManagePage() {
     };
 
     return (
-        <Container maxWidth="xl" sx={{ py: 1 }}>
+        <Container maxWidth="xl" sx={{ py: 2 }}>
             {/* 1. Header Title & Stats Cards */}
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={2}>
                 <Box>
-                    <Typography variant="h5" fontWeight="bold" color="primary.main">
-                        🔐 Quản Lý Tài Khoản & Bảo Mật Mật Khẩu
+                    <Typography variant="h5" fontWeight={800} sx={{ color: "#0088D6", display: "flex", alignItems: "center", gap: 1 }}>
+                        <LockIcon sx={{ fontSize: 28, color: "#0088D6" }} /> Quản Lý Tài Khoản & Phân Quyền Hệ Thống
                     </Typography>
-                    <Typography variant="body2" color="textSecondary">
-                        Quản lý toàn bộ tài khoản người dùng, phân quyền vai trò và đặt lại mật khẩu hệ thống
+                    <Typography variant="body2" sx={{ color: "#64748B", mt: 0.5 }}>
+                        Quản lý toàn bộ tài khoản nhân sự bệnh viện, phân quyền vai trò chuyên môn và thiết lập bảo mật
                     </Typography>
                 </Box>
 
@@ -456,17 +456,17 @@ export default function AccountManagePage() {
             </Paper>
 
             {/* 3. Bảng danh sách Tài khoản */}
-            <TableContainer component={Paper} elevation={1} sx={{ borderRadius: 3, overflow: "hidden" }}>
+            <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 3, border: "1px solid #E2E8F0", overflow: "hidden" }}>
                 <Table>
                     <TableHead sx={{ bgcolor: "#F8FAFC" }}>
                         <TableRow>
-                            <TableCell><b>Tài Khoản / Họ Tên</b></TableCell>
-                            <TableCell><b>Số Điện Thoại</b></TableCell>
-                            <TableCell><b>Email Liên Hệ</b></TableCell>
-                            <TableCell><b>Vai Trò Phân Quyền</b></TableCell>
-                            <TableCell align="center"><b>Trạng Thái</b></TableCell>
-                            <TableCell align="center"><b>Ngày Tạo</b></TableCell>
-                            <TableCell align="center"><b>Thao Tác Quản Trị</b></TableCell>
+                            <TableCell sx={{ fontWeight: 700, color: "#334155", py: 1.5, fontSize: "0.85rem", borderBottom: "1px solid #E2E8F0" }}>Tài Khoản / Họ Tên</TableCell>
+                            <TableCell sx={{ fontWeight: 700, color: "#334155", py: 1.5, fontSize: "0.85rem", borderBottom: "1px solid #E2E8F0" }}>Số Điện Thoại</TableCell>
+                            <TableCell sx={{ fontWeight: 700, color: "#334155", py: 1.5, fontSize: "0.85rem", borderBottom: "1px solid #E2E8F0" }}>Email Liên Hệ</TableCell>
+                            <TableCell sx={{ fontWeight: 700, color: "#334155", py: 1.5, fontSize: "0.85rem", borderBottom: "1px solid #E2E8F0" }}>Vai Trò Phân Quyền</TableCell>
+                            <TableCell align="center" sx={{ fontWeight: 700, color: "#334155", py: 1.5, fontSize: "0.85rem", borderBottom: "1px solid #E2E8F0" }}>Trạng Thái</TableCell>
+                            <TableCell align="center" sx={{ fontWeight: 700, color: "#334155", py: 1.5, fontSize: "0.85rem", borderBottom: "1px solid #E2E8F0" }}>Ngày Tạo</TableCell>
+                            <TableCell align="center" sx={{ fontWeight: 700, color: "#334155", py: 1.5, fontSize: "0.85rem", borderBottom: "1px solid #E2E8F0" }}>Thao Tác Quản Trị</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
@@ -577,7 +577,28 @@ export default function AccountManagePage() {
                         ) : (
                             <TableRow>
                                 <TableCell colSpan={7} align="center" sx={{ py: 6, color: "text.secondary" }}>
-                                    Không tìm thấy tài khoản nào phù hợp với điều kiện tìm kiếm.
+                                    <PeopleAltIcon sx={{ fontSize: 44, color: "#94A3B8", mb: 1 }} />
+                                    <Typography variant="subtitle1" fontWeight={700} sx={{ color: "#334155" }}>
+                                        Không tìm thấy tài khoản nào
+                                    </Typography>
+                                    <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+                                        {searchKeyword || selectedRoleFilter !== "ALL"
+                                            ? "Không có tài khoản nào khớp với bộ lọc hiện tại."
+                                            : "Hệ thống chưa có tài khoản người dùng nào."}
+                                    </Typography>
+                                    {(searchKeyword || selectedRoleFilter !== "ALL") && (
+                                        <Button
+                                            variant="outlined"
+                                            size="small"
+                                            onClick={() => {
+                                                setSearchKeyword("");
+                                                setSelectedRoleFilter("ALL");
+                                            }}
+                                            sx={{ borderRadius: 2 }}
+                                        >
+                                            Xóa bộ lọc tìm kiếm
+                                        </Button>
+                                    )}
                                 </TableCell>
                             </TableRow>
                         )}

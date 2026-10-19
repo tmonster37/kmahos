@@ -89,6 +89,31 @@ export default function TransactionManagePage() {
         return matchesKeyword && matchesStatus && matchesType;
     });
 
+    const handleExportCsv = () => {
+        if (!filtered || filtered.length === 0) {
+            alert("Không có giao dịch nào để xuất!");
+            return;
+        }
+
+        let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+        csvContent += "DANH SÁCH ĐỐI SOÁT GIAO DỊCH VIỆN PHÍ - YOUMED HMS\n";
+        csvContent += `Thời điểm xuất: ${new Date().toLocaleString("vi-VN")} | Tổng số giao dịch: ${filtered.length}\n\n`;
+        csvContent += "Mã Giao Dịch,Mã Đối Soát (TxnRef),Người Nộp Tiền,Loại Viện Phí,Kênh Thanh Toán,Số Tiền (VNĐ),Trạng Thái,Thời Gian Giao Dịch\n";
+
+        filtered.forEach(t => {
+            const timeStr = t.createdAt ? formatDateTime(t.createdAt) : "";
+            csvContent += `"${t.transactionId || ""}","${t.vnpayTxnRef || t.bankTxnNo || ""}","${t.accountName || t.fullName || "Khách vãng lai"}","${t.transactionType || "PAY_BOOKING"}","${t.paymentMethod || "CASH"}","${t.amount || 0}","${t.status || "SUCCESS"}","${timeStr}"\n`;
+        });
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `Doi_Soat_Giao_Dich_${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     return (
         <Container maxWidth="xl" sx={{ py: 3 }}>
             {/* Header */}
@@ -98,7 +123,7 @@ export default function TransactionManagePage() {
                         📑 Đối Soát & Quản Lý Giao Dịch Thanh Toán
                     </Typography>
                     <Typography variant="body2" color="textSecondary">
-                        Theo dõi dòng tiền thu viện phí trực tuyến (VNPay, MoMo), máy POS và Quầy thu ngân
+                        Theo dõi dòng tiền thu viện phí trực tuyến (VNPay, VietQR, MoMo), máy POS và Quầy thu ngân
                     </Typography>
                 </Box>
                 <Box display="flex" gap={1.5}>
@@ -106,9 +131,29 @@ export default function TransactionManagePage() {
                         variant="outlined"
                         startIcon={<RefreshIcon />}
                         onClick={loadTransactions}
+                        disabled={loading}
                         sx={{ borderRadius: 2 }}
                     >
-                        Làm Mới
+                        {loading ? "Đang Tải..." : "Làm Mới"}
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        startIcon={<DownloadIcon />}
+                        onClick={handleExportCsv}
+                        disabled={filtered.length === 0}
+                        sx={{ borderRadius: 2, fontWeight: 700 }}
+                    >
+                        Xuất CSV / Excel
+                    </Button>
+                    <Button
+                        variant="outlined"
+                        color="inherit"
+                        startIcon={<PrintIcon />}
+                        onClick={() => window.print()}
+                        sx={{ borderRadius: 2, display: { xs: "none", sm: "inline-flex" } }}
+                    >
+                        In Báo Cáo
                     </Button>
                 </Box>
             </Box>

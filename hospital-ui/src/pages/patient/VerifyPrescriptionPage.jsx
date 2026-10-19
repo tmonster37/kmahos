@@ -23,8 +23,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import SecurityIcon from "@mui/icons-material/Security";
 import LocalHospitalIcon from "@mui/icons-material/LocalHospital";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
-import BadgeIcon from "@mui/icons-material/Badge";
-import axiosInstance from "../../services/AxiosInstance";
+import axiosInstance, { API_BASE_URL } from "../../services/AxiosInstance";
 
 export default function VerifyPrescriptionPage() {
     const [searchParams] = useSearchParams();
@@ -232,7 +231,7 @@ export default function VerifyPrescriptionPage() {
                                             color="error"
                                             size="large"
                                             startIcon={<PictureAsPdfIcon />}
-                                            href={`http://localhost:8080/api/prescriptions/${result.prescriptionCode}/pdf`}
+                                            href={`${API_BASE_URL}/api/prescriptions/${result.prescriptionCode}/pdf`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             sx={{ px: 4, py: 1.2, fontWeight: 700, borderRadius: 2 }}

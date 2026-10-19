@@ -268,13 +268,17 @@ export default function Navbar() {
                                         }
                                     }}
                                 >
-                                    <MenuItem onClick={() => { handlePatientRecordsClose(); navigate("/profiles"); }}>
+                                    <MenuItem onClick={() => { handlePatientRecordsClose(); navigate("/profiles?tab=profiles"); }}>
                                         <ListItemIcon><FolderSharedIcon fontSize="small" sx={{ color: designTokens.brand.primary }} /></ListItemIcon>
-                                        <ListItemText primary="Hồ Sơ Bệnh Nhân" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
+                                        <ListItemText primary="Hồ Sơ Bệnh Nhân (Gia Đình)" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
+                                    </MenuItem>
+                                    <MenuItem onClick={() => { handlePatientRecordsClose(); navigate("/profiles?tab=ticket"); }}>
+                                        <ListItemIcon><QrCodeScannerIcon fontSize="small" sx={{ color: designTokens.brand.primary }} /></ListItemIcon>
+                                        <ListItemText primary="Phiếu Khám Bệnh (Barcode & STT)" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
                                     </MenuItem>
                                     <MenuItem onClick={() => { handlePatientRecordsClose(); navigate("/my-history"); }}>
                                         <ListItemIcon><HistoryIcon fontSize="small" sx={{ color: designTokens.secondary.main }} /></ListItemIcon>
-                                        <ListItemText primary="Phiếu Khám & Lịch Sử" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
+                                        <ListItemText primary="Sổ Bệnh Án & Lịch Sử Khám" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
                                     </MenuItem>
                                     <MenuItem onClick={() => { handlePatientRecordsClose(); navigate("/my-bills"); }}>
                                         <ListItemIcon><ReceiptLongIcon fontSize="small" sx={{ color: designTokens.status.info.main }} /></ListItemIcon>

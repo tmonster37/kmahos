@@ -68,6 +68,7 @@ export default function ScheduleManagePage() {
     const [loading, setLoading] = useState(false);
     const [tableLoading, setTableLoading] = useState(false);
     const [toast, setToast] = useState({ open: false, message: "", severity: "success" });
+    const [deleteConfirm, setDeleteConfirm] = useState({ open: false, schedule: null });
 
     // Tải danh sách ca trực theo ngày
     const loadSchedules = async () => {
@@ -176,13 +177,13 @@ export default function ScheduleManagePage() {
         }));
     };
 
-    const handleDelete = async (scheduleId) => {
-        if (!window.confirm("Bạn có chắc chắn muốn xóa ca trực này không? Các khung giờ liên kết chưa đặt sẽ bị hủy.")) {
-            return;
-        }
+    const handleConfirmDelete = async () => {
+        if (!deleteConfirm.schedule) return;
+        const scheduleId = deleteConfirm.schedule.scheduleId;
         try {
             await axiosInstance.delete(`/api/schedules/${scheduleId}`);
             setToast({ open: true, message: "Đã hủy ca trực thành công!", severity: "success" });
+            setDeleteConfirm({ open: false, schedule: null });
             loadSchedules();
         } catch (err) {
             setToast({ open: true, message: err.message || "Lỗi xóa ca trực!", severity: "error" });
@@ -289,42 +290,42 @@ export default function ScheduleManagePage() {
             {/* Quick Stats Cards */}
             <Grid container spacing={2} mb={3}>
                 <Grid item xs={12} sm={6} md={2.4}>
-                    <Card elevation={1} sx={{ borderRadius: 2.5, borderLeft: "4px solid #1976d2" }}>
+                    <Card elevation={0} sx={{ border: "1px solid #E2E8F0", borderRadius: 3, bgcolor: "#FFFFFF" }}>
                         <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                            <Typography variant="caption" color="textSecondary" fontWeight="bold">TỔNG CA TRỰC NGÀY</Typography>
-                            <Typography variant="h5" fontWeight="bold" color="primary.main">{stats.total}</Typography>
+                            <Typography variant="caption" sx={{ color: "#64748B", fontWeight: 700, letterSpacing: 0.5 }}>TỔNG CA TRỰC NGÀY</Typography>
+                            <Typography variant="h5" fontWeight={800} sx={{ color: "#0088D6", mt: 0.5 }}>{stats.total}</Typography>
                         </CardContent>
                     </Card>
                 </Grid>
                 <Grid item xs={6} sm={3} md={2.4}>
-                    <Card elevation={1} sx={{ borderRadius: 2.5, borderLeft: "4px solid #0288d1" }}>
+                    <Card elevation={0} sx={{ border: "1px solid #E2E8F0", borderRadius: 3, bgcolor: "#FFFFFF" }}>
                         <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                            <Typography variant="caption" color="textSecondary" fontWeight="bold">CA SÁNG (07:30 - 11:30)</Typography>
-                            <Typography variant="h5" fontWeight="bold" color="info.main">{stats.morning}</Typography>
+                            <Typography variant="caption" sx={{ color: "#64748B", fontWeight: 700, letterSpacing: 0.5 }}>CA SÁNG (07:30 - 11:30)</Typography>
+                            <Typography variant="h5" fontWeight={800} sx={{ color: "#0288D1", mt: 0.5 }}>{stats.morning}</Typography>
                         </CardContent>
                     </Card>
                 </Grid>
                 <Grid item xs={6} sm={3} md={2.4}>
-                    <Card elevation={1} sx={{ borderRadius: 2.5, borderLeft: "4px solid #ed6c02" }}>
+                    <Card elevation={0} sx={{ border: "1px solid #E2E8F0", borderRadius: 3, bgcolor: "#FFFFFF" }}>
                         <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                            <Typography variant="caption" color="textSecondary" fontWeight="bold">CA CHIỀU (13:00 - 17:00)</Typography>
-                            <Typography variant="h5" fontWeight="bold" color="warning.main">{stats.afternoon}</Typography>
+                            <Typography variant="caption" sx={{ color: "#64748B", fontWeight: 700, letterSpacing: 0.5 }}>CA CHIỀU (13:00 - 17:00)</Typography>
+                            <Typography variant="h5" fontWeight={800} sx={{ color: "#F59E0B", mt: 0.5 }}>{stats.afternoon}</Typography>
                         </CardContent>
                     </Card>
                 </Grid>
                 <Grid item xs={6} sm={3} md={2.4}>
-                    <Card elevation={1} sx={{ borderRadius: 2.5, borderLeft: "4px solid #9c27b0" }}>
+                    <Card elevation={0} sx={{ border: "1px solid #E2E8F0", borderRadius: 3, bgcolor: "#FFFFFF" }}>
                         <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                            <Typography variant="caption" color="textSecondary" fontWeight="bold">CA TỐI (17:30 - 20:30)</Typography>
-                            <Typography variant="h5" fontWeight="bold" color="secondary.main">{stats.evening}</Typography>
+                            <Typography variant="caption" sx={{ color: "#64748B", fontWeight: 700, letterSpacing: 0.5 }}>CA TỐI (17:30 - 20:30)</Typography>
+                            <Typography variant="h5" fontWeight={800} sx={{ color: "#8B5CF6", mt: 0.5 }}>{stats.evening}</Typography>
                         </CardContent>
                     </Card>
                 </Grid>
                 <Grid item xs={6} sm={3} md={2.4}>
-                    <Card elevation={1} sx={{ borderRadius: 2.5, borderLeft: "4px solid #2e7d32" }}>
+                    <Card elevation={0} sx={{ border: "1px solid #E2E8F0", borderRadius: 3, bgcolor: "#FFFFFF" }}>
                         <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                            <Typography variant="caption" color="textSecondary" fontWeight="bold">LƯỢT ĐẶT / TỔNG SLOTS</Typography>
-                            <Typography variant="h5" fontWeight="bold" color="success.main">{stats.totalBookings} / {stats.totalSlots * 5}</Typography>
+                            <Typography variant="caption" sx={{ color: "#64748B", fontWeight: 700, letterSpacing: 0.5 }}>LƯỢT ĐẶT / SLOTS</Typography>
+                            <Typography variant="h5" fontWeight={800} sx={{ color: "#008C69", mt: 0.5 }}>{stats.totalBookings} / {stats.totalSlots * 5}</Typography>
                         </CardContent>
                     </Card>
                 </Grid>
@@ -409,17 +410,17 @@ export default function ScheduleManagePage() {
             </Paper>
 
             {/* Bảng danh sách Ca trực */}
-            <TableContainer component={Paper} elevation={2} sx={{ borderRadius: 3 }}>
+            <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 3, border: "1px solid #E2E8F0" }}>
                 <Table>
-                    <TableHead sx={{ bgcolor: "primary.light" }}>
+                    <TableHead sx={{ bgcolor: "#F8FAFC" }}>
                         <TableRow>
-                            <TableCell sx={{ fontWeight: "bold" }}>Bác sĩ phụ trách</TableCell>
-                            <TableCell sx={{ fontWeight: "bold" }}>Chuyên khoa</TableCell>
-                            <TableCell sx={{ fontWeight: "bold" }}>Buồng khám</TableCell>
-                            <TableCell sx={{ fontWeight: "bold" }}>Buổi trực</TableCell>
-                            <TableCell sx={{ fontWeight: "bold" }}>Ngày trực</TableCell>
-                            <TableCell sx={{ fontWeight: "bold" }}>Khung giờ khám (Slots)</TableCell>
-                            <TableCell align="center" sx={{ fontWeight: "bold" }}>Thao tác</TableCell>
+                            <TableCell sx={{ fontWeight: 700, color: "#334155", py: 1.5, fontSize: "0.85rem", borderBottom: "1px solid #E2E8F0" }}>Bác sĩ phụ trách</TableCell>
+                            <TableCell sx={{ fontWeight: 700, color: "#334155", py: 1.5, fontSize: "0.85rem", borderBottom: "1px solid #E2E8F0" }}>Chuyên khoa</TableCell>
+                            <TableCell sx={{ fontWeight: 700, color: "#334155", py: 1.5, fontSize: "0.85rem", borderBottom: "1px solid #E2E8F0" }}>Buồng khám</TableCell>
+                            <TableCell sx={{ fontWeight: 700, color: "#334155", py: 1.5, fontSize: "0.85rem", borderBottom: "1px solid #E2E8F0" }}>Buổi trực</TableCell>
+                            <TableCell sx={{ fontWeight: 700, color: "#334155", py: 1.5, fontSize: "0.85rem", borderBottom: "1px solid #E2E8F0" }}>Ngày trực</TableCell>
+                            <TableCell sx={{ fontWeight: 700, color: "#334155", py: 1.5, fontSize: "0.85rem", borderBottom: "1px solid #E2E8F0" }}>Khung giờ khám (Slots)</TableCell>
+                            <TableCell align="center" sx={{ fontWeight: 700, color: "#334155", py: 1.5, fontSize: "0.85rem", borderBottom: "1px solid #E2E8F0" }}>Thao tác</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
@@ -518,7 +519,7 @@ export default function ScheduleManagePage() {
                                         </TableCell>
                                         <TableCell align="center">
                                             <Tooltip title="Hủy ca trực này">
-                                                <IconButton size="small" color="error" onClick={() => handleDelete(sch.scheduleId)}>
+                                                <IconButton size="small" color="error" onClick={() => setDeleteConfirm({ open: true, schedule: sch })}>
                                                     <DeleteIcon fontSize="small" />
                                                 </IconButton>
                                             </Tooltip>
@@ -626,6 +627,29 @@ export default function ScheduleManagePage() {
                     <Button onClick={() => setOpenModal(false)}>Hủy</Button>
                     <Button variant="contained" color="primary" onClick={handleCreate} disabled={loading}>
                         {loading ? "Đang xử lý..." : "Xác Nhận Tạo Ca Trực"}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Dialog xác nhận hủy ca trực */}
+            <Dialog open={deleteConfirm.open} onClose={() => setDeleteConfirm({ open: false, schedule: null })} maxWidth="xs" fullWidth>
+                <DialogTitle sx={{ fontWeight: 700, color: "error.main", display: "flex", alignItems: "center", gap: 1 }}>
+                    <DeleteIcon color="error" /> Xác nhận hủy ca trực
+                </DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" sx={{ color: "#334155" }}>
+                        Bạn có chắc chắn muốn hủy ca trực của bác sĩ <b>{deleteConfirm.schedule?.doctorName}</b> vào ngày <b>{deleteConfirm.schedule?.scheduleDate}</b> không?
+                    </Typography>
+                    <Typography variant="caption" color="textSecondary" sx={{ display: "block", mt: 1 }}>
+                        Lưu ý: Tất cả các khung giờ khám 30 phút chưa có bệnh nhân đặt sẽ được tự động dọn dẹp.
+                    </Typography>
+                </DialogContent>
+                <DialogActions sx={{ p: 2, pt: 0 }}>
+                    <Button onClick={() => setDeleteConfirm({ open: false, schedule: null })} color="inherit">
+                        Bỏ qua
+                    </Button>
+                    <Button variant="contained" color="error" onClick={handleConfirmDelete}>
+                        Xác nhận hủy
                     </Button>
                 </DialogActions>
             </Dialog>

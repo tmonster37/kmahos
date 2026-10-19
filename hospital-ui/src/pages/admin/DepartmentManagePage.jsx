@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import {
     Container,
     Paper,
@@ -96,9 +97,17 @@ export default function DepartmentManagePage() {
         }
     };
 
+    const location = useLocation();
+
     useEffect(() => {
         loadData();
     }, []);
+
+    useEffect(() => {
+        if (location.pathname === "/admin/rooms" || location.pathname.startsWith("/admin/rooms")) {
+            setActiveTab(2);
+        }
+    }, [location.pathname]);
 
     // 1. Quản lý Khoa
     const handleOpenCreateDept = () => {
@@ -492,10 +501,29 @@ export default function DepartmentManagePage() {
             {/* TAB 2: DANH SÁCH PHÒNG & LỊCH TRỰC */}
             {activeTab === 2 && selectedDept && (
                 <Box>
-                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                        <Typography variant="h6" fontWeight="bold">
-                            Buồng Phòng & Lịch Trực: {selectedDept.departmentName}
-                        </Typography>
+                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} flexWrap="wrap" gap={1.5}>
+                        <Box display="flex" alignItems="center" gap={1.5} flexWrap="wrap">
+                            <Typography variant="h6" fontWeight="bold">
+                                Buồng Phòng & Lịch Trực: {selectedDept.departmentName}
+                            </Typography>
+                            <TextField
+                                select
+                                size="small"
+                                label="Chuyển khoa phòng"
+                                value={selectedDept?.departmentId || ""}
+                                onChange={(e) => {
+                                    const found = departments.find(d => d.departmentId === Number(e.target.value));
+                                    if (found) setSelectedDept(found);
+                                }}
+                                sx={{ minWidth: 200, bgcolor: "white", "& .MuiSelect-select": { py: 0.6, fontSize: "0.8rem", fontWeight: 700 } }}
+                            >
+                                {departments.map((d) => (
+                                    <MenuItem key={d.departmentId} value={d.departmentId}>
+                                        {d.departmentName}
+                                    </MenuItem>
+                                ))}
+                            </TextField>
+                        </Box>
                         <Button variant="contained" color="success" startIcon={<AddIcon />} onClick={handleOpenAddRoom} sx={{ borderRadius: 2 }}>
                             Thêm Buồng Phòng Mới
                         </Button>

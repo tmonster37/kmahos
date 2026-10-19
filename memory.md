@@ -94,6 +94,11 @@ Hệ thống y tế thông minh **YOUMED TNT HOSPITAL** tích hợp toàn diện
     - *Giai đoạn 2 (Patient Portal)*: Giữ slot 10 phút chống đặt trùng & Đơn thuốc điện tử PDF (OpenPDF) kèm mã QR xác thực chữ ký số SHA-256 Timing-Safe (29/29 PASS).
     - *Giai đoạn 3 (Reception Desk)*: Tiếp đón điều dưỡng hợp nhất (`ROLE_NURSE`), Check-in QR trong 5 giây, đo sinh hiệu & tính BMI tự động, thu viện phí tại quầy (`PAY_AT_CLINIC`), in biên lai chuẩn A5 và phiếu nhiệt K80 (35/35 PASS).
     - *Giai đoạn 4 (Admin Portal)*: Quản lý Chứng chỉ hành nghề (CCHN) Bác sĩ, Dashboard KPI Doanh thu theo 6 kênh & Công suất buồng khám Realtime, Nhật ký kiểm toán bất biến (Immutable Audit Logs - Append-only `REQUIRES_NEW`) tự động lọc bỏ PII nhạy cảm (38/38 PASS).
+15. **Audit Toàn Diện Hệ Thống & Chuẩn Hóa Giao Diện Bệnh Nhân / Quản Lý Bác Sĩ / Thương Hiệu TNT (TASK-17)**: Hoàn thành 100% kiểm thử thực tế 33/33 assertions PASS (`test_master_system_audit.js`) và frontend Vite build thành công không lỗi:
+    - *Giao diện Bệnh nhân*: Phân tách minh bạch giữa `/profiles` (Hồ sơ sức khỏe gia đình & Phiếu khám Barcode/STT) và `/my-history` (Sổ bệnh án & Lịch sử khám), loại bỏ hoàn toàn tình trạng trùng lặp menu và sheet bệnh án.
+    - *Chuẩn hóa thương hiệu*: Đồng bộ 100% thương hiệu Bệnh viện Đa khoa Quốc tế TNT (Bình Yên, Sơn Dương, Tuyên Quang), loại bỏ các địa chỉ/tên bệnh viện giả định.
+    - *Quản lý Bác sĩ*: Tối ưu hóa UI gọn gàng với bộ lọc 1 dòng tinh gọn, chế độ chuyển đổi linh hoạt Dạng Bảng (Table view) & Dạng Thẻ (Grid view), dialog xác nhận vô hiệu hóa an toàn.
+    - *Quản lý Bệnh nhân Admin*: Bổ sung API & Controller quản lý bệnh nhân chuẩn RBAC (`/api/admin/patients/**`).
 
 
 

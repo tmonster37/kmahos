@@ -22,5 +22,7 @@ public interface PatientProfileRepository extends JpaRepository<PatientProfile, 
            "p.healthInsuranceNumber LIKE %:kw% OR " +
            "LOWER(p.fullName) LIKE LOWER(CONCAT('%', :kw, '%')))")
     List<PatientProfile> searchProfiles(@Param("kw") String keyword);
+
+    List<PatientProfile> findAllByDeletedFalseOrderByCreatedAtDesc();
 }
 

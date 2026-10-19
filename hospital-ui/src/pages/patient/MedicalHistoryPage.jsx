@@ -51,8 +51,7 @@ import HotelIcon from "@mui/icons-material/Hotel";
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import MonitorHeartIcon from "@mui/icons-material/MonitorHeart";
 import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedIn";
-import LocalHospitalIcon from "@mui/icons-material/LocalHospital";
-import axiosInstance from "../../services/AxiosInstance";
+import axiosInstance, { API_BASE_URL } from "../../services/AxiosInstance";
 import { formatCurrency, formatDate, formatDateTime } from "../../utils/formatters";
 import { useNavigate } from "react-router-dom";
 import MedicalRecordPrintModal from "../Doctor/MedicalRecordPrintModal";
@@ -449,6 +448,15 @@ export default function MedicalHistoryPage() {
                                                     <Button
                                                         size="small"
                                                         variant="outlined"
+                                                        color="info"
+                                                        onClick={() => navigate("/profiles?tab=ticket")}
+                                                        sx={{ borderRadius: 2, textTransform: "none", fontSize: "0.8rem", py: 0.4 }}
+                                                    >
+                                                        Phiếu Khám (Barcode)
+                                                    </Button>
+                                                    <Button
+                                                        size="small"
+                                                        variant="outlined"
                                                         startIcon={<VisibilityIcon fontSize="small" />}
                                                         onClick={() => {
                                                             setSelectedBooking(b);
@@ -758,7 +766,7 @@ export default function MedicalHistoryPage() {
                                         variant="contained"
                                         color="error"
                                         startIcon={<PictureAsPdfIcon fontSize="small" />}
-                                        href={`http://localhost:8080/api/prescriptions/${selectedBooking.bookingCode}/pdf`}
+                                        href={`${API_BASE_URL}/api/prescriptions/${selectedBooking.bookingCode}/pdf`}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         sx={{ textTransform: "none", fontWeight: "bold" }}

@@ -169,50 +169,21 @@ export default function MedicineManagePage() {
     };
 
     return (
-        <Container maxWidth="xl" sx={{ py: 3 }}>
-            {/* Header Banner */}
-            <Paper
-                elevation={2}
-                sx={{
-                    p: 3,
-                    mb: 3,
-                    borderRadius: 3,
-                    background: "linear-gradient(135deg, #065F46 0%, #047857 100%)",
-                    color: "white",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    flexWrap: "wrap",
-                    gap: 2
-                }}
-            >
-                <Box display="flex" alignItems="center" gap={2}>
-                    <Box
-                        sx={{
-                            width: 52,
-                            height: 52,
-                            borderRadius: "50%",
-                            bgcolor: "rgba(255,255,255,0.2)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center"
-                        }}
-                    >
-                        <MedicationIcon sx={{ fontSize: 32 }} />
-                    </Box>
-                    <Box>
-                        <Typography variant="h5" fontWeight="bold">
-                            Quản Lý Kho Dược & Cảnh Báo FEFO (First Expired, First Out)
-                        </Typography>
-                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                            Giám sát tồn kho an toàn, cảnh báo thuốc cận hạn & xuất kho theo chuẩn dược vụ Bộ Y Tế
-                        </Typography>
-                    </Box>
+        <Container maxWidth="xl" sx={{ py: 2 }}>
+            {/* Header */}
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={2}>
+                <Box>
+                    <Typography variant="h5" fontWeight={800} sx={{ color: "#0088D6", display: "flex", alignItems: "center", gap: 1 }}>
+                        <MedicationIcon sx={{ fontSize: 28, color: "#0088D6" }} /> Quản Lý Kho Dược & Cảnh Báo FEFO
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: "#64748B", mt: 0.5 }}>
+                        Giám sát tồn kho an toàn, cảnh báo thuốc cận hạn & xuất kho theo chuẩn First Expired, First Out
+                    </Typography>
                 </Box>
                 <Stack direction="row" spacing={1.5}>
                     <Button
                         variant="contained"
-                        sx={{ bgcolor: "#F59E0B", color: "white", fontWeight: "bold", "&:hover": { bgcolor: "#D97706" } }}
+                        sx={{ bgcolor: "#F59E0B", color: "white", fontWeight: 700, borderRadius: 2, "&:hover": { bgcolor: "#D97706" } }}
                         startIcon={<FileDownloadIcon />}
                         onClick={handleExportProcurementList}
                     >
@@ -220,7 +191,7 @@ export default function MedicineManagePage() {
                     </Button>
                     <Button
                         variant="outlined"
-                        sx={{ color: "white", borderColor: "rgba(255,255,255,0.6)", fontWeight: "bold", "&:hover": { bgcolor: "rgba(255,255,255,0.1)" } }}
+                        sx={{ borderRadius: 2 }}
                         startIcon={<RefreshIcon />}
                         onClick={loadMedicines}
                         disabled={loading}
@@ -228,7 +199,7 @@ export default function MedicineManagePage() {
                         Làm mới
                     </Button>
                 </Stack>
-            </Paper>
+            </Box>
 
             {/* Error Banner */}
             {error && (
@@ -246,48 +217,48 @@ export default function MedicineManagePage() {
             )}
 
             {/* FEFO Warning Cards */}
-            <Grid container spacing={3} mb={3}>
+            <Grid container spacing={2.5} mb={3}>
                 <Grid item xs={12} sm={6} md={3}>
-                    <Card sx={{ borderRadius: 3, borderLeft: "5px solid #2563EB" }}>
-                        <CardContent>
-                            <Typography variant="body2" color="text.secondary">Tổng danh mục thuốc</Typography>
-                            <Typography variant="h4" fontWeight="bold" color="primary.main">{medicines.length}</Typography>
+                    <Card elevation={0} sx={{ border: "1px solid #E2E8F0", borderRadius: 3, bgcolor: "#FFFFFF" }}>
+                        <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
+                            <Typography variant="caption" sx={{ color: "#64748B", fontWeight: 700, letterSpacing: 0.5 }}>TỔNG DANH MỤC THUỐC</Typography>
+                            <Typography variant="h4" fontWeight={800} sx={{ color: "#0088D6", my: 0.5 }}>{medicines.length}</Typography>
                             <Typography variant="caption" color="text.secondary">Đang lưu hành tại bệnh viện</Typography>
                         </CardContent>
                     </Card>
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
-                    <Card sx={{ borderRadius: 3, borderLeft: "5px solid #EF4444", bgcolor: lowStockList.length > 0 ? "#FEF2F2" : "inherit" }}>
-                        <CardContent>
-                            <Typography variant="body2" color="error.main" fontWeight="bold" display="flex" alignItems="center" gap={0.5}>
-                                <WarningAmberIcon fontSize="small" /> Tồn kho dưới mức an toàn
+                    <Card elevation={0} sx={{ border: "1px solid #FECACA", borderRadius: 3, bgcolor: lowStockList.length > 0 ? "#FEF2F2" : "#FFFFFF" }}>
+                        <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
+                            <Typography variant="caption" sx={{ color: "#DC2626", fontWeight: 700, letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
+                                <WarningAmberIcon fontSize="small" /> DƯỚI MỨC AN TOÀN
                             </Typography>
-                            <Typography variant="h4" fontWeight="bold" color="error.main">{lowStockList.length}</Typography>
-                            <Typography variant="caption" color="error.dark">Cần lập đơn nhập kho gấp</Typography>
+                            <Typography variant="h4" fontWeight={800} sx={{ color: "#DC2626", my: 0.5 }}>{lowStockList.length}</Typography>
+                            <Typography variant="caption" sx={{ color: "#B91C1C" }}>Cần lập đơn nhập kho gấp</Typography>
                         </CardContent>
                     </Card>
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
-                    <Card sx={{ borderRadius: 3, borderLeft: "5px solid #F59E0B", bgcolor: expiringSoonList.length > 0 ? "#FFFBEB" : "inherit" }}>
-                        <CardContent>
-                            <Typography variant="body2" color="warning.dark" fontWeight="bold" display="flex" alignItems="center" gap={0.5}>
-                                <EventBusyIcon fontSize="small" /> Cận hạn sử dụng (&lt; 3 tháng)
+                    <Card elevation={0} sx={{ border: "1px solid #FDE68A", borderRadius: 3, bgcolor: expiringSoonList.length > 0 ? "#FFFBEB" : "#FFFFFF" }}>
+                        <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
+                            <Typography variant="caption" sx={{ color: "#D97706", fontWeight: 700, letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
+                                <EventBusyIcon fontSize="small" /> CẬN HẠN DÙNG (&lt; 90 NGÀY)
                             </Typography>
-                            <Typography variant="h4" fontWeight="bold" color="warning.main">{expiringSoonList.length}</Typography>
-                            <Typography variant="caption" color="warning.dark">Ưu tiên xuất kho trước (FEFO)</Typography>
+                            <Typography variant="h4" fontWeight={800} sx={{ color: "#D97706", my: 0.5 }}>{expiringSoonList.length}</Typography>
+                            <Typography variant="caption" sx={{ color: "#B45309" }}>Ưu tiên xuất kho trước (FEFO)</Typography>
                         </CardContent>
                     </Card>
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
-                    <Card sx={{ borderRadius: 3, borderLeft: "5px solid #10B981" }}>
-                        <CardContent>
-                            <Typography variant="body2" color="success.main" fontWeight="bold" display="flex" alignItems="center" gap={0.5}>
-                                <CheckCircleIcon fontSize="small" /> Tồn kho ổn định & An toàn
+                    <Card elevation={0} sx={{ border: "1px solid #BBF7D0", borderRadius: 3, bgcolor: "#F0FDF4" }}>
+                        <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
+                            <Typography variant="caption" sx={{ color: "#16A34A", fontWeight: 700, letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
+                                <CheckCircleIcon fontSize="small" /> TỒN KHO ỔN ĐỊNH
                             </Typography>
-                            <Typography variant="h4" fontWeight="bold" color="success.main">
+                            <Typography variant="h4" fontWeight={800} sx={{ color: "#16A34A", my: 0.5 }}>
                                 {medicines.length - lowStockList.length - expiringSoonList.length}
                             </Typography>
-                            <Typography variant="caption" color="text.secondary">Đủ cung ứng trên 90 ngày</Typography>
+                            <Typography variant="caption" sx={{ color: "#15803D" }}>Đủ cung ứng trên 90 ngày</Typography>
                         </CardContent>
                     </Card>
                 </Grid>
@@ -311,13 +282,13 @@ export default function MedicineManagePage() {
             )}
 
             {/* Tabs & Search */}
-            <Paper elevation={3} sx={{ p: 3, borderRadius: 3 }}>
+            <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: "1px solid #E2E8F0", bgcolor: "#FFFFFF" }}>
                 <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2} mb={2.5}>
                     <Tabs value={tabFilter} onChange={(_, v) => setTabFilter(v)}>
-                        <Tab label={`Tất cả (${medicines.length})`} value="ALL" />
-                        <Tab label={`Sắp hết hàng (${lowStockList.length})`} value="LOW_STOCK" sx={{ color: lowStockList.length > 0 ? "error.main" : "inherit" }} />
-                        <Tab label={`Cận hạn FEFO (${expiringSoonList.length})`} value="EXPIRING_SOON" sx={{ color: expiringSoonList.length > 0 ? "warning.main" : "inherit" }} />
-                        <Tab label="Tồn kho an toàn" value="SAFE" />
+                        <Tab label={`Tất cả (${medicines.length})`} value="ALL" sx={{ fontWeight: 700 }} />
+                        <Tab label={`Sắp hết hàng (${lowStockList.length})`} value="LOW_STOCK" sx={{ fontWeight: 700, color: lowStockList.length > 0 ? "error.main" : "inherit" }} />
+                        <Tab label={`Cận hạn FEFO (${expiringSoonList.length})`} value="EXPIRING_SOON" sx={{ fontWeight: 700, color: expiringSoonList.length > 0 ? "warning.main" : "inherit" }} />
+                        <Tab label="Tồn kho an toàn" value="SAFE" sx={{ fontWeight: 700 }} />
                     </Tabs>
 
                     <TextField
@@ -332,23 +303,24 @@ export default function MedicineManagePage() {
                                     <SearchIcon color="action" />
                                 </InputAdornment>
                             ),
+                            sx: { borderRadius: 2 }
                         }}
                     />
                 </Box>
 
-                <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
+                <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 2.5, border: "1px solid #E2E8F0" }}>
                     <Table>
                         <TableHead sx={{ bgcolor: "#F8FAFC" }}>
                             <TableRow>
-                                <TableCell><b>Mã thuốc</b></TableCell>
-                                <TableCell><b>Tên thuốc thương mại</b></TableCell>
-                                <TableCell><b>Hoạt chất chính</b></TableCell>
-                                <TableCell><b>Số lô SX (Batch)</b></TableCell>
-                                <TableCell><b>Hạn sử dụng (FEFO)</b></TableCell>
-                                <TableCell align="right"><b>Đơn giá</b></TableCell>
-                                <TableCell align="center"><b>Tồn kho hiện tại</b></TableCell>
-                                <TableCell align="center"><b>Trạng thái FEFO</b></TableCell>
-                                <TableCell align="center"><b>Thao tác</b></TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: "#334155", py: 1.5, fontSize: "0.85rem", borderBottom: "1px solid #E2E8F0" }}>Mã thuốc</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: "#334155", py: 1.5, fontSize: "0.85rem", borderBottom: "1px solid #E2E8F0" }}>Tên thuốc thương mại</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: "#334155", py: 1.5, fontSize: "0.85rem", borderBottom: "1px solid #E2E8F0" }}>Hoạt chất chính</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: "#334155", py: 1.5, fontSize: "0.85rem", borderBottom: "1px solid #E2E8F0" }}>Số lô SX (Batch)</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: "#334155", py: 1.5, fontSize: "0.85rem", borderBottom: "1px solid #E2E8F0" }}>Hạn sử dụng (FEFO)</TableCell>
+                                <TableCell align="right" sx={{ fontWeight: 700, color: "#334155", py: 1.5, fontSize: "0.85rem", borderBottom: "1px solid #E2E8F0" }}>Đơn giá</TableCell>
+                                <TableCell align="center" sx={{ fontWeight: 700, color: "#334155", py: 1.5, fontSize: "0.85rem", borderBottom: "1px solid #E2E8F0" }}>Tồn kho</TableCell>
+                                <TableCell align="center" sx={{ fontWeight: 700, color: "#334155", py: 1.5, fontSize: "0.85rem", borderBottom: "1px solid #E2E8F0" }}>Trạng thái FEFO</TableCell>
+                                <TableCell align="center" sx={{ fontWeight: 700, color: "#334155", py: 1.5, fontSize: "0.85rem", borderBottom: "1px solid #E2E8F0" }}>Thao tác</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -361,8 +333,29 @@ export default function MedicineManagePage() {
                                 </TableRow>
                             ) : filteredMedicines.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={9} align="center" sx={{ py: 4, color: "text.secondary" }}>
-                                        Không tìm thấy mặt hàng thuốc nào phù hợp với bộ lọc!
+                                    <TableCell colSpan={9} align="center" sx={{ py: 6, color: "text.secondary" }}>
+                                        <MedicationIcon sx={{ fontSize: 44, color: "#94A3B8", mb: 1 }} />
+                                        <Typography variant="subtitle1" fontWeight={700} sx={{ color: "#334155" }}>
+                                            Không tìm thấy thuốc nào
+                                        </Typography>
+                                        <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+                                            {searchKeyword || tabFilter !== "ALL"
+                                                ? "Không có mặt hàng thuốc nào phù hợp với bộ lọc tìm kiếm hiện tại."
+                                                : "Hệ thống chưa có danh mục thuốc lưu hành."}
+                                        </Typography>
+                                        {(searchKeyword || tabFilter !== "ALL") && (
+                                            <Button
+                                                variant="outlined"
+                                                size="small"
+                                                onClick={() => {
+                                                    setSearchKeyword("");
+                                                    setTabFilter("ALL");
+                                                }}
+                                                sx={{ borderRadius: 2 }}
+                                            >
+                                                Xóa bộ lọc tìm kiếm
+                                            </Button>
+                                        )}
                                     </TableCell>
                                 </TableRow>
                             ) : (

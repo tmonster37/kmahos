@@ -1170,10 +1170,10 @@ export default function BookingPage() {
                                     bookingCode: bookingResult.bookingCode,
                                     patientName: bookingResult.patientName || selectedProfile?.fullName || "Bệnh nhân YouMed TNT",
                                     phoneNumber: selectedProfile?.phoneNumber || "---",
-                                    departmentName: selectedDepartment?.name || "Khoa Khám Bệnh",
-                                    doctorName: selectedDoctor?.fullName || "Bác sĩ chuyên khoa",
-                                    bookingDate: formatDate(bookingDate),
-                                    timeSlot: selectedSlot?.timeSlot || "Trong giờ hành chính",
+                                    departmentName: bookingResult.departmentName || selectedDept?.departmentName || "Khoa Khám Bệnh",
+                                    doctorName: bookingResult.doctorName || selectedDoctorSchedule?.doctorName || "Bác sĩ chuyên khoa",
+                                    bookingDate: formatDate(bookingResult.bookingDate || selectedDate),
+                                    timeSlot: selectedSlot?.timeSlot || (bookingResult.startTime && bookingResult.endTime ? `${bookingResult.startTime} - ${bookingResult.endTime}` : "Trong giờ hành chính"),
                                     queueNumber: bookingResult.queueNumber,
                                     price: bookingResult.price || 200000
                                 })}

@@ -409,7 +409,7 @@ export default function PharmacyInventoryPage() {
                     </Box>
                 </Box>
 
-                <Stack direction="row" spacing={1.5}>
+                <Stack direction="row" spacing={1.5} flexWrap="wrap" sx={{ gap: 1 }}>
                     <Button
                         variant="outlined"
                         startIcon={<RefreshIcon />}
@@ -420,6 +420,7 @@ export default function PharmacyInventoryPage() {
                     </Button>
                     <Button
                         variant="contained"
+                        color="primary"
                         startIcon={<AddCircleIcon />}
                         onClick={() => {
                             setReceiveData(prev => ({ ...prev, warehouseId: selectedWarehouseId || (warehouses[0]?.warehouseId || "") }));
@@ -428,9 +429,7 @@ export default function PharmacyInventoryPage() {
                         sx={{
                             borderRadius: 2,
                             fontWeight: 700,
-                            textTransform: "none",
-                            background: "linear-gradient(135deg, #0088D6 0%, #00C292 100%)",
-                            boxShadow: "0 4px 12px rgba(0, 136, 214, 0.25)"
+                            textTransform: "none"
                         }}
                     >
                         Nhập Lô Mới
@@ -609,8 +608,29 @@ export default function PharmacyInventoryPage() {
                             <TableBody>
                                 {filteredPrescriptions.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={8} align="center" sx={{ py: 4, color: "#64748B" }}>
-                                            Không tìm thấy đơn thuốc nào phù hợp với bộ lọc hiện tại.
+                                        <TableCell colSpan={8} align="center" sx={{ py: 6, color: "#64748B" }}>
+                                            <AssignmentTurnedInIcon sx={{ fontSize: 44, color: "#94A3B8", mb: 1 }} />
+                                            <Typography variant="subtitle1" fontWeight={700} sx={{ color: "#334155" }}>
+                                                Không có đơn thuốc nào trong hàng đợi
+                                            </Typography>
+                                            <Typography variant="body2" color="textSecondary" sx={{ mb: 1.5 }}>
+                                                {searchKeyword || rxFilter !== "ALL"
+                                                    ? "Không tìm thấy đơn thuốc nào phù hợp với bộ lọc tìm kiếm hiện tại."
+                                                    : "Hiện tại không có đơn thuốc nào đang chờ cấp phát dược phẩm."}
+                                            </Typography>
+                                            {(searchKeyword || rxFilter !== "ALL") && (
+                                                <Button
+                                                    variant="outlined"
+                                                    size="small"
+                                                    onClick={() => {
+                                                        setSearchKeyword("");
+                                                        setRxFilter("ALL");
+                                                    }}
+                                                    sx={{ borderRadius: 2 }}
+                                                >
+                                                    Xem tất cả đơn thuốc
+                                                </Button>
+                                            )}
                                         </TableCell>
                                     </TableRow>
                                 ) : (
@@ -853,8 +873,16 @@ export default function PharmacyInventoryPage() {
                                 <TableBody>
                                     {filteredStocks.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={11} align="center" sx={{ py: 4, color: "#64748B" }}>
-                                                {loading ? "Đang tải dữ liệu tồn kho..." : "Không có thuốc nào trong kho này."}
+                                            <TableCell colSpan={11} align="center" sx={{ py: 6, color: "#64748B" }}>
+                                                <Inventory2Icon sx={{ fontSize: 44, color: "#94A3B8", mb: 1 }} />
+                                                <Typography variant="subtitle1" fontWeight={700} sx={{ color: "#334155" }}>
+                                                    {loading ? "Đang tải dữ liệu tồn kho..." : "Không có mặt hàng thuốc nào"}
+                                                </Typography>
+                                                <Typography variant="body2" color="textSecondary">
+                                                    {searchKeyword
+                                                        ? "Không tìm thấy dược phẩm nào khớp với từ khóa tìm kiếm."
+                                                        : "Kho này hiện chưa có dữ liệu tồn kho thuốc hoặc lô thuốc khả dụng."}
+                                                </Typography>
                                             </TableCell>
                                         </TableRow>
                                     ) : (
