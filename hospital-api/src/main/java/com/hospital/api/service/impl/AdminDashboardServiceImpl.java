@@ -58,28 +58,29 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
         long totalTxnCount = 0;
 
         for (Transaction txn : allTxns) {
-            BigDecimal amt = txn.getAmount() != null ? txn.getAmount() : BigDecimal.ZERO;
-            total = total.add(amt);
-            totalTxnCount++;
+            LocalDate txnDate = txn.getCreatedAt() != null
+                    ? txn.getCreatedAt().atZone(ZoneId.systemDefault()).toLocalDate()
+                    : LocalDate.now();
 
-            PaymentMethod method = txn.getPaymentMethod();
-            if (method != null) {
-                switch (method) {
-                    case CASH, COUNTER_CASH -> cash = cash.add(amt);
-                    case VIETQR -> vietQr = vietQr.add(amt);
-                    case MOMO -> momo = momo.add(amt);
-                    case VNPAY -> vnpay = vnpay.add(amt);
-                    case POS -> pos = pos.add(amt);
-                    default -> vietQr = vietQr.add(amt);
-                }
-            }
+            if (!txnDate.isBefore(start) && !txnDate.isAfter(end)) {
+                BigDecimal amt = txn.getAmount() != null ? txn.getAmount() : BigDecimal.ZERO;
+                total = total.add(amt);
+                totalTxnCount++;
 
-            if (txn.getCreatedAt() != null) {
-                LocalDate txnDate = txn.getCreatedAt().atZone(ZoneId.systemDefault()).toLocalDate();
-                if (!txnDate.isBefore(start) && !txnDate.isAfter(end)) {
-                    dailyRevenueMap.put(txnDate, dailyRevenueMap.getOrDefault(txnDate, BigDecimal.ZERO).add(amt));
-                    dailyCountMap.put(txnDate, dailyCountMap.getOrDefault(txnDate, 0L) + 1);
+                PaymentMethod method = txn.getPaymentMethod();
+                if (method != null) {
+                    switch (method) {
+                        case CASH, COUNTER_CASH -> cash = cash.add(amt);
+                        case VIETQR, PAYOS -> vietQr = vietQr.add(amt);
+                        case MOMO -> momo = momo.add(amt);
+                        case VNPAY -> vnpay = vnpay.add(amt);
+                        case POS -> pos = pos.add(amt);
+                        default -> vietQr = vietQr.add(amt);
+                    }
                 }
+
+                dailyRevenueMap.put(txnDate, dailyRevenueMap.getOrDefault(txnDate, BigDecimal.ZERO).add(amt));
+                dailyCountMap.put(txnDate, dailyCountMap.getOrDefault(txnDate, 0L) + 1);
             }
         }
 
@@ -88,16 +89,15 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                 .map(e -> new RevenueKpiResponse.DailyRevenueItem(e.getKey(), e.getValue(), dailyCountMap.getOrDefault(e.getKey(), 0L)))
                 .collect(Collectors.toList());
 
-        LocalDate today = LocalDate.now();
-        List<Booking> todayBookings = bookingRepository.findAllByBookingDateAndDeletedFalseOrderByIsPriorityDescQueueNumberAsc(today);
+        List<Booking> periodBookings = bookingRepository.findAllByBookingDateBetweenAndDeletedFalse(start, end);
 
-        long todayTotal = todayBookings.size();
-        long completed = todayBookings.stream().filter(b -> b.getStatus() == BookingStatus.COMPLETED).count();
-        long inProgress = todayBookings.stream().filter(b -> b.getStatus() == BookingStatus.IN_PROGRESS).count();
-        long cancelled = todayBookings.stream().filter(b -> b.getStatus() == BookingStatus.CANCELLED).count();
+        long periodTotal = periodBookings.size();
+        long completed = periodBookings.stream().filter(b -> b.getStatus() == BookingStatus.COMPLETED).count();
+        long inProgress = periodBookings.stream().filter(b -> b.getStatus() == BookingStatus.IN_PROGRESS).count();
+        long cancelled = periodBookings.stream().filter(b -> b.getStatus() == BookingStatus.CANCELLED).count();
 
-        double completionRate = todayTotal > 0 ? ((double) completed / todayTotal) * 100.0 : 0.0;
-        double cancellationRate = todayTotal > 0 ? ((double) cancelled / todayTotal) * 100.0 : 0.0;
+        double completionRate = periodTotal > 0 ? ((double) completed / periodTotal) * 100.0 : 0.0;
+        double cancellationRate = periodTotal > 0 ? ((double) cancelled / periodTotal) * 100.0 : 0.0;
 
         return new RevenueKpiResponse(
                 total,
@@ -107,7 +107,7 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                 vnpay,
                 pos,
                 totalTxnCount,
-                todayTotal,
+                periodTotal,
                 completed,
                 inProgress,
                 cancelled,

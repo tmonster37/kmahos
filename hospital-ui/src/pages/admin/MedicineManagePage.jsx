@@ -170,20 +170,21 @@ export default function MedicineManagePage() {
 
     return (
         <Container maxWidth="xl" sx={{ py: 3 }}>
-            {/* Header Banner */}
+            {/* 1. Header Banner (Apple HIG Paper) */}
             <Paper
-                elevation={2}
+                elevation={0}
                 sx={{
-                    p: 3,
+                    p: { xs: 2.5, md: 3 },
                     mb: 3,
-                    borderRadius: 3,
-                    background: "linear-gradient(135deg, #065F46 0%, #047857 100%)",
-                    color: "white",
+                    borderRadius: 4,
+                    border: "1px solid rgba(15, 23, 42, 0.08)",
+                    bgcolor: "#FFFFFF",
                     display: "flex",
+                    flexDirection: { xs: "column", md: "row" },
+                    alignItems: { xs: "flex-start", md: "center" },
                     justifyContent: "space-between",
-                    alignItems: "center",
-                    flexWrap: "wrap",
-                    gap: 2
+                    gap: 2.5,
+                    boxShadow: "0 2px 12px rgba(15, 23, 42, 0.03)"
                 }}
             >
                 <Box display="flex" alignItems="center" gap={2}>
@@ -191,41 +192,74 @@ export default function MedicineManagePage() {
                         sx={{
                             width: 52,
                             height: 52,
-                            borderRadius: "50%",
-                            bgcolor: "rgba(255,255,255,0.2)",
+                            borderRadius: "16px",
+                            bgcolor: "rgba(0, 136, 214, 0.1)",
+                            color: "#0088D6",
                             display: "flex",
                             alignItems: "center",
-                            justifyContent: "center"
+                            justifyContent: "center",
+                            boxShadow: "0 4px 14px rgba(0, 136, 214, 0.2)"
                         }}
                     >
-                        <MedicationIcon sx={{ fontSize: 32 }} />
+                        <MedicationIcon sx={{ fontSize: 28 }} />
                     </Box>
                     <Box>
-                        <Typography variant="h5" fontWeight="bold">
-                            Quản Lý Kho Dược & Cảnh Báo FEFO (First Expired, First Out)
-                        </Typography>
-                        <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                            Giám sát tồn kho an toàn, cảnh báo thuốc cận hạn & xuất kho theo chuẩn dược vụ Bộ Y Tế
+                        <Box display="flex" alignItems="center" gap={1.2} flexWrap="wrap">
+                            <Typography variant="h5" fontWeight={800} color="#0F172A" letterSpacing="-0.02em">
+                                Quản Lý Danh Mục Thuốc & Cảnh Báo FEFO
+                            </Typography>
+                            <Chip
+                                label="SmartHIS Pharmacopoeia Pro"
+                                size="small"
+                                sx={{
+                                    height: 22,
+                                    fontSize: "0.72rem",
+                                    fontWeight: 700,
+                                    bgcolor: "rgba(0, 136, 214, 0.1)",
+                                    color: "#0088D6",
+                                    border: "1px solid rgba(0, 136, 214, 0.2)"
+                                }}
+                            />
+                        </Box>
+                        <Typography variant="body2" sx={{ color: "#64748B", mt: 0.3 }}>
+                            Giám sát định mức an toàn, cảnh báo thuốc cận hạn & thuật toán cấp phát xuất kho First-Expiry First-Out
                         </Typography>
                     </Box>
                 </Box>
-                <Stack direction="row" spacing={1.5}>
-                    <Button
-                        variant="contained"
-                        sx={{ bgcolor: "#F59E0B", color: "white", fontWeight: "bold", "&:hover": { bgcolor: "#D97706" } }}
-                        startIcon={<FileDownloadIcon />}
-                        onClick={handleExportProcurementList}
-                    >
-                        Xuất Dự Trù Dược Phẩm (CSV)
-                    </Button>
+
+                <Stack direction="row" spacing={1.5} flexWrap="wrap">
                     <Button
                         variant="outlined"
-                        sx={{ color: "white", borderColor: "rgba(255,255,255,0.6)", fontWeight: "bold", "&:hover": { bgcolor: "rgba(255,255,255,0.1)" } }}
                         startIcon={<RefreshIcon />}
                         onClick={loadMedicines}
                         disabled={loading}
+                        sx={{
+                            borderRadius: 2.5,
+                            fontWeight: 700,
+                            textTransform: "none",
+                            fontSize: "0.85rem",
+                            color: "#475569",
+                            borderColor: "rgba(15, 23, 42, 0.15)",
+                            "&:hover": { borderColor: "#0F172A", bgcolor: "rgba(15, 23, 42, 0.04)" }
+                        }}
                     >
-                        Làm mới
+                        Làm Mới
+                    </Button>
+                    <Button
+                        variant="contained"
+                        startIcon={<FileDownloadIcon />}
+                        onClick={handleExportProcurementList}
+                        sx={{
+                            borderRadius: 2.5,
+                            fontWeight: 700,
+                            textTransform: "none",
+                            fontSize: "0.85rem",
+                            bgcolor: "#F59E0B",
+                            boxShadow: "0 4px 14px rgba(245, 158, 11, 0.25)",
+                            "&:hover": { bgcolor: "#D97706" }
+                        }}
+                    >
+                        Xuất Dự Trù Dược Phẩm (CSV)
                     </Button>
                 </Stack>
             </Paper>
@@ -234,9 +268,9 @@ export default function MedicineManagePage() {
             {error && (
                 <Alert
                     severity="warning"
-                    sx={{ mb: 3, borderRadius: 2.5 }}
+                    sx={{ mb: 3, borderRadius: 3, border: "1px solid rgba(245, 158, 11, 0.2)" }}
                     action={
-                        <Button color="inherit" size="small" onClick={loadMedicines}>
+                        <Button color="inherit" size="small" onClick={loadMedicines} sx={{ fontWeight: 700 }}>
                             Thử lại
                         </Button>
                     }
@@ -245,56 +279,211 @@ export default function MedicineManagePage() {
                 </Alert>
             )}
 
-            {/* FEFO Warning Cards */}
-            <Grid container spacing={3} mb={3}>
+            {/* 2. Micro-KPI Cards (FEFO & Stock Health) */}
+            <Grid container spacing={2.5} mb={3}>
                 <Grid item xs={12} sm={6} md={3}>
-                    <Card sx={{ borderRadius: 3, borderLeft: "5px solid #2563EB" }}>
-                        <CardContent>
-                            <Typography variant="body2" color="text.secondary">Tổng danh mục thuốc</Typography>
-                            <Typography variant="h4" fontWeight="bold" color="primary.main">{medicines.length}</Typography>
-                            <Typography variant="caption" color="text.secondary">Đang lưu hành tại bệnh viện</Typography>
+                    <Card
+                        elevation={0}
+                        sx={{
+                            border: "1px solid rgba(15, 23, 42, 0.08)",
+                            borderRadius: 3.5,
+                            bgcolor: "#FFFFFF",
+                            position: "relative",
+                            overflow: "hidden",
+                            transition: "all 0.2s ease",
+                            "&:hover": { transform: "translateY(-2px)", boxShadow: "0 8px 24px rgba(0, 136, 214, 0.08)" },
+                            "&::before": {
+                                content: '""',
+                                position: "absolute",
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                height: "3.5px",
+                                bgcolor: "#0088D6"
+                            }
+                        }}
+                    >
+                        <CardContent sx={{ display: "flex", alignItems: "center", gap: 2, p: 2.5 }}>
+                            <Box
+                                sx={{
+                                    width: 48,
+                                    height: 48,
+                                    borderRadius: 2.5,
+                                    bgcolor: "rgba(0, 136, 214, 0.1)",
+                                    color: "#0088D6",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center"
+                                }}
+                            >
+                                <Inventory2Icon />
+                            </Box>
+                            <Box>
+                                <Typography variant="caption" sx={{ color: "#64748B", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                                    TỔNG DANH MỤC THUỐC
+                                </Typography>
+                                <Typography variant="h4" fontWeight={800} color="#0F172A" sx={{ letterSpacing: "-0.03em" }}>
+                                    {medicines.length}
+                                </Typography>
+                                <Typography variant="caption" sx={{ color: "#94A3B8" }}>Đang lưu hành viện</Typography>
+                            </Box>
                         </CardContent>
                     </Card>
                 </Grid>
+
                 <Grid item xs={12} sm={6} md={3}>
-                    <Card sx={{ borderRadius: 3, borderLeft: "5px solid #EF4444", bgcolor: lowStockList.length > 0 ? "#FEF2F2" : "inherit" }}>
-                        <CardContent>
-                            <Typography variant="body2" color="error.main" fontWeight="bold" display="flex" alignItems="center" gap={0.5}>
-                                <WarningAmberIcon fontSize="small" /> Tồn kho dưới mức an toàn
-                            </Typography>
-                            <Typography variant="h4" fontWeight="bold" color="error.main">{lowStockList.length}</Typography>
-                            <Typography variant="caption" color="error.dark">Cần lập đơn nhập kho gấp</Typography>
+                    <Card
+                        elevation={0}
+                        sx={{
+                            border: "1px solid rgba(15, 23, 42, 0.08)",
+                            borderRadius: 3.5,
+                            bgcolor: "#FFFFFF",
+                            position: "relative",
+                            overflow: "hidden",
+                            transition: "all 0.2s ease",
+                            "&:hover": { transform: "translateY(-2px)", boxShadow: "0 8px 24px rgba(239, 68, 68, 0.08)" },
+                            "&::before": {
+                                content: '""',
+                                position: "absolute",
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                height: "3.5px",
+                                bgcolor: "#EF4444"
+                            }
+                        }}
+                    >
+                        <CardContent sx={{ display: "flex", alignItems: "center", gap: 2, p: 2.5 }}>
+                            <Box
+                                sx={{
+                                    width: 48,
+                                    height: 48,
+                                    borderRadius: 2.5,
+                                    bgcolor: "rgba(239, 68, 68, 0.1)",
+                                    color: "#EF4444",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center"
+                                }}
+                            >
+                                <WarningAmberIcon />
+                            </Box>
+                            <Box>
+                                <Typography variant="caption" sx={{ color: "#DC2626", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                                    DƯỚI MỨC AN TOÀN
+                                </Typography>
+                                <Typography variant="h4" fontWeight={800} color="#DC2626" sx={{ letterSpacing: "-0.03em" }}>
+                                    {lowStockList.length}
+                                </Typography>
+                                <Typography variant="caption" sx={{ color: "#EF4444" }}>Cần dự trù nhập kho</Typography>
+                            </Box>
                         </CardContent>
                     </Card>
                 </Grid>
+
                 <Grid item xs={12} sm={6} md={3}>
-                    <Card sx={{ borderRadius: 3, borderLeft: "5px solid #F59E0B", bgcolor: expiringSoonList.length > 0 ? "#FFFBEB" : "inherit" }}>
-                        <CardContent>
-                            <Typography variant="body2" color="warning.dark" fontWeight="bold" display="flex" alignItems="center" gap={0.5}>
-                                <EventBusyIcon fontSize="small" /> Cận hạn sử dụng (&lt; 3 tháng)
-                            </Typography>
-                            <Typography variant="h4" fontWeight="bold" color="warning.main">{expiringSoonList.length}</Typography>
-                            <Typography variant="caption" color="warning.dark">Ưu tiên xuất kho trước (FEFO)</Typography>
+                    <Card
+                        elevation={0}
+                        sx={{
+                            border: "1px solid rgba(15, 23, 42, 0.08)",
+                            borderRadius: 3.5,
+                            bgcolor: "#FFFFFF",
+                            position: "relative",
+                            overflow: "hidden",
+                            transition: "all 0.2s ease",
+                            "&:hover": { transform: "translateY(-2px)", boxShadow: "0 8px 24px rgba(245, 158, 11, 0.08)" },
+                            "&::before": {
+                                content: '""',
+                                position: "absolute",
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                height: "3.5px",
+                                bgcolor: "#F59E0B"
+                            }
+                        }}
+                    >
+                        <CardContent sx={{ display: "flex", alignItems: "center", gap: 2, p: 2.5 }}>
+                            <Box
+                                sx={{
+                                    width: 48,
+                                    height: 48,
+                                    borderRadius: 2.5,
+                                    bgcolor: "rgba(245, 158, 11, 0.1)",
+                                    color: "#D97706",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center"
+                                }}
+                            >
+                                <EventBusyIcon />
+                            </Box>
+                            <Box>
+                                <Typography variant="caption" sx={{ color: "#D97706", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                                    CẬN HẠN DÙNG (&lt;90D)
+                                </Typography>
+                                <Typography variant="h4" fontWeight={800} color="#D97706" sx={{ letterSpacing: "-0.03em" }}>
+                                    {expiringSoonList.length}
+                                </Typography>
+                                <Typography variant="caption" sx={{ color: "#B45309" }}>Ưu tiên cấp phát FEFO</Typography>
+                            </Box>
                         </CardContent>
                     </Card>
                 </Grid>
+
                 <Grid item xs={12} sm={6} md={3}>
-                    <Card sx={{ borderRadius: 3, borderLeft: "5px solid #10B981" }}>
-                        <CardContent>
-                            <Typography variant="body2" color="success.main" fontWeight="bold" display="flex" alignItems="center" gap={0.5}>
-                                <CheckCircleIcon fontSize="small" /> Tồn kho ổn định & An toàn
-                            </Typography>
-                            <Typography variant="h4" fontWeight="bold" color="success.main">
-                                {medicines.length - lowStockList.length - expiringSoonList.length}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">Đủ cung ứng trên 90 ngày</Typography>
+                    <Card
+                        elevation={0}
+                        sx={{
+                            border: "1px solid rgba(15, 23, 42, 0.08)",
+                            borderRadius: 3.5,
+                            bgcolor: "#FFFFFF",
+                            position: "relative",
+                            overflow: "hidden",
+                            transition: "all 0.2s ease",
+                            "&:hover": { transform: "translateY(-2px)", boxShadow: "0 8px 24px rgba(16, 185, 129, 0.08)" },
+                            "&::before": {
+                                content: '""',
+                                position: "absolute",
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                height: "3.5px",
+                                bgcolor: "#10B981"
+                            }
+                        }}
+                    >
+                        <CardContent sx={{ display: "flex", alignItems: "center", gap: 2, p: 2.5 }}>
+                            <Box
+                                sx={{
+                                    width: 48,
+                                    height: 48,
+                                    borderRadius: 2.5,
+                                    bgcolor: "rgba(16, 185, 129, 0.1)",
+                                    color: "#10B981",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center"
+                                }}
+                            >
+                                <CheckCircleIcon />
+                            </Box>
+                            <Box>
+                                <Typography variant="caption" sx={{ color: "#059669", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                                    TỒN KHO ỔN ĐỊNH
+                                </Typography>
+                                <Typography variant="h4" fontWeight={800} color="#0F172A" sx={{ letterSpacing: "-0.03em" }}>
+                                    {medicines.length - lowStockList.length - expiringSoonList.length}
+                                </Typography>
+                                <Typography variant="caption" sx={{ color: "#15803D" }}>Cung ứng an toàn &gt;90d</Typography>
+                            </Box>
                         </CardContent>
                     </Card>
                 </Grid>
             </Grid>
 
             {feedback.message && (
-                <Alert severity={feedback.type || "info"} sx={{ mb: 3, borderRadius: 2 }} onClose={() => setFeedback({ type: "", message: "" })}>
+                <Alert severity={feedback.type || "info"} sx={{ mb: 3, borderRadius: 3 }} onClose={() => setFeedback({ type: "", message: "" })}>
                     {feedback.message}
                 </Alert>
             )}
@@ -304,19 +493,54 @@ export default function MedicineManagePage() {
                 <Alert
                     severity="warning"
                     icon={<WarningAmberIcon fontSize="inherit" />}
-                    sx={{ mb: 3, borderRadius: 2 }}
+                    sx={{ mb: 3, borderRadius: 3, border: "1px solid rgba(245, 158, 11, 0.25)" }}
                 >
                     <b>CẢNH BÁO DƯỢC VỤ & NGUYÊN TẮC FEFO:</b> Đang có <b>{lowStockList.length}</b> mặt hàng thuốc dưới mức tồn an toàn (&lt; 50 đơn vị) và <b>{expiringSoonList.length}</b> mặt hàng sắp hết hạn trong vòng 90 ngày tới. Vui lòng ưu tiên cấp phát các lô có hạn dùng gần nhất trước khi nhập đợt thuốc mới!
                 </Alert>
             )}
 
-            {/* Tabs & Search */}
-            <Paper elevation={3} sx={{ p: 3, borderRadius: 3 }}>
+            {/* 3. Tabs & Search */}
+            <Paper
+                elevation={0}
+                sx={{
+                    p: 2.5,
+                    borderRadius: 3.5,
+                    border: "1px solid rgba(15, 23, 42, 0.08)",
+                    bgcolor: "#FFFFFF",
+                    boxShadow: "0 2px 12px rgba(15, 23, 42, 0.02)"
+                }}
+            >
                 <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2} mb={2.5}>
-                    <Tabs value={tabFilter} onChange={(_, v) => setTabFilter(v)}>
+                    <Tabs
+                        value={tabFilter}
+                        onChange={(_, v) => setTabFilter(v)}
+                        variant="scrollable"
+                        scrollButtons="auto"
+                        sx={{
+                            "& .MuiTab-root": {
+                                textTransform: "none",
+                                fontWeight: 700,
+                                fontSize: "0.85rem",
+                                minHeight: 40,
+                                borderRadius: 2,
+                                px: 2,
+                                mr: 0.5,
+                                color: "#64748B",
+                                "&.Mui-selected": {
+                                    color: "#0088D6",
+                                    bgcolor: "rgba(0, 136, 214, 0.08)"
+                                }
+                            },
+                            "& .MuiTabs-indicator": {
+                                bgcolor: "#0088D6",
+                                height: 3,
+                                borderRadius: 1.5
+                            }
+                        }}
+                    >
                         <Tab label={`Tất cả (${medicines.length})`} value="ALL" />
-                        <Tab label={`Sắp hết hàng (${lowStockList.length})`} value="LOW_STOCK" sx={{ color: lowStockList.length > 0 ? "error.main" : "inherit" }} />
-                        <Tab label={`Cận hạn FEFO (${expiringSoonList.length})`} value="EXPIRING_SOON" sx={{ color: expiringSoonList.length > 0 ? "warning.main" : "inherit" }} />
+                        <Tab label={`Sắp hết hàng (${lowStockList.length})`} value="LOW_STOCK" sx={{ color: lowStockList.length > 0 ? "#DC2626 !important" : "inherit" }} />
+                        <Tab label={`Cận hạn FEFO (${expiringSoonList.length})`} value="EXPIRING_SOON" sx={{ color: expiringSoonList.length > 0 ? "#D97706 !important" : "inherit" }} />
                         <Tab label="Tồn kho an toàn" value="SAFE" />
                     </Tabs>
 
@@ -329,40 +553,91 @@ export default function MedicineManagePage() {
                         InputProps={{
                             startAdornment: (
                                 <InputAdornment position="start">
-                                    <SearchIcon color="action" />
+                                    <SearchIcon sx={{ color: "#94A3B8" }} />
                                 </InputAdornment>
                             ),
+                            sx: {
+                                borderRadius: 2.5,
+                                bgcolor: "#F8FAFC",
+                                "& fieldset": { borderColor: "rgba(15, 23, 42, 0.1)" },
+                                "&:hover fieldset": { borderColor: "#0088D6" },
+                                "&.Mui-focused fieldset": { borderColor: "#0088D6" }
+                            }
                         }}
                     />
                 </Box>
 
-                <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
+                <TableContainer
+                    component={Paper}
+                    elevation={0}
+                    sx={{
+                        borderRadius: 3,
+                        border: "1px solid rgba(15, 23, 42, 0.08)",
+                        overflow: "hidden"
+                    }}
+                >
                     <Table>
                         <TableHead sx={{ bgcolor: "#F8FAFC" }}>
                             <TableRow>
-                                <TableCell><b>Mã thuốc</b></TableCell>
-                                <TableCell><b>Tên thuốc thương mại</b></TableCell>
-                                <TableCell><b>Hoạt chất chính</b></TableCell>
-                                <TableCell><b>Số lô SX (Batch)</b></TableCell>
-                                <TableCell><b>Hạn sử dụng (FEFO)</b></TableCell>
-                                <TableCell align="right"><b>Đơn giá</b></TableCell>
-                                <TableCell align="center"><b>Tồn kho hiện tại</b></TableCell>
-                                <TableCell align="center"><b>Trạng thái FEFO</b></TableCell>
-                                <TableCell align="center"><b>Thao tác</b></TableCell>
+                                <TableCell sx={{ fontWeight: 800, color: "#475569", py: 1.8, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", borderBottom: "1px solid rgba(15, 23, 42, 0.08)" }}>Mã Thuốc</TableCell>
+                                <TableCell sx={{ fontWeight: 800, color: "#475569", py: 1.8, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", borderBottom: "1px solid rgba(15, 23, 42, 0.08)" }}>Tên Thuốc Thương Mại</TableCell>
+                                <TableCell sx={{ fontWeight: 800, color: "#475569", py: 1.8, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", borderBottom: "1px solid rgba(15, 23, 42, 0.08)" }}>Hoạt Chất Chính</TableCell>
+                                <TableCell sx={{ fontWeight: 800, color: "#475569", py: 1.8, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", borderBottom: "1px solid rgba(15, 23, 42, 0.08)" }}>Số Lô SX (Batch)</TableCell>
+                                <TableCell sx={{ fontWeight: 800, color: "#475569", py: 1.8, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", borderBottom: "1px solid rgba(15, 23, 42, 0.08)" }}>Hạn Dùng (FEFO)</TableCell>
+                                <TableCell align="right" sx={{ fontWeight: 800, color: "#475569", py: 1.8, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", borderBottom: "1px solid rgba(15, 23, 42, 0.08)" }}>Đơn Giá</TableCell>
+                                <TableCell align="center" sx={{ fontWeight: 800, color: "#475569", py: 1.8, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", borderBottom: "1px solid rgba(15, 23, 42, 0.08)" }}>Tồn Kho</TableCell>
+                                <TableCell align="center" sx={{ fontWeight: 800, color: "#475569", py: 1.8, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", borderBottom: "1px solid rgba(15, 23, 42, 0.08)" }}>Trạng Thái FEFO</TableCell>
+                                <TableCell align="center" sx={{ fontWeight: 800, color: "#475569", py: 1.8, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", borderBottom: "1px solid rgba(15, 23, 42, 0.08)" }}>Thao Tác</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
                             {loading ? (
                                 <TableRow>
-                                    <TableCell colSpan={9} align="center" sx={{ py: 6 }}>
-                                        <CircularProgress size={32} />
-                                        <Typography variant="body2" color="textSecondary" mt={1}>Đang tải danh mục kho thuốc...</Typography>
+                                    <TableCell colSpan={9} align="center" sx={{ py: 8 }}>
+                                        <CircularProgress size={34} sx={{ color: "#0088D6" }} />
+                                        <Typography variant="body2" sx={{ color: "#64748B", mt: 1.5, fontWeight: 600 }}>Đang tải danh mục kho thuốc...</Typography>
                                     </TableCell>
                                 </TableRow>
                             ) : filteredMedicines.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={9} align="center" sx={{ py: 4, color: "text.secondary" }}>
-                                        Không tìm thấy mặt hàng thuốc nào phù hợp với bộ lọc!
+                                    <TableCell colSpan={9} align="center" sx={{ py: 8 }}>
+                                        <Box
+                                            sx={{
+                                                width: 56,
+                                                height: 56,
+                                                borderRadius: "16px",
+                                                bgcolor: "rgba(100, 116, 139, 0.08)",
+                                                color: "#94A3B8",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                mx: "auto",
+                                                mb: 1.5
+                                            }}
+                                        >
+                                            <MedicationIcon sx={{ fontSize: 30 }} />
+                                        </Box>
+                                        <Typography variant="subtitle1" fontWeight={700} sx={{ color: "#334155" }}>
+                                            Không tìm thấy thuốc nào
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ color: "#64748B", mb: 2 }}>
+                                            {searchKeyword || tabFilter !== "ALL"
+                                                ? "Không có mặt hàng thuốc nào phù hợp với bộ lọc tìm kiếm hiện tại."
+                                                : "Hệ thống chưa có danh mục thuốc lưu hành."}
+                                        </Typography>
+                                        {(searchKeyword || tabFilter !== "ALL") && (
+                                            <Button
+                                                variant="outlined"
+                                                size="small"
+                                                onClick={() => {
+                                                    setSearchKeyword("");
+                                                    setTabFilter("ALL");
+                                                }}
+                                                sx={{ borderRadius: 2.2, textTransform: "none", fontWeight: 700 }}
+                                            >
+                                                Xóa bộ lọc tìm kiếm
+                                            </Button>
+                                        )}
                                     </TableCell>
                                 </TableRow>
                             ) : (
@@ -376,55 +651,93 @@ export default function MedicineManagePage() {
                                     const unitLabel = getUnitLabel(m.unit);
 
                                     return (
-                                        <TableRow key={m.medicineId} hover sx={{ bgcolor: isExpired ? "#FEF2F2" : (isExpiringSoon ? "#FFFBEB" : "inherit") }}>
-                                            <TableCell><b>#MED-{m.medicineId}</b></TableCell>
-                                            <TableCell>
-                                                <Typography variant="body2" fontWeight="bold" color="primary">
+                                        <TableRow
+                                            key={m.medicineId}
+                                            hover
+                                            sx={{
+                                                bgcolor: isExpired ? "rgba(254, 242, 242, 0.6)" : (isExpiringSoon ? "rgba(255, 251, 235, 0.6)" : "inherit"),
+                                                "&:hover": { bgcolor: "rgba(248, 250, 252, 0.8)" },
+                                                transition: "background-color 0.15s ease"
+                                            }}
+                                        >
+                                            <TableCell sx={{ py: 2, borderBottom: "1px solid rgba(15, 23, 42, 0.06)" }}>
+                                                <Typography variant="body2" fontWeight={700} sx={{ fontFamily: "monospace", color: "#64748B" }}>
+                                                    #MED-{m.medicineId}
+                                                </Typography>
+                                            </TableCell>
+                                            <TableCell sx={{ py: 2, borderBottom: "1px solid rgba(15, 23, 42, 0.06)" }}>
+                                                <Typography variant="body2" fontWeight={800} sx={{ color: "#0F172A", fontSize: "0.85rem" }}>
                                                     {m.medicineName}
                                                 </Typography>
                                             </TableCell>
-                                            <TableCell><i>{m.activeIngredient || "Theo chỉ định"}</i></TableCell>
-                                            <TableCell>
-                                                <Chip label={m.batchNumber || "LOT-STD"} size="small" variant="outlined" />
+                                            <TableCell sx={{ py: 2, borderBottom: "1px solid rgba(15, 23, 42, 0.06)" }}>
+                                                <Typography variant="body2" color="#475569">
+                                                    {m.activeIngredient || <i>Theo chỉ định</i>}
+                                                </Typography>
                                             </TableCell>
-                                            <TableCell>
-                                                <Typography variant="body2" fontWeight="bold" color={isExpired ? "error.main" : (isExpiringSoon ? "warning.main" : "text.primary")}>
+                                            <TableCell sx={{ py: 2, borderBottom: "1px solid rgba(15, 23, 42, 0.06)" }}>
+                                                <Chip
+                                                    label={m.batchNumber || "LOT-STD"}
+                                                    size="small"
+                                                    sx={{
+                                                        fontFamily: "monospace",
+                                                        fontWeight: 700,
+                                                        fontSize: "0.72rem",
+                                                        bgcolor: "rgba(100, 116, 139, 0.08)",
+                                                        color: "#475569",
+                                                        border: "1px solid rgba(100, 116, 139, 0.2)",
+                                                        borderRadius: 1.5
+                                                    }}
+                                                />
+                                            </TableCell>
+                                            <TableCell sx={{ py: 2, borderBottom: "1px solid rgba(15, 23, 42, 0.06)" }}>
+                                                <Typography variant="body2" fontWeight={700} color={isExpired ? "#EF4444" : (isExpiringSoon ? "#D97706" : "#0F172A")} sx={{ fontFamily: "monospace" }}>
                                                     {m.expiryDate ? formatDate(m.expiryDate) : "31/12/2027"}
                                                 </Typography>
-                                                <Typography variant="caption" color="text.secondary">
+                                                <Typography variant="caption" sx={{ color: isExpired ? "#EF4444" : (isExpiringSoon ? "#D97706" : "#94A3B8") }}>
                                                     {isExpired ? "Đã hết hạn" : `(Còn ${daysUntilExp} ngày)`}
                                                 </Typography>
                                             </TableCell>
-                                            <TableCell align="right">
-                                                <b>{formatCurrency(m.price)}</b>
+                                            <TableCell align="right" sx={{ py: 2, borderBottom: "1px solid rgba(15, 23, 42, 0.06)" }}>
+                                                <Typography variant="body2" fontWeight={800} color="#0F172A" sx={{ fontFamily: "monospace" }}>
+                                                    {formatCurrency(m.price)}
+                                                </Typography>
                                             </TableCell>
-                                            <TableCell align="center">
-                                                <Chip
-                                                    label={`${stock} ${unitLabel}`}
-                                                    color={isLow ? "error" : "success"}
-                                                    size="small"
-                                                    sx={{ fontWeight: 700 }}
-                                                />
+                                            <TableCell align="center" sx={{ py: 2, borderBottom: "1px solid rgba(15, 23, 42, 0.06)", whiteSpace: "nowrap" }}>
+                                                <Typography variant="body2" fontWeight={700} sx={{ fontFamily: "monospace", color: isLow ? "#DC2626" : "#0F172A" }}>
+                                                    {stock.toLocaleString()} <Typography component="span" variant="caption" sx={{ color: "#64748B", fontWeight: 700, fontSize: "0.72rem" }}>{unitLabel}</Typography>
+                                                </Typography>
                                             </TableCell>
-                                            <TableCell align="center">
+                                            <TableCell align="center" sx={{ py: 2, borderBottom: "1px solid rgba(15, 23, 42, 0.06)" }}>
                                                 {isExpired ? (
-                                                    <Chip label="HẾT HẠN - TIÊU HỦY" color="error" size="small" sx={{ fontWeight: 800 }} />
+                                                    <Chip label="HẾT HẠN - TIÊU HỦY" size="small" sx={{ fontWeight: 800, fontSize: "0.7rem", bgcolor: "rgba(239, 68, 68, 0.12)", color: "#DC2626", border: "1px solid rgba(239, 68, 68, 0.3)", borderRadius: 1.5 }} />
                                                 ) : isExpiringSoon ? (
-                                                    <Chip label="ƯU TIÊN XUẤT (FEFO)" color="warning" size="small" sx={{ fontWeight: 800 }} />
+                                                    <Chip label="ƯU TIÊN XUẤT (FEFO)" size="small" sx={{ fontWeight: 800, fontSize: "0.7rem", bgcolor: "rgba(245, 158, 11, 0.12)", color: "#D97706", border: "1px solid rgba(245, 158, 11, 0.3)", borderRadius: 1.5 }} />
                                                 ) : isLow ? (
-                                                    <Chip label="SẮP HẾT TỒN KHO" color="error" size="small" variant="outlined" sx={{ fontWeight: 700 }} />
+                                                    <Chip label="SẮP HẾT TỒN KHO" size="small" sx={{ fontWeight: 700, fontSize: "0.7rem", bgcolor: "rgba(239, 68, 68, 0.08)", color: "#EF4444", border: "1px solid rgba(239, 68, 68, 0.2)", borderRadius: 1.5 }} />
                                                 ) : (
-                                                    <Chip label="AN TOÀN" color="success" size="small" variant="outlined" />
+                                                    <Chip label="AN TOÀN" size="small" sx={{ fontWeight: 700, fontSize: "0.7rem", bgcolor: "rgba(16, 185, 129, 0.08)", color: "#059669", border: "1px solid rgba(16, 185, 129, 0.2)", borderRadius: 1.5 }} />
                                                 )}
                                             </TableCell>
-                                            <TableCell align="center">
+                                            <TableCell align="center" sx={{ py: 2, borderBottom: "1px solid rgba(15, 23, 42, 0.06)", minWidth: 130, whiteSpace: "nowrap" }}>
                                                 <Button
                                                     size="small"
                                                     variant="contained"
-                                                    color="primary"
-                                                    startIcon={<AddShoppingCartIcon />}
+                                                    startIcon={<AddShoppingCartIcon sx={{ fontSize: 16 }} />}
                                                     onClick={() => handleOpenRestockModal(m)}
-                                                    sx={{ borderRadius: 2, textTransform: "none", fontWeight: 600 }}
+                                                    sx={{
+                                                        borderRadius: 2,
+                                                        textTransform: "none",
+                                                        fontWeight: 700,
+                                                        fontSize: "0.78rem",
+                                                        whiteSpace: "nowrap",
+                                                        minWidth: "105px",
+                                                        px: 1.8,
+                                                        py: 0.6,
+                                                        bgcolor: "#0088D6",
+                                                        boxShadow: "0 2px 8px rgba(0, 136, 214, 0.2)",
+                                                        "&:hover": { bgcolor: "#0073B7" }
+                                                    }}
                                                 >
                                                     Nhập thêm
                                                 </Button>
@@ -440,23 +753,46 @@ export default function MedicineManagePage() {
 
             {/* Modal Nhập thêm thuốc theo Lô & HSD (FEFO) */}
             {selectedMed && (
-                <Dialog open={openRestock} onClose={() => setOpenRestock(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
-                    <DialogTitle sx={{ fontWeight: "bold", color: "primary.main", borderBottom: "1px solid #E2E8F0" }}>
+                <Dialog
+                    open={openRestock}
+                    onClose={() => setOpenRestock(false)}
+                    maxWidth="sm"
+                    fullWidth
+                    PaperProps={{
+                        sx: {
+                            borderRadius: 4,
+                            border: "1px solid rgba(15, 23, 42, 0.08)",
+                            boxShadow: "0 20px 40px rgba(15, 23, 42, 0.15)"
+                        }
+                    }}
+                >
+                    <DialogTitle sx={{ fontWeight: 800, color: "#0F172A", display: "flex", alignItems: "center", gap: 1.2, pb: 1 }}>
+                        <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: "rgba(0, 136, 214, 0.1)", color: "#0088D6", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <AddShoppingCartIcon sx={{ fontSize: 20 }} />
+                        </Box>
                         Nhập Thêm Lô Thuốc: {selectedMed.medicineName}
                     </DialogTitle>
-                    <DialogContent sx={{ pt: 2.5 }}>
-                        <Box sx={{ mb: 2.5, p: 2, bgcolor: "#F8FAFC", borderRadius: 2, border: "1px solid #E2E8F0" }}>
-                            <Grid container spacing={1}>
-                                <Grid item xs={6}><Typography variant="body2">Mã thuốc: <b>#MED-{selectedMed.medicineId}</b></Typography></Grid>
-                                <Grid item xs={6}><Typography variant="body2">Hoạt chất: <b>{selectedMed.activeIngredient}</b></Typography></Grid>
+                    <DialogContent dividers sx={{ borderColor: "rgba(15, 23, 42, 0.08)" }}>
+                        <Box sx={{ mb: 2.5, p: 2, bgcolor: "#F8FAFC", borderRadius: 3, border: "1px solid rgba(15, 23, 42, 0.08)" }}>
+                            <Grid container spacing={1.5}>
                                 <Grid item xs={6}>
-                                    <Typography variant="body2">
-                                        Tồn kho hiện tại: <b style={{ color: selectedMed.stockQuantity < 50 ? "#EF4444" : "#10B981" }}>
-                                            {selectedMed.stockQuantity} {getUnitLabel(selectedMed.unit)}
-                                        </b>
+                                    <Typography variant="body2" sx={{ color: "#64748B" }}>Mã thuốc:</Typography>
+                                    <Typography variant="body2" fontWeight={800} color="#0F172A" sx={{ fontFamily: "monospace" }}>#MED-{selectedMed.medicineId}</Typography>
+                                </Grid>
+                                <Grid item xs={6}>
+                                    <Typography variant="body2" sx={{ color: "#64748B" }}>Hoạt chất:</Typography>
+                                    <Typography variant="body2" fontWeight={800} color="#0F172A">{selectedMed.activeIngredient || "Theo chỉ định"}</Typography>
+                                </Grid>
+                                <Grid item xs={6}>
+                                    <Typography variant="body2" sx={{ color: "#64748B" }}>Tồn kho hiện tại:</Typography>
+                                    <Typography variant="body2" fontWeight={800} sx={{ color: selectedMed.stockQuantity < 50 ? "#EF4444" : "#10B981" }}>
+                                        {selectedMed.stockQuantity} {getUnitLabel(selectedMed.unit)}
                                     </Typography>
                                 </Grid>
-                                <Grid item xs={6}><Typography variant="body2">Lô hiện hành: <b>{selectedMed.batchNumber}</b></Typography></Grid>
+                                <Grid item xs={6}>
+                                    <Typography variant="body2" sx={{ color: "#64748B" }}>Lô hiện hành:</Typography>
+                                    <Typography variant="body2" fontWeight={800} color="#0F172A" sx={{ fontFamily: "monospace" }}>{selectedMed.batchNumber || "LOT-STD"}</Typography>
+                                </Grid>
                             </Grid>
                         </Box>
 
@@ -471,6 +807,7 @@ export default function MedicineManagePage() {
                                     inputProps={{ min: 1 }}
                                     autoFocus
                                     required
+                                    InputProps={{ sx: { borderRadius: 2.5 } }}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={6}>
@@ -481,6 +818,7 @@ export default function MedicineManagePage() {
                                     onChange={(e) => setImportBatch(e.target.value)}
                                     placeholder="LOT-2026-XX"
                                     required
+                                    InputProps={{ sx: { borderRadius: 2.5 } }}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={6}>
@@ -492,13 +830,25 @@ export default function MedicineManagePage() {
                                     value={importExpiry}
                                     onChange={(e) => setImportExpiry(e.target.value)}
                                     required
+                                    InputProps={{ sx: { borderRadius: 2.5 } }}
                                 />
                             </Grid>
                         </Grid>
                     </DialogContent>
-                    <DialogActions sx={{ p: 2.5, borderTop: "1px solid #E2E8F0" }}>
-                        <Button onClick={() => setOpenRestock(false)} variant="outlined" color="inherit">Hủy</Button>
-                        <Button variant="contained" color="success" onClick={handleRestock} sx={{ fontWeight: 700, px: 3 }}>
+                    <DialogActions sx={{ p: 2.5 }}>
+                        <Button onClick={() => setOpenRestock(false)} sx={{ borderRadius: 2, textTransform: "none", fontWeight: 600 }}>Hủy</Button>
+                        <Button
+                            variant="contained"
+                            onClick={handleRestock}
+                            sx={{
+                                borderRadius: 2.2,
+                                fontWeight: 700,
+                                textTransform: "none",
+                                bgcolor: "#10B981",
+                                boxShadow: "0 4px 14px rgba(16, 185, 129, 0.25)",
+                                "&:hover": { bgcolor: "#059669" }
+                            }}
+                        >
                             Xác Nhận Nhập Kho (FEFO)
                         </Button>
                     </DialogActions>

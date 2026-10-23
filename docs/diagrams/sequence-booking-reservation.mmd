@@ -1,0 +1,39 @@
+sequenceDiagram
+    autonumber
+    actor Patient as Bệnh nhân / giao diện
+    participant Controller as BookingController
+    participant Reservation as SlotReservationService
+    participant SlotRepo as TimeSlotRepository
+    participant BookingService as BookingServiceImpl
+    participant BookingRepo as BookingRepository
+
+    Patient->>Controller: POST /api/bookings/reserve-slot
+    Controller->>Reservation: reserveSlot(timeSlotId, profileId)
+    Reservation->>SlotRepo: findById(timeSlotId)
+    SlotRepo-->>Reservation: TimeSlot
+    alt currentBookings + holdingCount < maxCapacity
+        Reservation->>SlotRepo: save(holdingCount + 1)
+        Reservation->>Reservation: lưu reservationId vào cache, TTL 600 giây
+        Reservation-->>Controller: reservationId, expiresAt
+        Controller-->>Patient: giữ chỗ tạm thời thành công
+    else Khung giờ đã đủ sức chứa
+        Reservation-->>Controller: HTTP 409 CONFLICT
+        Controller-->>Patient: chọn khung giờ khác
+    end
+
+    Patient->>Controller: POST /api/bookings (reservationId, timeSlotId)
+    Controller->>BookingService: createBooking(accountId, request)
+    BookingService->>BookingService: xác minh hồ sơ thuộc tài khoản
+    BookingService->>SlotRepo: findByIdWithLock(timeSlotId)
+    SlotRepo-->>BookingService: TimeSlot đã khóa
+    opt Có reservationId
+        BookingService->>Reservation: confirmSlotReservation(reservationId)
+        Reservation->>SlotRepo: giảm holdingCount
+    end
+    BookingService->>SlotRepo: tăng currentBookings và lưu
+    BookingService->>BookingRepo: đếm lượt trong ngày, lưu Booking
+    BookingRepo-->>BookingService: Booking đã tạo
+    BookingService-->>Controller: BookingResponse
+    Controller-->>Patient: HTTP 201, mã đặt khám và số thứ tự
+
+    Note over Reservation,SlotRepo: Reservation hết hạn được quét mỗi 10 giây và giải phóng sau TTL 600 giây.

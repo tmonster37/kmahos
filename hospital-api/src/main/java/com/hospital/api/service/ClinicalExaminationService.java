@@ -13,6 +13,7 @@ public interface ClinicalExaminationService {
     List<MedicalTestResponse> assignMedicalTests(UUID recordId, AssignMedicalTestRequest request);
     MedicalTestResponse updateTestResult(UUID testId, UpdateTestResultRequest request);
     MedicalRecordResponse makeDiagnosis(UUID recordId, DiagnosisRequest request);
+    MedicalRecordResponse completeExamination(UUID recordId, CompleteExaminationRequest request);
     PrescriptionResponse createPrescription(UUID recordId, CreatePrescriptionRequest request);
     DrugSafetyCheckResponse checkPrescriptionSafety(UUID recordId, CheckPrescriptionSafetyRequest request);
     MedicalRecordResponse getRecordById(UUID recordId);
@@ -27,6 +28,7 @@ public interface ClinicalExaminationService {
     LabTestDetailResponse getLabTestById(UUID testId);
     LabTestDetailResponse collectSpecimen(UUID testId, CollectSpecimenRequest request);
     LabTestDetailResponse saveDetailedTestResult(UUID testId, SaveDetailedTestResultRequest request);
+    MedicalTestResponse cancelMedicalTest(UUID testId, String reason);
 
     // Quản lý Chỉ số lâm sàng (EHR Observations - OpenMRS/FHIR)
     MedicalRecordResponse recordObservations(UUID recordId, List<ObservationInputRequest> observations);

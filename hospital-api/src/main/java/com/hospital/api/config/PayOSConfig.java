@@ -66,13 +66,22 @@ public class PayOSConfig {
      * Sinh đường dẫn ảnh VietQR chuẩn Napas 247 quốc gia (QuickLink / VietQR API)
      */
     public String generateVietQRUrl(long amount, String transferContent) {
-        String encodedHolder = URLEncoder.encode(accountHolder, StandardCharsets.UTF_8);
-        String encodedContent = URLEncoder.encode(transferContent, StandardCharsets.UTF_8);
+        return generateVietQRUrl(bankBin, bankAccount, accountHolder, amount, transferContent);
+    }
+
+    public String generateVietQRUrl(String bin, String account, String holder, long amount, String transferContent) {
+        String cleanBin = (bin != null && !bin.isBlank()) ? bin.trim().replaceAll("\\s+", "") : "MB";
+        String cleanAccount = (account != null && !account.isBlank()) ? account.trim().replaceAll("\\s+", "") : "0987654321";
+        String safeHolder = (holder != null && !holder.isBlank()) ? holder.trim() : "BENH VIEN DA KHOA QUOC TE TNT";
+        String safeContent = (transferContent != null && !transferContent.isBlank()) ? transferContent.trim() : "";
+
+        String encodedHolder = URLEncoder.encode(safeHolder, StandardCharsets.UTF_8);
+        String encodedContent = URLEncoder.encode(safeContent, StandardCharsets.UTF_8);
 
         return String.format(
                 "https://img.vietqr.io/image/%s-%s-compact2.png?amount=%d&addInfo=%s&accountName=%s",
-                bankBin,
-                bankAccount,
+                cleanBin,
+                cleanAccount,
                 amount,
                 encodedContent,
                 encodedHolder
@@ -95,6 +104,45 @@ public class PayOSConfig {
             return result.toString();
         } catch (Exception e) {
             throw new RuntimeException("Lỗi tính toán chữ ký PayOS HMAC-SHA256: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Xác thực tính toàn vẹn của dữ liệu trả về qua Return URL theo tài liệu PayOS:
+     * https://payos.vn/docs/du-lieu-tra-ve/return-url/
+     */
+    public boolean verifyReturnUrlData(java.util.Map<String, String> queryParams) {
+        if (queryParams == null || queryParams.isEmpty()) {
+            return false;
+        }
+        String signature = queryParams.get("signature");
+        if (signature == null || signature.isBlank()) {
+            // Không có signature: kiểm tra mã code=00 và status=PAID, không cancel
+            return "00".equals(queryParams.get("code")) && !"true".equalsIgnoreCase(queryParams.get("cancel"));
+        }
+
+        // Sắp xếp các tham số alphabet key=value theo đặc tả PayOS (loại trừ signature)
+        java.util.List<String> sortedKeys = queryParams.keySet().stream()
+                .filter(k -> !"signature".equalsIgnoreCase(k))
+                .sorted()
+                .toList();
+
+        StringBuilder sb = new StringBuilder();
+        for (String k : sortedKeys) {
+            String val = queryParams.get(k);
+            if (val != null && !val.isBlank()) {
+                if (!sb.isEmpty()) {
+                    sb.append("&");
+                }
+                sb.append(k).append("=").append(val);
+            }
+        }
+
+        try {
+            String calculated = hmacSHA256(checksumKey, sb.toString());
+            return calculated.equalsIgnoreCase(signature);
+        } catch (Exception e) {
+            return false;
         }
     }
 }

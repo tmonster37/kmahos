@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
     Dialog,
-    DialogTitle,
     DialogContent,
     DialogActions,
     Box,
@@ -12,21 +11,18 @@ import {
     Chip,
     CircularProgress,
     IconButton,
-    Alert,
     Tooltip,
-    Divider,
     Stack
 } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import QrCode2Icon from "@mui/icons-material/QrCode2";
 import CloseIcon from "@mui/icons-material/Close";
 import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
 import DoneAllIcon from "@mui/icons-material/DoneAll";
 import DownloadIcon from "@mui/icons-material/Download";
-import SecurityIcon from "@mui/icons-material/Security";
 import SyncIcon from "@mui/icons-material/Sync";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+import { QRCodeCanvas } from "qrcode.react";
 import axiosInstance from "../../services/AxiosInstance";
 import { formatCurrency } from "../../utils/formatters";
 
@@ -35,11 +31,15 @@ export default function PaymentQRModal({ open, onClose, paymentData, onSuccess }
     const [status, setStatus] = useState("PENDING");
     const [confirming, setConfirming] = useState(false);
     const [syncing, setSyncing] = useState(false);
+    const [imgError, setImgError] = useState(false);
+    const qrCanvasRef = useRef(null);
 
     const txnRef = paymentData?.txnRef;
 
     useEffect(() => {
-        if (!open || !txnRef) return;
+        if (!open) return;
+        setImgError(false);
+        if (!txnRef) return;
         setStatus("PENDING");
 
         // Polling check transaction status every 2.5s
@@ -60,23 +60,56 @@ export default function PaymentQRModal({ open, onClose, paymentData, onSuccess }
         }, 2500);
 
         return () => clearInterval(interval);
-    }, [open, txnRef]);
+    }, [open, txnRef, paymentData]);
 
     const handleCopy = (text, fieldName) => {
-        navigator.clipboard.writeText(text);
+        if (!text) return;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).catch(() => {});
+        } else {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand("copy");
+            } catch (e) {
+                // Ignore copy failure
+            }
+            document.body.removeChild(textArea);
+        }
         setCopiedField(fieldName);
         setTimeout(() => setCopiedField(null), 2000);
     };
 
     const handleDownloadQR = () => {
-        if (!paymentData?.qrImageUrl) return;
-        const link = document.createElement("a");
-        link.href = paymentData.qrImageUrl;
-        link.download = `VietQR-${txnRef}.png`;
-        link.target = "_blank";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        // Ưu tiên 1: Tải trực tiếp file ảnh PNG độ nét cao từ QRCodeCanvas
+        const canvas = qrCanvasRef.current || document.getElementById("vietqr-canvas");
+        if (canvas) {
+            try {
+                const pngUrl = canvas.toDataURL("image/png");
+                const link = document.createElement("a");
+                link.href = pngUrl;
+                link.download = `VietQR-${txnRef || "payment"}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                return;
+            } catch (e) {
+                console.error("Lỗi xuất ảnh từ canvas:", e);
+            }
+        }
+
+        // Ưu tiên 2: Tải từ URL nếu là link ảnh HTTP hợp lệ
+        if (isImageUrl && !imgError) {
+            const link = document.createElement("a");
+            link.href = qrImageUrl;
+            link.download = `VietQR-${txnRef || "payment"}.png`;
+            link.target = "_blank";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
     };
 
     // Đồng bộ trực tiếp từ cổng PayOS
@@ -120,6 +153,27 @@ export default function PaymentQRModal({ open, onClose, paymentData, onSuccess }
     };
 
     if (!paymentData) return null;
+
+    const rawQrCode = paymentData?.qrCode;
+    const qrImageUrl = paymentData?.qrImageUrl;
+
+    // Kiểm tra xem qrImageUrl có phải là URL HTTP(S) trỏ đến file ảnh hay không
+    const isImageUrl = Boolean(
+        qrImageUrl &&
+        (qrImageUrl.startsWith("http://") ||
+         qrImageUrl.startsWith("https://") ||
+         qrImageUrl.startsWith("data:image/"))
+    );
+
+    // Chuỗi mã hóa VietQR EMVCo (nếu backend trả về raw string trong qrCode hoặc qrImageUrl)
+    const emvCoPayload = rawQrCode || (!isImageUrl ? qrImageUrl : null);
+
+    // Giá trị QR code hợp lệ để hiển thị
+    const effectiveQrValue = emvCoPayload || (isImageUrl ? qrImageUrl : (paymentData.paymentUrl || `PAY:${txnRef}:${paymentData.amount}`));
+
+    // Số tài khoản sạch không chứa dấu cách để copy chính xác vào App ngân hàng
+    const displayAccountNo = paymentData.bankAccountNo || "0987654321";
+    const cleanAccountNo = displayAccountNo.replace(/\s+/g, "");
 
     return (
         <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 4, overflow: "hidden" } }}>
@@ -186,6 +240,7 @@ export default function PaymentQRModal({ open, onClose, paymentData, onSuccess }
                                 bgcolor: "#EFF6FF",
                                 border: "1px dashed #93C5FD",
                                 display: "flex",
+                                justifyItems: "center",
                                 justifyContent: "space-around",
                                 flexWrap: "wrap",
                                 gap: 1
@@ -211,21 +266,55 @@ export default function PaymentQRModal({ open, onClose, paymentData, onSuccess }
                                         p: 1.5,
                                         borderRadius: 3,
                                         bgcolor: "white",
-                                        display: "inline-block",
-                                        border: "2px solid #005BAA"
+                                        display: "inline-flex",
+                                        flexDirection: "column",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        border: "2px solid #005BAA",
+                                        minWidth: 216,
+                                        minHeight: 216
                                     }}
                                 >
-                                    <Box
-                                        component="img"
-                                        src={paymentData.qrImageUrl}
-                                        alt="VietQR Payment"
-                                        sx={{
-                                            width: 200,
-                                            height: 200,
-                                            display: "block",
-                                            borderRadius: 2
-                                        }}
-                                    />
+                                    {isImageUrl && !imgError && !emvCoPayload ? (
+                                        <Box
+                                            component="img"
+                                            src={qrImageUrl}
+                                            alt="VietQR Payment"
+                                            onError={() => setImgError(true)}
+                                            sx={{
+                                                width: 200,
+                                                height: 200,
+                                                display: "block",
+                                                borderRadius: 2,
+                                                objectFit: "contain"
+                                            }}
+                                        />
+                                    ) : (
+                                        <Box display="flex" flexDirection="column" alignItems="center" p={0.5}>
+                                            <QRCodeCanvas
+                                                id="vietqr-canvas"
+                                                ref={qrCanvasRef}
+                                                value={effectiveQrValue}
+                                                size={188}
+                                                level="M"
+                                                marginSize={2}
+                                            />
+                                            <Box display="flex" alignItems="center" gap={0.5} mt={0.8}>
+                                                <Chip
+                                                    label="VietQR • Napas 247"
+                                                    size="small"
+                                                    sx={{
+                                                        height: 20,
+                                                        fontSize: "0.68rem",
+                                                        fontWeight: 800,
+                                                        bgcolor: "#EFF6FF",
+                                                        color: "#005BAA",
+                                                        border: "1px solid #BFDBFE"
+                                                    }}
+                                                />
+                                            </Box>
+                                        </Box>
+                                    )}
                                 </Paper>
 
                                 <Box mt={1.5} display="flex" flexDirection="column" alignItems="center" gap={1}>
@@ -242,7 +331,7 @@ export default function PaymentQRModal({ open, onClose, paymentData, onSuccess }
                                         variant="text"
                                         startIcon={<DownloadIcon />}
                                         onClick={handleDownloadQR}
-                                        sx={{ fontSize: "0.75rem", textTransform: "none" }}
+                                        sx={{ fontSize: "0.75rem", textTransform: "none", fontWeight: 700 }}
                                     >
                                         Tải ảnh QR về máy
                                     </Button>
@@ -295,11 +384,11 @@ export default function PaymentQRModal({ open, onClose, paymentData, onSuccess }
                                             <Box>
                                                 <Typography variant="caption" color="text.secondary">Số tài khoản:</Typography>
                                                 <Typography variant="body1" fontWeight="900" color="primary.main" fontFamily="monospace">
-                                                    {paymentData.bankAccountNo || "0987654321"}
+                                                    {displayAccountNo}
                                                 </Typography>
                                             </Box>
                                             <Tooltip title={copiedField === "account" ? "Đã copy!" : "Copy số TK"}>
-                                                <IconButton size="small" onClick={() => handleCopy(paymentData.bankAccountNo || "0987654321", "account")}>
+                                                <IconButton size="small" onClick={() => handleCopy(cleanAccountNo, "account")}>
                                                     {copiedField === "account" ? <CheckCircleIcon color="success" fontSize="small" /> : <ContentCopyIcon fontSize="small" />}
                                                 </IconButton>
                                             </Tooltip>

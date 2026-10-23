@@ -83,12 +83,20 @@ const tntTheme = createTheme({
                     },
                 },
                 containedPrimary: {
-                    background: `linear-gradient(135deg, ${designTokens.brand.primary} 0%, ${designTokens.brand.primaryHover} 100%)`,
+                    backgroundColor: designTokens.brand.primary,
+                    backgroundImage: `linear-gradient(135deg, ${designTokens.brand.primary} 0%, ${designTokens.brand.primaryHover} 100%)`,
                     color: "#FFFFFF",
+                    "&:hover": {
+                        backgroundColor: designTokens.brand.primaryHover,
+                    },
                 },
                 containedSecondary: {
-                    background: `linear-gradient(135deg, ${designTokens.secondary.main} 0%, ${designTokens.secondary.hover} 100%)`,
+                    backgroundColor: designTokens.secondary.main,
+                    backgroundImage: `linear-gradient(135deg, ${designTokens.secondary.main} 0%, ${designTokens.secondary.hover} 100%)`,
                     color: "#FFFFFF",
+                    "&:hover": {
+                        backgroundColor: designTokens.secondary.hover,
+                    },
                 },
             },
         },

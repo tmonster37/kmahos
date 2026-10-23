@@ -21,6 +21,5 @@ public record RegisterRequest(
     @Size(min = 6, message = "Mật khẩu phải từ 6 ký tự trở lên")
     String password,
 
-    @NotNull(message = "Vai trò không được để trống")
     Role role
 ) {}

@@ -87,3 +87,21 @@ tnt_automation/bao_cao_test.html
 scratch/
 .agents/
 .sharkrebel-antigravity/
+.work/
+anh/
+
+# ------------------------------------------------------------------------------
+# 9. Local Integration & Verification Test Scripts
+# ------------------------------------------------------------------------------
+test_payos_real_integration.js
+*.local.js
+
+# ------------------------------------------------------------------------------
+# 10. Visual Test Screenshots
+# ------------------------------------------------------------------------------
+*.png
+*.jpg
+*.jpeg
+!hospital-ui/public/**
+
+

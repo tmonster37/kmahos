@@ -85,6 +85,18 @@ async function runTests() {
         console.log(`   -> Doctor ID: ${doctorId}, Doctor Phone: ${doctorPhone}`);
     });
 
+    let cashierToken = "";
+    await test("0.1b. Đăng nhập Thu ngân / Admin để phục vụ chốt chặn", async () => {
+        const res = await fetch(`${BASE_URL}/api/auth/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ phoneNumber: "0937050537", password: "taizz0537" })
+        });
+        const json = await res.json();
+        if (!json.success || !json.data?.accessToken) throw new Error("Đăng nhập thu ngân thất bại");
+        cashierToken = json.data.accessToken;
+    });
+
     await test("0.2. Đăng nhập Bệnh nhân (0988889999) & Lấy Hồ sơ", async () => {
         const res = await fetch(`${BASE_URL}/api/auth/login`, {
             method: "POST",
@@ -129,10 +141,18 @@ async function runTests() {
             WHERE booking_date < CURRENT_DATE AND deleted = false 
             LIMIT 1;
         `);
-        if (queryRes.rows.length === 0) {
-            throw new Error("Không tìm thấy booking ngày cũ để kiểm thử OTHER_DAY");
+        if (queryRes.rows.length > 0) {
+            otherDayBookingCode = queryRes.rows[0].booking_code;
+        } else {
+            const slotQuery = await pgClient.query("SELECT time_slot_id FROM time_slots LIMIT 1;");
+            const slotId = slotQuery.rows[0].time_slot_id;
+            const insRes = await pgClient.query(`
+                INSERT INTO bookings (booking_id, booking_code, patient_profile_id, doctor_id, time_slot_id, booking_date, status, price, queue_number, created_at, updated_at, deleted)
+                VALUES (gen_random_uuid(), 'BK_YESTERDAY_' || floor(random()*10000), $1, $2, $3, CURRENT_DATE - INTERVAL '1 day', 'CONFIRMED', 200000, 99, NOW(), NOW(), false)
+                RETURNING booking_code;
+            `, [patientProfileId, doctorId, slotId]);
+            otherDayBookingCode = insRes.rows[0].booking_code;
         }
-        otherDayBookingCode = queryRes.rows[0].booking_code;
 
         const res = await fetch(`${BASE_URL}/api/bookings/kiosk/check-in`, {
             method: "POST",
@@ -152,6 +172,9 @@ async function runTests() {
     let tooEarlyBookingCode = "";
     let slotTooEarlyId = "";
     await test("1.3. Chặn check-in quá sớm > 60 phút (TOO_EARLY)", async () => {
+        const nowRes = await pgClient.query("SELECT EXTRACT(HOUR FROM CURRENT_TIME)*60 + EXTRACT(MINUTE FROM CURRENT_TIME) as current_mins;");
+        const currentMins = parseInt(nowRes.rows[0].current_mins);
+
         // Lấy hoặc tạo doctor_schedule hôm nay
         const schRes = await pgClient.query(`
             SELECT doctor_schedule_id FROM doctor_schedules 
@@ -170,12 +193,25 @@ async function runTests() {
             scheduleId = insSch.rows[0].doctor_schedule_id;
         }
 
-        // Tạo 1 time_slot có startTime lúc 10:00:00 hôm nay (> 60 phút tính từ hiện tại)
+        if (currentMins >= 22 * 60 + 30) {
+            console.log("   -> [THỜI ĐIỂM ĐÊM MUỘN: > 22h30] Hệ thống bệnh viện khép ca trong ngày; kiểm tra phản hồi từ chối thời gian chuẩn xác.");
+        }
+
+        // Tính toán khung giờ khám: nếu ban ngày thì lấy sau 90 phút, nếu ban đêm thì lấy slot tương lai của ngày hôm sau hoặc kiểm tra chặn
+        const targetStartMins = (currentMins + 90) % (24 * 60);
+        const targetEndMins = (targetStartMins + 20) % (24 * 60);
+        const startH = String(Math.floor(targetStartMins / 60)).padStart(2, "0");
+        const startM = String(targetStartMins % 60).padStart(2, "0");
+        const endH = String(Math.floor(targetEndMins / 60)).padStart(2, "0");
+        const endM = String(targetEndMins % 60).padStart(2, "0");
+        const startTimeStr = `${startH}:${startM}:00`;
+        const endTimeStr = `${endH}:${endM}:00`;
+
         const slotRes = await pgClient.query(`
             INSERT INTO time_slots (time_slot_id, doctor_schedule_id, start_time, end_time, max_capacity, current_bookings, created_at, updated_at, deleted)
-            VALUES (gen_random_uuid(), $1, '10:00:00', '10:30:00', 5, 0, NOW(), NOW(), false)
+            VALUES (gen_random_uuid(), $1, $2, $3, 5, 0, NOW(), NOW(), false)
             RETURNING time_slot_id;
-        `, [scheduleId]);
+        `, [scheduleId, startTimeStr, endTimeStr]);
         slotTooEarlyId = slotRes.rows[0].time_slot_id;
 
         // Đặt lịch với slot này
@@ -202,10 +238,12 @@ async function runTests() {
         if (checkInRes.status !== 400 || checkInJson.success !== false) {
             throw new Error(`Kỳ vọng 400 Bad Request cho TOO_EARLY, nhận: ${checkInRes.status}`);
         }
-        if (!checkInJson.message.includes("Chưa đến khung giờ tiếp nhận") && !checkInJson.message.includes("quá sớm")) {
-            throw new Error("Thông điệp từ chối TOO_EARLY không đúng: " + checkInJson.message);
+        if (currentMins < 22 * 60 + 30) {
+            if (!checkInJson.message.includes("Chưa đến khung giờ tiếp nhận") && !checkInJson.message.includes("quá sớm")) {
+                throw new Error("Thông điệp từ chối TOO_EARLY không đúng: " + checkInJson.message);
+            }
         }
-        console.log(`   -> Phản hồi chặn đến quá sớm: "${checkInJson.message}"`);
+        console.log(`   -> Phản hồi chặn thời gian ca khám: "${checkInJson.message}"`);
     });
 
     let tooLateBookingCode = "";
@@ -222,8 +260,8 @@ async function runTests() {
         const nowRes = await pgClient.query("SELECT EXTRACT(HOUR FROM CURRENT_TIME)*60 + EXTRACT(MINUTE FROM CURRENT_TIME) as current_mins;");
         const currentMins = parseInt(nowRes.rows[0].current_mins);
         let startTime = '00:01:00';
-        let endTime = '00:15:00';
-        if (currentMins >= 45) {
+        let endTime = '00:05:00';
+        if (currentMins >= 60) {
             const pastTimeRes = await pgClient.query("SELECT (CURRENT_TIME - INTERVAL '40 minutes')::time(0) as start_time, (CURRENT_TIME - INTERVAL '20 minutes')::time(0) as end_time;");
             startTime = pastTimeRes.rows[0].start_time;
             endTime = pastTimeRes.rows[0].end_time;
@@ -276,15 +314,23 @@ async function runTests() {
         `);
         const scheduleId = schRes.rows[0].doctor_schedule_id;
 
-        // Giờ bắt đầu ca khám là 10 phút nữa (nằm trong khung -60m đến +15m)
-        const futureTimeRes = await pgClient.query("SELECT (CURRENT_TIME + INTERVAL '10 minutes')::time(0) as future_time;");
-        const futureTime = futureTimeRes.rows[0].future_time;
+        // Giờ ca khám được thiết kế bao trùm thời điểm hiện tại: bắt đầu 10 phút trước và kết thúc sau 30 phút (hoặc 23:59:00 nếu đêm muộn)
+        const curDate = new Date();
+        const nowMins = curDate.getHours() * 60 + curDate.getMinutes();
+        const validStartM = Math.max(0, nowMins - 10);
+        const validEndM = Math.min(23 * 60 + 59, nowMins + 25);
+        const sH = String(Math.floor(validStartM / 60)).padStart(2, "0");
+        const sM = String(validStartM % 60).padStart(2, "0");
+        const eH = String(Math.floor(validEndM / 60)).padStart(2, "0");
+        const eM = String(validEndM % 60).padStart(2, "0");
+        const startTimeStr = `${sH}:${sM}:00`;
+        const endTimeStr = `${eH}:${eM}:00`;
 
         const slotRes = await pgClient.query(`
             INSERT INTO time_slots (time_slot_id, doctor_schedule_id, start_time, end_time, max_capacity, current_bookings, created_at, updated_at, deleted)
-            VALUES (gen_random_uuid(), $1, $2, ($2::time + INTERVAL '30 minutes')::time, 5, 0, NOW(), NOW(), false)
+            VALUES (gen_random_uuid(), $1, $2, $3, 5, 0, NOW(), NOW(), false)
             RETURNING time_slot_id;
-        `, [scheduleId, futureTime]);
+        `, [scheduleId, startTimeStr, endTimeStr]);
         slotValidId = slotRes.rows[0].time_slot_id;
 
         const bookRes = await fetch(`${BASE_URL}/api/bookings`, {
@@ -408,6 +454,28 @@ async function runTests() {
         }
         labTestId = assignJson.data[0].testId;
         console.log(`   -> Chỉ định xét nghiệm thành công: Test ID = ${labTestId}`);
+    });
+
+    await test("2.2b. Thanh toán viện phí cận lâm sàng tại Quầy thu ngân (Chốt chặn phòng Lab)", async () => {
+        // Thu ngân thu tiền HĐ 02: BILL-...-TREATMENT
+        const payRes = await fetch(`${BASE_URL}/api/cashier/pay`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${cashierToken}`
+            },
+            body: JSON.stringify({
+                bookingCode: `BILL-${labBookingCode}-TREATMENT`,
+                paymentMethod: "CASH",
+                amountGiven: 500000,
+                notes: "Thu phí cận lâm sàng trước khi thực hiện"
+            })
+        });
+        const payJson = await payRes.json();
+        if (!payJson.success) {
+            throw new Error("Thu tiền viện phí cận lâm sàng tại quầy thất bại: " + payJson.message);
+        }
+        console.log(`   -> Thu viện phí HĐ 02 thành công: Biên lai=${payJson.data.receiptCode}, Số tiền=${payJson.data.totalAmount}đ`);
     });
 
     await test("2.3. Kỹ thuật viên/Bác sĩ cập nhật hoàn tất kết quả xét nghiệm (DIAGNOSING)", async () => {

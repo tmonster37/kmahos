@@ -28,6 +28,7 @@ import ScheduleManagePage from "../pages/admin/ScheduleManagePage";
 import MedicalServiceManagePage from "../pages/admin/MedicalServiceManagePage";
 import AccountManagePage from "../pages/admin/AccountManagePage";
 import TransactionManagePage from "../pages/admin/TransactionManagePage";
+import BookingManagePage from "../pages/admin/BookingManagePage";
 import CashierPage from "../pages/cashier/CashierPage";
 import NurseReceptionPage from "../pages/nurse/NurseReceptionPage";
 import PatientManagePage from "../pages/admin/PatientManagePage";
@@ -70,7 +71,10 @@ export default function AppRoutes() {
                 <Route path="/tra-cuu" element={<PatientLookupPage />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
+                <Route path="/dang-ky" element={<RegisterPage />} />
                 <Route path="/payment" element={<PaymentPage />} />
+                <Route path="/payment/return" element={<PaymentPage />} />
+                <Route path="/payment/cancel" element={<PaymentPage />} />
 
                 {/* Sổ khám điện tử (Bệnh nhân & Nhân viên y tế) */}
                 <Route element={<ProtectedRoute allowedRoles={["ROLE_PATIENT", "ROLE_DOCTOR", "ROLE_HEAD_OF_DEPARTMENT", "ROLE_NURSE", "ROLE_LAB_TECHNICIAN", "ROLE_CASHIER", "ROLE_ADMIN"]} />}>
@@ -138,6 +142,7 @@ export default function AppRoutes() {
                     <Route element={<ProtectedRoute allowedRoles={["ROLE_ADMIN"]} />}>
                         <Route path="/admin/accounts" element={<AccountManagePage />} />
                         <Route path="/admin/transactions" element={<TransactionManagePage />} />
+                        <Route path="/admin/bookings" element={<BookingManagePage />} />
                     </Route>
                 </Route>
             </Route>

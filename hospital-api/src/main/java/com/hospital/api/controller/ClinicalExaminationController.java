@@ -122,6 +122,16 @@ public class ClinicalExaminationController {
         return ResponseEntity.ok(ApiResponse.ok(clinicalService.updateTestResult(testId, request), "Cập nhật kết quả xét nghiệm thành công"));
     }
 
+    // 6.1. Hủy chỉ định xét nghiệm (tránh kẹt ca khám lâm sàng)
+    @PostMapping("/tests/{testId}/cancel")
+    @PreAuthorize("hasAnyRole('DOCTOR', 'HEAD_OF_DEPARTMENT', 'ADMIN', 'LAB_TECHNICIAN')")
+    public ResponseEntity<ApiResponse<MedicalTestResponse>> cancelMedicalTest(
+            @PathVariable UUID testId,
+            @RequestParam(required = false) String reason
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(clinicalService.cancelMedicalTest(testId, reason), "Đã hủy chỉ định xét nghiệm thành công"));
+    }
+
     // 7. Bác sĩ kết luận chẩn đoán sau khi có KQ xét nghiệm
     @PutMapping("/records/{recordId}/diagnosis")
     @PreAuthorize("hasAnyRole('DOCTOR', 'HEAD_OF_DEPARTMENT', 'ADMIN')")
@@ -130,6 +140,16 @@ public class ClinicalExaminationController {
             @Valid @RequestBody DiagnosisRequest request
     ) {
         return ResponseEntity.ok(ApiResponse.ok(clinicalService.makeDiagnosis(recordId, request), "Ghi nhận chẩn đoán thành công"));
+    }
+
+    // 7.1. Bác sĩ hoàn tất ca khám (cho trường hợp không kê đơn, tư vấn/hướng dẫn hoặc đã có chẩn đoán)
+    @PostMapping({"/records/{recordId}/complete", "/records/{recordId}/finish"})
+    @PreAuthorize("hasAnyRole('DOCTOR', 'HEAD_OF_DEPARTMENT', 'ADMIN')")
+    public ResponseEntity<ApiResponse<MedicalRecordResponse>> completeExamination(
+            @PathVariable UUID recordId,
+            @RequestBody(required = false) com.hospital.api.dto.request.CompleteExaminationRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(clinicalService.completeExamination(recordId, request), "Hoàn tất ca khám bệnh thành công"));
     }
 
     // 8. Bác sĩ kê đơn thuốc (Tự động trừ kho thuốc & hoàn tất buổi khám)

@@ -2,6 +2,7 @@ package com.hospital.api.dto.response;
 
 import com.hospital.api.constant.CounterTicketStatus;
 import com.hospital.api.constant.CounterType;
+import com.hospital.api.config.HospitalTimeConfig;
 import com.hospital.api.entity.Booking;
 import com.hospital.api.entity.CounterTicket;
 
@@ -74,7 +75,7 @@ public record CounterTicketResponse(
                 entity.getHasInsurance(),
                 entity.getStatus(),
                 waitingBefore,
-                entity.getCreatedAt() != null ? LocalDateTime.ofInstant(entity.getCreatedAt(), ZoneId.systemDefault()) : null,
+                entity.getCreatedAt() != null ? LocalDateTime.ofInstant(entity.getCreatedAt(), HospitalTimeConfig.HOSPITAL_ZONE) : null,
                 entity.getCalledAt(),
                 entity.getServedAt(),
                 entity.getDispatchedRoomId(),

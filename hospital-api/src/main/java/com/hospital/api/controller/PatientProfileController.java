@@ -25,7 +25,7 @@ public class PatientProfileController {
 
     // Tra cứu nhanh hồ sơ bệnh nhân cũ theo SĐT hoặc CCCD (Kèm lịch sử khám gần nhất)
     @GetMapping("/lookup")
-    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR', 'HEAD_OF_DEPARTMENT', 'NURSE', 'CASHIER', 'STAFF', 'PHARMACIST', 'LAB_TECHNICIAN')")
+    @org.springframework.security.access.prepost.PreAuthorize("permitAll()")
     public ResponseEntity<ApiResponse<List<PatientProfileLookupResponse>>> lookupPatients(
             @RequestParam(value = "keyword", required = false, defaultValue = "") String keyword
     ) {

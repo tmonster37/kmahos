@@ -38,9 +38,9 @@ public class DepartmentController {
                 .body(ApiResponse.ok(structureService.createDepartment(request), "Tạo khoa thành công"));
     }
 
-    // Cập nhật thông tin khoa (Admin)
+    // Cập nhật thông tin khoa (Admin + Trưởng khoa)
     @PutMapping("/{departmentId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_OF_DEPARTMENT')")
     public ResponseEntity<ApiResponse<DepartmentResponse>> updateDepartment(
             @PathVariable Integer departmentId,
             @Valid @RequestBody DepartmentRequest request
@@ -72,17 +72,17 @@ public class DepartmentController {
         return ResponseEntity.ok(ApiResponse.ok(structureService.getRoomsByDepartment(departmentId, includeInactive), "Lấy danh sách phòng thành công"));
     }
 
-    // Tạo phòng mới trong khoa (Admin)
+    // Tạo phòng mới trong khoa (Admin + Trưởng khoa)
     @PostMapping("/rooms")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_OF_DEPARTMENT')")
     public ResponseEntity<ApiResponse<RoomResponse>> createRoom(@Valid @RequestBody RoomRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.ok(structureService.createRoom(request), "Tạo phòng thành công"));
     }
 
-    // Cập nhật phòng (Admin)
+    // Cập nhật phòng (Admin + Trưởng khoa)
     @PutMapping("/rooms/{roomId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_OF_DEPARTMENT')")
     public ResponseEntity<ApiResponse<RoomResponse>> updateRoom(
             @PathVariable Integer roomId,
             @Valid @RequestBody RoomRequest request
@@ -90,9 +90,9 @@ public class DepartmentController {
         return ResponseEntity.ok(ApiResponse.ok(structureService.updateRoom(roomId, request), "Cập nhật thông tin phòng thành công"));
     }
 
-    // Bật/Tắt trạng thái hoạt động của phòng (Admin)
+    // Bật/Tắt trạng thái hoạt động của phòng (Admin + Trưởng khoa)
     @DeleteMapping("/rooms/{roomId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_OF_DEPARTMENT')")
     public ResponseEntity<ApiResponse<RoomResponse>> toggleRoomStatus(@PathVariable Integer roomId) {
         return ResponseEntity.ok(ApiResponse.ok(structureService.toggleRoomStatus(roomId), "Thay đổi trạng thái phòng thành công"));
     }

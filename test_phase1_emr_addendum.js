@@ -70,7 +70,7 @@ async function runTests() {
         });
         await initDb.connect();
         const docRes = await initDb.query(`
-            SELECT d.doctor_id, a.phone_number, a.full_name
+            SELECT d.doctor_id, a.user_id, a.phone_number, a.full_name
             FROM doctors d
             JOIN accounts a ON d.account_id = a.user_id
             WHERE d.deleted = false

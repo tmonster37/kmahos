@@ -323,6 +323,31 @@ async function runMasterAudit() {
     if (!data.success || !Array.isArray(data.data)) throw new Error("Lỗi lấy danh sách Lab");
   });
 
+  await test("6.4b Bệnh nhân thanh toán viện phí cận lâm sàng tại Quầy thu ngân (/api/cashier/pay)", async () => {
+    const pRes = await fetch(`${BASE_URL}/cashier/pending-bills`, {
+      headers: { 'Authorization': `Bearer ${adminToken}` }
+    });
+    const pData = await pRes.json();
+    const bills = pData.data || [];
+    const treatmentBill = bills.find(b => b.bookingCode === sampleBookingCode && b.billId?.includes("-TREATMENT"))
+      || bills.find(b => b.bookingCode === sampleBookingCode);
+    
+    const billToPay = treatmentBill ? treatmentBill.billId : `${sampleBookingCode}-TREATMENT`;
+
+    const res = await fetch(`${BASE_URL}/cashier/pay`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+      body: JSON.stringify({
+        bookingCode: billToPay,
+        paymentMethod: "CASH",
+        amountGiven: 1000000,
+        notes: "Thu phí xét nghiệm cận lâm sàng tại quầy"
+      })
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.message || "Thanh toán viện phí CLS thất bại");
+  });
+
   await test("6.5 Kỹ thuật viên trả kết quả xét nghiệm + link ảnh/PDF", async () => {
     if (!sampleTestId) throw new Error("Không có testId");
     const res = await fetch(`${BASE_URL}/clinical/tests/${sampleTestId}/result`, {

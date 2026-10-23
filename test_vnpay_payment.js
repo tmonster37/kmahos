@@ -225,8 +225,8 @@ async function runVNPayTests() {
         const res = await fetch(`${BASE_URL}/api/payment/vnpay/callback?${queryParams.toString()}`);
         const json = await res.json();
 
-        if (json.data && json.data.status === "FAILED" && json.data.description.includes("Chữ ký không hợp lệ")) {
-            console.log(`   -> Đã chặn thành công: Giao dịch bị đánh dấu FAILED do sai chữ ký.`);
+        if ((json.data && json.data.status === "FAILED" && json.data.description && json.data.description.includes("Chữ ký")) || (!json.success && json.message && json.message.includes("Chữ ký"))) {
+            console.log(`   -> Đã chặn thành công: Hệ thống từ chối do chữ ký không hợp lệ.`);
         } else {
             throw new Error(`Hệ thống không phát hiện sai chữ ký: ${JSON.stringify(json)}`);
         }

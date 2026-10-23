@@ -7,7 +7,7 @@ import com.hospital.api.constant.TransactionType;
 import com.hospital.api.dto.request.NurseCheckInRequest;
 import com.hospital.api.dto.request.PayAtClinicRequest;
 import com.hospital.api.dto.response.ClinicReceiptResponse;
-import com.hospital.api.dto.response.DoctorQueueResponse;
+import com.hospital.api.dto.response.NurseQueueResponse;
 import com.hospital.api.dto.response.NurseCheckInResponse;
 import com.hospital.api.entity.*;
 import com.hospital.api.exception.AppException;
@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -39,6 +40,9 @@ public class NurseReceptionServiceImpl implements NurseReceptionService {
     private final AccountRepository accountRepository;
     private final TransactionRepository transactionRepository;
     private final RoomRepository roomRepository;
+    private final MedicalConceptRepository conceptRepository;
+    private final MedicalObservationRepository observationRepository;
+    private final Clock hospitalClock;
 
     @Override
     @Transactional
@@ -108,6 +112,39 @@ public class NurseReceptionServiceImpl implements NurseReceptionService {
         record.setSymptoms(notes.toString());
         recordRepository.save(record);
 
+        // Lưu các chỉ số sinh hiệu dạng cấu trúc (Structured EHR Observations)
+        if (request.weight() != null) {
+            saveObservation(record, "VITAL_WEIGHT", request.weight(), null);
+        }
+        if (request.height() != null) {
+            saveObservation(record, "VITAL_HEIGHT", request.height(), null);
+        }
+        if (request.temperature() != null) {
+            saveObservation(record, "VITAL_TEMP", request.temperature(), null);
+        }
+        if (request.heartRate() != null) {
+            saveObservation(record, "VITAL_PULSE", BigDecimal.valueOf(request.heartRate()), null);
+        }
+        if (request.spo2() != null) {
+            saveObservation(record, "VITAL_SPO2", BigDecimal.valueOf(request.spo2()), null);
+        }
+        if (request.bloodPressure() != null && !request.bloodPressure().isBlank()) {
+            String bp = request.bloodPressure().trim();
+            if (bp.contains("/")) {
+                String[] parts = bp.split("/");
+                try {
+                    BigDecimal sys = new BigDecimal(parts[0].trim());
+                    saveObservation(record, "VITAL_BP_SYS", sys, null);
+                } catch (Exception ignored) {}
+                try {
+                    BigDecimal dia = new BigDecimal(parts[1].trim());
+                    saveObservation(record, "VITAL_BP_DIA", dia, null);
+                } catch (Exception ignored) {}
+            } else {
+                saveObservation(record, "VITAL_BP_SYS", null, bp);
+            }
+        }
+
         // Lấy thông tin phòng khám
         String roomName = "Phòng Khám 101";
         if (booking.getTimeSlot() != null && booking.getTimeSlot().getDoctorSchedule() != null && booking.getTimeSlot().getDoctorSchedule().getRoom() != null) {
@@ -127,7 +164,7 @@ public class NurseReceptionServiceImpl implements NurseReceptionService {
                 ? booking.getDoctor().getAccount().getFullName()
                 : "Bác sĩ phụ trách";
 
-        String checkInTime = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+        String checkInTime = LocalTime.now(hospitalClock).format(DateTimeFormatter.ofPattern("HH:mm:ss"));
         log.info("Lễ tân/Điều dưỡng tiếp nhận check-in QR thành công cho mã {}: STT={}, Phòng={}", code, booking.getQueueNumber(), roomName);
 
         return new NurseCheckInResponse(
@@ -150,8 +187,8 @@ public class NurseReceptionServiceImpl implements NurseReceptionService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<DoctorQueueResponse> getReceptionQueue(Integer departmentId) {
-        LocalDate today = LocalDate.now();
+    public List<NurseQueueResponse> getReceptionQueue(Integer departmentId) {
+        LocalDate today = LocalDate.now(hospitalClock);
         List<Booking> bookings;
         if (departmentId != null) {
             bookings = bookingRepository.findAllByDoctor_Department_DepartmentIdAndBookingDateAndDeletedFalseOrderByIsPriorityDescQueueNumberAsc(departmentId, today);
@@ -161,11 +198,8 @@ public class NurseReceptionServiceImpl implements NurseReceptionService {
 
         return bookings.stream()
                 .filter(b -> b.getStatus() == BookingStatus.CONFIRMED || b.getStatus() == BookingStatus.IN_PROGRESS)
-                .map(b -> {
-                    MedicalExaminationRecord rec = recordRepository.findByBooking_BookingId(b.getBookingId()).orElse(null);
-                    return DoctorQueueResponse.fromEntity(b, rec);
-                })
-                .collect(Collectors.toList());
+                .map(NurseQueueResponse::fromEntity)
+                .toList();
     }
 
     @Override
@@ -198,9 +232,15 @@ public class NurseReceptionServiceImpl implements NurseReceptionService {
                 .build();
         transactionRepository.save(txn);
 
+        // Nếu ca khám đang chờ thanh toán tiền khám ban đầu -> Cập nhật sang CONFIRMED
+        if (booking.getStatus() == BookingStatus.PENDING_PAYMENT) {
+            booking.setStatus(BookingStatus.CONFIRMED);
+            bookingRepository.save(booking);
+        }
+
         int qNum = booking.getQueueNumber() != null ? booking.getQueueNumber() : 1;
-        String receiptCode = "HD-" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) + "-" + String.format("%04d", qNum);
-        String paidAt = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss dd/MM/yyyy"));
+        String receiptCode = "HD-" + LocalDate.now(hospitalClock).format(DateTimeFormatter.ofPattern("yyyyMMdd")) + "-" + String.format("%04d", qNum);
+        String paidAt = LocalDateTime.now(hospitalClock).format(DateTimeFormatter.ofPattern("HH:mm:ss dd/MM/yyyy"));
 
         PatientProfile patient = booking.getPatientProfile();
         String patientName = patient != null ? patient.getFullName() : "Bệnh nhân";
@@ -248,5 +288,33 @@ public class NurseReceptionServiceImpl implements NurseReceptionService {
             return raw;
         }
         return null;
+    }
+
+    @Override
+    @Transactional
+    public com.hospital.api.dto.response.BookingResponse updateBookingStatus(UUID bookingId, BookingStatus newStatus) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new AppException("Không tìm thấy ca khám với ID: " + bookingId, HttpStatus.NOT_FOUND));
+
+        BookingStatus oldStatus = booking.getStatus();
+        booking.setStatus(newStatus);
+        Booking saved = bookingRepository.save(booking);
+
+        log.info("Điều dưỡng cập nhật trạng thái ca khám {}: {} -> {}", booking.getBookingCode(), oldStatus, newStatus);
+        return com.hospital.api.dto.response.BookingResponse.fromEntity(saved);
+    }
+
+    private void saveObservation(MedicalExaminationRecord record, String conceptCode, BigDecimal numericVal, String textVal) {
+        if (record == null || conceptCode == null) return;
+        conceptRepository.findByConceptCode(conceptCode).ifPresent(concept -> {
+            MedicalObservation obs = MedicalObservation.builder()
+                    .medicalRecord(record)
+                    .concept(concept)
+                    .valueNumeric(numericVal)
+                    .valueText(textVal)
+                    .recordedAt(LocalDateTime.now(hospitalClock))
+                    .build();
+            observationRepository.save(obs);
+        });
     }
 }

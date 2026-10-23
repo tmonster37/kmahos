@@ -51,8 +51,7 @@ import HotelIcon from "@mui/icons-material/Hotel";
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import MonitorHeartIcon from "@mui/icons-material/MonitorHeart";
 import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedIn";
-import LocalHospitalIcon from "@mui/icons-material/LocalHospital";
-import axiosInstance from "../../services/AxiosInstance";
+import axiosInstance, { API_BASE_URL } from "../../services/AxiosInstance";
 import { formatCurrency, formatDate, formatDateTime } from "../../utils/formatters";
 import { useNavigate } from "react-router-dom";
 import MedicalRecordPrintModal from "../Doctor/MedicalRecordPrintModal";
@@ -261,27 +260,98 @@ export default function MedicalHistoryPage() {
     };
 
     return (
-        <Container maxWidth="md" sx={{ py: 4 }}>
-            {/* Header */}
-            <Box mb={3} display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2}>
-                <Box>
-                    <Typography variant="h5" fontWeight="bold" color="#0f172a" gutterBottom>
-                        📋 Sổ Khám & Bệnh Án Điện Tử
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                        Theo dõi kết quả khám ngoại trú, lịch hẹn và hồ sơ nằm viện nội trú
-                    </Typography>
+        <Container maxWidth="md" sx={{ py: 3 }}>
+            {/* Header Banner - Apple HIG + Linear Elevated Header */}
+            <Paper
+                elevation={0}
+                sx={{
+                    p: { xs: 2.5, md: 3 },
+                    mb: 3,
+                    borderRadius: 3.5,
+                    bgcolor: "#FFFFFF",
+                    border: "1px solid rgba(15, 23, 42, 0.08)",
+                    boxShadow: "0 2px 10px rgba(0,0,0,0.03)",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    gap: 2
+                }}
+            >
+                <Box display="flex" alignItems="center" gap={2}>
+                    <Box
+                        sx={{
+                            width: 54,
+                            height: 54,
+                            borderRadius: 3,
+                            bgcolor: "rgba(0, 136, 214, 0.1)",
+                            color: "#0088D6",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            border: "1px solid rgba(0, 136, 214, 0.2)"
+                        }}
+                    >
+                        <MedicalServicesIcon sx={{ fontSize: 30 }} />
+                    </Box>
+                    <Box>
+                        <Box display="flex" alignItems="center" gap={1.2} mb={0.5} flexWrap="wrap">
+                            <Chip
+                                label="HỒ SƠ Y TẾ ĐIỆN TỬ • DIGITAL HEALTH RECORD (EHR)"
+                                size="small"
+                                sx={{
+                                    height: 22,
+                                    fontSize: "0.68rem",
+                                    fontWeight: 700,
+                                    letterSpacing: "0.06em",
+                                    bgcolor: "#EBF5FF",
+                                    color: "#0088D6",
+                                    borderRadius: 1.5,
+                                    border: "1px solid rgba(0, 136, 214, 0.2)"
+                                }}
+                            />
+                            <Chip
+                                label="BẢO MẬT HL7 / FHIR"
+                                size="small"
+                                sx={{
+                                    height: 22,
+                                    fontSize: "0.68rem",
+                                    fontWeight: 700,
+                                    bgcolor: "rgba(16, 185, 129, 0.1)",
+                                    color: "#059669",
+                                    borderRadius: 1.5
+                                }}
+                            />
+                        </Box>
+                        <Typography variant="h5" fontWeight={800} color="#0F172A" sx={{ letterSpacing: "-0.02em" }}>
+                            Sổ Khám & Bệnh Án Điện Tử
+                        </Typography>
+                        <Typography variant="body2" color="#64748B" sx={{ mt: 0.25 }}>
+                            Theo dõi kết quả khám ngoại trú, đơn thuốc, xét nghiệm và hồ sơ điều trị nội trú.
+                        </Typography>
+                    </Box>
                 </Box>
-                <Button variant="contained" color="primary" onClick={() => navigate("/booking")} sx={{ borderRadius: 2, textTransform: "none", px: 2.5 }}>
+                <Button
+                    variant="contained"
+                    onClick={() => navigate("/booking")}
+                    sx={{
+                        borderRadius: 2.5,
+                        textTransform: "none",
+                        fontWeight: 700,
+                        bgcolor: "#0088D6",
+                        "&:hover": { bgcolor: "#0077BE" },
+                        px: 2.5
+                    }}
+                >
                     + Đặt Lịch Khám Mới
                 </Button>
-            </Box>
+            </Paper>
 
             {/* Error Banner */}
             {historyError && (
                 <Alert
                     severity="warning"
-                    sx={{ mb: 3, borderRadius: 2 }}
+                    sx={{ mb: 3, borderRadius: 2.5 }}
                     action={
                         <Button color="inherit" size="small" onClick={loadBookings}>
                             Thử lại
@@ -293,7 +363,7 @@ export default function MedicalHistoryPage() {
             )}
 
             {/* Main Tabs: Ngoại Trú vs Nội Trú */}
-            <Paper elevation={0} sx={{ mb: 3, borderRadius: 2.5, border: "1px solid #e2e8f0", bgcolor: "white", p: 0.5 }}>
+            <Paper elevation={0} sx={{ mb: 3, borderRadius: 3, border: "1px solid rgba(15, 23, 42, 0.08)", bgcolor: "#FFFFFF", p: 0.75, boxShadow: "0 1px 3px rgba(0,0,0,0.02)" }}>
                 <Tabs
                     value={mainTab}
                     onChange={(e, val) => setMainTab(val)}
@@ -446,6 +516,15 @@ export default function MedicalHistoryPage() {
                                                         </Button>
                                                     )}
 
+                                                    <Button
+                                                        size="small"
+                                                        variant="outlined"
+                                                        color="info"
+                                                        onClick={() => navigate("/profiles?tab=ticket")}
+                                                        sx={{ borderRadius: 2, textTransform: "none", fontSize: "0.8rem", py: 0.4 }}
+                                                    >
+                                                        Phiếu Khám (Barcode)
+                                                    </Button>
                                                     <Button
                                                         size="small"
                                                         variant="outlined"
@@ -758,7 +837,7 @@ export default function MedicalHistoryPage() {
                                         variant="contained"
                                         color="error"
                                         startIcon={<PictureAsPdfIcon fontSize="small" />}
-                                        href={`http://localhost:8080/api/prescriptions/${selectedBooking.bookingCode}/pdf`}
+                                        href={`${API_BASE_URL}/api/prescriptions/${selectedBooking.bookingCode}/pdf`}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         sx={{ textTransform: "none", fontWeight: "bold" }}

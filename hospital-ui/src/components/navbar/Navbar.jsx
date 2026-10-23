@@ -181,20 +181,17 @@ export default function Navbar() {
                         sx={{ textDecoration: "none", mr: 2 }}
                     >
                         <Box
+                            component="img"
+                            src="/images/logo.png"
+                            alt="Logo Bệnh Viện TNT"
                             sx={{
-                                width: 40,
-                                height: 40,
+                                width: 42,
+                                height: 42,
                                 borderRadius: "10px",
-                                background: `linear-gradient(135deg, ${designTokens.brand.primary} 0%, ${designTokens.secondary.main} 100%)`,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                color: "#FFFFFF",
-                                boxShadow: "0 4px 12px rgba(0, 136, 214, 0.2)"
+                                objectFit: "contain",
+                                filter: "drop-shadow(0 2px 8px rgba(13, 148, 136, 0.25))"
                             }}
-                        >
-                            <LocalHospitalIcon sx={{ fontSize: 24, m: "auto" }} />
-                        </Box>
+                        />
                         <Box>
                             <Typography
                                 variant="h6"
@@ -268,13 +265,17 @@ export default function Navbar() {
                                         }
                                     }}
                                 >
-                                    <MenuItem onClick={() => { handlePatientRecordsClose(); navigate("/profiles"); }}>
+                                    <MenuItem onClick={() => { handlePatientRecordsClose(); navigate("/profiles?tab=profiles"); }}>
                                         <ListItemIcon><FolderSharedIcon fontSize="small" sx={{ color: designTokens.brand.primary }} /></ListItemIcon>
-                                        <ListItemText primary="Hồ Sơ Bệnh Nhân" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
+                                        <ListItemText primary="Hồ Sơ Bệnh Nhân (Gia Đình)" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
+                                    </MenuItem>
+                                    <MenuItem onClick={() => { handlePatientRecordsClose(); navigate("/profiles?tab=ticket"); }}>
+                                        <ListItemIcon><QrCodeScannerIcon fontSize="small" sx={{ color: designTokens.brand.primary }} /></ListItemIcon>
+                                        <ListItemText primary="Phiếu Khám Bệnh (Barcode & STT)" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
                                     </MenuItem>
                                     <MenuItem onClick={() => { handlePatientRecordsClose(); navigate("/my-history"); }}>
                                         <ListItemIcon><HistoryIcon fontSize="small" sx={{ color: designTokens.secondary.main }} /></ListItemIcon>
-                                        <ListItemText primary="Phiếu Khám & Lịch Sử" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
+                                        <ListItemText primary="Sổ Bệnh Án & Lịch Sử Khám" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
                                     </MenuItem>
                                     <MenuItem onClick={() => { handlePatientRecordsClose(); navigate("/my-bills"); }}>
                                         <ListItemIcon><ReceiptLongIcon fontSize="small" sx={{ color: designTokens.status.info.main }} /></ListItemIcon>

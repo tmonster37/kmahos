@@ -108,21 +108,104 @@ const playCallChime = () => {
     }
 };
 
-// Common ICD-10 Quick Templates for Vietnamese Clinical Practice
-const ICD10_QUICK_TEMPLATES = [
-    { code: "J00", name: "Viêm mũi họng cấp (Cảm thường)" },
-    { code: "J02.9", name: "Viêm họng cấp" },
-    { code: "J20.9", name: "Viêm phế quản cấp" },
-    { code: "K29.7", name: "Viêm dạ dày không đặc hiệu" },
-    { code: "K21.9", name: "Trào ngược dạ dày - thực quản (GERD)" },
-    { code: "I10", name: "Tăng huyết áp vô căn (nguyên phát)" },
-    { code: "E11.9", name: "Đái tháo đường typ 2" },
-    { code: "M54.5", name: "Đau thắt lưng (Đau lưng dưới)" },
-    { code: "G43.9", name: "Đau nửa đầu Migraine" },
-    { code: "A09", name: "Viêm dạ dày ruột / Tiêu chảy nhiễm khuẩn" },
-    { code: "B34.9", name: "Nhiễm virus không đặc hiệu" },
-    { code: "R50.9", name: "Sốt không rõ nguyên nhân" }
+// Kho danh mục ICD-10 chuyên sâu phân theo chuyên khoa và từ khóa tìm kiếm tiếng Việt
+const EXPANDED_ICD10_DATABASE = [
+    // Hô hấp
+    { code: "J00", name: "Viêm mũi họng cấp (Cảm thường)", dept: "Hô hấp", keywords: "cam cum so mui nghet mui viem mui" },
+    { code: "J02.9", name: "Viêm họng cấp", dept: "Hô hấp", keywords: "dau hong rat hong viem hong" },
+    { code: "J04.0", name: "Viêm thanh quản cấp", dept: "Hô hấp", keywords: "khan tieng mat tieng viem thanh quan" },
+    { code: "J06.9", name: "Nhiễm khuẩn đường hô hấp trên cấp tính", dept: "Hô hấp", keywords: "nhiem trung ho hap tren viem ho hap" },
+    { code: "J20.9", name: "Viêm phế quản cấp", dept: "Hô hấp", keywords: "ho co dom phe quan sot ho khac dom" },
+    { code: "J45.9", name: "Hen phế quản (Suyễn)", dept: "Hô hấp", keywords: "hen suyen kho khe kho tho con hen" },
+    { code: "J18.9", name: "Viêm phổi không đặc hiệu", dept: "Hô hấp", keywords: "viem phoi sot cao tho nhanh ran phoi" },
+    { code: "J30.1", name: "Viêm mũi dị ứng do phấn hoa / thời tiết", dept: "Hô hấp", keywords: "di ung hat hoi ngua mui chay nuoc mui" },
+
+    // Tim mạch & Chuyển hóa
+    { code: "I10", name: "Tăng huyết áp vô căn (nguyên phát)", dept: "Tim mạch", keywords: "cao huyet ap tang huyet ap tang ha" },
+    { code: "I20.9", name: "Cơn đau thắt ngực không đặc hiệu", dept: "Tim mạch", keywords: "dau nguc tuc nguc con dau that nguc mach vanh" },
+    { code: "I25.1", name: "Bệnh tim thiếu máu cục bộ xơ vữa", dept: "Tim mạch", keywords: "thieu mau co tim xo vua dong mach vanh" },
+    { code: "I50.9", name: "Suy tim không đặc hiệu", dept: "Tim mạch", keywords: "suy tim phu chan kho tho khi nam" },
+    { code: "E11.9", name: "Đái tháo đường typ 2 không biến chứng", dept: "Nội tiết", keywords: "tieu duong dai thao duong type 2 ha duong huyet" },
+    { code: "E78.5", name: "Tăng lipid máu / Rối loạn chuyển hóa lipid", dept: "Nội tiết", keywords: "mo mau cao roi loan lipid cholesterol triglyceride" },
+    { code: "E04.1", name: "Bướu giáp đơn nhân lành tính", dept: "Nội tiết", keywords: "buou co buou giap tuyen giap" },
+    { code: "E03.9", name: "Suy giáp không đặc hiệu", dept: "Nội tiết", keywords: "suy giap tang can met moi da kho" },
+
+    // Tiêu hóa - Gan mật
+    { code: "K29.7", name: "Viêm dạ dày không đặc hiệu", dept: "Tiêu hóa", keywords: "dau da day dau thuong vi viem da day" },
+    { code: "K21.9", name: "Trào ngược dạ dày - thực quản (GERD)", dept: "Tiêu hóa", keywords: "trao nguoc o chua nong rat co hong gerd" },
+    { code: "K25.9", name: "Loét dạ dày không đặc hiệu", dept: "Tiêu hóa", keywords: "loet da day xuat huyet tieu hoa dau sau an" },
+    { code: "K58.9", name: "Hội chứng ruột kích thích (IBS)", dept: "Tiêu hóa", keywords: "dai trang co that dau bung roi loan tieu hoa ibs" },
+    { code: "K76.0", name: "Thoái hóa mỡ của gan (Gan nhiễm mỡ)", dept: "Tiêu hóa", keywords: "gan nhiem mo tang men gan" },
+    { code: "A09", name: "Viêm dạ dày ruột / Tiêu chảy nhiễm trùng", dept: "Tiêu hóa", keywords: "tieu chay ngo doc thuc an non oi di ngoai" },
+
+    // Cơ xương khớp
+    { code: "M54.5", name: "Đau thắt lưng (Đau lưng dưới)", dept: "Cơ xương khớp", keywords: "dau lung dau that lung thoai hoa cot song" },
+    { code: "M50.9", name: "Bệnh lý đĩa đệm cột sống cổ", dept: "Cơ xương khớp", keywords: "thoat vi co dau co vai gay te tay" },
+    { code: "M17.9", name: "Thoái hóa khớp gối không đặc hiệu", dept: "Cơ xương khớp", keywords: "thoai hoa khop goi dau khop luc cuc tran dich" },
+    { code: "M10.9", name: "Gút (Viêm khớp gút cấp / mạn)", dept: "Cơ xương khớp", keywords: "gut gout sung ngon chan cai acid uric cao" },
+    { code: "M79.1", name: "Đau cơ / Đau xơ cơ", dept: "Cơ xương khớp", keywords: "dau co moi co dau nhuc toan than" },
+
+    // Thần kinh - Tâm thần
+    { code: "G43.9", name: "Đau nửa đầu Migraine", dept: "Thần kinh", keywords: "dau nua dau migraine non oi so anh sang" },
+    { code: "G44.2", name: "Đau đầu do căng thẳng", dept: "Thần kinh", keywords: "dau dau cang thang stress mat ngu" },
+    { code: "G45.9", name: "Cơn thiếu máu não cục bộ thoáng qua (TIA)", dept: "Thần kinh", keywords: "thieu mau nao hoa mat chong mat tia say xam" },
+    { code: "G47.0", name: "Rối loạn khởi đầu và duy trì giấc ngủ (Mất ngủ)", dept: "Thần kinh", keywords: "mat ngu kho ngu giac ngu chap chon" },
+    { code: "F41.9", name: "Rối loạn lo âu không đặc hiệu", dept: "Tâm thần", keywords: "lo au hoi hop tim dap nhanh hoang so" },
+
+    // Tiết niệu - Thận
+    { code: "N39.0", name: "Nhiễm khuẩn đường tiết niệu (UTI)", dept: "Tiết niệu", keywords: "viem tiet nieu tieu buot tieu rat tieu duc uti" },
+    { code: "N20.0", name: "Sỏi thận", dept: "Tiết niệu", keywords: "soi than con dau quan than tieu mau" },
+    { code: "N20.1", name: "Sỏi niệu quản", dept: "Tiết niệu", keywords: "soi nieu quan dau quan than" },
+
+    // Toàn thân & Khác
+    { code: "B34.9", name: "Nhiễm virus không đặc hiệu", dept: "Nhiễm khuẩn", keywords: "sot virus nhiem sieu vi dau minh may" },
+    { code: "R50.9", name: "Sốt không rõ nguyên nhân", dept: "Triệu chứng", keywords: "sot cao khong ro nguyen nhan" },
+    { code: "H10.9", name: "Viêm kết mạc không đặc hiệu (Đau mắt đỏ)", dept: "Mắt", keywords: "dau mat do viem ket mac ngau do chay nuoc mat" },
+    { code: "H66.9", name: "Viêm tai giữa không đặc hiệu", dept: "Tai mũi họng", keywords: "viem tai giua dau tai chay mu tai" },
+    { code: "L20.9", name: "Viêm da cơ địa không đặc hiệu (Eczema)", dept: "Da liễu", keywords: "viem da co dia ngua di ung da chong" }
 ];
+
+// Danh sách các chuyên khoa để lọc
+const ICD10_DEPARTMENTS = ["ALL", "Hô hấp", "Tim mạch", "Tiêu hóa", "Nội tiết", "Cơ xương khớp", "Thần kinh", "Tiết niệu"];
+
+// Tương thích ngược với mã mẫu nhanh
+const ICD10_QUICK_TEMPLATES = EXPANDED_ICD10_DATABASE.slice(0, 12);
+
+// Bản đồ gợi ý bệnh kèm theo thường gặp (Comorbidity Suggestions)
+const COMORBIDITY_RECOMMENDATIONS = {
+    "I10": [
+        { code: "E78.5", name: "Rối loạn chuyển hóa lipid", reason: "80% BN tăng huyết áp kèm rối loạn mỡ máu" },
+        { code: "E11.9", name: "Đái tháo đường typ 2", reason: "Yếu tố nguy cơ tim mạch kết hợp" },
+        { code: "I25.1", name: "Thiếu máu cơ tim mạn tính", reason: "Biến chứng xơ vữa mạch vành" }
+    ],
+    "E11": [
+        { code: "I10", name: "Tăng huyết áp nguyên phát", reason: "Hội chứng chuyển hóa kết hợp" },
+        { code: "E78.5", name: "Rối loạn lipid máu", reason: "Nguy cơ xơ vữa mạch máu lớn" },
+        { code: "N08.3", name: "Bệnh lý thận do đái tháo đường", reason: "Biến chứng vi mạch mạn tính" }
+    ],
+    "K21": [
+        { code: "K29.7", name: "Viêm dạ dày mạn tính", reason: "Thường đi kèm tổn thương niêm mạc dạ dày" },
+        { code: "K58.9", name: "Hội chứng ruột kích thích", reason: "Rối loạn trục não - ruột liên quan" },
+        { code: "G47.0", name: "Rối loạn giấc ngủ", reason: "Trào ngược về đêm gây mất ngủ" }
+    ],
+    "K29": [
+        { code: "K21.9", name: "Trào ngược dạ dày thực quản (GERD)", reason: "Viêm dạ dày kích phát trào ngược" },
+        { code: "G44.2", name: "Đau đầu do căng thẳng (Stress)", reason: "Stress làm tăng tiết acid dịch vị" }
+    ],
+    "M10": [
+        { code: "E78.5", name: "Tăng lipid máu", reason: "Rối loạn chuyển hóa purin & lipid" },
+        { code: "I10", name: "Tăng huyết áp", reason: "Tăng gánh nặng bài tiết acid uric qua thận" },
+        { code: "N20.0", name: "Sỏi thận (Sỏi urat)", reason: "Lắng đọng tinh thể urat đường tiết niệu" }
+    ],
+    "J45": [
+        { code: "J30.1", name: "Viêm mũi dị ứng", reason: "Hội chứng một đường thở thống nhất" },
+        { code: "K21.9", name: "Trào ngược dạ dày thực quản", reason: "GERD làm khởi phát cơn hen phế quản" }
+    ],
+    "M54": [
+        { code: "M50.9", name: "Thoái hóa đĩa đệm cột sống", reason: "Thoái hóa hệ trục cột sống đa tầng" },
+        { code: "M79.1", name: "Đau cơ / Co cứng cơ cạnh sống", reason: "Phản ứng co cứng cơ thứ phát sau đau" }
+    ]
+};
 
 // Quick Treatment Advice Templates
 const QUICK_ADVICE_TAGS = [
@@ -163,6 +246,8 @@ export default function ExaminationPage() {
     const [treatmentPlan, setTreatmentPlan] = useState("");
     const [reExamDate, setReExamDate] = useState("");
     const [savingDiagnosis, setSavingDiagnosis] = useState(false);
+    const [icdSearchTerm, setIcdSearchTerm] = useState("");
+    const [selectedDeptFilter, setSelectedDeptFilter] = useState("ALL");
 
     // Modals
     const [openTestModal, setOpenTestModal] = useState(false);
@@ -490,6 +575,46 @@ export default function ExaminationPage() {
         }
     };
 
+    const [completingExam, setCompletingExam] = useState(false);
+
+    const handleCompleteExamWithoutPrescription = async () => {
+        if (!record) return;
+        const confirmDone = window.confirm(
+            `Xác nhận hoàn tất ca khám cho bệnh nhân ${selectedPatient?.patientName || ""} (Không kê đơn thuốc)?\n\nHệ thống sẽ chuyển trạng thái ca khám sang HOÀN THÀNH (DONE) và đóng hồ sơ.`
+        );
+        if (!confirmDone) return;
+
+        setCompletingExam(true);
+        try {
+            const cleanDate = reExamDate && reExamDate.trim().length >= 8 ? reExamDate.trim() : null;
+            let targetRecordId = record.recordId;
+            if (!targetRecordId || String(targetRecordId).startsWith("temp-")) {
+                const startRes = await axiosInstance.post("/api/clinical/start", {
+                    bookingCode: selectedPatient?.bookingCode,
+                    symptoms: selectedPatient?.symptoms,
+                    initialDiagnosis: initialDiagnosis || finalDiagnosis || "Khám nội tổng quát",
+                });
+                const startData = startRes?.data || startRes;
+                targetRecordId = startData?.recordId || startData?.data?.recordId;
+            }
+
+            const res = await axiosInstance.post(`/api/clinical/records/${targetRecordId}/complete`, {
+                finalDiagnosis: finalDiagnosis || "Khám nội tổng quát - Không phát hiện bất thường cần can thiệp thuốc",
+                treatmentPlan: treatmentPlan || "Theo dõi sức khỏe định kỳ, điều chỉnh chế độ ăn uống sinh hoạt",
+                reExaminationDate: cleanDate,
+            });
+            const data = res?.data?.data || res?.data || res;
+            setRecord(data);
+            setMessage(`🎉 Đã hoàn tất buổi khám cho bệnh nhân ${selectedPatient?.patientName || ""} thành công!`);
+            fetchDoctorQueue();
+        } catch (err) {
+            console.error("Lỗi hoàn tất buổi khám:", err);
+            alert(err?.message || "Lỗi hoàn tất buổi khám!");
+        } finally {
+            setCompletingExam(false);
+        }
+    };
+
     const refreshRecord = async () => {
         if (record) {
             try {
@@ -653,6 +778,148 @@ export default function ExaminationPage() {
         patientVitals.medicalHistory.trim() !== ""
     );
 
+    // Phân tích toàn diện cảnh báo nguy cơ sinh hiệu bất thường (Triage Risk Evaluation)
+    const vitalSignRisks = useMemo(() => {
+        const risks = [];
+        // Huyết áp
+        const bp = patientVitals.bloodPressure || "";
+        const parts = bp.split("/").map((p) => parseInt(p.trim(), 10));
+        if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+            const [sys, dia] = parts;
+            if (sys >= 160 || dia >= 100) {
+                risks.push({
+                    level: "CRITICAL",
+                    title: `Tăng Huyết Áp Khẩn Cấp (${sys}/${dia} mmHg)`,
+                    desc: "Huyết áp tâm thu >= 160 hoặc tâm trương >= 100 mmHg. Cần cho bệnh nhân nằm nghỉ ngơi tại buồng khám, theo dõi sát dấu hiệu đau đầu, mờ mắt, đau ngực và cân nhắc hạ áp khẩn cấp.",
+                    action: "Nghỉ ngơi 15p & Đo lại HA"
+                });
+            } else if (sys >= 140 || dia >= 90) {
+                risks.push({
+                    level: "WARNING",
+                    title: `Tăng Huyết Áp Độ 1 (${sys}/${dia} mmHg)`,
+                    desc: "Vượt ngưỡng huyết áp mục tiêu chuẩn Bộ Y Tế. Cần đối chiếu tiền sử dùng thuốc và lối sống.",
+                    action: "Theo dõi HA"
+                });
+            } else if (sys < 90 || dia < 60) {
+                risks.push({
+                    level: "WARNING",
+                    title: `Hạ Huyết Áp (${sys}/${dia} mmHg)`,
+                    desc: "Nguy cơ tụt huyết áp tư thế hoặc thiếu thể tích tuần hoàn.",
+                    action: "Bù dịch / Nằm đầu thấp"
+                });
+            }
+        }
+
+        // SpO2
+        const spo2 = Number(patientVitals.spO2) || 98;
+        if (spo2 < 92) {
+            risks.push({
+                level: "CRITICAL",
+                title: `Suy Hô Hấp Cấp - SpO2 Báo Động (${spo2}%)`,
+                desc: "Độ bão hòa oxy máu dưới 92%. Cần hỗ trợ thở oxy kính/mask ngay lập tức, kiểm tra đường thở và nghe phổi khẩn cấp.",
+                action: "Chỉ định Thở Oxy Khẩn"
+            });
+        } else if (spo2 < 95) {
+            risks.push({
+                level: "WARNING",
+                title: `Giảm Nồng Độ Oxy Máu (${spo2}%)`,
+                desc: "SpO2 nằm trong khoảng cảnh báo (92% - 94%). Cần kiểm tra ran phổi hoặc tiền sử COPD/Hen.",
+                action: "Theo dõi SpO2 liên tục"
+            });
+        }
+
+        // Thân nhiệt
+        const temp = parseFloat(patientVitals.temperature);
+        if (!isNaN(temp)) {
+            if (temp >= 39.0) {
+                risks.push({
+                    level: "CRITICAL",
+                    title: `Sốt Rất Cao (${temp}°C)`,
+                    desc: "Thân nhiệt >= 39.0°C. Nguy cơ co giật do sốt (đặc biệt trẻ em) hoặc nhiễm trùng huyết. Cần chỉ định thuốc hạ sốt Paracetamol và lau mát tích cực.",
+                    action: "Hạ Sốt Tích Cực"
+                });
+            } else if (temp >= 38.5) {
+                risks.push({
+                    level: "WARNING",
+                    title: `Sốt Cao (${temp}°C)`,
+                    desc: "Thân nhiệt >= 38.5°C. Cho bệnh nhân uống nhiều nước điện giải Oresol, dùng thuốc hạ sốt.",
+                    action: "Uống nhiều nước / Oresol"
+                });
+            } else if (temp < 35.5) {
+                risks.push({
+                    level: "WARNING",
+                    title: `Hạ Thân Nhiệt (${temp}°C)`,
+                    desc: "Thân nhiệt < 35.5°C. Nguy cơ suy kiệt hoặc sốc.",
+                    action: "Ủ ấm bệnh nhân"
+                });
+            }
+        }
+
+        // Nhịp tim
+        const hr = Number(patientVitals.heartRate) || 76;
+        if (hr > 120) {
+            risks.push({
+                level: "CRITICAL",
+                title: `Nhịp Tim Nhanh Bất Thường (${hr} bpm)`,
+                desc: "Tần số tim > 120 chu kỳ/phút. Cần loại trừ cơn nhịp nhanh kịch phát, cường giáp hoặc sốc tim.",
+                action: "Đo Điện Tim ECG Ngay"
+            });
+        } else if (hr < 50) {
+            risks.push({
+                level: "CRITICAL",
+                title: `Nhịp Tim Chậm Nguy Hiểm (${hr} bpm)`,
+                desc: "Tần số tim < 50 chu kỳ/phút. Nguy cơ block nhĩ thất hoặc suy nút xoang.",
+                action: "Đo Điện Tim ECG Khẩn"
+            });
+        }
+
+        return risks;
+    }, [patientVitals]);
+
+    // Gợi ý bệnh kèm theo tự động dựa trên chẩn đoán hiện tại
+    const suggestedComorbidities = useMemo(() => {
+        if (!finalDiagnosis) return [];
+        const upper = finalDiagnosis.toUpperCase();
+        const suggestions = [];
+
+        Object.keys(COMORBIDITY_RECOMMENDATIONS).forEach(key => {
+            if (upper.includes(key)) {
+                COMORBIDITY_RECOMMENDATIONS[key].forEach(item => {
+                    if (!upper.includes(item.code) && !suggestions.some(s => s.code === item.code)) {
+                        suggestions.push(item);
+                    }
+                });
+            }
+        });
+
+        return suggestions;
+    }, [finalDiagnosis]);
+
+    // Lọc danh mục ICD-10 theo ô tìm kiếm và nhóm chuyên khoa
+    const filteredIcd10List = useMemo(() => {
+        let list = EXPANDED_ICD10_DATABASE;
+        if (selectedDeptFilter !== "ALL") {
+            list = list.filter(item => item.dept === selectedDeptFilter);
+        }
+        if (icdSearchTerm.trim()) {
+            const rawTerm = icdSearchTerm.toLowerCase();
+            const termWithoutAccent = rawTerm.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d");
+            list = list.filter(item => {
+                const codeMatch = item.code.toLowerCase().includes(rawTerm);
+                const nameRaw = item.name.toLowerCase();
+                const nameWithoutAccent = nameRaw.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d");
+                const keywords = item.keywords || "";
+                return (
+                    codeMatch ||
+                    nameRaw.includes(rawTerm) ||
+                    nameWithoutAccent.includes(termWithoutAccent) ||
+                    keywords.includes(termWithoutAccent)
+                );
+            });
+        }
+        return list;
+    }, [icdSearchTerm, selectedDeptFilter]);
+
     // Vitals object compatibility alias
     const vitals = patientVitals;
 
@@ -687,131 +954,159 @@ export default function ExaminationPage() {
                     }}
                 />
 
-                <Grid container spacing={1.5} alignItems="center">
+                <Box
+                    sx={{
+                        display: "flex",
+                        flexDirection: { xs: "column", lg: "row" },
+                        alignItems: { xs: "flex-start", lg: "center" },
+                        justifyContent: "space-between",
+                        gap: 2
+                    }}
+                >
                     {/* Left: Department & Title */}
-                    <Grid item xs={12} md={5.5}>
-                        <Box display="flex" alignItems="center" gap={1.5}>
-                            <Box
-                                sx={{
-                                    width: 42,
-                                    height: 42,
-                                    borderRadius: 2.5,
-                                    bgcolor: "rgba(56, 189, 248, 0.15)",
-                                    border: "1px solid rgba(56, 189, 248, 0.3)",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    color: "#38bdf8",
-                                    flexShrink: 0
-                                }}
-                            >
-                                <LocalHospitalIcon sx={{ fontSize: 24 }} />
-                            </Box>
-                            <Box sx={{ minWidth: 0 }}>
-                                <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
-                                    <Typography variant="h6" fontWeight={800} sx={{ letterSpacing: "-0.3px", fontSize: "1.1rem", whiteSpace: "nowrap" }}>
-                                        Bàn Khám Bác Sĩ & Lâm Sàng
-                                    </Typography>
-                                    <Chip
-                                        label="Live Cockpit"
-                                        size="small"
-                                        sx={{
-                                            bgcolor: "#0284c7",
-                                            color: "#ffffff",
-                                            fontWeight: 700,
-                                            fontSize: "0.65rem",
-                                            height: 18
-                                        }}
-                                    />
-                                </Box>
-                                <Typography variant="caption" sx={{ color: "#94a3b8", display: "block", mt: 0.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                    BV Đa khoa TNT • Khoa Khám Bệnh • Ca: <CockpitLiveClock />
-                                </Typography>
-                            </Box>
+                    <Box display="flex" alignItems="center" gap={1.5} sx={{ minWidth: 0, flexShrink: 0 }}>
+                        <Box
+                            sx={{
+                                width: 44,
+                                height: 44,
+                                borderRadius: 2.5,
+                                bgcolor: "rgba(56, 189, 248, 0.15)",
+                                border: "1px solid rgba(56, 189, 248, 0.3)",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                color: "#38bdf8",
+                                flexShrink: 0
+                            }}
+                        >
+                            <LocalHospitalIcon sx={{ fontSize: 24 }} />
                         </Box>
-                    </Grid>
+                        <Box sx={{ minWidth: 0 }}>
+                            <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+                                <Typography variant="h6" fontWeight={800} sx={{ letterSpacing: "-0.3px", fontSize: "1.15rem", whiteSpace: "nowrap", color: "#ffffff !important" }}>
+                                    Bàn Khám Bác Sĩ & Lâm Sàng
+                                </Typography>
+                                <Chip
+                                    label="Live Cockpit"
+                                    size="small"
+                                    sx={{
+                                        bgcolor: "#0284c7",
+                                        color: "#ffffff",
+                                        fontWeight: 700,
+                                        fontSize: "0.65rem",
+                                        height: 18
+                                    }}
+                                />
+                            </Box>
+                            <Typography variant="caption" sx={{ color: "rgba(226, 232, 240, 0.9)", display: "block", mt: 0.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                BV Đa khoa TNT • Khoa Khám Bệnh • Ca: <CockpitLiveClock />
+                            </Typography>
+                        </Box>
+                    </Box>
 
                     {/* Middle: Live Queue Counters */}
-                    <Grid item xs={12} md={3.5}>
-                        <Stack direction="row" spacing={0.8} justifyContent={{ xs: "flex-start", md: "center" }}>
-                            <Box sx={{ px: 1.2, py: 0.5, borderRadius: 2, bgcolor: "rgba(245, 158, 11, 0.15)", border: "1px solid rgba(245, 158, 11, 0.3)", textAlign: "center", minWidth: 62 }}>
-                                <Typography variant="caption" sx={{ color: "#fbbf24", fontWeight: 700, display: "block", fontSize: "0.62rem", whiteSpace: "nowrap" }}>CHỜ KHÁM</Typography>
-                                <Typography variant="subtitle1" fontWeight={800} sx={{ color: "#fef08a", lineHeight: 1.1, fontSize: "1.05rem" }}>{waitingCount}</Typography>
+                    <Stack
+                        direction="row"
+                        spacing={1}
+                        alignItems="center"
+                        justifyContent={{ xs: "flex-start", sm: "center" }}
+                        sx={{ flexShrink: 0, my: { xs: 0.5, lg: 0 } }}
+                    >
+                        <Box sx={{ px: 1.4, py: 0.6, borderRadius: 2, bgcolor: "rgba(245, 158, 11, 0.15)", border: "1px solid rgba(245, 158, 11, 0.3)", textAlign: "center", minWidth: 68 }}>
+                            <Typography variant="caption" sx={{ color: "#fbbf24", fontWeight: 700, display: "block", fontSize: "0.65rem", whiteSpace: "nowrap" }}>CHỜ KHÁM</Typography>
+                            <Typography variant="subtitle1" fontWeight={800} sx={{ color: "#fef08a", lineHeight: 1.1, fontSize: "1.1rem" }}>{waitingCount}</Typography>
+                        </Box>
+                        <Box sx={{ px: 1.4, py: 0.6, borderRadius: 2, bgcolor: "rgba(56, 189, 248, 0.15)", border: "1px solid rgba(56, 189, 248, 0.3)", textAlign: "center", minWidth: 68 }}>
+                            <Typography variant="caption" sx={{ color: "#38bdf8", fontWeight: 700, display: "block", fontSize: "0.65rem", whiteSpace: "nowrap" }}>ĐANG KHÁM</Typography>
+                            <Typography variant="subtitle1" fontWeight={800} sx={{ color: "#e0f2fe", lineHeight: 1.1, fontSize: "1.1rem" }}>{inProgressCount}</Typography>
+                        </Box>
+                        <Box sx={{ px: 1.4, py: 0.6, borderRadius: 2, bgcolor: "rgba(34, 197, 94, 0.15)", border: "1px solid rgba(34, 197, 94, 0.3)", textAlign: "center", minWidth: 68 }}>
+                            <Typography variant="caption" sx={{ color: "#4ade80", fontWeight: 700, display: "block", fontSize: "0.65rem", whiteSpace: "nowrap" }}>ĐÃ KHÁM</Typography>
+                            <Typography variant="subtitle1" fontWeight={800} sx={{ color: "#bbf7d0", lineHeight: 1.1, fontSize: "1.1rem" }}>{completedCount}</Typography>
+                        </Box>
+                        {priorityCount > 0 && (
+                            <Box sx={{ px: 1.4, py: 0.6, borderRadius: 2, bgcolor: "rgba(239, 68, 68, 0.2)", border: "1px solid rgba(239, 68, 68, 0.4)", textAlign: "center", minWidth: 68 }}>
+                                <Typography variant="caption" sx={{ color: "#fca5a5", fontWeight: 800, display: "block", fontSize: "0.65rem", whiteSpace: "nowrap" }}>ƯU TIÊN</Typography>
+                                <Typography variant="subtitle1" fontWeight={800} sx={{ color: "#fee2e2", lineHeight: 1.1, fontSize: "1.1rem" }}>{priorityCount}</Typography>
                             </Box>
-                            <Box sx={{ px: 1.2, py: 0.5, borderRadius: 2, bgcolor: "rgba(56, 189, 248, 0.15)", border: "1px solid rgba(56, 189, 248, 0.3)", textAlign: "center", minWidth: 62 }}>
-                                <Typography variant="caption" sx={{ color: "#38bdf8", fontWeight: 700, display: "block", fontSize: "0.62rem", whiteSpace: "nowrap" }}>ĐANG KHÁM</Typography>
-                                <Typography variant="subtitle1" fontWeight={800} sx={{ color: "#e0f2fe", lineHeight: 1.1, fontSize: "1.05rem" }}>{inProgressCount}</Typography>
-                            </Box>
-                            <Box sx={{ px: 1.2, py: 0.5, borderRadius: 2, bgcolor: "rgba(34, 197, 94, 0.15)", border: "1px solid rgba(34, 197, 94, 0.3)", textAlign: "center", minWidth: 62 }}>
-                                <Typography variant="caption" sx={{ color: "#4ade80", fontWeight: 700, display: "block", fontSize: "0.62rem", whiteSpace: "nowrap" }}>ĐÃ KHÁM</Typography>
-                                <Typography variant="subtitle1" fontWeight={800} sx={{ color: "#bbf7d0", lineHeight: 1.1, fontSize: "1.05rem" }}>{completedCount}</Typography>
-                            </Box>
-                            {priorityCount > 0 && (
-                                <Box sx={{ px: 1.2, py: 0.5, borderRadius: 2, bgcolor: "rgba(239, 68, 68, 0.2)", border: "1px solid rgba(239, 68, 68, 0.4)", textAlign: "center", minWidth: 62 }}>
-                                    <Typography variant="caption" sx={{ color: "#fca5a5", fontWeight: 800, display: "block", fontSize: "0.62rem", whiteSpace: "nowrap" }}>ƯU TIÊN</Typography>
-                                    <Typography variant="subtitle1" fontWeight={800} sx={{ color: "#fee2e2", lineHeight: 1.1, fontSize: "1.05rem" }}>{priorityCount}</Typography>
-                                </Box>
-                            )}
-                        </Stack>
-                    </Grid>
+                        )}
+                    </Stack>
 
                     {/* Right: Actions */}
-                    <Grid item xs={12} md={3}>
-                        <Stack direction="row" spacing={1.2} justifyContent={{ xs: "flex-start", md: "flex-end" }} alignItems="center">
-                            <Tooltip title="Xem lịch phân công trực">
-                                <Button
-                                    variant="outlined"
-                                    size="small"
-                                    onClick={handleOpenMySchedule}
-                                    sx={{
-                                        color: "#e2e8f0",
-                                        borderColor: "#475569",
-                                        bgcolor: "rgba(15, 23, 42, 0.6)",
-                                        borderRadius: 2,
-                                        fontWeight: 600,
-                                        textTransform: "none",
-                                        "&:hover": { borderColor: "#94a3b8", bgcolor: "rgba(30, 41, 59, 0.8)" }
-                                    }}
-                                    startIcon={<CalendarMonthIcon fontSize="small" />}
-                                >
-                                    Lịch Trực
-                                </Button>
-                            </Tooltip>
-
+                    <Stack
+                        direction="row"
+                        spacing={1.2}
+                        alignItems="center"
+                        justifyContent={{ xs: "flex-start", lg: "flex-end" }}
+                        sx={{ flexShrink: 0 }}
+                    >
+                        <Tooltip title="Xem lịch phân công trực">
                             <Button
-                                variant="contained"
-                                size="medium"
-                                startIcon={<VolumeUpIcon />}
-                                onClick={handleCallNext}
+                                variant="outlined"
+                                size="small"
+                                onClick={handleOpenMySchedule}
                                 sx={{
-                                    bgcolor: "#f59e0b",
-                                    color: "#0f172a",
-                                    fontWeight: 800,
-                                    borderRadius: 2.5,
-                                    px: 2.2,
-                                    boxShadow: "0 4px 15px rgba(245, 158, 11, 0.4)",
+                                    color: "#e2e8f0",
+                                    borderColor: "#475569",
+                                    bgcolor: "rgba(15, 23, 42, 0.6)",
+                                    borderRadius: 2,
+                                    fontWeight: 600,
                                     textTransform: "none",
-                                    "&:hover": { bgcolor: "#d97706" }
+                                    whiteSpace: "nowrap",
+                                    height: "36px",
+                                    px: 1.5,
+                                    "&:hover": { borderColor: "#94a3b8", bgcolor: "rgba(30, 41, 59, 0.8)" }
+                                }}
+                                startIcon={<CalendarMonthIcon fontSize="small" />}
+                            >
+                                Lịch Trực
+                            </Button>
+                        </Tooltip>
+
+                        <Button
+                            variant="contained"
+                            size="medium"
+                            startIcon={<VolumeUpIcon />}
+                            onClick={handleCallNext}
+                            sx={{
+                                background: "linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important",
+                                bgcolor: "#0284c7 !important",
+                                backgroundImage: "none !important",
+                                color: "#ffffff !important",
+                                fontWeight: 800,
+                                borderRadius: 2,
+                                height: "36px",
+                                px: 2.2,
+                                whiteSpace: "nowrap",
+                                boxShadow: "0 4px 15px rgba(2, 132, 199, 0.4)",
+                                textTransform: "none",
+                                "&:hover": {
+                                    background: "linear-gradient(135deg, #0369a1 0%, #075985 100%) !important",
+                                    boxShadow: "0 6px 20px rgba(2, 132, 199, 0.5)"
+                                }
+                            }}
+                        >
+                            Gọi Số Tiếp ({waitingCount})
+                        </Button>
+
+                        <Tooltip title="Làm mới hàng đợi">
+                            <IconButton
+                                onClick={fetchDoctorQueue}
+                                size="small"
+                                sx={{
+                                    color: "#e2e8f0",
+                                    bgcolor: "rgba(255,255,255,0.1)",
+                                    width: 36,
+                                    height: 36,
+                                    borderRadius: 2,
+                                    "&:hover": { bgcolor: "rgba(255,255,255,0.2)" }
                                 }}
                             >
-                                Gọi Số Tiếp ({waitingCount})
-                            </Button>
-
-                            <Tooltip title="Làm mới hàng đợi">
-                                <IconButton
-                                    onClick={fetchDoctorQueue}
-                                    sx={{
-                                        color: "#e2e8f0",
-                                        bgcolor: "rgba(255,255,255,0.1)",
-                                        "&:hover": { bgcolor: "rgba(255,255,255,0.2)" }
-                                    }}
-                                >
-                                    <RefreshIcon />
-                                </IconButton>
-                            </Tooltip>
-                        </Stack>
-                    </Grid>
-                </Grid>
+                                <RefreshIcon fontSize="small" />
+                            </IconButton>
+                        </Tooltip>
+                    </Stack>
+                </Box>
             </Paper>
 
             {message && (
@@ -1422,6 +1717,110 @@ export default function ExaminationPage() {
                                 </Box>
                             </Paper>
 
+                            {/* CẢNH BÁO NGUY CƠ SINH HIỆU BẤT THƯỜNG (TRIAGE RISK ALERT BANNER) */}
+                            {vitalSignRisks && vitalSignRisks.length > 0 && (
+                                <Paper
+                                    elevation={0}
+                                    sx={{
+                                        p: 2,
+                                        borderRadius: 2.5,
+                                        border: vitalSignRisks.some(r => r.level === "CRITICAL") ? "2px solid #dc2626" : "1.5px solid #f59e0b",
+                                        bgcolor: vitalSignRisks.some(r => r.level === "CRITICAL") ? "#fef2f2" : "#fffbeb",
+                                        boxShadow: "0 4px 14px rgba(220, 38, 38, 0.1)"
+                                    }}
+                                >
+                                    <Box display="flex" alignItems="center" justifyContent="space-between" mb={1} flexWrap="wrap" gap={1}>
+                                        <Box display="flex" alignItems="center" gap={1.2}>
+                                            <Box
+                                                sx={{
+                                                    width: 36,
+                                                    height: 36,
+                                                    borderRadius: 2,
+                                                    bgcolor: vitalSignRisks.some(r => r.level === "CRITICAL") ? "#fee2e2" : "#fef3c7",
+                                                    color: vitalSignRisks.some(r => r.level === "CRITICAL") ? "#dc2626" : "#b45309",
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "center"
+                                                }}
+                                            >
+                                                <WarningAmberIcon sx={{ fontSize: 22 }} />
+                                            </Box>
+                                            <Box>
+                                                <Typography variant="subtitle2" fontWeight={900} sx={{ color: vitalSignRisks.some(r => r.level === "CRITICAL") ? "#991b1b" : "#92400e", textTransform: "uppercase" }}>
+                                                    🚨 CẢNH BÁO SINH HIỆU VƯỢT NGƯỠNG AN TOÀN ({vitalSignRisks.length} CHỈ SỐ BẤT THƯỜNG)
+                                                </Typography>
+                                                <Typography variant="caption" sx={{ color: "#64748b" }}>
+                                                    Khuyến cáo Bác sĩ đánh giá nguy cơ lâm sàng trước khi kê đơn hoặc ra chỉ định điều trị
+                                                </Typography>
+                                            </Box>
+                                        </Box>
+                                        <Button
+                                            variant="outlined"
+                                            size="small"
+                                            onClick={() => {
+                                                setEditingVitals({ ...patientVitals });
+                                                setOpenEditVitalsModal(true);
+                                            }}
+                                            sx={{ borderRadius: 1.5, fontWeight: 700, textTransform: "none", fontSize: "0.75rem" }}
+                                        >
+                                            Đo Lại / Cập Nhật
+                                        </Button>
+                                    </Box>
+
+                                    <Stack spacing={1} mt={1}>
+                                        {vitalSignRisks.map((risk, rIdx) => (
+                                            <Box
+                                                key={rIdx}
+                                                sx={{
+                                                    p: 1.2,
+                                                    borderRadius: 2,
+                                                    bgcolor: risk.level === "CRITICAL" ? "#fee2e2" : "#fef3c7",
+                                                    border: risk.level === "CRITICAL" ? "1px solid #fecaca" : "1px solid #fde68a",
+                                                    display: "flex",
+                                                    justifyContent: "space-between",
+                                                    alignItems: "center",
+                                                    flexWrap: "wrap",
+                                                    gap: 1
+                                                }}
+                                            >
+                                                <Box sx={{ flex: 1, minWidth: 240 }}>
+                                                    <Box display="flex" alignItems="center" gap={0.8}>
+                                                        <Chip
+                                                            label={risk.level === "CRITICAL" ? "NGUY CƠ CAO" : "CẢNH BÁO"}
+                                                            size="small"
+                                                            sx={{
+                                                                bgcolor: risk.level === "CRITICAL" ? "#dc2626" : "#d97706",
+                                                                color: "#fff",
+                                                                fontWeight: 800,
+                                                                fontSize: "0.62rem",
+                                                                height: 18
+                                                            }}
+                                                        />
+                                                        <Typography variant="body2" fontWeight={800} sx={{ color: risk.level === "CRITICAL" ? "#991b1b" : "#92400e" }}>
+                                                            {risk.title}
+                                                        </Typography>
+                                                    </Box>
+                                                    <Typography variant="caption" sx={{ color: risk.level === "CRITICAL" ? "#7f1d1d" : "#78350f", display: "block", mt: 0.3 }}>
+                                                        {risk.desc}
+                                                    </Typography>
+                                                </Box>
+                                                <Chip
+                                                    label={`Hành động: ${risk.action}`}
+                                                    size="small"
+                                                    sx={{
+                                                        bgcolor: "#ffffff",
+                                                        color: risk.level === "CRITICAL" ? "#991b1b" : "#92400e",
+                                                        fontWeight: 800,
+                                                        fontSize: "0.72rem",
+                                                        border: "1px solid rgba(0,0,0,0.1)"
+                                                    }}
+                                                />
+                                            </Box>
+                                        ))}
+                                    </Stack>
+                                </Paper>
+                            )}
+
                             {/* HIGH-PRIORITY CLINICAL ALLERGY ALERT BANNER */}
                             {hasKnownAllergy && (
                                 <Paper
@@ -1864,35 +2263,128 @@ export default function ExaminationPage() {
                                                     </Typography>
                                                 </Box>
 
-                                                {/* QUICK ICD-10 TEMPLATE CHIPS */}
-                                                <Paper elevation={0} sx={{ p: 2, mb: 2.5, bgcolor: "#f8fafc", borderRadius: 2.5, border: "1px solid #e2e8f0" }}>
-                                                    <Box display="flex" alignItems="center" gap={1} mb={1}>
-                                                        <AutoAwesomeIcon fontSize="small" sx={{ color: "#0284c7" }} />
-                                                        <Typography variant="subtitle2" fontWeight={800} sx={{ color: "#0f172a" }}>
-                                                            Mẫu Chẩn Đoán ICD-10 Phổ Biến (Nhấp 1 chạm để điền nhanh):
+                                                {/* BỘ TRA CỨU DANH MỤC ICD-10 CHUYÊN SÂU & GỢI Ý BỆNH KÈM THEO */}
+                                                <Paper elevation={0} sx={{ p: 2.2, mb: 2.5, bgcolor: "#f8fafc", borderRadius: 2.5, border: "1px solid #e2e8f0" }}>
+                                                    {/* Header & Filter Controls */}
+                                                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={1.5} flexWrap="wrap" gap={1}>
+                                                        <Box display="flex" alignItems="center" gap={1}>
+                                                            <AutoAwesomeIcon fontSize="small" sx={{ color: "#0284c7" }} />
+                                                            <Typography variant="subtitle2" fontWeight={800} sx={{ color: "#0f172a" }}>
+                                                                Tra Cứu Thông Minh Danh Mục ICD-10 Chuẩn Bộ Y Tế:
+                                                            </Typography>
+                                                        </Box>
+                                                        <Typography variant="caption" sx={{ color: "#64748b" }}>
+                                                            Tìm theo mã (J00, I10...) hoặc tên bệnh tiếng Việt có dấu/không dấu
                                                         </Typography>
                                                     </Box>
-                                                    <Box display="flex" flexWrap="wrap" gap={0.8}>
-                                                        {ICD10_QUICK_TEMPLATES.map((tmpl) => (
-                                                            <Chip
-                                                                key={tmpl.code}
-                                                                label={`${tmpl.code} - ${tmpl.name}`}
+
+                                                    {/* Search Input & Specialty Department Filter */}
+                                                    <Grid container spacing={1.5} mb={1.5}>
+                                                        <Grid item xs={12} sm={7} md={8}>
+                                                            <TextField
+                                                                fullWidth
                                                                 size="small"
-                                                                onClick={() => {
-                                                                    const text = `${tmpl.name} (${tmpl.code})`;
-                                                                    setFinalDiagnosis(finalDiagnosis ? `${finalDiagnosis}, ${text}` : text);
-                                                                }}
-                                                                sx={{
-                                                                    cursor: "pointer",
-                                                                    bgcolor: "#ffffff",
-                                                                    border: "1px solid #cbd5e1",
-                                                                    fontWeight: 600,
-                                                                    fontSize: "0.75rem",
-                                                                    "&:hover": { bgcolor: "#e0f2fe", borderColor: "#0284c7", color: "#0369a1" }
+                                                                placeholder="🔍 Nhập mã bệnh ICD hoặc triệu chứng (VD: 'da day', 'tang huyet ap', 'J20', 'I10', 'sot')..."
+                                                                value={icdSearchTerm}
+                                                                onChange={(e) => setIcdSearchTerm(e.target.value)}
+                                                                InputProps={{
+                                                                    sx: { bgcolor: "#ffffff", borderRadius: 2 },
+                                                                    endAdornment: icdSearchTerm ? (
+                                                                        <InputAdornment position="end">
+                                                                            <Button size="small" onClick={() => setIcdSearchTerm("")} sx={{ minWidth: 24, p: 0.2, fontSize: "0.75rem", color: "#64748b" }}>
+                                                                                Xóa
+                                                                            </Button>
+                                                                        </InputAdornment>
+                                                                    ) : null
                                                                 }}
                                                             />
-                                                        ))}
+                                                        </Grid>
+                                                        <Grid item xs={12} sm={5} md={4}>
+                                                            <Box display="flex" alignItems="center" gap={0.5} sx={{ overflowX: "auto", py: 0.3 }}>
+                                                                {ICD10_DEPARTMENTS.slice(0, 5).map((dept) => (
+                                                                    <Chip
+                                                                        key={dept}
+                                                                        label={dept === "ALL" ? "Tất cả" : dept}
+                                                                        size="small"
+                                                                        onClick={() => setSelectedDeptFilter(dept)}
+                                                                        sx={{
+                                                                            cursor: "pointer",
+                                                                            fontWeight: 700,
+                                                                            fontSize: "0.7rem",
+                                                                            bgcolor: selectedDeptFilter === dept ? "#0284c7" : "#e2e8f0",
+                                                                            color: selectedDeptFilter === dept ? "#ffffff" : "#334155",
+                                                                            "&:hover": { bgcolor: selectedDeptFilter === dept ? "#0369a1" : "#cbd5e1" }
+                                                                        }}
+                                                                    />
+                                                                ))}
+                                                            </Box>
+                                                        </Grid>
+                                                    </Grid>
+
+                                                    {/* Danh sách kết quả tra cứu ICD-10 */}
+                                                    <Box sx={{ maxHeight: 180, overflowY: "auto", pr: 0.5 }}>
+                                                        <Box display="flex" flexWrap="wrap" gap={0.8}>
+                                                            {filteredIcd10List.slice(0, 18).map((tmpl) => (
+                                                                <Chip
+                                                                    key={tmpl.code}
+                                                                    label={`${tmpl.code} - ${tmpl.name}`}
+                                                                    size="small"
+                                                                    onClick={() => {
+                                                                        const text = `${tmpl.name} (${tmpl.code})`;
+                                                                        setFinalDiagnosis(finalDiagnosis ? `${finalDiagnosis}, ${text}` : text);
+                                                                    }}
+                                                                    sx={{
+                                                                        cursor: "pointer",
+                                                                        bgcolor: "#ffffff",
+                                                                        border: "1px solid #cbd5e1",
+                                                                        fontWeight: 600,
+                                                                        fontSize: "0.74rem",
+                                                                        "&:hover": { bgcolor: "#e0f2fe", borderColor: "#0284c7", color: "#0369a1" }
+                                                                    }}
+                                                                />
+                                                            ))}
+                                                            {filteredIcd10List.length === 0 && (
+                                                                <Typography variant="caption" sx={{ color: "#94a3b8", fontStyle: "italic", p: 1 }}>
+                                                                    Không tìm thấy mã ICD-10 phù hợp với từ khóa "{icdSearchTerm}". Bác sĩ có thể nhập trực tiếp vào ô chẩn đoán bên dưới.
+                                                                </Typography>
+                                                            )}
+                                                        </Box>
                                                     </Box>
+
+                                                    {/* GỢI Ý BỆNH KÈM THEO THƯỜNG GẶP (COMORBIDITY RECOMMENDATIONS) */}
+                                                    {suggestedComorbidities.length > 0 && (
+                                                        <Box mt={2} p={1.5} sx={{ bgcolor: "#faf5ff", borderRadius: 2, border: "1.5px dashed #c084fc" }}>
+                                                            <Box display="flex" alignItems="center" gap={0.8} mb={1}>
+                                                                <StarsIcon sx={{ color: "#9333ea", fontSize: 18 }} />
+                                                                <Typography variant="subtitle2" fontWeight={800} sx={{ color: "#6b21a8", fontSize: "0.82rem" }}>
+                                                                    Gợi Ý Bệnh Kèm Theo Thường Gặp (Comorbidities) Dựa Trên Chẩn Đoán Chính:
+                                                                </Typography>
+                                                            </Box>
+                                                            <Box display="flex" flexWrap="wrap" gap={1}>
+                                                                {suggestedComorbidities.map((item) => (
+                                                                    <Tooltip key={item.code} title={item.reason} arrow>
+                                                                        <Chip
+                                                                            label={`+ ${item.code} - ${item.name}`}
+                                                                            size="small"
+                                                                            onClick={() => {
+                                                                                const text = `${item.name} (${item.code})`;
+                                                                                setFinalDiagnosis(finalDiagnosis ? `${finalDiagnosis}, ${text}` : text);
+                                                                            }}
+                                                                            sx={{
+                                                                                cursor: "pointer",
+                                                                                bgcolor: "#f3e8ff",
+                                                                                color: "#7e22ce",
+                                                                                border: "1px solid #d8b4fe",
+                                                                                fontWeight: 700,
+                                                                                fontSize: "0.72rem",
+                                                                                "&:hover": { bgcolor: "#e9d5ff", borderColor: "#a855f7" }
+                                                                            }}
+                                                                        />
+                                                                    </Tooltip>
+                                                                ))}
+                                                            </Box>
+                                                        </Box>
+                                                    )}
                                                 </Paper>
 
                                                 <Grid container spacing={2.5}>
@@ -2039,9 +2531,9 @@ export default function ExaminationPage() {
                                                         </Alert>
                                                     )}
 
-                                                    <Grid container spacing={2.5}>
+                                                    <Grid container spacing={2}>
                                                         {/* LỰA CHỌN 1: ĐIỀU TRỊ NGOẠI TRÚ */}
-                                                        <Grid item xs={12} sm={6}>
+                                                        <Grid item xs={12} md={4}>
                                                             <Card
                                                                 variant="outlined"
                                                                 sx={{
@@ -2079,13 +2571,13 @@ export default function ExaminationPage() {
                                                                         "&:hover": { bgcolor: "#15803d" }
                                                                     }}
                                                                 >
-                                                                    Sang Bước: Kê Đơn Thuốc Ngoại Trú
+                                                                    Sang Bước: Kê Đơn Thuốc
                                                                 </Button>
                                                             </Card>
                                                         </Grid>
 
                                                         {/* LỰA CHỌN 2: CHỈ ĐỊNH NHẬP VIỆN NỘI TRÚ */}
-                                                        <Grid item xs={12} sm={6}>
+                                                        <Grid item xs={12} md={4}>
                                                             <Card
                                                                 variant="outlined"
                                                                 sx={{
@@ -2129,6 +2621,51 @@ export default function ExaminationPage() {
                                                                     }}
                                                                 >
                                                                     {admissionInfo ? "Xem / Bổ Sung Chỉ Định Nhập Viện" : "Lập Phiếu Chỉ Định Nhập Viện"}
+                                                                </Button>
+                                                            </Card>
+                                                        </Grid>
+
+                                                        {/* LỰA CHỌN 3: TƯ VẤN & KẾT THÚC KHÁM (KHÔNG DÙNG THUỐC) */}
+                                                        <Grid item xs={12} md={4}>
+                                                            <Card
+                                                                variant="outlined"
+                                                                sx={{
+                                                                    borderRadius: 2.5,
+                                                                    borderColor: "#bae6fd",
+                                                                    bgcolor: "#f0f9ff",
+                                                                    height: "100%",
+                                                                    display: "flex",
+                                                                    flexDirection: "column",
+                                                                    justifyContent: "space-between",
+                                                                    p: 2
+                                                                }}
+                                                            >
+                                                                <Box>
+                                                                    <Box display="flex" alignItems="center" gap={1} mb={1}>
+                                                                        <Chip label="HƯỚNG 3" size="small" sx={{ bgcolor: "#0284c7", color: "#ffffff", fontWeight: 800 }} />
+                                                                        <Typography variant="subtitle2" fontWeight={800} sx={{ color: "#0369a1" }}>
+                                                                            Tư Vấn & Kết Thúc Khám
+                                                                        </Typography>
+                                                                    </Box>
+                                                                    <Typography variant="body2" sx={{ color: "#075985", mb: 2 }}>
+                                                                        Bệnh nhân không cần dùng thuốc, chỉ cần điều chỉnh chế độ ăn uống, sinh hoạt, tập luyện hoặc hẹn tái khám.
+                                                                    </Typography>
+                                                                </Box>
+                                                                <Button
+                                                                    variant="contained"
+                                                                    startIcon={completingExam ? <CircularProgress size={18} color="inherit" /> : <CheckCircleIcon />}
+                                                                    onClick={handleCompleteExamWithoutPrescription}
+                                                                    disabled={completingExam || record?.state === "DONE"}
+                                                                    sx={{
+                                                                        bgcolor: record?.state === "DONE" ? "#94a3b8" : "#0284c7",
+                                                                        borderRadius: 2,
+                                                                        fontWeight: 800,
+                                                                        textTransform: "none",
+                                                                        boxShadow: "0 4px 12px rgba(2, 132, 199, 0.25)",
+                                                                        "&:hover": { bgcolor: "#0369a1" }
+                                                                    }}
+                                                                >
+                                                                    {record?.state === "DONE" ? "Ca Khám Đã Hoàn Tất" : (completingExam ? "Đang xử lý..." : "Hoàn Tất Ca Khám (Không Dùng Thuốc)")}
                                                                 </Button>
                                                             </Card>
                                                         </Grid>
@@ -2254,25 +2791,81 @@ export default function ExaminationPage() {
                                                         <Typography variant="subtitle2" fontWeight={700} sx={{ color: "#334155" }}>
                                                             Chưa kê đơn thuốc cho bệnh nhân này
                                                         </Typography>
-                                                        <Typography variant="body2" sx={{ color: "#64748b", mb: 1.5, fontSize: "0.8rem" }}>
-                                                            Bác sĩ có thể bấm nút dưới đây để tìm thuốc trong kho và chỉ định liều lượng.
+                                                        <Typography variant="body2" sx={{ color: "#64748b", mb: 2, fontSize: "0.85rem" }}>
+                                                            Bác sĩ có thể bấm kê đơn thuốc hoặc bấm hoàn tất ca khám nếu bệnh nhân không cần dùng thuốc.
                                                         </Typography>
-                                                        <Button
-                                                            variant="contained"
-                                                            size="small"
-                                                            startIcon={<MedicationIcon />}
-                                                            onClick={() => setOpenRxModal(true)}
-                                                            sx={{
-                                                                bgcolor: "#16a34a",
-                                                                borderRadius: 2,
-                                                                fontWeight: 700,
-                                                                textTransform: "none",
-                                                                "&:hover": { bgcolor: "#15803d" }
-                                                            }}
-                                                        >
-                                                            Kê đơn thuốc ngay
-                                                        </Button>
+                                                        <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap">
+                                                            <Button
+                                                                variant="contained"
+                                                                size="medium"
+                                                                startIcon={<MedicationIcon />}
+                                                                onClick={() => setOpenRxModal(true)}
+                                                                sx={{
+                                                                    bgcolor: "#16a34a",
+                                                                    borderRadius: 2,
+                                                                    fontWeight: 700,
+                                                                    textTransform: "none",
+                                                                    "&:hover": { bgcolor: "#15803d" }
+                                                                }}
+                                                            >
+                                                                Kê đơn thuốc ngay
+                                                            </Button>
+                                                            <Button
+                                                                variant="outlined"
+                                                                color="primary"
+                                                                size="medium"
+                                                                startIcon={completingExam ? <CircularProgress size={18} /> : <CheckCircleIcon />}
+                                                                onClick={handleCompleteExamWithoutPrescription}
+                                                                disabled={completingExam || record?.state === "DONE"}
+                                                                sx={{
+                                                                    borderRadius: 2,
+                                                                    fontWeight: 700,
+                                                                    textTransform: "none"
+                                                                }}
+                                                            >
+                                                                {record?.state === "DONE" ? "Đã Hoàn Tất Khám" : (completingExam ? "Đang xử lý..." : "Hoàn Tất Khám (Không Dùng Thuốc)")}
+                                                            </Button>
+                                                        </Stack>
                                                     </Paper>
+                                                )}
+
+                                                {/* HƯỚNG DẪN BỆNH NHÂN SAU KHI HOÀN TẤT */}
+                                                {(record.prescription || record.state === "DONE") && (
+                                                    <Alert severity="success" sx={{ mt: 2.5, borderRadius: 2 }}>
+                                                        <Typography variant="subtitle2" fontWeight={800}>
+                                                            ✅ Buổi khám bệnh đã hoàn tất!
+                                                        </Typography>
+                                                        <Typography variant="body2" sx={{ mt: 0.5 }}>
+                                                            {record.prescription
+                                                                ? "Bệnh nhân vui lòng di chuyển đến Quầy Thu Ngân để thanh toán tiền thuốc (hoặc quét mã VietQR), sau đó nhận thuốc tại Quầy Dược Ngoại Trú theo quy trình cấp phát FEFO."
+                                                                : "Bệnh nhân đã được ghi nhận chẩn đoán và hướng dẫn điều trị. Bác sĩ có thể in Hồ sơ bệnh án tóm tắt hoặc dặn dò bệnh nhân ngày tái khám."
+                                                            }
+                                                        </Typography>
+                                                        <Box mt={1.5} display="flex" gap={1} flexWrap="wrap">
+                                                            <Button
+                                                                size="small"
+                                                                variant="outlined"
+                                                                color="success"
+                                                                startIcon={<PrintIcon />}
+                                                                onClick={() => setOpenRecordPrintModal(true)}
+                                                                sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                                                            >
+                                                                In Hồ Sơ Bệnh Án (A4)
+                                                            </Button>
+                                                            {record.prescription && (
+                                                                <Button
+                                                                    size="small"
+                                                                    variant="contained"
+                                                                    color="success"
+                                                                    startIcon={<PrintIcon />}
+                                                                    onClick={() => setOpenRxPrintModal(true)}
+                                                                    sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                                                                >
+                                                                    In Đơn Thuốc (A4)
+                                                                </Button>
+                                                            )}
+                                                        </Box>
+                                                    </Alert>
                                                 )}
                                             </Box>
                                         )}

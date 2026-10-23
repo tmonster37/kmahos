@@ -19,6 +19,10 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     Optional<Booking> findByBookingCode(String bookingCode);
 
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT b FROM Booking b WHERE b.bookingId = :bookingId AND b.deleted = false")
+    Optional<Booking> findByIdWithLock(@Param("bookingId") UUID bookingId);
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT b FROM Booking b WHERE b.bookingCode = :bookingCode")
     Optional<Booking> findByBookingCodeForUpdate(@Param("bookingCode") String bookingCode);
 
@@ -33,6 +37,9 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     List<Booking> findAllByDoctor_Department_DepartmentIdAndBookingDateAndDeletedFalseOrderByIsPriorityDescQueueNumberAsc(Integer departmentId, LocalDate bookingDate);
 
     List<Booking> findAllByPatientProfile_PhoneNumberAndBookingDateAndDeletedFalse(String phoneNumber, LocalDate bookingDate);
+
+    @Query("SELECT b FROM Booking b WHERE b.bookingDate >= :startDate AND b.bookingDate <= :endDate AND b.deleted = false ORDER BY b.bookingDate ASC, b.queueNumber ASC")
+    List<Booking> findAllByBookingDateBetweenAndDeletedFalse(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 }
 
 

@@ -32,6 +32,12 @@ public class CounterTicket extends BaseEntity {
     @Column(name = "ticket_code", nullable = false, length = 30)
     private String ticketCode; // Ví dụ: UT-01, BH-03, TH-15, AP-02
 
+    @Column(name = "idempotency_key", unique = true, length = 64)
+    private String idempotencyKey;
+
+    @Column(name = "waiting_before")
+    private Integer waitingBefore;
+
     @Column(name = "queue_number", nullable = false)
     private Integer queueNumber; // 1, 2, 3...
 

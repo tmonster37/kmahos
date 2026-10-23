@@ -25,6 +25,7 @@ Thư mục này đóng vai trò là **Kho lưu trữ vĩnh viễn Kế hoạch K
 | **05** | [`module_05_ai_triage.md`](file:///c:/Users/ASUS/Downloads/hospital-api%20%281%29/test-plans/module_05_ai_triage.md) | AI Trợ lý Y tế Triage 24/7 & Gợi ý Đặt khám | [`test_module5_ai_chat.js`](file:///c:/Users/ASUS/Downloads/hospital-api%20%281%29/test_module5_ai_chat.js) |
 | **06** | [`module_06_pharmacy_inventory.md`](file:///c:/Users/ASUS/Downloads/hospital-api%20%281%29/test-plans/module_06_pharmacy_inventory.md) | Quản lý Kho Dược đa kho, hạn dùng & Cấp phát thuốc | [`test_master_system_audit.js`](file:///c:/Users/ASUS/Downloads/hospital-api%20%281%29/test_master_system_audit.js) |
 | **07** | [`module_07_payment_cashier.md`](file:///c:/Users/ASUS/Downloads/hospital-api%20%281%29/test-plans/module_07_payment_cashier.md) | Quầy Thu ngân Viện phí & Cổng thanh toán VNPay | [`test_vnpay_payment.js`](file:///c:/Users/ASUS/Downloads/hospital-api%20%281%29/test_vnpay_payment.js) |
+| **18** | [`kiosk_booking_hardening.md`](file:///c:/Users/ASUS/Downloads/hospital-api%20%281%29/test-plans/kiosk_booking_hardening.md) | Đặt lịch Kiosk, check-in bền vững, sức chứa & quản lý lịch Admin | Maven unit tests; syntax-only kiosk script checks (API-backed runs pending) |
 
 ---
 

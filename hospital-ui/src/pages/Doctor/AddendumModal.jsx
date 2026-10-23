@@ -88,10 +88,10 @@ export default function AddendumModal({ open, onClose, record, onAddendumSuccess
     };
 
     return (
-        <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-            <DialogTitle sx={{ bgcolor: "#d32f2f", color: "#fff", display: "flex", alignItems: "center", gap: 1 }}>
+        <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 3.5, overflow: "hidden" } }}>
+            <DialogTitle sx={{ bgcolor: "#b91c1c", color: "#fff", display: "flex", alignItems: "center", gap: 1.2, py: 1.5, px: 2.5 }}>
                 <LockIcon />
-                <Typography variant="h6" component="span" sx={{ fontWeight: "bold" }}>
+                <Typography variant="h6" component="span" sx={{ fontWeight: 800, fontSize: "1.05rem" }}>
                     Lập Phụ Lục Bệnh Án Điện Tử (EMR Addendum)
                 </Typography>
             </DialogTitle>

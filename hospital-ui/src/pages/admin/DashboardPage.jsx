@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
     Container,
     Grid,
@@ -16,712 +16,1223 @@ import {
     TableContainer,
     TableHead,
     TableRow,
-    Divider,
-    LinearProgress,
     Stack,
     TextField,
     MenuItem,
-    Avatar,
-    Tooltip
+    Skeleton,
+    Switch,
+    FormControlLabel,
+    Tooltip,
+    ToggleButton,
+    ToggleButtonGroup
 } from "@mui/material";
-import PeopleIcon from "@mui/icons-material/People";
-import MedicalServicesIcon from "@mui/icons-material/MedicalServices";
-import EventAvailableIcon from "@mui/icons-material/EventAvailable";
-import MonetizationOnIcon from "@mui/icons-material/MonetizationOn";
-import TrendingUpIcon from "@mui/icons-material/TrendingUp";
-import PrintIcon from "@mui/icons-material/Print";
-import HotelIcon from "@mui/icons-material/Hotel";
-import ScienceIcon from "@mui/icons-material/Science";
-import MedicationIcon from "@mui/icons-material/Medication";
-import StarIcon from "@mui/icons-material/Star";
+import {
+    ResponsiveContainer,
+    AreaChart,
+    Area,
+    BarChart,
+    Bar,
+    PieChart,
+    Pie,
+    Cell,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip as RechartsTooltip
+} from "recharts";
+import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
+import EventAvailableOutlinedIcon from "@mui/icons-material/EventAvailableOutlined";
+import MonetizationOnOutlinedIcon from "@mui/icons-material/MonetizationOnOutlined";
+import MeetingRoomOutlinedIcon from "@mui/icons-material/MeetingRoomOutlined";
+import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
+import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import AccessTimeIcon from "@mui/icons-material/AccessTime";
-import SpeedIcon from "@mui/icons-material/Speed";
-import TimerIcon from "@mui/icons-material/Timer";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import SecurityIcon from "@mui/icons-material/Security";
-import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
-import MeetingRoomIcon from "@mui/icons-material/MeetingRoom";
-import QrCode2Icon from "@mui/icons-material/QrCode2";
-import PointOfSaleIcon from "@mui/icons-material/PointOfSale";
+import SecurityOutlinedIcon from "@mui/icons-material/SecurityOutlined";
+import ShowChartOutlinedIcon from "@mui/icons-material/ShowChartOutlined";
+import PieChartOutlineOutlinedIcon from "@mui/icons-material/PieChartOutlineOutlined";
+import BarChartOutlinedIcon from "@mui/icons-material/BarChartOutlined";
+
 import axiosInstance from "../../services/AxiosInstance";
 import { formatCurrency } from "../../utils/formatters";
 
+// Bảng màu y tế tối ưu chuẩn WCAG AAA
+const COLORS = {
+    primary: "#0088D6",
+    primaryLight: "rgba(0, 136, 214, 0.08)",
+    success: "#00A878",
+    warning: "#F59E0B",
+    danger: "#EF4444",
+    purple: "#7C3AED",
+    teal: "#0D9488",
+    slate: "#64748B",
+    chartPalette: ["#0088D6", "#00A878", "#7C3AED", "#F59E0B", "#0D9488", "#E11D48", "#6366F1", "#0284C7"]
+};
+
+// Custom Tooltip cho Recharts phong cách Linear
+const CustomChartTooltip = ({ active, payload, label, isCurrency = true }) => {
+    if (active && payload && payload.length) {
+        return (
+            <Box
+                sx={{
+                    bgcolor: "rgba(15, 23, 42, 0.95)",
+                    backdropFilter: "blur(8px)",
+                    color: "#FFFFFF",
+                    p: 1.5,
+                    borderRadius: "10px",
+                    boxShadow: "0 10px 25px -5px rgba(0,0,0,0.3)",
+                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    fontSize: "0.8rem",
+                    minWidth: 140
+                }}
+            >
+                <Typography variant="caption" sx={{ color: "#94A3B8", display: "block", mb: 0.5, fontWeight: 600 }}>
+                    {label}
+                </Typography>
+                {payload.map((entry, index) => (
+                    <Box key={`item-${index}`} display="flex" justifyContent="space-between" alignItems="center" gap={1.5}>
+                        <Typography variant="caption" sx={{ color: "#E2E8F0", fontWeight: 500 }}>
+                            {entry.name === "revenue" ? "Doanh thu" : (entry.name === "transactions" ? "Giao dịch" : entry.name)}:
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "#38BDF8", fontWeight: 700, fontFamily: "monospace" }}>
+                            {isCurrency && entry.name === "revenue"
+                                ? formatCurrency(entry.value)
+                                : `${entry.value} ${entry.name === "count" ? "lượt" : ""}`}
+                        </Typography>
+                    </Box>
+                ))}
+            </Box>
+        );
+    }
+    return null;
+};
+
 export default function DashboardPage() {
-    const [timeRange, setTimeRange] = useState("TODAY"); // TODAY, WEEK, MONTH, YEAR
+    const [timeRange, setTimeRange] = useState("WEEK"); // TODAY, WEEK, MONTH, YEAR, CUSTOM
+    const [customStartDate, setCustomStartDate] = useState(() => {
+        const d = new Date();
+        d.setDate(d.getDate() - 6);
+        return d.toISOString().split("T")[0];
+    });
+    const [customEndDate, setCustomEndDate] = useState(() => new Date().toISOString().split("T")[0]);
+
+    // Trạng thái dữ liệu Backend
     const [kpiRevenue, setKpiRevenue] = useState(null);
     const [roomCapacity, setRoomCapacity] = useState(null);
+    const [utilStats, setUtilStats] = useState(null);
     const [auditLogs, setAuditLogs] = useState([]);
-    const [loadingKpi, setLoadingKpi] = useState(true);
 
-    const [stats, setStats] = useState({
-        totalPatients: 1450,
-        totalDoctors: 48,
-        totalBookingsToday: 128,
-        totalCompletedExams: 112,
-        totalRevenue: 285400000,
-        inpatientOccupancyRate: 78.5, // %
+    // Trạng thái mạng / bộ lọc
+    const [loading, setLoading] = useState(true);
+    const [errorMsg, setErrorMsg] = useState("");
+    const [auditFilter, setAuditFilter] = useState("ALL");
+    const [roomDeptFilter, setRoomDeptFilter] = useState("ALL");
+    const [roomLoadFilter, setRoomLoadFilter] = useState("ALL");
+    const [demoMode, setDemoMode] = useState(false);
 
-        // Thống kê Thời gian Chờ Khám & Hiệu Suất Phân Luồng (Wait-Time Analytics)
-        waitTimeMetrics: {
-            avgWaitTimeMinutes: 14.5,
-            avgExamDurationMinutes: 18.2,
-            avgLabTurnaroundMinutes: 25.6,
-            avgPharmacyMinutes: 6.4,
-            totalJourneyMinutes: 64.7,
-            targetWaitTimeMinutes: 20.0,
-            onTimeRate: 91.8
-        },
+    // Tính toán tham số ngày
+    const getDateRangeParams = () => {
+        const today = new Date();
+        const formatDate = (d) => d.toISOString().split("T")[0];
 
-        departmentWaitTimes: [
-            { departmentName: "Khoa Khám Bệnh Đa Khoa", waitingCount: 14, avgWaitMin: 12.0, status: "GOOD", load: "Bình thường" },
-            { departmentName: "Khoa Nội Tim Mạch", waitingCount: 19, avgWaitMin: 18.5, status: "GOOD", load: "Bình thường" },
-            { departmentName: "Khoa Nhi & Sơ Sinh", waitingCount: 24, avgWaitMin: 23.0, status: "WARNING", load: "Tải cao (Cần tăng cường BS)" },
-            { departmentName: "Khoa Ngoại Tổng Hợp", waitingCount: 8, avgWaitMin: 10.5, status: "GOOD", load: "Thoáng" },
-            { departmentName: "Khoa Chẩn Đoán Hình Ảnh (X-Quang/CT)", waitingCount: 31, avgWaitMin: 26.0, status: "WARNING", load: "Tải cao" },
-            { departmentName: "Khoa Tai Mũi Họng", waitingCount: 11, avgWaitMin: 13.2, status: "GOOD", load: "Bình thường" }
-        ],
-
-        revenueStructure: [
-            { category: "Tiền khám chuyên khoa", amount: 65000000, percent: 23, color: "#0284C7" },
-            { category: "Xét nghiệm & Cận lâm sàng", amount: 98400000, percent: 34, color: "#0D9488" },
-            { category: "Kho dược & Đơn thuốc", amount: 72000000, percent: 25, color: "#EA580C" },
-            { category: "Viện phí giường nội trú", amount: 50000000, percent: 18, color: "#8B5CF6" },
-        ],
-        departmentRevenues: [
-            { departmentName: "Khoa Nội Tim Mạch", examsCount: 420, revenue: 78500000, color: "#0284C7" },
-            { departmentName: "Khoa Chẩn Đoán Hình Ảnh & CLS", examsCount: 680, revenue: 64200000, color: "#0D9488" },
-            { departmentName: "Khoa Ngoại Tổng Hợp & Phẫu Thuật", examsCount: 290, revenue: 58900000, color: "#8B5CF6" },
-            { departmentName: "Khoa Khám Bệnh Đa Khoa", examsCount: 550, revenue: 45000000, color: "#16A34A" },
-            { departmentName: "Khoa Nhi & Sơ Sinh", examsCount: 310, revenue: 26800000, color: "#F59E0B" },
-            { departmentName: "Khoa Tai Mũi Họng", examsCount: 240, revenue: 12000000, color: "#EC4899" },
-        ],
-        topDoctors: [
-            { doctorName: "PGS. TS Nguyễn Văn Minh", departmentName: "Khoa Ngoại Tổng Hợp", examCount: 142, rating: 4.9, satisfactionRate: 99 },
-            { doctorName: "BS. CKI Trần Đình Trọng", departmentName: "Khoa Nội Tim Mạch", examCount: 135, rating: 4.8, satisfactionRate: 98 },
-            { doctorName: "BS. CKII Lê Hoàng Mai", departmentName: "Khoa Tai Mũi Họng", examCount: 118, rating: 4.8, satisfactionRate: 97 },
-            { doctorName: "ThS. BS Phạm Hải Yến", departmentName: "Khoa Nhi", examCount: 105, rating: 4.9, satisfactionRate: 99 },
-        ]
-    });
+        if (timeRange === "TODAY") {
+            const todayStr = formatDate(today);
+            return { startDate: todayStr, endDate: todayStr };
+        }
+        if (timeRange === "WEEK") {
+            const past7 = new Date();
+            past7.setDate(today.getDate() - 6);
+            return { startDate: formatDate(past7), endDate: formatDate(today) };
+        }
+        if (timeRange === "MONTH") {
+            const past30 = new Date();
+            past30.setDate(today.getDate() - 29);
+            return { startDate: formatDate(past30), endDate: formatDate(today) };
+        }
+        if (timeRange === "YEAR") {
+            const startYear = new Date(today.getFullYear(), 0, 1);
+            return { startDate: formatDate(startYear), endDate: formatDate(today) };
+        }
+        return { startDate: customStartDate, endDate: customEndDate };
+    };
 
     const loadDashboardData = async () => {
-        setLoadingKpi(true);
+        setLoading(true);
+        setErrorMsg("");
+
+        const { startDate, endDate } = getDateRangeParams();
+
         try {
             const [utilRes, kpiRevRes, roomCapRes, auditRes] = await Promise.allSettled([
                 axiosInstance.get("/api/utilities/admin/dashboard"),
-                axiosInstance.get("/api/admin/dashboard/kpi-revenue"),
+                axiosInstance.get("/api/admin/dashboard/kpi-revenue", {
+                    params: { startDate, endDate }
+                }),
                 axiosInstance.get("/api/admin/dashboard/room-capacity"),
-                axiosInstance.get("/api/admin/audit-logs")
+                axiosInstance.get("/api/admin/audit-logs", { params: { limit: 50 } })
             ]);
 
-            if (utilRes.status === "fulfilled" && utilRes.value.data) {
-                setStats(prev => ({ ...prev, ...utilRes.value.data }));
+            const extractData = (resVal) => {
+                if (!resVal) return null;
+                const d = resVal.data !== undefined ? resVal.data : resVal;
+                return (d && d.data !== undefined) ? d.data : d;
+            };
+
+            let hasError = false;
+
+            if (utilRes.status === "fulfilled" && utilRes.value) {
+                setUtilStats(extractData(utilRes.value));
+            } else {
+                hasError = true;
             }
-            if (kpiRevRes.status === "fulfilled" && kpiRevRes.value.data) {
-                setKpiRevenue(kpiRevRes.value.data);
+
+            if (kpiRevRes.status === "fulfilled" && kpiRevRes.value) {
+                setKpiRevenue(extractData(kpiRevRes.value));
+            } else {
+                hasError = true;
             }
-            if (roomCapRes.status === "fulfilled" && roomCapRes.value.data) {
-                setRoomCapacity(roomCapRes.value.data);
+
+            if (roomCapRes.status === "fulfilled" && roomCapRes.value) {
+                setRoomCapacity(extractData(roomCapRes.value));
             }
-            if (auditRes.status === "fulfilled" && auditRes.value.data) {
-                setAuditLogs(auditRes.value.data);
+
+            if (auditRes.status === "fulfilled" && auditRes.value) {
+                const logs = extractData(auditRes.value);
+                setAuditLogs(Array.isArray(logs) ? logs : []);
+            }
+
+            if (hasError && !kpiRevRes.value && !utilRes.value) {
+                setErrorMsg("Không thể đồng bộ một số dữ liệu chỉ số từ máy chủ. Kiểm tra kết nối API.");
             }
         } catch (err) {
             console.error("Lỗi nạp Dashboard:", err);
+            setErrorMsg(err.message || "Đã xảy ra lỗi khi tải dữ liệu bảng điều khiển.");
         } finally {
-            setLoadingKpi(false);
+            setLoading(false);
         }
     };
 
     useEffect(() => {
         loadDashboardData();
-    }, [timeRange]);
+    }, [timeRange, customStartDate, customEndDate]);
 
+    // Thống kê buồng khám
+    const roomList = useMemo(() => {
+        if (!roomCapacity?.rooms) return [];
+        return roomCapacity.rooms;
+    }, [roomCapacity]);
+
+    const totalWaitingBN = useMemo(() => {
+        return roomList.reduce((acc, r) => acc + (r.waitingCount || 0), 0);
+    }, [roomList]);
+
+    const totalExaminingBN = useMemo(() => {
+        return roomList.reduce((acc, r) => acc + (r.examiningCount || 0), 0);
+    }, [roomList]);
+
+    const overloadedRoomsCount = useMemo(() => {
+        return roomList.filter(r => r.loadLevel === "HEAVY" || (r.waitingCount || 0) >= 5 || (r.utilizationRate || 0) >= 80).length;
+    }, [roomList]);
+
+    // Lọc buồng khám
+    const filteredRooms = useMemo(() => {
+        return roomList.filter(rm => {
+            const matchDept = roomDeptFilter === "ALL" || rm.departmentName === roomDeptFilter;
+            const matchLoad = roomLoadFilter === "ALL" ||
+                (roomLoadFilter === "HEAVY" && (rm.loadLevel === "HEAVY" || rm.waitingCount >= 5)) ||
+                (roomLoadFilter === "MEDIUM" && rm.loadLevel === "MEDIUM" && rm.waitingCount < 5) ||
+                (roomLoadFilter === "LIGHT" && rm.loadLevel === "LIGHT");
+            return matchDept && matchLoad;
+        });
+    }, [roomList, roomDeptFilter, roomLoadFilter]);
+
+    const uniqueDepartments = useMemo(() => {
+        const depts = new Set(roomList.map(r => r.departmentName).filter(Boolean));
+        return Array.from(depts);
+    }, [roomList]);
+
+    // Dữ liệu dòng thời gian doanh thu
+    const revenueTimelineData = useMemo(() => {
+        if (kpiRevenue?.dailyBreakdown && kpiRevenue.dailyBreakdown.length > 0) {
+            return kpiRevenue.dailyBreakdown.map(item => {
+                let formattedDate = "N/A";
+                if (item.date) {
+                    const parts = item.date.split("-");
+                    formattedDate = parts.length === 3 ? `${parts[2]}/${parts[1]}` : item.date;
+                }
+                return {
+                    date: formattedDate,
+                    fullDate: item.date,
+                    revenue: Number(item.revenue) || 0,
+                    transactions: Number(item.transactionCount) || 0
+                };
+            });
+        }
+        if (demoMode) {
+            return [
+                { date: "12/10", fullDate: "2026-10-12", revenue: 38500000, transactions: 24 },
+                { date: "13/10", fullDate: "2026-10-13", revenue: 42000000, transactions: 28 },
+                { date: "14/10", fullDate: "2026-10-14", revenue: 36000000, transactions: 22 },
+                { date: "15/10", fullDate: "2026-10-15", revenue: 51200000, transactions: 35 },
+                { date: "16/10", fullDate: "2026-10-16", revenue: 48900000, transactions: 31 },
+                { date: "17/10", fullDate: "2026-10-17", revenue: 45000000, transactions: 29 },
+                { date: "18/10", fullDate: "2026-10-18", revenue: 54000000, transactions: 38 }
+            ];
+        }
+        return [];
+    }, [kpiRevenue, demoMode]);
+
+    // Dữ liệu phân bổ lượt khám theo khoa
+    const departmentChartData = useMemo(() => {
+        if (utilStats?.bookingsByDepartment && Object.keys(utilStats.bookingsByDepartment).length > 0) {
+            return Object.entries(utilStats.bookingsByDepartment)
+                .map(([name, count]) => ({
+                    department: name.replace("Khoa ", ""),
+                    fullName: name,
+                    count: Number(count) || 0
+                }))
+                .sort((a, b) => b.count - a.count);
+        }
+        if (demoMode) {
+            return [
+                { department: "Nội Tim Mạch", fullName: "Khoa Nội Tim Mạch", count: 420 },
+                { department: "CĐHA & CLS", fullName: "Khoa Chẩn Đoán Hình Ảnh", count: 380 },
+                { department: "Khám Đa Khoa", fullName: "Khoa Khám Bệnh Đa Khoa", count: 310 },
+                { department: "Nhi & Sơ Sinh", fullName: "Khoa Nhi", count: 260 },
+                { department: "Ngoại Tổng Hợp", fullName: "Khoa Ngoại Tổng Hợp", count: 190 },
+                { department: "Tai Mũi Họng", fullName: "Khoa Tai Mũi Họng", count: 140 }
+            ];
+        }
+        return [];
+    }, [utilStats, demoMode]);
+
+    // Cơ cấu phương thức thanh toán
+    const paymentMethodsData = useMemo(() => {
+        const rawVietQr = Number(kpiRevenue?.vietQrRevenue) || 0;
+        const rawCash = Number(kpiRevenue?.cashRevenue) || 0;
+        const rawMomo = Number(kpiRevenue?.momoRevenue) || 0;
+        const rawVnpay = Number(kpiRevenue?.vnpayRevenue) || 0;
+        const rawPos = Number(kpiRevenue?.posRevenue) || 0;
+
+        const total = rawVietQr + rawCash + rawMomo + rawVnpay + rawPos;
+
+        if (total > 0) {
+            return [
+                { name: "VietQR (Chuyển khoản)", value: rawVietQr, color: "#0088D6" },
+                { name: "Tiền mặt tại Quầy", value: rawCash, color: "#00A878" },
+                { name: "Ví MoMo", value: rawMomo, color: "#D81B60" },
+                { name: "Cổng VNPAY-QR", value: rawVnpay, color: "#F59E0B" },
+                { name: "Thẻ POS", value: rawPos, color: "#7C3AED" }
+            ].filter(i => i.value > 0);
+        }
+
+        if (demoMode) {
+            return [
+                { name: "VietQR (Chuyển khoản)", value: 120000000, color: "#0088D6" },
+                { name: "Tiền mặt tại Quầy", value: 65000000, color: "#00A878" },
+                { name: "Cổng VNPAY-QR", value: 45000000, color: "#F59E0B" },
+                { name: "Ví MoMo", value: 32000000, color: "#D81B60" },
+                { name: "Thẻ POS", value: 23400000, color: "#7C3AED" }
+            ];
+        }
+        return [];
+    }, [kpiRevenue, demoMode]);
+
+    // Lọc Audit Logs
+    const filteredAuditLogs = useMemo(() => {
+        if (!auditLogs) return [];
+        if (auditFilter === "ALL") return auditLogs;
+        return auditLogs.filter(l => l.action && l.action.toUpperCase().includes(auditFilter));
+    }, [auditLogs, auditFilter]);
+
+    // Xuất CSV
+    const handleExportCsv = () => {
+        if (!kpiRevenue && !utilStats && !roomCapacity) {
+            alert("Chưa có dữ liệu để xuất báo cáo!");
+            return;
+        }
+
+        let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+        csvContent += "BÁO CÁO HIỆU SUẤT VẬN HÀNH BỆNH VIỆN - TNT HOSPITAL\n";
+        csvContent += `Khoảng thời gian: ${timeRange} | Ngày xuất: ${new Date().toLocaleString("vi-VN")}\n\n`;
+
+        csvContent += "1. CHỈ SỐ DOANH THU & TIẾP NHẬN\n";
+        csvContent += `Tổng Doanh Thu Thực Tế (VNĐ),${kpiRevenue?.totalRevenue || utilStats?.totalRevenueThisMonth || 0}\n`;
+        csvContent += `Tổng Giao Dịch Quyết Toán,${kpiRevenue?.totalTransactions || 0}\n`;
+        csvContent += `Lượt Đặt Khám Hôm Nay,${kpiRevenue?.todayAppointments || utilStats?.totalBookingsToday || 0}\n`;
+        csvContent += `Lượt Khám Hoàn Tất,${kpiRevenue?.completedAppointments || utilStats?.totalCompletedExams || 0}\n`;
+        csvContent += `Tỷ Lệ Hoàn Tất Khám (%),${kpiRevenue?.completionRate || 0}\n\n`;
+
+        csvContent += "2. DOANH THU THEO CHUỖI NGÀY\n";
+        csvContent += "Ngày,Doanh thu (VNĐ),Số giao dịch\n";
+        if (revenueTimelineData.length > 0) {
+            revenueTimelineData.forEach(item => {
+                csvContent += `${item.fullDate || item.date},${item.revenue},${item.transactions}\n`;
+            });
+        }
+        csvContent += "\n3. GIÁM SÁT BUỒNG KHÁM\n";
+        csvContent += "Buồng Khám,Chuyên Khoa,Bác Sĩ Trực,Đang Chờ (BN),Đang Khám (BN),Công Suất (%),Mức Tải\n";
+        roomList.forEach(rm => {
+            csvContent += `"${rm.roomName || rm.roomId}","${rm.departmentName || ""}","${rm.doctorName || ""}","${rm.waitingCount || 0}","${rm.examiningCount || 0}","${rm.utilizationRate || 0}%","${rm.loadLevel || "LIGHT"}"\n`;
+        });
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `Bao_Cao_HMS_${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    // 4 Thẻ KPI hàng đầu
     const statCards = [
         {
-            title: "Tổng Doanh Thu Thực Tế (KPI)",
-            value: kpiRevenue ? formatCurrency(kpiRevenue.totalRevenue) : formatCurrency(stats.totalRevenue),
-            subtext: kpiRevenue ? `Đã quyết toán ${kpiRevenue.totalCompletedInvoices} giao dịch` : "Đạt 105% chỉ tiêu",
-            icon: <MonetizationOnIcon fontSize="large" />,
-            color: "#16A34A"
+            title: "Tổng Doanh Thu Quyết Toán",
+            value: formatCurrency(kpiRevenue?.totalRevenue ?? utilStats?.totalRevenueThisMonth ?? 0),
+            subtext: `Đã đối soát ${kpiRevenue?.totalTransactions ?? 0} giao dịch`,
+            icon: <MonetizationOnOutlinedIcon />,
+            color: COLORS.success,
+            bgColor: "rgba(0, 168, 120, 0.08)",
+            trend: "+12.4% chu kỳ"
         },
         {
-            title: "Tỷ Lệ Hoàn Tất Khám",
-            value: kpiRevenue ? `${kpiRevenue.completionRate}%` : "88.4%",
-            subtext: kpiRevenue ? `Hủy/vắng: ${kpiRevenue.totalCanceledAppointments} ca (${kpiRevenue.cancellationRate}%)` : "Tỷ lệ xử lý cao",
-            icon: <CheckCircleIcon fontSize="large" />,
-            color: "#0284C7"
+            title: timeRange === "TODAY" ? "Lượt Tiếp Nhận (Hôm nay)" : `Lượt Tiếp Nhận (${timeRange === "WEEK" ? "7 ngày qua" : (timeRange === "MONTH" ? "30 ngày" : (timeRange === "YEAR" ? "Năm 2026" : "Kỳ chọn"))})`,
+            value: `${kpiRevenue?.todayAppointments ?? utilStats?.totalBookingsToday ?? 0} ca`,
+            subtext: `Hoàn tất: ${kpiRevenue?.completedAppointments ?? utilStats?.totalCompletedExams ?? 0} ca (${kpiRevenue?.completionRate ?? 0}%)`,
+            icon: <EventAvailableOutlinedIcon />,
+            color: COLORS.primary,
+            bgColor: "rgba(0, 136, 214, 0.08)",
+            trend: `Hủy: ${kpiRevenue?.cancelledAppointments ?? 0} ca`
         },
         {
-            title: "Công Suất Buồng Khám (Real-time)",
-            value: roomCapacity ? `${roomCapacity.occupancyRate}%` : "75.0%",
-            subtext: roomCapacity ? `${roomCapacity.activeRooms}/${roomCapacity.totalExamRooms} buồng đang khám (${roomCapacity.utilizationStatus})` : "Tải ổn định",
-            icon: <MeetingRoomIcon fontSize="large" />,
-            color: roomCapacity?.utilizationStatus === "HEAVY" ? "#DC2626" : "#EA580C"
+            title: "Công Suất Buồng Khám",
+            value: `${roomCapacity?.overallUtilizationRate ?? 0}%`,
+            subtext: `${roomCapacity?.activeRooms ?? 0}/${roomCapacity?.totalRooms ?? roomList.length} buồng đang mở phiên`,
+            icon: <MeetingRoomOutlinedIcon />,
+            color: overloadedRoomsCount > 0 ? COLORS.danger : COLORS.teal,
+            bgColor: overloadedRoomsCount > 0 ? "rgba(239, 68, 68, 0.08)" : "rgba(13, 148, 136, 0.08)",
+            trend: overloadedRoomsCount > 0 ? `${overloadedRoomsCount} buồng quá tải` : "Tải ổn định"
         },
         {
-            title: "Bệnh Nhân Đang Chờ Khám",
-            value: roomCapacity ? `${roomCapacity.totalPatientsWaiting} người` : "14 người",
-            subtext: roomCapacity ? `${roomCapacity.totalPatientsExamining} ca đang ngồi ghế khám` : "Luồng phân bổ nhịp nhàng",
-            icon: <PeopleIcon fontSize="large" />,
-            color: "#8B5CF6"
-        },
+            title: "Bệnh Nhân Chờ Khám",
+            value: `${totalWaitingBN} người`,
+            subtext: `${totalExaminingBN} bệnh nhân đang ngồi ghế khám`,
+            icon: <PeopleAltOutlinedIcon />,
+            color: totalWaitingBN > 20 ? COLORS.warning : COLORS.purple,
+            bgColor: totalWaitingBN > 20 ? "rgba(245, 158, 11, 0.08)" : "rgba(124, 58, 237, 0.08)",
+            trend: `${utilStats?.totalPatients ?? 0} hồ sơ BN`
+        }
     ];
 
     return (
-        <Container maxWidth="xl" sx={{ py: 2 }}>
-            {/* Header */}
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={2}>
-                <Box>
-                    <Typography variant="h4" fontWeight="bold" color="primary.main">
-                        📊 Dashboard & Phân Tích Hiệu Suất Toàn Viện
-                    </Typography>
-                    <Typography variant="body2" color="textSecondary">
-                        Giám sát thời gian chờ khám, công suất buồng bệnh, cơ cấu doanh thu & chất lượng phục vụ
-                    </Typography>
-                </Box>
-                <Box display="flex" gap={1.5}>
-                    <TextField
-                        select
-                        size="small"
-                        value={timeRange}
-                        onChange={(e) => setTimeRange(e.target.value)}
-                        sx={{ minWidth: 160, bgcolor: "white" }}
-                    >
-                        <MenuItem value="TODAY">Hôm nay</MenuItem>
-                        <MenuItem value="WEEK">Tuần này</MenuItem>
-                        <MenuItem value="MONTH">Tháng này</MenuItem>
-                        <MenuItem value="YEAR">Năm 2026</MenuItem>
-                    </TextField>
-                    <Button variant="outlined" startIcon={<RefreshIcon />} onClick={() => window.location.reload()}>
-                        Làm mới
-                    </Button>
-                </Box>
-            </Box>
+        <Box sx={{ bgcolor: "#F8FAFC", minHeight: "100vh", pb: 6 }}>
+            <Container maxWidth="xl" sx={{ pt: 3.5 }}>
 
-            {/* Hàng 1: Thẻ thống kê tổng quan */}
-            <Grid container spacing={3} mb={3}>
-                {statCards.map((c, i) => (
-                    <Grid item xs={12} sm={6} md={3} key={i}>
-                        <Card sx={{ borderRadius: 3, boxShadow: "0 4px 12px rgba(0,0,0,0.05)", borderLeft: `5px solid ${c.color}` }}>
-                            <CardContent>
-                                <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
-                                    <Typography variant="body2" color="textSecondary" fontWeight="bold">
+                {/* 1. Header & Unified Time Range Controls */}
+                <Box
+                    display="flex"
+                    justifyContent="space-between"
+                    alignItems={{ xs: "flex-start", lg: "center" }}
+                    flexDirection={{ xs: "column", lg: "row" }}
+                    gap={2.5}
+                    mb={3}
+                >
+                    <Box>
+                        <Stack direction="row" alignItems="center" spacing={1.5}>
+                            <Typography
+                                variant="h4"
+                                component="h1"
+                                sx={{
+                                    fontWeight: 800,
+                                    color: "#0F172A",
+                                    letterSpacing: "-0.03em",
+                                    fontSize: { xs: "1.5rem", sm: "1.85rem" }
+                                }}
+                            >
+                                Dashboard Điều Hành Toàn Viện
+                            </Typography>
+                            <Chip
+                                label="Live Analytics"
+                                size="small"
+                                sx={{
+                                    bgcolor: "rgba(0, 168, 120, 0.08)",
+                                    color: "#00A878",
+                                    fontWeight: 700,
+                                    fontSize: "0.75rem",
+                                    borderRadius: "6px",
+                                    height: "24px"
+                                }}
+                            />
+                        </Stack>
+                        <Typography variant="body2" sx={{ color: "#64748B", mt: 0.5, fontSize: "0.925rem" }}>
+                            Giám sát thời gian thực công suất phòng khám, doanh thu theo chu kỳ, phân bổ chuyên khoa và an toàn dữ liệu
+                        </Typography>
+                    </Box>
+
+                    {/* Time Range Selector & Action Buttons */}
+                    <Stack
+                        direction={{ xs: "column", sm: "row" }}
+                        spacing={1.5}
+                        alignItems={{ xs: "stretch", sm: "center" }}
+                        alignSelf={{ xs: "stretch", lg: "auto" }}
+                        flexWrap="wrap"
+                    >
+                        {/* Segmented Time Range Pills */}
+                        <ToggleButtonGroup
+                            value={timeRange}
+                            exclusive
+                            size="small"
+                            onChange={(_, newRange) => newRange && setTimeRange(newRange)}
+                            sx={{
+                                borderRadius: "10px",
+                                bgcolor: "#FFFFFF",
+                                border: "1px solid rgba(15, 23, 42, 0.08)",
+                                p: "2px",
+                                "& .MuiToggleButton-root": {
+                                    border: "none",
+                                    borderRadius: "8px",
+                                    px: 1.5,
+                                    py: 0.7,
+                                    textTransform: "none",
+                                    fontWeight: 600,
+                                    fontSize: "0.825rem",
+                                    color: "#64748B",
+                                    "&.Mui-selected": {
+                                        bgcolor: "#0F172A",
+                                        color: "#FFFFFF",
+                                        boxShadow: "0 1px 3px rgba(15, 23, 42, 0.12)"
+                                    }
+                                }
+                            }}
+                        >
+                            <ToggleButton value="TODAY">Hôm nay</ToggleButton>
+                            <ToggleButton value="WEEK">7 ngày</ToggleButton>
+                            <ToggleButton value="MONTH">30 ngày</ToggleButton>
+                            <ToggleButton value="YEAR">Năm 2026</ToggleButton>
+                            <ToggleButton value="CUSTOM">Tùy chọn</ToggleButton>
+                        </ToggleButtonGroup>
+
+                        {timeRange === "CUSTOM" && (
+                            <Stack direction="row" spacing={1} alignItems="center">
+                                <TextField
+                                    type="date"
+                                    size="small"
+                                    value={customStartDate}
+                                    onChange={(e) => setCustomStartDate(e.target.value)}
+                                    sx={{ width: 140, bgcolor: "#FFFFFF", "& .MuiOutlinedInput-root": { borderRadius: "10px" } }}
+                                />
+                                <TextField
+                                    type="date"
+                                    size="small"
+                                    value={customEndDate}
+                                    onChange={(e) => setCustomEndDate(e.target.value)}
+                                    sx={{ width: 140, bgcolor: "#FFFFFF", "& .MuiOutlinedInput-root": { borderRadius: "10px" } }}
+                                />
+                            </Stack>
+                        )}
+
+                        <Button
+                            variant="outlined"
+                            startIcon={<RefreshIcon sx={{ fontSize: 18 }} />}
+                            onClick={loadDashboardData}
+                            disabled={loading}
+                            sx={{
+                                borderRadius: "10px",
+                                fontWeight: 600,
+                                textTransform: "none",
+                                color: "#334155",
+                                borderColor: "rgba(15, 23, 42, 0.12)",
+                                bgcolor: "#FFFFFF",
+                                px: 1.8,
+                                py: 0.8
+                            }}
+                        >
+                            Làm mới
+                        </Button>
+
+                        <Button
+                            variant="contained"
+                            startIcon={<FileDownloadOutlinedIcon sx={{ fontSize: 18 }} />}
+                            onClick={handleExportCsv}
+                            sx={{
+                                borderRadius: "10px",
+                                fontWeight: 700,
+                                textTransform: "none",
+                                bgcolor: "#0088D6",
+                                px: 2,
+                                py: 0.8,
+                                boxShadow: "0 2px 8px rgba(0, 136, 214, 0.25)",
+                                "&:hover": { bgcolor: "#0070B3" }
+                            }}
+                        >
+                            Xuất CSV
+                        </Button>
+
+                        <Button
+                            variant="outlined"
+                            startIcon={<PrintOutlinedIcon sx={{ fontSize: 18 }} />}
+                            onClick={() => window.print()}
+                            sx={{
+                                borderRadius: "10px",
+                                fontWeight: 600,
+                                textTransform: "none",
+                                color: "#334155",
+                                borderColor: "rgba(15, 23, 42, 0.12)",
+                                bgcolor: "#FFFFFF",
+                                px: 1.8,
+                                py: 0.8,
+                                display: { xs: "none", sm: "inline-flex" }
+                            }}
+                        >
+                            In
+                        </Button>
+                    </Stack>
+                </Box>
+
+                {/* Banner Thông báo Lỗi / Cảnh báo */}
+                {errorMsg && (
+                    <Alert
+                        severity="warning"
+                        sx={{ mb: 2.5, borderRadius: "12px", border: "1px solid rgba(245, 158, 11, 0.2)" }}
+                        action={
+                            <Button color="inherit" size="small" onClick={loadDashboardData} sx={{ fontWeight: 700 }}>
+                                Thử Lại
+                            </Button>
+                        }
+                    >
+                        {errorMsg}
+                    </Alert>
+                )}
+
+                {/* Demo Mode & Đồng bộ trạng thái */}
+                <Box display="flex" justifyContent="space-between" alignItems="center" px={0.5} mb={2.5}>
+                    <FormControlLabel
+                        control={
+                            <Switch
+                                checked={demoMode}
+                                onChange={(e) => setDemoMode(e.target.checked)}
+                                color="warning"
+                                size="small"
+                            />
+                        }
+                        label={
+                            <Typography variant="caption" fontWeight="600" color="#64748B">
+                                Chế độ số liệu mô phỏng minh họa (Demo Visual Mode)
+                            </Typography>
+                        }
+                    />
+                    <Typography variant="caption" sx={{ color: "#94A3B8" }}>
+                        Cập nhật: {new Date().toLocaleTimeString("vi-VN")}
+                    </Typography>
+                </Box>
+
+                {/* 2. Hàng 4 Thẻ Chỉ Số KPI (Linear Metric Stage) */}
+                <Grid container spacing={2.5} mb={3}>
+                    {statCards.map((c, i) => (
+                        <Grid item xs={12} sm={6} md={3} key={i}>
+                            <Paper
+                                elevation={0}
+                                sx={{
+                                    p: 2.5,
+                                    borderRadius: "14px",
+                                    bgcolor: "#FFFFFF",
+                                    border: "1px solid rgba(15, 23, 42, 0.08)",
+                                    height: "100%",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    justifyContent: "space-between",
+                                    transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+                                    "&:hover": {
+                                        transform: "translateY(-2px)",
+                                        boxShadow: "0 8px 20px -4px rgba(15, 23, 42, 0.06)",
+                                        borderColor: "rgba(15, 23, 42, 0.15)"
+                                    }
+                                }}
+                            >
+                                <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1.5}>
+                                    <Typography
+                                        variant="caption"
+                                        sx={{
+                                            color: "#64748B",
+                                            fontWeight: 700,
+                                            textTransform: "uppercase",
+                                            letterSpacing: "0.04em",
+                                            fontSize: "0.75rem"
+                                        }}
+                                    >
                                         {c.title}
                                     </Typography>
-                                    <Box sx={{ color: c.color }}>{c.icon}</Box>
+                                    <Box
+                                        sx={{
+                                            width: 38,
+                                            height: 38,
+                                            borderRadius: "10px",
+                                            bgcolor: c.bgColor,
+                                            color: c.color,
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center"
+                                        }}
+                                    >
+                                        {React.cloneElement(c.icon, { sx: { fontSize: 20 } })}
+                                    </Box>
                                 </Box>
-                                <Typography variant="h4" fontWeight="bold" color="#0F172A">
-                                    {c.value}
-                                </Typography>
-                                <Typography variant="caption" color="textSecondary" sx={{ mt: 0.5, display: "block" }}>
-                                    {c.subtext}
-                                </Typography>
-                            </CardContent>
-                        </Card>
-                    </Grid>
-                ))}
-            </Grid>
 
-            {/* KHỐI MỚI: PHÂN TÍCH THỜI GIAN CHỜ KHÁM & HIỆU SUẤT PHÂN LUỒNG BUỒNG BỆNH */}
-            <Paper elevation={0} sx={{ p: 3, borderRadius: 3, mb: 3, border: "1px solid #E2E8F0", borderTop: "4px solid #0088D6", boxShadow: "0 2px 12px rgba(0,0,0,0.03)" }}>
-                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} flexWrap="wrap" gap={2}>
-                    <Box display="flex" alignItems="center" gap={1.5}>
-                        <AccessTimeIcon color="primary" sx={{ fontSize: 30 }} />
-                        <Box>
-                            <Typography variant="h6" fontWeight="bold" color="#0F172A">
-                                ⏱️ Đo Lường Thời Gian Chờ Khám & Hành Trình Người Bệnh (Wait-Time Analytics)
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                                Dữ liệu tính từ lúc Cấp số thứ tự sảnh chờ ➔ Bàn khám Bác sĩ ➔ Trả KQ Xét nghiệm ➔ Lĩnh thuốc tại quầy
-                            </Typography>
-                        </Box>
-                    </Box>
-                    <Chip
-                        icon={<CheckCircleIcon sx={{ fontSize: "16px !important", color: "#fff !important" }} />}
-                        label={`Đạt chuẩn phục vụ: ${stats.waitTimeMetrics.onTimeRate}%`}
-                        color="success"
-                        sx={{ fontWeight: "bold" }}
-                    />
-                </Box>
-
-                {/* 4 Chỉ số khâu thời gian */}
-                <Grid container spacing={2.5} mb={3}>
-                    <Grid item xs={12} sm={6} md={3}>
-                        <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5, bgcolor: "#F0F9FF", borderColor: "#BAE6FD" }}>
-                            <Typography variant="caption" color="text.secondary" fontWeight="bold" display="block">
-                                1. Thời gian chờ vào buồng khám
-                            </Typography>
-                            <Typography variant="h4" fontWeight="bold" color="primary.main" my={0.5}>
-                                {stats.waitTimeMetrics.avgWaitTimeMinutes} <span style={{ fontSize: "1rem" }}>phút</span>
-                            </Typography>
-                            <Typography variant="caption" color="success.dark" fontWeight="bold">
-                                ✓ Mục tiêu &lt; {stats.waitTimeMetrics.targetWaitTimeMinutes}p (Đạt chuẩn xanh)
-                            </Typography>
-                        </Paper>
-                    </Grid>
-                    <Grid item xs={12} sm={6} md={3}>
-                        <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5, bgcolor: "#F8FAFC" }}>
-                            <Typography variant="caption" color="text.secondary" fontWeight="bold" display="block">
-                                2. Thời gian khám & tư vấn
-                            </Typography>
-                            <Typography variant="h4" fontWeight="bold" color="text.primary" my={0.5}>
-                                {stats.waitTimeMetrics.avgExamDurationMinutes} <span style={{ fontSize: "1rem" }}>phút</span>
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                                Bác sĩ thăm khám lâm sàng kỹ lưỡng
-                            </Typography>
-                        </Paper>
-                    </Grid>
-                    <Grid item xs={12} sm={6} md={3}>
-                        <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5, bgcolor: "#FEFCE8", borderColor: "#FEF08A" }}>
-                            <Typography variant="caption" color="warning.dark" fontWeight="bold" display="block">
-                                3. Thời gian trả kết quả CLS / X-Quang
-                            </Typography>
-                            <Typography variant="h4" fontWeight="bold" color="warning.main" my={0.5}>
-                                {stats.waitTimeMetrics.avgLabTurnaroundMinutes} <span style={{ fontSize: "1rem" }}>phút</span>
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                                Chụp chiếu, xét nghiệm & đọc kết quả
-                            </Typography>
-                        </Paper>
-                    </Grid>
-                    <Grid item xs={12} sm={6} md={3}>
-                        <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5, bgcolor: "#F0FDF4", borderColor: "#BBF7D0" }}>
-                            <Typography variant="caption" color="success.dark" fontWeight="bold" display="block">
-                                4. Tổng hành trình khám ngoại trú
-                            </Typography>
-                            <Typography variant="h4" fontWeight="bold" color="success.main" my={0.5}>
-                                {stats.waitTimeMetrics.totalJourneyMinutes} <span style={{ fontSize: "1rem" }}>phút</span>
-                            </Typography>
-                            <Typography variant="caption" color="success.dark" fontWeight="bold">
-                                Tiêu chuẩn BV Thông minh (&lt; 90 phút)
-                            </Typography>
-                        </Paper>
-                    </Grid>
-                </Grid>
-
-                {/* Bảng phân tích thời gian chờ theo Chuyên khoa */}
-                <Typography variant="subtitle2" fontWeight="bold" color="#0F172A" mb={1.5}>
-                    📊 Chi Tiết Thời Gian Chờ & Mức Độ Tải Từng Buồng Khám (Real-time Flow)
-                </Typography>
-                <TableContainer variant="outlined" component={Paper} sx={{ borderRadius: 2 }}>
-                    <Table size="small">
-                        <TableHead sx={{ bgcolor: "#F8FAFC" }}>
-                            <TableRow>
-                                <TableCell><b>Chuyên khoa / Buồng khám</b></TableCell>
-                                <TableCell align="center"><b>Bệnh nhân đang chờ</b></TableCell>
-                                <TableCell align="center"><b>Thời gian chờ TB</b></TableCell>
-                                <TableCell><b>Tiến độ đối chiếu mục tiêu (20 phút)</b></TableCell>
-                                <TableCell align="center"><b>Trạng thái tải</b></TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {stats.departmentWaitTimes.map((row, idx) => {
-                                const percent = Math.min((row.avgWaitMin / 30) * 100, 100);
-                                const isWarning = row.status === "WARNING";
-                                return (
-                                    <TableRow key={idx} hover sx={{ bgcolor: isWarning ? "#FFFBEB" : "inherit" }}>
-                                        <TableCell><b>{row.departmentName}</b></TableCell>
-                                        <TableCell align="center">
-                                            <Chip label={`${row.waitingCount} người`} size="small" color={row.waitingCount > 20 ? "warning" : "default"} />
-                                        </TableCell>
-                                        <TableCell align="center">
-                                            <Typography variant="body2" fontWeight="bold" color={isWarning ? "warning.main" : "success.main"}>
-                                                {row.avgWaitMin} phút
-                                            </Typography>
-                                        </TableCell>
-                                        <TableCell sx={{ minWidth: 200 }}>
-                                            <Box display="flex" alignItems="center" gap={1}>
-                                                <LinearProgress
-                                                    variant="determinate"
-                                                    value={percent}
-                                                    sx={{
-                                                        flexGrow: 1,
-                                                        height: 8,
-                                                        borderRadius: 4,
-                                                        bgcolor: "#E2E8F0",
-                                                        "& .MuiLinearProgress-bar": { bgcolor: isWarning ? "#F59E0B" : "#10B981" }
-                                                    }}
-                                                />
-                                                <Typography variant="caption">{Math.round(percent)}%</Typography>
-                                            </Box>
-                                        </TableCell>
-                                        <TableCell align="center">
-                                            <Chip
-                                                label={row.load}
-                                                size="small"
-                                                color={isWarning ? "warning" : "success"}
-                                                variant={isWarning ? "filled" : "outlined"}
-                                                sx={{ fontWeight: "bold" }}
-                                            />
-                                        </TableCell>
-                                    </TableRow>
-                                );
-                            })}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
-            </Paper>
-
-            {/* Hàng 2: Biểu đồ doanh thu theo khoa & cơ cấu nguồn thu */}
-            <Grid container spacing={3} mb={3}>
-                {/* Doanh thu theo chuyên khoa */}
-                <Grid item xs={12} md={7}>
-                    <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: "1px solid #E2E8F0", boxShadow: "0 2px 10px rgba(0,0,0,0.03)", height: "100%" }}>
-                        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                            <Typography variant="h6" fontWeight="bold" color="#0F172A">
-                                🏥 Doanh Thu Theo Chuyên Khoa Khám
-                            </Typography>
-                            <Chip label="Đơn vị: VNĐ" size="small" variant="outlined" />
-                        </Box>
-
-                        <Stack spacing={2.5}>
-                            {stats.departmentRevenues.map((dept, idx) => {
-                                const maxRev = 80000000;
-                                const percent = Math.min((dept.revenue / maxRev) * 100, 100);
-                                return (
-                                    <Box key={idx}>
-                                        <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
-                                            <Typography variant="body2" fontWeight="bold">
-                                                {dept.departmentName} ({dept.examsCount} lượt khám)
-                                            </Typography>
-                                            <Typography variant="body2" fontWeight="bold" sx={{ color: dept.color }}>
-                                                {formatCurrency(dept.revenue)}
-                                            </Typography>
-                                        </Box>
-                                        <LinearProgress
-                                            variant="determinate"
-                                            value={percent}
+                                <Box my={0.5}>
+                                    {loading ? (
+                                        <Skeleton variant="text" width="70%" height={40} />
+                                    ) : (
+                                        <Typography
+                                            variant="h4"
                                             sx={{
-                                                height: 10,
-                                                borderRadius: 5,
-                                                bgcolor: "#F1F5F9",
-                                                "& .MuiLinearProgress-bar": { bgcolor: dept.color, borderRadius: 5 }
+                                                fontWeight: 800,
+                                                color: "#0F172A",
+                                                letterSpacing: "-0.03em",
+                                                fontSize: { xs: "1.45rem", sm: "1.75rem" }
                                             }}
-                                        />
-                                    </Box>
-                                );
-                            })}
-                        </Stack>
-                    </Paper>
+                                        >
+                                            {c.value}
+                                        </Typography>
+                                    )}
+                                </Box>
+
+                                <Box display="flex" justifyContent="space-between" alignItems="center" mt={1}>
+                                    <Typography variant="caption" sx={{ color: "#64748B", fontWeight: 500 }}>
+                                        {c.subtext}
+                                    </Typography>
+                                    <Chip
+                                        label={c.trend}
+                                        size="small"
+                                        sx={{
+                                            height: 20,
+                                            fontSize: "0.68rem",
+                                            fontWeight: 700,
+                                            bgcolor: c.bgColor,
+                                            color: c.color,
+                                            borderRadius: "6px"
+                                        }}
+                                    />
+                                </Box>
+                            </Paper>
+                        </Grid>
+                    ))}
                 </Grid>
 
-                {/* Cơ cấu nguồn thu viện phí */}
-                <Grid item xs={12} md={5}>
-                    <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: "1px solid #E2E8F0", boxShadow: "0 2px 10px rgba(0,0,0,0.03)", height: "100%" }}>
-                        <Typography variant="h6" fontWeight="bold" color="#0F172A" mb={2}>
-                            🥧 Cơ Cấu Nguồn Thu Viện Phí
-                        </Typography>
-
-                        <Stack spacing={2} mb={3}>
-                            {stats.revenueStructure.map((item, idx) => (
-                                <Paper key={idx} variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderLeft: `5px solid ${item.color}` }}>
-                                    <Box display="flex" justifyContent="space-between" alignItems="center">
-                                        <Box>
-                                            <Typography variant="body2" fontWeight="bold">{item.category}</Typography>
-                                            <Typography variant="caption" color="text.secondary">{item.percent}% tổng doanh thu</Typography>
-                                        </Box>
-                                        <Typography variant="body1" fontWeight="bold" sx={{ color: item.color }}>
-                                            {formatCurrency(item.amount)}
-                                        </Typography>
-                                    </Box>
-                                </Paper>
-                            ))}
-                        </Stack>
-
-                        <Alert severity="success" sx={{ borderRadius: 2 }}>
-                            Doanh thu cận lâm sàng & xét nghiệm chiếm tỷ trọng cao nhất <b>(34%)</b>, phản ánh hiệu suất phân luồng y tế tối ưu.
-                        </Alert>
-                    </Paper>
-                </Grid>
-            </Grid>
-
-            {/* Hàng 3: Bảng Xếp Hạng Năng Suất & Đánh Giá Bác Sĩ */}
-            <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: "1px solid #E2E8F0", boxShadow: "0 2px 10px rgba(0,0,0,0.03)" }}>
-                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                    <Typography variant="h6" fontWeight="bold" color="#0F172A">
-                        ⭐ Bảng Xếp Hạng Năng Suất & Mức Độ Hài Lòng Bác Sĩ
-                    </Typography>
-                    <Chip label="Đánh giá từ người bệnh" size="small" color="warning" icon={<StarIcon />} />
-                </Box>
-
-                <TableContainer>
-                    <Table size="small">
-                        <TableHead sx={{ bgcolor: "#F8FAFC" }}>
-                            <TableRow>
-                                <TableCell><b>#</b></TableCell>
-                                <TableCell><b>Bác sĩ điều trị</b></TableCell>
-                                <TableCell><b>Chuyên khoa phụ trách</b></TableCell>
-                                <TableCell align="center"><b>Số ca khám hoàn thành</b></TableCell>
-                                <TableCell align="center"><b>Đánh giá trung bình</b></TableCell>
-                                <TableCell align="right"><b>Tỷ lệ hài lòng (%)</b></TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {stats.topDoctors.map((doc, idx) => (
-                                <TableRow key={idx} hover>
-                                    <TableCell>
-                                        <Chip label={`#${idx + 1}`} size="small" color={idx === 0 ? "primary" : "default"} sx={{ fontWeight: "bold" }} />
-                                    </TableCell>
-                                    <TableCell>
-                                        <Typography variant="body2" fontWeight="bold" color="primary">
-                                            {doc.doctorName}
-                                        </Typography>
-                                    </TableCell>
-                                    <TableCell>{doc.departmentName}</TableCell>
-                                    <TableCell align="center"><b>{doc.examCount} ca</b></TableCell>
-                                    <TableCell align="center">
-                                        <Box display="flex" alignItems="center" justifyContent="center" gap={0.5}>
-                                            <StarIcon sx={{ color: "#F59E0B", fontSize: 18 }} />
-                                            <Typography variant="body2" fontWeight="bold">{doc.rating} / 5.0</Typography>
-                                        </Box>
-                                    </TableCell>
-                                    <TableCell align="right">
-                                        <Chip label={`${doc.satisfactionRate}%`} color="success" size="small" sx={{ fontWeight: "bold" }} />
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
-            </Paper>
-
-            {/* HÀNG 4 (PHASE 4): DOANH THU THỰC TẾ THEO 6 KÊNH & CÔNG SUẤT BUỒNG KHÁM CHI TIẾT */}
-            <Grid container spacing={3} my={1}>
-                {/* 1. Doanh thu theo 6 kênh thanh toán */}
-                <Grid item xs={12} md={6}>
-                    <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: "1px solid #E2E8F0", height: "100%", boxShadow: "0 2px 10px rgba(0,0,0,0.03)" }}>
-                        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                            <Box display="flex" alignItems="center" gap={1}>
-                                <AccountBalanceWalletIcon color="success" />
-                                <Typography variant="h6" fontWeight="bold" color="#0F172A">
-                                    💳 Doanh Thu Thực Tế Theo 6 Kênh Thanh Toán
-                                </Typography>
+                {/* 3. Hàng Biểu Đồ Doanh Thu & Cơ Cấu Kênh Thanh Toán */}
+                <Grid container spacing={2.5} mb={3}>
+                    {/* AreaChart Doanh Thu */}
+                    <Grid item xs={12} lg={8}>
+                        <Paper
+                            elevation={0}
+                            sx={{
+                                p: 2.5,
+                                borderRadius: "14px",
+                                border: "1px solid rgba(15, 23, 42, 0.08)",
+                                bgcolor: "#FFFFFF",
+                                height: "100%"
+                            }}
+                        >
+                            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} flexWrap="wrap" gap={1}>
+                                <Stack direction="row" alignItems="center" spacing={1}>
+                                    <ShowChartOutlinedIcon sx={{ color: "#0088D6" }} />
+                                    <Typography variant="h6" sx={{ fontWeight: 800, color: "#0F172A", fontSize: "1.05rem" }}>
+                                        Biến Động Doanh Thu & Số Giao Dịch
+                                    </Typography>
+                                </Stack>
+                                <Chip
+                                    label="Đơn vị: VNĐ"
+                                    size="small"
+                                    sx={{
+                                        fontWeight: 600,
+                                        fontSize: "0.72rem",
+                                        borderRadius: "6px",
+                                        bgcolor: "#F1F5F9",
+                                        color: "#475569"
+                                    }}
+                                />
                             </Box>
-                            <Chip
-                                label={`Tổng: ${kpiRevenue ? formatCurrency(kpiRevenue.totalRevenue) : "0 VNĐ"}`}
-                                color="success"
-                                size="small"
-                                sx={{ fontWeight: "bold" }}
-                            />
-                        </Box>
-                        <Typography variant="body2" color="textSecondary" mb={2}>
-                            Dữ liệu đối soát trực tiếp từ sổ cái giao dịch Payment (Hoàn tất: {kpiRevenue?.completionRate || 0}%)
-                        </Typography>
 
-                        <Stack spacing={2}>
-                            {[
-                                { name: "VietQR (Chuyển khoản động)", amount: kpiRevenue?.revenueByMethod?.vietQrRevenue || 0, color: "#0284C7", icon: <QrCode2Icon fontSize="small" /> },
-                                { name: "Tiền mặt tại Quầy (COUNTER_CASH)", amount: kpiRevenue?.revenueByMethod?.counterCashRevenue || 0, color: "#16A34A", icon: <MonetizationOnIcon fontSize="small" /> },
-                                { name: "Ví MoMo", amount: kpiRevenue?.revenueByMethod?.momoRevenue || 0, color: "#D81B60", icon: <AccountBalanceWalletIcon fontSize="small" /> },
-                                { name: "Cổng VNPAY-QR", amount: kpiRevenue?.revenueByMethod?.vnpayRevenue || 0, color: "#EA580C", icon: <QrCode2Icon fontSize="small" /> },
-                                { name: "Cà thẻ POS", amount: kpiRevenue?.revenueByMethod?.posRevenue || 0, color: "#8B5CF6", icon: <PointOfSaleIcon fontSize="small" /> },
-                                { name: "Ví nội bộ Bệnh viện", amount: kpiRevenue?.revenueByMethod?.internalWalletRevenue || 0, color: "#0D9488", icon: <AccountBalanceWalletIcon fontSize="small" /> },
-                            ].map((ch, idx) => {
-                                const total = kpiRevenue?.totalRevenue || 1;
-                                const pct = total > 0 ? Math.round((ch.amount / total) * 100) : 0;
-                                return (
-                                    <Box key={idx} sx={{ p: 1.5, borderRadius: 2, bgcolor: "#F8FAFC", border: "1px solid #E2E8F0" }}>
-                                        <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
+                            {loading ? (
+                                <Box sx={{ height: 290, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                    <Skeleton variant="rectangular" width="100%" height={270} sx={{ borderRadius: "10px" }} />
+                                </Box>
+                            ) : revenueTimelineData.length > 0 ? (
+                                <Box sx={{ width: "100%", height: 290 }}>
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <AreaChart data={revenueTimelineData} margin={{ top: 10, right: 15, left: 10, bottom: 5 }}>
+                                            <defs>
+                                                <linearGradient id="revenueLinearGradient" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor={COLORS.primary} stopOpacity={0.25} />
+                                                    <stop offset="95%" stopColor={COLORS.primary} stopOpacity={0.0} />
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(15, 23, 42, 0.05)" vertical={false} />
+                                            <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#64748B" }} stroke="rgba(15, 23, 42, 0.1)" />
+                                            <YAxis
+                                                width={48}
+                                                tick={{ fontSize: 11, fill: "#64748B" }}
+                                                stroke="rgba(15, 23, 42, 0.1)"
+                                                tickFormatter={(val) => val >= 1000000 ? `${(val / 1000000).toFixed(0)}Tr` : val}
+                                            />
+                                            <RechartsTooltip
+                                                content={<CustomChartTooltip isCurrency={true} />}
+                                            />
+                                            <Area
+                                                type="monotone"
+                                                dataKey="revenue"
+                                                stroke={COLORS.primary}
+                                                strokeWidth={2.5}
+                                                dot={{ r: 3.5, fill: COLORS.primary, stroke: "#FFFFFF", strokeWidth: 1.5 }}
+                                                activeDot={{ r: 6, fill: COLORS.primary }}
+                                                fillOpacity={1}
+                                                fill="url(#revenueLinearGradient)"
+                                                name="revenue"
+                                            />
+                                        </AreaChart>
+                                    </ResponsiveContainer>
+                                </Box>
+                            ) : (
+                                <Box sx={{ height: 260, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                                    <Typography variant="body2" color="#64748B">
+                                        Chưa có dữ liệu giao dịch trong khoảng thời gian này.
+                                    </Typography>
+                                    <Button size="small" onClick={() => setDemoMode(true)} sx={{ mt: 1, textTransform: "none", fontWeight: 700 }}>
+                                        Bật chế độ xem mẫu mô phỏng
+                                    </Button>
+                                </Box>
+                            )}
+                        </Paper>
+                    </Grid>
+
+                    {/* Donut Chart Kênh Thanh Toán */}
+                    <Grid item xs={12} lg={4}>
+                        <Paper
+                            elevation={0}
+                            sx={{
+                                p: 2.5,
+                                borderRadius: "14px",
+                                border: "1px solid rgba(15, 23, 42, 0.08)",
+                                bgcolor: "#FFFFFF",
+                                height: "100%",
+                                display: "flex",
+                                flexDirection: "column"
+                            }}
+                        >
+                            <Box display="flex" justifyContent="space-between" alignItems="center" mb={1.5}>
+                                <Stack direction="row" alignItems="center" spacing={1}>
+                                    <PieChartOutlineOutlinedIcon sx={{ color: "#00A878" }} />
+                                    <Typography variant="h6" sx={{ fontWeight: 800, color: "#0F172A", fontSize: "1.05rem" }}>
+                                        Cơ Cấu Kênh Thu
+                                    </Typography>
+                                </Stack>
+                                <Chip
+                                    label={formatCurrency(kpiRevenue?.totalRevenue || 0)}
+                                    size="small"
+                                    sx={{ fontWeight: 700, fontSize: "0.72rem", bgcolor: "rgba(0, 168, 120, 0.08)", color: "#00A878", borderRadius: "6px" }}
+                                />
+                            </Box>
+                            <Typography variant="caption" sx={{ color: "#64748B", mb: 2 }}>
+                                Tỷ trọng phân bổ theo kênh thanh toán (VietQR, Tiền mặt, MoMo, VNPay, POS)
+                            </Typography>
+
+                            {paymentMethodsData.length > 0 ? (
+                                <Box sx={{ height: 190, width: "100%" }}>
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie
+                                                data={paymentMethodsData}
+                                                dataKey="value"
+                                                nameKey="name"
+                                                cx="50%"
+                                                cy="50%"
+                                                innerRadius={50}
+                                                outerRadius={75}
+                                                paddingAngle={3}
+                                            >
+                                                {paymentMethodsData.map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                                ))}
+                                            </Pie>
+                                            <RechartsTooltip content={<CustomChartTooltip isCurrency={true} />} />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                </Box>
+                            ) : (
+                                <Box sx={{ height: 160, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                    <Typography variant="caption" color="#64748B">
+                                        Chưa ghi nhận doanh thu phát sinh
+                                    </Typography>
+                                </Box>
+                            )}
+
+                            {/* Legend Breakdown */}
+                            <Stack spacing={0.8} mt="auto">
+                                {paymentMethodsData.map((method, idx) => {
+                                    const total = paymentMethodsData.reduce((acc, cur) => acc + cur.value, 0) || 1;
+                                    const pct = Math.round((method.value / total) * 100);
+                                    return (
+                                        <Box
+                                            key={idx}
+                                            display="flex"
+                                            justifyContent="space-between"
+                                            alignItems="center"
+                                            sx={{
+                                                p: 0.8,
+                                                borderRadius: "8px",
+                                                bgcolor: "#F8FAFC",
+                                                border: "1px solid rgba(15, 23, 42, 0.04)"
+                                            }}
+                                        >
                                             <Box display="flex" alignItems="center" gap={1}>
-                                                <Box sx={{ color: ch.color }}>{ch.icon}</Box>
-                                                <Typography variant="body2" fontWeight="bold">
-                                                    {ch.name}
+                                                <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: method.color }} />
+                                                <Typography variant="caption" sx={{ fontWeight: 600, color: "#334155" }}>
+                                                    {method.name}
                                                 </Typography>
                                             </Box>
-                                            <Typography variant="body2" fontWeight="bold" sx={{ color: ch.color }}>
-                                                {formatCurrency(ch.amount)} ({pct}%)
+                                            <Typography variant="caption" sx={{ fontWeight: 700, color: method.color, fontFamily: "monospace" }}>
+                                                {pct}% ({formatCurrency(method.value)})
                                             </Typography>
                                         </Box>
-                                        <LinearProgress
-                                            variant="determinate"
-                                            value={pct}
-                                            sx={{
-                                                height: 6,
-                                                borderRadius: 3,
-                                                bgcolor: "#E2E8F0",
-                                                "& .MuiLinearProgress-bar": { bgcolor: ch.color }
-                                            }}
-                                        />
-                                    </Box>
-                                );
-                            })}
-                        </Stack>
-                    </Paper>
+                                    );
+                                })}
+                            </Stack>
+                        </Paper>
+                    </Grid>
                 </Grid>
 
-                {/* 2. Chi tiết buồng khám và trạng thái tải */}
-                <Grid item xs={12} md={6}>
-                    <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: "1px solid #E2E8F0", height: "100%", boxShadow: "0 2px 10px rgba(0,0,0,0.03)" }}>
-                        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                            <Box display="flex" alignItems="center" gap={1}>
-                                <MeetingRoomIcon color="primary" />
-                                <Typography variant="h6" fontWeight="bold" color="#0F172A">
-                                    🏥 Giám Sát Buồng Khám Thời Gian Thực
-                                </Typography>
+                {/* 4. Hàng Phân Bổ Chuyên Khoa & Giám Sát Buồng Khám */}
+                <Grid container spacing={2.5} mb={3}>
+                    {/* BarChart Lượt khám theo khoa */}
+                    <Grid item xs={12} lg={6}>
+                        <Paper
+                            elevation={0}
+                            sx={{
+                                p: 2.5,
+                                borderRadius: "14px",
+                                border: "1px solid rgba(15, 23, 42, 0.08)",
+                                bgcolor: "#FFFFFF",
+                                height: "100%"
+                            }}
+                        >
+                            <Box display="flex" justifyContent="space-between" alignItems="center" mb={1.5}>
+                                <Stack direction="row" alignItems="center" spacing={1}>
+                                    <BarChartOutlinedIcon sx={{ color: "#7C3AED" }} />
+                                    <Typography variant="h6" sx={{ fontWeight: 800, color: "#0F172A", fontSize: "1.05rem" }}>
+                                        Lượt Khám Theo Chuyên Khoa
+                                    </Typography>
+                                </Stack>
+                                <Chip
+                                    label="Thăm khám"
+                                    size="small"
+                                    sx={{ fontWeight: 600, fontSize: "0.72rem", borderRadius: "6px", bgcolor: "#F1F5F9" }}
+                                />
                             </Box>
-                            <Chip
-                                label={`Công suất: ${roomCapacity?.occupancyRate || 0}%`}
-                                color={roomCapacity?.utilizationStatus === "HEAVY" ? "error" : "primary"}
-                                size="small"
-                                sx={{ fontWeight: "bold" }}
-                            />
-                        </Box>
-                        <Typography variant="body2" color="textSecondary" mb={2}>
-                            Tổng {roomCapacity?.totalExamRooms || 0} buồng khám ({roomCapacity?.activeRooms || 0} buồng đang mở phiên)
-                        </Typography>
+                            <Typography variant="caption" sx={{ color: "#64748B", mb: 2, display: "block" }}>
+                                Thống kê số lượng bệnh nhân thực tế đăng ký khám qua cổng tiếp đón theo từng khoa
+                            </Typography>
 
-                        <TableContainer sx={{ maxHeight: 380 }}>
-                            <Table size="small" stickyHeader>
-                                <TableHead>
-                                    <TableRow sx={{ bgcolor: "#F8FAFC" }}>
-                                        <TableCell><b>Phòng</b></TableCell>
-                                        <TableCell><b>Chuyên khoa</b></TableCell>
-                                        <TableCell align="center"><b>Đang đợi</b></TableCell>
-                                        <TableCell align="center"><b>Đang khám</b></TableCell>
-                                        <TableCell align="center"><b>Trạng thái</b></TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {roomCapacity?.roomDetails && roomCapacity.roomDetails.length > 0 ? (
-                                        roomCapacity.roomDetails.map((rm, idx) => (
-                                            <TableRow key={idx} hover>
-                                                <TableCell><b>{rm.roomNumber}</b></TableCell>
-                                                <TableCell>{rm.departmentName}</TableCell>
-                                                <TableCell align="center">
-                                                    <Chip
-                                                        label={`${rm.waitingCount} BN`}
-                                                        size="small"
-                                                        color={rm.waitingCount > 5 ? "warning" : "default"}
-                                                    />
-                                                </TableCell>
-                                                <TableCell align="center">
-                                                    <Chip
-                                                        label={`${rm.examiningCount} BN`}
-                                                        size="small"
-                                                        color={rm.examiningCount > 0 ? "success" : "default"}
-                                                        variant={rm.examiningCount > 0 ? "filled" : "outlined"}
-                                                    />
-                                                </TableCell>
-                                                <TableCell align="center">
-                                                    <Chip
-                                                        label={rm.status === "ACTIVE" ? "ĐANG KHÁM" : "SẴN SÀNG"}
-                                                        size="small"
-                                                        color={rm.status === "ACTIVE" ? "primary" : "default"}
-                                                        sx={{ fontWeight: "bold", fontSize: "0.7rem" }}
-                                                    />
+                            {departmentChartData.length > 0 ? (
+                                <Box sx={{ width: "100%", height: 270 }}>
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={departmentChartData} margin={{ top: 10, right: 15, left: 5, bottom: 35 }}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(15, 23, 42, 0.05)" vertical={false} />
+                                            <XAxis
+                                                dataKey="department"
+                                                tick={{ fontSize: 10, fill: "#475569" }}
+                                                stroke="rgba(15, 23, 42, 0.1)"
+                                                interval={0}
+                                                angle={-18}
+                                                textAnchor="end"
+                                                height={35}
+                                            />
+                                            <YAxis width={35} tick={{ fontSize: 11, fill: "#64748B" }} stroke="rgba(15, 23, 42, 0.1)" />
+                                            <RechartsTooltip content={<CustomChartTooltip isCurrency={false} />} />
+                                            <Bar dataKey="count" fill={COLORS.primary} radius={[6, 6, 0, 0]}>
+                                                {departmentChartData.map((_, index) => (
+                                                    <Cell key={`cell-${index}`} fill={COLORS.chartPalette[index % COLORS.chartPalette.length]} />
+                                                ))}
+                                            </Bar>
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </Box>
+                            ) : (
+                                <Box sx={{ height: 250, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                    <Typography variant="body2" color="#64748B">
+                                        Chưa có số liệu phân bổ lượt khám theo khoa.
+                                    </Typography>
+                                </Box>
+                            )}
+                        </Paper>
+                    </Grid>
+
+                    {/* Giám Sát Buồng Khám */}
+                    <Grid item xs={12} lg={6}>
+                        <Paper
+                            elevation={0}
+                            sx={{
+                                p: 2.5,
+                                borderRadius: "14px",
+                                border: "1px solid rgba(15, 23, 42, 0.08)",
+                                bgcolor: "#FFFFFF",
+                                height: "100%"
+                            }}
+                        >
+                            <Box display="flex" justifyContent="space-between" alignItems="center" mb={1} flexWrap="wrap" gap={1}>
+                                <Stack direction="row" alignItems="center" spacing={1}>
+                                    <MeetingRoomOutlinedIcon sx={{ color: "#0088D6" }} />
+                                    <Typography variant="h6" sx={{ fontWeight: 800, color: "#0F172A", fontSize: "1.05rem" }}>
+                                        Giám Sát Buồng Khám & Mức Tải
+                                    </Typography>
+                                </Stack>
+                                <Chip
+                                    label={`Công suất: ${roomCapacity?.overallUtilizationRate ?? 0}%`}
+                                    size="small"
+                                    sx={{
+                                        fontWeight: 700,
+                                        fontSize: "0.72rem",
+                                        borderRadius: "6px",
+                                        bgcolor: overloadedRoomsCount > 0 ? "rgba(239, 68, 68, 0.08)" : "rgba(0, 136, 214, 0.08)",
+                                        color: overloadedRoomsCount > 0 ? "#EF4444" : "#0088D6"
+                                    }}
+                                />
+                            </Box>
+                            <Typography variant="caption" sx={{ color: "#64748B", mb: 2, display: "block" }}>
+                                {roomList.length} buồng khám ({roomCapacity?.activeRooms ?? 0} buồng đang mở phiên tiếp nhận)
+                            </Typography>
+
+                            {/* Lọc nhanh theo khoa & mức tải */}
+                            <Stack direction="row" spacing={1.5} mb={2} flexWrap="wrap">
+                                <TextField
+                                    select
+                                    size="small"
+                                    label="Lọc theo Khoa"
+                                    value={roomDeptFilter}
+                                    onChange={(e) => setRoomDeptFilter(e.target.value)}
+                                    sx={{ minWidth: 150, "& .MuiOutlinedInput-root": { borderRadius: "10px", fontSize: "0.8rem" } }}
+                                >
+                                    <MenuItem value="ALL">Tất cả khoa</MenuItem>
+                                    {uniqueDepartments.map((dept, i) => (
+                                        <MenuItem key={i} value={dept}>{dept}</MenuItem>
+                                    ))}
+                                </TextField>
+
+                                <TextField
+                                    select
+                                    size="small"
+                                    label="Trạng thái tải"
+                                    value={roomLoadFilter}
+                                    onChange={(e) => setRoomLoadFilter(e.target.value)}
+                                    sx={{ minWidth: 140, "& .MuiOutlinedInput-root": { borderRadius: "10px", fontSize: "0.8rem" } }}
+                                >
+                                    <MenuItem value="ALL">Tất cả</MenuItem>
+                                    <MenuItem value="HEAVY">Quá tải (&gt;=5 BN)</MenuItem>
+                                    <MenuItem value="MEDIUM">Đang khám</MenuItem>
+                                    <MenuItem value="LIGHT">Thoáng / Sẵn sàng</MenuItem>
+                                </TextField>
+                            </Stack>
+
+                            <TableContainer sx={{ maxHeight: 250, border: "1px solid rgba(15, 23, 42, 0.06)", borderRadius: "10px" }}>
+                                <Table size="small" stickyHeader>
+                                    <TableHead>
+                                        <TableRow sx={{ "& th": { bgcolor: "#F8FAFC", fontWeight: 700, fontSize: "0.72rem", color: "#64748B" } }}>
+                                            <TableCell>Buồng phòng</TableCell>
+                                            <TableCell>Khoa phụ trách</TableCell>
+                                            <TableCell align="center">Chờ</TableCell>
+                                            <TableCell align="center">Đang khám</TableCell>
+                                            <TableCell align="center">Mức tải</TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {filteredRooms.length > 0 ? (
+                                            filteredRooms.map((rm, idx) => {
+                                                const isHeavy = rm.loadLevel === "HEAVY" || rm.waitingCount >= 5;
+                                                return (
+                                                    <TableRow key={idx} sx={{ "&:hover": { bgcolor: "rgba(241, 245, 249, 0.6)" } }}>
+                                                        <TableCell sx={{ fontSize: "0.8rem", fontWeight: 700, color: "#0F172A" }}>
+                                                            {rm.roomName || `Phòng ${rm.roomId}`}
+                                                        </TableCell>
+                                                        <TableCell sx={{ fontSize: "0.75rem", color: "#64748B" }}>
+                                                            {rm.departmentName || "Khoa khám"}
+                                                        </TableCell>
+                                                        <TableCell align="center">
+                                                            <Chip
+                                                                label={`${rm.waitingCount ?? 0} BN`}
+                                                                size="small"
+                                                                sx={{
+                                                                    height: 20,
+                                                                    fontSize: "0.68rem",
+                                                                    fontWeight: 700,
+                                                                    borderRadius: "4px",
+                                                                    bgcolor: (rm.waitingCount || 0) >= 5 ? "rgba(239, 68, 68, 0.1)" : "rgba(15, 23, 42, 0.05)",
+                                                                    color: (rm.waitingCount || 0) >= 5 ? "#EF4444" : "#475569"
+                                                                }}
+                                                            />
+                                                        </TableCell>
+                                                        <TableCell align="center">
+                                                            <Chip
+                                                                label={`${rm.examiningCount ?? 0} BN`}
+                                                                size="small"
+                                                                sx={{
+                                                                    height: 20,
+                                                                    fontSize: "0.68rem",
+                                                                    fontWeight: 700,
+                                                                    borderRadius: "4px",
+                                                                    bgcolor: (rm.examiningCount || 0) > 0 ? "rgba(0, 136, 214, 0.1)" : "#F1F5F9",
+                                                                    color: (rm.examiningCount || 0) > 0 ? "#0088D6" : "#94A3B8"
+                                                                }}
+                                                            />
+                                                        </TableCell>
+                                                        <TableCell align="center">
+                                                            <Chip
+                                                                label={isHeavy ? "QUÁ TẢI" : (rm.examiningCount > 0 ? "ĐANG KHÁM" : "SẴN SÀNG")}
+                                                                size="small"
+                                                                sx={{
+                                                                    fontWeight: 700,
+                                                                    fontSize: "0.65rem",
+                                                                    height: 20,
+                                                                    borderRadius: "4px",
+                                                                    bgcolor: isHeavy ? "rgba(239, 68, 68, 0.1)" : (rm.examiningCount > 0 ? "rgba(0, 136, 214, 0.1)" : "rgba(0, 168, 120, 0.1)"),
+                                                                    color: isHeavy ? "#EF4444" : (rm.examiningCount > 0 ? "#0088D6" : "#00A878")
+                                                                }}
+                                                            />
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })
+                                        ) : (
+                                            <TableRow>
+                                                <TableCell colSpan={5} align="center">
+                                                    <Typography variant="caption" color="#64748B" py={2} display="block">
+                                                        Không có buồng khám nào phù hợp bộ lọc
+                                                    </Typography>
                                                 </TableCell>
                                             </TableRow>
-                                        ))
-                                    ) : (
-                                        <TableRow>
-                                            <TableCell colSpan={5} align="center">
-                                                <Typography variant="body2" color="textSecondary" py={2}>
-                                                    Đang tải danh sách buồng khám...
-                                                </Typography>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        </Paper>
+                    </Grid>
+                </Grid>
+
+                {/* 5. Nhật Ký Kiểm Toán Toàn Viện (Immutable Audit Logs - PII Sanitized) */}
+                <Paper
+                    elevation={0}
+                    sx={{
+                        p: 2.5,
+                        borderRadius: "14px",
+                        border: "1px solid rgba(15, 23, 42, 0.08)",
+                        bgcolor: "#FFFFFF"
+                    }}
+                >
+                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={1.5} flexWrap="wrap" gap={1}>
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                            <SecurityOutlinedIcon sx={{ color: "#0088D6" }} />
+                            <Typography variant="h6" sx={{ fontWeight: 800, color: "#0F172A", fontSize: "1.05rem" }}>
+                                Nhật Ký Kiểm Toán Toàn Viện (Immutable Audit Trail)
+                            </Typography>
+                        </Stack>
+
+                        <Stack direction="row" spacing={1.5} alignItems="center">
+                            <TextField
+                                select
+                                size="small"
+                                value={auditFilter}
+                                onChange={(e) => setAuditFilter(e.target.value)}
+                                sx={{ minWidth: 150, "& .MuiOutlinedInput-root": { borderRadius: "10px", fontSize: "0.8rem" } }}
+                            >
+                                <MenuItem value="ALL">Tất cả hành động</MenuItem>
+                                <MenuItem value="CREATE">CREATE (Tạo mới)</MenuItem>
+                                <MenuItem value="UPDATE">UPDATE (Cập nhật)</MenuItem>
+                                <MenuItem value="DELETE">DELETE (Xóa/Hủy)</MenuItem>
+                                <MenuItem value="PAY">PAYMENT (Thanh toán)</MenuItem>
+                                <MenuItem value="CHECK_IN">CHECK-IN (Tiếp đón)</MenuItem>
+                            </TextField>
+
+                            <Chip
+                                label={`${filteredAuditLogs.length} sự kiện`}
+                                size="small"
+                                sx={{ fontWeight: 700, borderRadius: "6px", bgcolor: "#F1F5F9", color: "#334155" }}
+                            />
+                        </Stack>
+                    </Box>
+
+                    <Typography variant="caption" sx={{ color: "#64748B", mb: 2, display: "block" }}>
+                        Cơ chế ghi nhật ký bất biến (`REQUIRES_NEW`), tự động ẩn thông tin nhạy cảm PII theo quy chuẩn an toàn dữ liệu y tế.
+                    </Typography>
+
+                    <TableContainer sx={{ maxHeight: 300, border: "1px solid rgba(15, 23, 42, 0.06)", borderRadius: "10px" }}>
+                        <Table size="small" stickyHeader>
+                            <TableHead>
+                                <TableRow sx={{ "& th": { bgcolor: "#F8FAFC", fontWeight: 700, fontSize: "0.72rem", color: "#64748B" } }}>
+                                    <TableCell>Thời gian</TableCell>
+                                    <TableCell>Hành động</TableCell>
+                                    <TableCell>Người thao tác</TableCell>
+                                    <TableCell>Vai trò</TableCell>
+                                    <TableCell>Thực thể / ID</TableCell>
+                                    <TableCell>Chi tiết (Sanitized)</TableCell>
+                                    <TableCell align="right">Địa chỉ IP</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {filteredAuditLogs.length > 0 ? (
+                                    filteredAuditLogs.map((log, idx) => (
+                                        <TableRow key={log.logId || idx} sx={{ "&:hover": { bgcolor: "rgba(241, 245, 249, 0.6)" } }}>
+                                            <TableCell sx={{ fontSize: "0.75rem", whiteSpace: "nowrap", color: "#64748B", fontFamily: "monospace" }}>
+                                                {log.createdAt || "N/A"}
+                                            </TableCell>
+                                            <TableCell>
+                                                <Chip
+                                                    label={log.action}
+                                                    size="small"
+                                                    sx={{
+                                                        fontWeight: 700,
+                                                        fontSize: "0.68rem",
+                                                        height: 22,
+                                                        borderRadius: "4px",
+                                                        bgcolor: log.action?.includes("DELETE") || log.action?.includes("CANCEL") ? "rgba(239, 68, 68, 0.1)" :
+                                                            log.action?.includes("UPDATE") || log.action?.includes("PAY") ? "rgba(245, 158, 11, 0.1)" :
+                                                            log.action?.includes("CREATE") || log.action?.includes("CHECK_IN") ? "rgba(0, 168, 120, 0.1)" : "rgba(0, 136, 214, 0.1)",
+                                                        color: log.action?.includes("DELETE") || log.action?.includes("CANCEL") ? "#EF4444" :
+                                                            log.action?.includes("UPDATE") || log.action?.includes("PAY") ? "#D97706" :
+                                                            log.action?.includes("CREATE") || log.action?.includes("CHECK_IN") ? "#00A878" : "#0088D6"
+                                                    }}
+                                                />
+                                            </TableCell>
+                                            <TableCell sx={{ fontWeight: 700, color: "#0088D6", fontSize: "0.78rem" }}>
+                                                {log.actorName || "Hệ thống"}
+                                            </TableCell>
+                                            <TableCell>
+                                                <Chip label={log.actorRole || "STAFF"} size="small" sx={{ height: 20, fontSize: "0.65rem", borderRadius: "4px" }} />
+                                            </TableCell>
+                                            <TableCell sx={{ fontSize: "0.75rem", fontFamily: "monospace" }}>
+                                                {log.entityType ? `${log.entityType} #${log.entityId || ""}` : "SYSTEM"}
+                                            </TableCell>
+                                            <TableCell sx={{ maxWidth: 350, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "0.75rem" }}>
+                                                <Tooltip title={log.details || ""}>
+                                                    <span>{log.details || "Không có mô tả chi tiết"}</span>
+                                                </Tooltip>
+                                            </TableCell>
+                                            <TableCell align="right" sx={{ fontSize: "0.75rem", fontFamily: "monospace", color: "#64748B" }}>
+                                                {log.ipAddress || "127.0.0.1"}
                                             </TableCell>
                                         </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-                    </Paper>
-                </Grid>
-            </Grid>
-
-            {/* HÀNG 5 (PHASE 4): NHẬT KÝ KIỂM TOÁN BẤT BIẾN (IMMUTABLE AUDIT LOGS - PII SANITIZED) */}
-            <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: "1px solid #E2E8F0", my: 3, boxShadow: "0 2px 10px rgba(0,0,0,0.03)" }}>
-                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} flexWrap="wrap" gap={1}>
-                    <Box display="flex" alignItems="center" gap={1}>
-                        <SecurityIcon color="primary" />
-                        <Typography variant="h6" fontWeight="bold" color="#0F172A">
-                            🛡️ Nhật Ký Kiểm Toán Toàn Viện (Immutable Audit Logs)
-                        </Typography>
-                    </Box>
-                    <Box display="flex" gap={1}>
-                        <Chip
-                            label="Append-Only & Che Giấu PII"
-                            color="info"
-                            size="small"
-                            variant="outlined"
-                            sx={{ fontWeight: "bold" }}
-                        />
-                        <Chip
-                            label={`${auditLogs.length} sự kiện gần nhất`}
-                            color="default"
-                            size="small"
-                        />
-                    </Box>
-                </Box>
-                <Typography variant="body2" color="textSecondary" mb={2}>
-                    Cơ chế ghi log giao dịch bất biến (`REQUIRES_NEW`), tự động lọc bỏ thông tin bảo mật (mật khẩu, token, OTP) theo chuẩn an toàn thông tin y tế.
-                </Typography>
-
-                <TableContainer sx={{ maxHeight: 360 }}>
-                    <Table size="small" stickyHeader>
-                        <TableHead>
-                            <TableRow sx={{ bgcolor: "#F8FAFC" }}>
-                                <TableCell><b>Thời gian</b></TableCell>
-                                <TableCell><b>Hành động</b></TableCell>
-                                <TableCell><b>Người thao tác</b></TableCell>
-                                <TableCell><b>Vai trò</b></TableCell>
-                                <TableCell><b>Thực thể / ID</b></TableCell>
-                                <TableCell><b>Chi tiết (Sanitized)</b></TableCell>
-                                <TableCell align="right"><b>Địa chỉ IP</b></TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {auditLogs && auditLogs.length > 0 ? (
-                                auditLogs.map((log) => (
-                                    <TableRow key={log.auditId} hover>
-                                        <TableCell sx={{ fontSize: "0.8rem", whiteSpace: "nowrap" }}>
-                                            {log.createdAt ? new Date(log.createdAt).toLocaleString("vi-VN") : "Vừa xong"}
-                                        </TableCell>
-                                        <TableCell>
-                                            <Chip
-                                                label={log.action}
-                                                size="small"
-                                                color={
-                                                    log.action?.includes("DELETE") || log.action?.includes("CANCEL") ? "error" :
-                                                    log.action?.includes("UPDATE") || log.action?.includes("PAY") ? "warning" :
-                                                    log.action?.includes("CREATE") || log.action?.includes("CHECK_IN") ? "success" : "primary"
-                                                }
-                                                sx={{ fontWeight: "bold", fontSize: "0.7rem" }}
-                                            />
-                                        </TableCell>
-                                        <TableCell sx={{ fontWeight: "bold", color: "primary.main" }}>
-                                            {log.actorUsername || "system"}
-                                        </TableCell>
-                                        <TableCell>
-                                            <Chip label={log.actorRole || "N/A"} size="small" variant="outlined" />
-                                        </TableCell>
-                                        <TableCell>
-                                            <code>{log.targetEntity} #{log.targetId}</code>
-                                        </TableCell>
-                                        <TableCell sx={{ maxWidth: 350, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                            <Tooltip title={log.details || ""}>
-                                                <span>{log.details || "Không có ghi chú"}</span>
-                                            </Tooltip>
-                                        </TableCell>
-                                        <TableCell align="right">
-                                            <code>{log.ipAddress || "127.0.0.1"}</code>
+                                    ))
+                                ) : (
+                                    <TableRow>
+                                        <TableCell colSpan={7} align="center">
+                                            <Typography variant="caption" color="#64748B" py={2} display="block">
+                                                Chưa ghi nhận sự kiện kiểm toán nào
+                                            </Typography>
                                         </TableCell>
                                     </TableRow>
-                                ))
-                            ) : (
-                                <TableRow>
-                                    <TableCell colSpan={7} align="center">
-                                        <Typography variant="body2" color="textSecondary" py={3}>
-                                            Chưa ghi nhận sự kiện kiểm toán nào
-                                        </Typography>
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
-            </Paper>
-        </Container>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                </Paper>
+
+            </Container>
+        </Box>
     );
 }

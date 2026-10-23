@@ -1,7 +1,7 @@
-// Đổi 150000 -> "150.000 đ"
+// Đổi 150000 -> "150.000 đ" (Chuẩn typography tiếng Việt, không bị lệch baseline ký tự tiền tệ)
 export const formatCurrency = (amount) => {
-    if (amount == null) return "0 đ";
-    return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(amount);
+    if (amount == null || isNaN(amount)) return "0 đ";
+    return `${Number(amount).toLocaleString("vi-VN")} đ`;
 };
 
 // Đổi ngày sang chuẩn Việt Nam: 23/09/2026

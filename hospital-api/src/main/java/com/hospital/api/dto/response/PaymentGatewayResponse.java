@@ -14,6 +14,7 @@ public record PaymentGatewayResponse(
         BigDecimal amount,
         String status,
         String qrImageUrl,
+        String qrCode,
         String paymentUrl,
         String deeplink,
         String bankName,

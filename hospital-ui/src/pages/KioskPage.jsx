@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Container,
   Box,
@@ -16,7 +16,9 @@ import {
   IconButton,
   Tooltip,
   Tabs,
-  Tab
+  Tab,
+  Stack,
+  Divider
 } from '@mui/material';
 import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
 import TouchAppIcon from '@mui/icons-material/TouchApp';
@@ -37,15 +39,19 @@ import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import ScheduleIcon from '@mui/icons-material/Schedule';
 import MeetingRoomIcon from '@mui/icons-material/MeetingRoom';
+import VerifiedIcon from '@mui/icons-material/Verified';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+
 import axiosInstance from '../services/AxiosInstance';
 import ThermalTicketModal from '../components/kiosk/ThermalTicketModal';
+import designTokens from '../theme/designTokens';
 
 const PRIORITY_OPTIONS = [
-  { id: 'STANDARD', label: 'Bệnh nhân thường', reason: '', icon: <MedicalServicesIcon />, color: 'primary' },
-  { id: 'ELDERLY', label: 'Người cao tuổi (≥ 75 tuổi)', reason: 'Người cao tuổi', icon: <ElderlyIcon />, color: 'error' },
-  { id: 'PREGNANT', label: 'Phụ nữ mang thai', reason: 'Phụ nữ mang thai', icon: <PregnantWomanIcon />, color: 'secondary' },
-  { id: 'CHILD', label: 'Trẻ em (< 6 tuổi)', reason: 'Trẻ em', icon: <ChildCareIcon />, color: 'warning' },
-  { id: 'DISABILITY', label: 'Người khuyết tật / Ưu tiên', reason: 'Đối tượng chính sách', icon: <AccessibleIcon />, color: 'info' },
+  { id: 'STANDARD', label: 'Bệnh nhân thường', reason: '', icon: <MedicalServicesIcon sx={{ fontSize: 20 }} />, color: '#0284C7', bg: '#E0F2FE' },
+  { id: 'ELDERLY', label: 'Người cao tuổi (≥ 65 tuổi)', reason: 'Người cao tuổi', icon: <ElderlyIcon sx={{ fontSize: 20 }} />, color: '#DC2626', bg: '#FEE2E2' },
+  { id: 'PREGNANT', label: 'Phụ nữ mang thai', reason: 'Phụ nữ mang thai', icon: <PregnantWomanIcon sx={{ fontSize: 20 }} />, color: '#7C3AED', bg: '#EDE9FE' },
+  { id: 'CHILD', label: 'Trẻ em (< 6 tuổi)', reason: 'Trẻ em', icon: <ChildCareIcon sx={{ fontSize: 20 }} />, color: '#D97706', bg: '#FEF3C7' },
+  { id: 'DISABILITY', label: 'Đối tượng ưu tiên / Khuyết tật', reason: 'Đối tượng chính sách', icon: <AccessibleIcon sx={{ fontSize: 20 }} />, color: '#059669', bg: '#D1FAE5' },
 ];
 
 const SYMPTOM_QUICK_PICKS = [
@@ -58,6 +64,7 @@ const SYMPTOM_QUICK_PICKS = [
 ];
 
 export default function KioskPage() {
+  const submissionAttemptRef = useRef({ fingerprint: null, key: null });
   const [currentTime, setCurrentTime] = useState(new Date());
   const [departments, setDepartments] = useState([]);
   const [loadingDepts, setLoadingDepts] = useState(true);
@@ -138,6 +145,7 @@ export default function KioskPage() {
   };
 
   const handleResetForm = () => {
+    submissionAttemptRef.current = { fingerprint: null, key: null };
     setSelectedDept(null);
     setFullName('');
     setPhoneNumber('');
@@ -150,70 +158,52 @@ export default function KioskPage() {
 
   const handleSubmitTicket = async () => {
     if (!selectedDept) {
-      setErrorMsg('Vui lòng chọn Khoa khám bệnh!');
+      setErrorMsg('Vui l\u00f2ng ch\u1ecdn Khoa kh\u00e1m b\u1ec7nh tr\u00ean m\u00e0n h\u00ecnh c\u1ea3m \u1ee9ng!');
       return;
     }
     if (!fullName.trim()) {
-      setErrorMsg('Vui lòng nhập Họ và tên bệnh nhân!');
+      setErrorMsg('Vui l\u00f2ng nh\u1eadp H\u1ecd v\u00e0 t\u00ean b\u1ec7nh nh\u00e2n!');
       return;
     }
-    if (!phoneNumber || phoneNumber.length < 9) {
-      setErrorMsg('Vui lòng nhập Số điện thoại hợp lệ (tối thiểu 10 số)!');
+    if (!phoneNumber || phoneNumber.length < 10) {
+      setErrorMsg('Vui l\u00f2ng nh\u1eadp S\u1ed1 \u0111i\u1ec7n tho\u1ea1i h\u1ee3p l\u1ec7 (t\u1ed1i thi\u1ec3u 10 s\u1ed1)!');
       return;
+    }
+
+    const selectedPrio = PRIORITY_OPTIONS.find(p => p.id === priorityType);
+    const isPriority = priorityType !== 'STANDARD';
+    const requestFields = {
+      fullName: fullName.trim(),
+      phoneNumber: phoneNumber.trim(),
+      departmentId: selectedDept.departmentId,
+      isPriority,
+      priorityReason: selectedPrio?.reason || null,
+      hasInsurance,
+      birthYear: birthYear ? parseInt(birthYear, 10) : undefined
+    };
+    const fingerprint = JSON.stringify(requestFields);
+    if (submissionAttemptRef.current.fingerprint !== fingerprint || !submissionAttemptRef.current.key) {
+      const key = window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      submissionAttemptRef.current = { fingerprint, key };
     }
 
     try {
       setSubmitting(true);
       setErrorMsg('');
-
-      const selectedPrio = PRIORITY_OPTIONS.find(p => p.id === priorityType);
-      const isPriority = priorityType !== 'STANDARD';
-
-      const dispatchPayload = {
-        fullName: fullName.trim(),
-        phoneNumber: phoneNumber.trim(),
-        departmentId: selectedDept.departmentId,
-        isPriority,
-        priorityReason: selectedPrio?.reason || null,
-        hasInsurance,
-        birthYear: birthYear ? parseInt(birthYear) : undefined,
-        bookingCode: undefined
-      };
-
-      try {
-        const res = await axiosInstance.post('/api/counters/kiosk/dispatch', dispatchPayload);
-        if (res.data) {
-          const data = res.data;
-          data.departmentName = selectedDept.name;
-          data.patientPhone = phoneNumber;
-          setTicketResult(data);
-          setOpenTicketModal(true);
-          handleResetForm();
-          return;
-        }
-      } catch (counterErr) {
-        console.warn("Lỗi khi điều phối quầy tiếp đón, chuyển sang fallback:", counterErr);
-        const legacyPayload = {
-          fullName: fullName.trim(),
-          phoneNumber: phoneNumber.trim(),
-          departmentId: selectedDept.departmentId,
-          isPriority,
-          priorityReason: selectedPrio?.reason || null,
-          symptoms: symptoms.trim() || undefined
-        };
-        const resLegacy = await axiosInstance.post('/api/bookings/kiosk', legacyPayload);
-        if (resLegacy.data) {
-          const data = resLegacy.data;
-          data.departmentName = selectedDept.name;
-          data.patientPhone = phoneNumber;
-          setTicketResult(data);
-          setOpenTicketModal(true);
-          handleResetForm();
-        }
+      const dispatchPayload = { ...requestFields, idempotencyKey: submissionAttemptRef.current.key };
+      const response = await axiosInstance.post('/api/counters/kiosk/dispatch', dispatchPayload);
+      const data = response?.data || response;
+      if (!data) {
+        throw new Error('The API did not return a ticket. Please retry.');
       }
+      data.departmentName = selectedDept.name || selectedDept.departmentName;
+      data.patientPhone = phoneNumber;
+      setTicketResult(data);
+      setOpenTicketModal(true);
+      handleResetForm();
     } catch (err) {
-      console.error("Lỗi cấp phiếu kiosk:", err);
-      setErrorMsg(err.message || 'Có lỗi xảy ra khi cấp phiếu, vui lòng liên hệ nhân viên tiếp đón.');
+      console.error("Kiosk ticket dispatch failed:", err);
+      setErrorMsg(err.message || 'Kh\u00f4ng th\u1ec3 c\u1ea5p phi\u1ebfu l\u00fac n\u00e0y. Vui l\u00f2ng th\u1eed l\u1ea1i sau; m\u00e3 g\u1eedi hi\u1ec7n t\u1ea1i s\u1ebd gi\u00fap tr\u00e1nh t\u1ea1o phi\u1ebfu tr\u00f9ng.');
     } finally {
       setSubmitting(false);
     }
@@ -269,64 +259,90 @@ export default function KioskPage() {
     <Box
       sx={{
         minHeight: '100vh',
-        bgcolor: '#f4f7fb',
+        bgcolor: '#F8FAFC',
         display: 'flex',
         flexDirection: 'column',
         userSelect: 'none'
       }}
     >
-      {/* Kiosk Header Bar */}
+      {/* =========================================================================
+          1. KIOSK HEADER: High-Tech Glassmorphic Navy Top Bar
+      ========================================================================= */}
       <Paper
-        elevation={3}
+        elevation={0}
         sx={{
           py: 2,
-          px: { xs: 2, md: 4 },
-          bgcolor: '#0d47a1',
-          color: '#ffffff',
+          px: { xs: 2.5, md: 5 },
+          background: 'linear-gradient(90deg, #071E3D 0%, #004D8C 60%, #0062A3 100%)',
+          color: '#FFFFFF',
           borderRadius: 0,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          borderBottom: '4px solid #1976d2'
+          borderBottom: '1px solid rgba(255, 255, 255, 0.12)',
+          boxShadow: '0 4px 20px rgba(7, 30, 61, 0.3)'
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Box
             sx={{
               p: 1.2,
-              bgcolor: 'rgba(255,255,255,0.15)',
-              borderRadius: 2,
+              bgcolor: 'rgba(255,255,255,0.14)',
+              backdropFilter: 'blur(10px)',
+              borderRadius: '14px',
+              border: '1px solid rgba(255,255,255,0.2)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
             }}
           >
-            <LocalHospitalIcon sx={{ fontSize: 40, color: '#ffeb3b' }} />
+            <LocalHospitalIcon sx={{ fontSize: 36, color: '#38BDF8' }} />
           </Box>
           <Box>
-            <Typography variant="h5" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1 }}>
-              Kiosk Lấy Số Khám Tự Động
-            </Typography>
-            <Typography variant="body2" sx={{ opacity: 0.9 }}>
-              Hệ thống Tiếp nhận & Phân luồng Bệnh nhân Thông minh
+            <Box display="flex" alignItems="center" gap={1.2}>
+              <Typography variant="h5" sx={{ fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: { xs: '1.25rem', md: '1.5rem' } }}>
+                Kiosk Lấy Số Khám Tự Phục Vụ
+              </Typography>
+              <Box
+                sx={{
+                  display: { xs: 'none', sm: 'inline-flex' },
+                  alignItems: 'center',
+                  gap: 0.6,
+                  bgcolor: 'rgba(16, 185, 129, 0.2)',
+                  border: '1px solid #10B981',
+                  borderRadius: '9999px',
+                  px: 1.2,
+                  py: 0.2
+                }}
+              >
+                <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#10B981' }} />
+                <Typography sx={{ fontSize: '0.68rem', fontWeight: 800, color: '#A7F3D0' }}>
+                  ONLINE
+                </Typography>
+              </Box>
+            </Box>
+            <Typography variant="body2" sx={{ opacity: 0.88, fontSize: '0.85rem' }}>
+              Hệ thống Tiếp nhận & Cấp Số Thứ Tự Thông Minh · YouMed TNT Hospital
             </Typography>
           </Box>
         </Box>
 
+        {/* Real-time Monospace Clock */}
         <Box sx={{ textAlign: 'right', display: { xs: 'none', sm: 'block' } }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, fontFamily: 'monospace', display: 'flex', alignItems: 'center', gap: 1 }}>
-            <AccessTimeIcon />
+          <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: 'monospace', letterSpacing: '0.05em', color: '#67E8F9' }}>
             {currentTime.toLocaleTimeString('vi-VN')}
           </Typography>
-          <Typography variant="caption" sx={{ opacity: 0.85 }}>
+          <Typography variant="caption" sx={{ opacity: 0.8, fontSize: '0.82rem' }}>
             {currentTime.toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </Typography>
         </Box>
       </Paper>
 
-      {/* Tabs Chuyển đổi: 1. Lấy số vãng lai / 2. Check-in đặt trước */}
-      <Paper square elevation={1} sx={{ bgcolor: '#ffffff', borderBottom: '2px solid #e0e0e0' }}>
-        <Container maxWidth="xl">
+      {/* =========================================================================
+          2. TOUCH TABS: Apple HIG Segmented Bar
+      ========================================================================= */}
+      <Paper elevation={0} sx={{ bgcolor: '#FFFFFF', borderBottom: '1px solid #E2E8F0', px: { xs: 1, md: 4 } }}>
+        <Container maxWidth="xl" disableGutters>
           <Tabs
             value={kioskTab}
             onChange={(e, val) => {
@@ -338,30 +354,42 @@ export default function KioskPage() {
             indicatorColor="primary"
             sx={{
               '& .MuiTab-root': {
-                py: 2,
-                fontSize: { xs: '0.95rem', md: '1.1rem' },
+                py: 2.2,
+                fontSize: { xs: '0.98rem', md: '1.12rem' },
                 fontWeight: 800,
                 textTransform: 'uppercase',
-                minHeight: 64,
-                gap: 1
+                minHeight: 68,
+                gap: 1.2,
+                letterSpacing: '0.02em',
+                color: '#64748B',
+                '&.Mui-selected': {
+                  color: '#0284C7'
+                }
+              },
+              '& .MuiTabs-indicator': {
+                height: 3.5,
+                borderRadius: '3px 3px 0 0',
+                bgcolor: '#0284C7'
               }
             }}
           >
-            <Tab icon={<ConfirmationNumberIcon sx={{ fontSize: 26 }} />} iconPosition="start" label="1. Lấy số khám mới (Vãng lai)" />
-            <Tab icon={<QrCodeScannerIcon sx={{ fontSize: 26 }} />} iconPosition="start" label="2. Check-in lịch hẹn (Đã đặt trước)" />
+            <Tab icon={<ConfirmationNumberIcon sx={{ fontSize: 26 }} />} iconPosition="start" label="1. Lấy số khám mới (Bệnh nhân vãng lai)" />
+            <Tab icon={<QrCodeScannerIcon sx={{ fontSize: 26 }} />} iconPosition="start" label="2. Check-in đặt trước (Đã có mã hẹn)" />
           </Tabs>
         </Container>
       </Paper>
 
-      {/* Main Content Area */}
+      {/* =========================================================================
+          3. MAIN TOUCH AREA
+      ========================================================================= */}
       <Container maxWidth="xl" sx={{ flexGrow: 1, py: 3, display: 'flex', flexDirection: 'column' }}>
         {errorMsg && (
-          <Alert severity="error" sx={{ mb: 2, fontSize: '1.1rem', fontWeight: 600 }} onClose={() => setErrorMsg('')}>
+          <Alert severity="error" sx={{ mb: 2.5, fontSize: '1.05rem', fontWeight: 700, borderRadius: '14px', border: '1px solid #FECACA' }} onClose={() => setErrorMsg('')}>
             {errorMsg}
           </Alert>
         )}
         {successMsg && (
-          <Alert severity="success" sx={{ mb: 2, fontSize: '1.1rem', fontWeight: 600 }} onClose={() => setSuccessMsg('')}>
+          <Alert severity="success" sx={{ mb: 2.5, fontSize: '1.05rem', fontWeight: 700, borderRadius: '14px', border: '1px solid #A7F3D0' }} onClose={() => setSuccessMsg('')}>
             {successMsg}
           </Alert>
         )}
@@ -371,255 +399,315 @@ export default function KioskPage() {
           <Grid container spacing={3} sx={{ flexGrow: 1 }}>
             {/* CỘT TRÁI: Chọn Chuyên Khoa */}
             <Grid item xs={12} md={7}>
-            <Paper
-              elevation={2}
-              sx={{
-                p: 3,
-                height: '100%',
-                borderRadius: 3,
-                bgcolor: '#ffffff',
-                display: 'flex',
-                flexDirection: 'column'
-              }}
-            >
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                <Typography variant="h6" sx={{ fontWeight: 800, color: '#0d47a1', display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <TouchAppIcon color="primary" /> BƯỚC 1: CHỌN KHOA KHÁM BỆNH
-                </Typography>
-                {selectedDept && (
-                  <Chip
-                    label={`Đã chọn: ${selectedDept.name}`}
-                    color="primary"
-                    onDelete={() => setSelectedDept(null)}
-                    sx={{ fontWeight: 700, fontSize: '0.9rem' }}
-                  />
-                )}
-              </Box>
-
-              {loadingDepts ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexGrow: 1, py: 8 }}>
-                  <CircularProgress size={48} />
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 3.5,
+                  height: '100%',
+                  borderRadius: '20px',
+                  bgcolor: '#FFFFFF',
+                  border: '1px solid rgba(15, 23, 42, 0.08)',
+                  boxShadow: '0 4px 16px rgba(15, 23, 42, 0.03)',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2.5, flexWrap: 'wrap', gap: 1 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 900, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 1, fontSize: '1.15rem' }}>
+                    <TouchAppIcon sx={{ color: '#0284C7' }} /> BƯỚC 1: CHẠM CHỌN KHOA KHÁM BỆNH
+                  </Typography>
+                  {selectedDept && (
+                    <Chip
+                      icon={<CheckCircleIcon sx={{ fontSize: '16px !important' }} />}
+                      label={`Đã chọn: ${selectedDept.name}`}
+                      color="primary"
+                      onDelete={() => setSelectedDept(null)}
+                      sx={{ fontWeight: 800, fontSize: '0.85rem', bgcolor: '#0284C7', borderRadius: '8px' }}
+                    />
+                  )}
                 </Box>
-              ) : (
-                <Grid container spacing={2} sx={{ flexGrow: 1, alignContent: 'flex-start' }}>
-                  {departments.map((dept) => {
-                    const isSelected = selectedDept?.departmentId === dept.departmentId;
-                    return (
-                      <Grid item xs={12} sm={6} key={dept.departmentId}>
-                        <Card
-                          elevation={isSelected ? 6 : 1}
-                          sx={{
-                            borderRadius: 2.5,
-                            border: isSelected ? '3px solid #1976d2' : '2px solid #e0e0e0',
-                            bgcolor: isSelected ? '#e3f2fd' : '#ffffff',
-                            transition: 'all 0.2s',
-                            '&:hover': {
-                              borderColor: '#1976d2',
-                              transform: 'translateY(-2px)'
-                            }
-                          }}
-                        >
-                          <CardActionArea
-                            onClick={() => setSelectedDept(dept)}
-                            sx={{ p: 2, height: '100%', minHeight: 110 }}
+
+                {loadingDepts ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexGrow: 1, py: 8 }}>
+                    <CircularProgress size={44} />
+                  </Box>
+                ) : (
+                  <Grid container spacing={2} sx={{ flexGrow: 1, alignContent: 'flex-start' }}>
+                    {departments.map((dept) => {
+                      const isSelected = selectedDept?.departmentId === dept.departmentId;
+                      return (
+                        <Grid item xs={12} sm={6} key={dept.departmentId}>
+                          <Card
+                            elevation={0}
+                            sx={{
+                              borderRadius: '16px',
+                              border: isSelected ? '2px solid #0284C7' : '1px solid rgba(15, 23, 42, 0.08)',
+                              bgcolor: isSelected ? '#F0F9FF' : '#FFFFFF',
+                              boxShadow: isSelected ? '0 10px 24px -4px rgba(2, 132, 199, 0.16)' : '0 2px 6px rgba(15, 23, 42, 0.02)',
+                              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                              '&:hover': {
+                                borderColor: '#0284C7',
+                                transform: 'translateY(-2px)'
+                              }
+                            }}
                           >
-                            <CardContent sx={{ p: 0 }}>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.8 }}>
-                                <LocalHospitalIcon color={isSelected ? "primary" : "action"} fontSize="large" />
-                                <Typography variant="subtitle1" sx={{ fontWeight: 800, color: isSelected ? '#0d47a1' : '#222' }}>
-                                  {dept.name}
+                            <CardActionArea
+                              onClick={() => setSelectedDept(dept)}
+                              sx={{ p: 2.2, height: '100%', minHeight: 110 }}
+                            >
+                              <CardContent sx={{ p: 0 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                                  <Box
+                                    sx={{
+                                      width: 44,
+                                      height: 44,
+                                      borderRadius: '12px',
+                                      bgcolor: isSelected ? '#0284C7' : '#F1F5F9',
+                                      color: isSelected ? '#FFFFFF' : '#0284C7',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      flexShrink: 0,
+                                      border: `1px solid ${isSelected ? '#0284C7' : '#E2E8F0'}`
+                                    }}
+                                  >
+                                    <LocalHospitalIcon sx={{ fontSize: 24 }} />
+                                  </Box>
+                                  <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                                    <Typography variant="subtitle1" sx={{ fontWeight: 800, color: isSelected ? '#0369A1' : '#0F172A', fontSize: '1.02rem', lineHeight: 1.3 }}>
+                                      {dept.name}
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ color: isSelected ? '#0284C7' : '#64748B', fontWeight: 600 }}>
+                                      Khoa tiếp nhận chuẩn BYT
+                                    </Typography>
+                                  </Box>
+                                </Box>
+                                <Typography
+                                  variant="body2"
+                                  sx={{
+                                    color: '#64748B',
+                                    fontSize: '0.82rem',
+                                    display: '-webkit-box',
+                                    WebkitLineClamp: 2,
+                                    WebkitBoxOrient: 'vertical',
+                                    overflow: 'hidden',
+                                    lineHeight: 1.45
+                                  }}
+                                >
+                                  {dept.description || 'Tiếp nhận khám và chẩn đoán điều trị chuyên sâu'}
                                 </Typography>
-                              </Box>
-                              <Typography variant="body2" sx={{ color: '#666', fontSize: '0.82rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                                {dept.description || 'Tiếp nhận khám và chẩn đoán điều trị chuyên sâu'}
-                              </Typography>
-                            </CardContent>
-                          </CardActionArea>
-                        </Card>
-                      </Grid>
-                    );
-                  })}
-                </Grid>
-              )}
-            </Paper>
-          </Grid>
-
-          {/* CỘT PHẢI: Thông tin & Bàn phím số Kiosk */}
-          <Grid item xs={12} md={5}>
-            <Paper
-              elevation={2}
-              sx={{
-                p: 3,
-                height: '100%',
-                borderRadius: 3,
-                bgcolor: '#ffffff',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 2.5
-              }}
-            >
-              <Typography variant="h6" sx={{ fontWeight: 800, color: '#0d47a1', display: 'flex', alignItems: 'center', gap: 1 }}>
-                <PersonIcon color="primary" /> BƯỚC 2: THÔNG TIN BỆNH NHÂN
-              </Typography>
-
-              {/* Đối tượng ưu tiên */}
-              <Box>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#444', mb: 1 }}>
-                  Đối tượng khám:
-                </Typography>
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                  {PRIORITY_OPTIONS.map(option => (
-                    <Chip
-                      key={option.id}
-                      icon={option.icon}
-                      label={option.label}
-                      color={priorityType === option.id ? option.color : 'default'}
-                      variant={priorityType === option.id ? 'filled' : 'outlined'}
-                      onClick={() => setPriorityType(option.id)}
-                      sx={{
-                        fontWeight: 700,
-                        py: 2.2,
-                        px: 1,
-                        fontSize: '0.85rem',
-                        cursor: 'pointer',
-                        borderRadius: 2
-                      }}
-                    />
-                  ))}
-                </Box>
-              </Box>
-
-              {/* Họ và tên */}
-              <TextField
-                fullWidth
-                label="Họ và tên Bệnh nhân *"
-                placeholder="VD: NGUYỄN VĂN AN"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value.toUpperCase())}
-                inputProps={{ style: { fontSize: '1.1rem', fontWeight: 600, textTransform: 'uppercase' } }}
-              />
-
-              {/* Số điện thoại + Màn hình hiển thị số */}
-              <Box>
-                <TextField
-                  fullWidth
-                  label="Số điện thoại liên hệ *"
-                  placeholder="Nhập 10 chữ số..."
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
-                  inputProps={{ style: { fontSize: '1.25rem', fontWeight: 700, letterSpacing: 2 } }}
-                />
-
-                {/* Bàn phím số cảm ứng trên Kiosk */}
-                <Box sx={{ mt: 1.5, p: 1.5, bgcolor: '#f8f9fa', borderRadius: 2, border: '1px solid #e0e0e0' }}>
-                  <Grid container spacing={1}>
-                    {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(num => (
-                      <Grid item xs={4} key={num}>
-                        <Button
-                          fullWidth
-                          variant="outlined"
-                          onClick={() => handleKeypadPress(num)}
-                          sx={{
-                            fontSize: '1.4rem',
-                            fontWeight: 800,
-                            py: 1.2,
-                            borderRadius: 2,
-                            bgcolor: '#fff',
-                            color: '#1a237e'
-                          }}
-                        >
-                          {num}
-                        </Button>
-                      </Grid>
-                    ))}
-                    <Grid item xs={4}>
-                      <Button
-                        fullWidth
-                        variant="outlined"
-                        color="error"
-                        onClick={handleKeypadClear}
-                        sx={{ fontSize: '0.9rem', fontWeight: 700, py: 1.5, borderRadius: 2 }}
-                      >
-                        XÓA HẾT
-                      </Button>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Button
-                        fullWidth
-                        variant="outlined"
-                        onClick={() => handleKeypadPress('0')}
-                        sx={{ fontSize: '1.4rem', fontWeight: 800, py: 1.2, borderRadius: 2, bgcolor: '#fff', color: '#1a237e' }}
-                      >
-                        0
-                      </Button>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Button
-                        fullWidth
-                        variant="outlined"
-                        color="warning"
-                        onClick={handleKeypadDelete}
-                        sx={{ py: 1.5, borderRadius: 2 }}
-                      >
-                        <BackspaceIcon />
-                      </Button>
-                    </Grid>
+                              </CardContent>
+                            </CardActionArea>
+                          </Card>
+                        </Grid>
+                      );
+                    })}
                   </Grid>
-                </Box>
-              </Box>
+                )}
+              </Paper>
+            </Grid>
 
-              {/* Triệu chứng / Lý do khám nhanh */}
-              <Box>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#444', mb: 0.8 }}>
-                  Lý do / Triệu chứng (nếu có):
+            {/* CỘT PHẢI: Thông tin Bệnh nhân & Bàn phím số Touch */}
+            <Grid item xs={12} md={5}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 3.5,
+                  height: '100%',
+                  borderRadius: '20px',
+                  bgcolor: '#FFFFFF',
+                  border: '1px solid rgba(15, 23, 42, 0.08)',
+                  boxShadow: '0 4px 16px rgba(15, 23, 42, 0.03)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 2.2
+                }}
+              >
+                <Typography variant="h6" sx={{ fontWeight: 900, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 1, fontSize: '1.15rem' }}>
+                  <PersonIcon sx={{ color: '#0284C7' }} /> BƯỚC 2: NHẬP THÔNG TIN BỆNH NHÂN
                 </Typography>
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.8, mb: 1 }}>
-                  {SYMPTOM_QUICK_PICKS.map(s => (
-                    <Chip
-                      key={s}
-                      label={s}
-                      size="small"
-                      variant={symptoms === s ? 'filled' : 'outlined'}
-                      color="info"
-                      onClick={() => setSymptoms(s)}
-                      sx={{ cursor: 'pointer', fontWeight: 600 }}
-                    />
-                  ))}
+
+                {/* Đối tượng ưu tiên */}
+                <Box>
+                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748B', textTransform: 'uppercase', mb: 1, display: 'block', fontSize: '0.75rem' }}>
+                    Đối tượng khám ưu tiên:
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.8 }}>
+                    {PRIORITY_OPTIONS.map(option => (
+                      <Chip
+                        key={option.id}
+                        icon={option.icon}
+                        label={option.label}
+                        onClick={() => setPriorityType(option.id)}
+                        sx={{
+                          fontWeight: priorityType === option.id ? 800 : 600,
+                          py: 2,
+                          px: 0.6,
+                          fontSize: '0.82rem',
+                          cursor: 'pointer',
+                          borderRadius: '8px',
+                          border: '1px solid',
+                          borderColor: priorityType === option.id ? option.color : '#E2E8F0',
+                          bgcolor: priorityType === option.id ? option.bg : '#F8FAFC',
+                          color: priorityType === option.id ? option.color : '#334155'
+                        }}
+                      />
+                    ))}
+                  </Box>
                 </Box>
+
+                {/* Họ và tên */}
                 <TextField
                   fullWidth
                   size="small"
-                  placeholder="Ghi chú thêm triệu chứng khác..."
-                  value={symptoms}
-                  onChange={(e) => setSymptoms(e.target.value)}
+                  label="Họ và tên Bệnh nhân *"
+                  placeholder="VD: NGUYỄN VĂN AN"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value.toUpperCase())}
+                  inputProps={{ style: { fontSize: '1.1rem', fontWeight: 800, textTransform: 'uppercase' } }}
+                  sx={{ bgcolor: '#F8FAFC' }}
                 />
-              </Box>
 
-              {/* Nút bấm LẤY SỐ KHÁM */}
-              <Button
-                fullWidth
-                variant="contained"
-                size="large"
-                disabled={submitting}
-                onClick={handleSubmitTicket}
-                startIcon={submitting ? <CircularProgress size={24} color="inherit" /> : <TouchAppIcon sx={{ fontSize: 32 }} />}
-                sx={{
-                  mt: 'auto',
-                  py: 2,
-                  fontSize: '1.3rem',
-                  fontWeight: 900,
-                  letterSpacing: 1,
-                  borderRadius: 3,
-                  bgcolor: '#2e7d32',
-                  '&:hover': { bgcolor: '#1b5e20' },
-                  boxShadow: '0 6px 20px rgba(46,125,50,0.35)'
-                }}
-              >
-                {submitting ? 'ĐANG CẤP SỐ...' : 'XÁC NHẬN IN PHIẾU KHÁM'}
-              </Button>
-            </Paper>
+                {/* Số điện thoại + Bàn phím số cảm ứng Kiosk */}
+                <Box>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Số điện thoại liên hệ *"
+                    placeholder="Nhập 10 chữ số..."
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
+                    inputProps={{ style: { fontSize: '1.25rem', fontWeight: 900, letterSpacing: '0.12em', fontFamily: 'monospace' } }}
+                    sx={{ bgcolor: '#F8FAFC' }}
+                  />
+
+                  {/* Bàn phím số Touch Calculator Style */}
+                  <Box sx={{ mt: 1.2, p: 1.5, bgcolor: '#F1F5F9', borderRadius: '14px', border: '1px solid #E2E8F0' }}>
+                    <Grid container spacing={1}>
+                      {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(num => (
+                        <Grid item xs={4} key={num}>
+                          <Button
+                            fullWidth
+                            variant="outlined"
+                            onClick={() => handleKeypadPress(num)}
+                            sx={{
+                              fontSize: '1.4rem',
+                              fontWeight: 900,
+                              py: 1,
+                              borderRadius: '10px',
+                              bgcolor: '#FFFFFF',
+                              color: '#0F172A',
+                              border: '1px solid #CBD5E1',
+                              boxShadow: '0 2px 4px rgba(15, 23, 42, 0.05)',
+                              '&:hover': { bgcolor: '#F8FAFC', borderColor: '#0284C7' }
+                            }}
+                          >
+                            {num}
+                          </Button>
+                        </Grid>
+                      ))}
+                      <Grid item xs={4}>
+                        <Button
+                          fullWidth
+                          variant="outlined"
+                          color="error"
+                          onClick={handleKeypadClear}
+                          sx={{ fontSize: '0.82rem', fontWeight: 800, py: 1.2, borderRadius: '10px', bgcolor: '#FFFFFF' }}
+                        >
+                          XÓA HẾT
+                        </Button>
+                      </Grid>
+                      <Grid item xs={4}>
+                        <Button
+                          fullWidth
+                          variant="outlined"
+                          onClick={() => handleKeypadPress('0')}
+                          sx={{
+                            fontSize: '1.4rem',
+                            fontWeight: 900,
+                            py: 1,
+                            borderRadius: '10px',
+                            bgcolor: '#FFFFFF',
+                            color: '#0F172A',
+                            border: '1px solid #CBD5E1'
+                          }}
+                        >
+                          0
+                        </Button>
+                      </Grid>
+                      <Grid item xs={4}>
+                        <Button
+                          fullWidth
+                          variant="outlined"
+                          color="warning"
+                          onClick={handleKeypadDelete}
+                          sx={{ py: 1.2, borderRadius: '10px', bgcolor: '#FFFFFF' }}
+                        >
+                          <BackspaceIcon sx={{ fontSize: 22 }} />
+                        </Button>
+                      </Grid>
+                    </Grid>
+                  </Box>
+                </Box>
+
+                {/* Triệu chứng / Lý do khám nhanh */}
+                <Box>
+                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748B', textTransform: 'uppercase', mb: 0.6, display: 'block', fontSize: '0.75rem' }}>
+                    Triệu chứng / Lý do khám nhanh:
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.6, mb: 1 }}>
+                    {SYMPTOM_QUICK_PICKS.map(s => (
+                      <Chip
+                        key={s}
+                        label={s}
+                        size="small"
+                        onClick={() => setSymptoms(s)}
+                        sx={{
+                          cursor: 'pointer',
+                          fontWeight: 600,
+                          fontSize: '0.75rem',
+                          borderRadius: '6px',
+                          bgcolor: symptoms === s ? '#0284C7' : '#F1F5F9',
+                          color: symptoms === s ? '#FFFFFF' : '#334155'
+                        }}
+                      />
+                    ))}
+                  </Box>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    placeholder="Ghi chú thêm triệu chứng khác..."
+                    value={symptoms}
+                    onChange={(e) => setSymptoms(e.target.value)}
+                    sx={{ bgcolor: '#F8FAFC' }}
+                  />
+                </Box>
+
+                {/* Nút bấm LẤY SỐ KHÁM */}
+                <Button
+                  fullWidth
+                  variant="contained"
+                  size="large"
+                  disabled={submitting}
+                  onClick={handleSubmitTicket}
+                  startIcon={submitting ? <CircularProgress size={24} color="inherit" /> : <TouchAppIcon sx={{ fontSize: 28 }} />}
+                  sx={{
+                    mt: 'auto',
+                    py: 1.8,
+                    fontSize: '1.2rem',
+                    fontWeight: 900,
+                    letterSpacing: '0.04em',
+                    borderRadius: '14px',
+                    bgcolor: '#059669',
+                    boxShadow: '0 8px 24px rgba(5, 150, 105, 0.35)',
+                    '&:hover': { bgcolor: '#047857' }
+                  }}
+                >
+                  {submitting ? 'ĐANG CẤP SỐ...' : 'XÁC NHẬN IN PHIẾU KHÁM'}
+                </Button>
+              </Paper>
+            </Grid>
           </Grid>
-        </Grid>
         )}
 
         {/* TAB 1: CHECK-IN LỊCH HẸN ĐÃ ĐẶT TRƯỚC (WINDOW GUARD) */}
@@ -628,67 +716,68 @@ export default function KioskPage() {
             {/* CỘT TRÁI: Hướng dẫn Khung giờ tiếp nhận (Check-in Window Guard) */}
             <Grid item xs={12} md={6}>
               <Paper
-                elevation={2}
+                elevation={0}
                 sx={{
-                  p: 3,
+                  p: 3.5,
                   height: '100%',
-                  borderRadius: 3,
-                  bgcolor: '#ffffff',
+                  borderRadius: '20px',
+                  bgcolor: '#FFFFFF',
+                  border: '1px solid rgba(15, 23, 42, 0.08)',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: 2.5
+                  gap: 2.2
                 }}
               >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, pb: 1, borderBottom: '2px solid #e3f2fd' }}>
-                  <ScheduleIcon sx={{ fontSize: 32, color: '#0d47a1' }} />
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, pb: 1.5, borderBottom: '1px solid #E2E8F0' }}>
+                  <ScheduleIcon sx={{ fontSize: 32, color: '#0284C7' }} />
                   <Box>
-                    <Typography variant="h6" sx={{ fontWeight: 800, color: '#0d47a1' }}>
+                    <Typography variant="h6" sx={{ fontWeight: 900, color: '#0F172A', fontSize: '1.15rem' }}>
                       QUY ĐỊNH TIẾP NHẬN CHECK-IN TỰ ĐỘNG
                     </Typography>
-                    <Typography variant="caption" sx={{ color: '#666' }}>
-                      Áp dụng cho bệnh nhân đã đăng ký khám trước qua ứng dụng / website
+                    <Typography variant="caption" sx={{ color: '#64748B' }}>
+                      Dành cho bệnh nhân đã đăng ký trước qua ứng dụng hoặc website YouMed TNT
                     </Typography>
                   </Box>
                 </Box>
 
-                <Alert severity="info" icon={<InfoOutlinedIcon fontSize="inherit" />} sx={{ fontSize: '0.95rem', fontWeight: 600 }}>
-                  Hệ thống Kiosk tự động xác thực thời gian đến khám và cấp số thứ tự ưu tiên vào thẳng phòng khám của Bác sĩ phụ trách.
+                <Alert severity="info" icon={<InfoOutlinedIcon fontSize="inherit" />} sx={{ fontSize: '0.92rem', fontWeight: 600, borderRadius: '12px' }}>
+                  Hệ thống Kiosk tự động xác thực thời gian đến khám và cấp số thứ tự ưu tiên vào thẳng phòng khám của Bác sĩ.
                 </Alert>
 
                 {/* Các quy tắc khung giờ */}
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <Box sx={{ p: 2, bgcolor: '#e8f5e9', borderRadius: 2, borderLeft: '5px solid #2e7d32' }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#1b5e20', display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Stack spacing={1.8}>
+                  <Box sx={{ p: 2, bgcolor: '#ECFDF5', borderRadius: '12px', borderLeft: '4px solid #10B981' }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#065F46', display: 'flex', alignItems: 'center', gap: 0.8 }}>
                       🟢 KHUNG GIỜ MỞ TIẾP NHẬN (HỢP LỆ)
                     </Typography>
-                    <Typography variant="body2" sx={{ color: '#333', mt: 0.5 }}>
-                      Bắt đầu mở từ <strong>60 phút trước</strong> giờ khám cho đến tối đa <strong>15 phút sau</strong> ca khám đã đặt. Khi check-in thành công, máy sẽ in phiếu kèm số phòng khám ngay lập tức.
+                    <Typography variant="body2" sx={{ color: '#047857', mt: 0.4, fontSize: '0.85rem', lineHeight: 1.5 }}>
+                      Bắt đầu mở từ <b>60 phút trước</b> giờ khám đến tối đa <b>15 phút sau</b> ca khám đã đặt. Máy sẽ in phiếu kèm phòng khám lập tức.
                     </Typography>
                   </Box>
 
-                  <Box sx={{ p: 2, bgcolor: '#fffde7', borderRadius: 2, borderLeft: '5px solid #fbc02d' }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#f57f17', display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ p: 2, bgcolor: '#FFFBEB', borderRadius: '12px', borderLeft: '4px solid #F59E0B' }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#92400E', display: 'flex', alignItems: 'center', gap: 0.8 }}>
                       🟡 ĐẾN QUÁ SỚM (&gt; 60 PHÚT)
                     </Typography>
-                    <Typography variant="body2" sx={{ color: '#333', mt: 0.5 }}>
-                      Nếu đến trước ca khám trên 60 phút, hệ thống sẽ nhắc nhở và chưa cấp số nhằm hạn chế quá tải buồng chờ. Quý khách vui lòng nghỉ ngơi tại sảnh chờ đến khung giờ tiếp nhận.
+                    <Typography variant="body2" sx={{ color: '#B45309', mt: 0.4, fontSize: '0.85rem', lineHeight: 1.5 }}>
+                      Hệ thống sẽ nhắc nhở và chưa cấp số nhằm hạn chế quá tải buồng chờ. Quý khách vui lòng nghỉ ngơi tại sảnh đợi đến giờ tiếp nhận.
                     </Typography>
                   </Box>
 
-                  <Box sx={{ p: 2, bgcolor: '#ffebee', borderRadius: 2, borderLeft: '5px solid #d32f2f' }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#b71c1c', display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ p: 2, bgcolor: '#FEF2F2', borderRadius: '12px', borderLeft: '4px solid #EF4444' }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#991B1B', display: 'flex', alignItems: 'center', gap: 0.8 }}>
                       🔴 ĐẾN QUÁ TRỄ (&gt; 15 PHÚT)
                     </Typography>
-                    <Typography variant="body2" sx={{ color: '#333', mt: 0.5 }}>
-                      Nếu đến trễ quá 15 phút sau giờ khám, ca khám tự động đóng để nhường lượt cho bệnh nhân kế tiếp. Quý khách vui lòng liên hệ <strong>Quầy tiếp đón số 01</strong> để được hỗ trợ sắp xếp ca khám mới.
+                    <Typography variant="body2" sx={{ color: '#B91C1C', mt: 0.4, fontSize: '0.85rem', lineHeight: 1.5 }}>
+                      Ca khám tự động đóng để nhường lượt cho bệnh nhân kế tiếp. Vui lòng liên hệ <b>Quầy Tiếp Đón số 01</b> để được hỗ trợ sắp xếp ca mới.
                     </Typography>
                   </Box>
-                </Box>
+                </Stack>
 
-                <Box sx={{ mt: 'auto', p: 2, bgcolor: '#f5f5f5', borderRadius: 2, display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                  <MeetingRoomIcon sx={{ color: '#0d47a1', fontSize: 28 }} />
-                  <Typography variant="body2" sx={{ color: '#555' }}>
-                    <strong>Mẹo:</strong> Sau khi có phiếu in, quý khách di chuyển trực tiếp đến cửa phòng Bác sĩ ghi trên phiếu mà không cần qua quầy đăng ký.
+                <Box sx={{ mt: 'auto', p: 2, bgcolor: '#F8FAFC', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: 1.5, border: '1px solid #E2E8F0' }}>
+                  <MeetingRoomIcon sx={{ color: '#0284C7', fontSize: 26 }} />
+                  <Typography variant="body2" sx={{ color: '#475569', fontSize: '0.85rem' }}>
+                    <b>Mẹo:</b> Sau khi có phiếu in, quý khách di chuyển trực tiếp đến cửa phòng Bác sĩ ghi trên phiếu mà không cần qua quầy đăng ký.
                   </Typography>
                 </Box>
               </Paper>
@@ -697,25 +786,26 @@ export default function KioskPage() {
             {/* CỘT PHẢI: Ô nhập Mã đặt lịch / SĐT & Bàn phím số */}
             <Grid item xs={12} md={6}>
               <Paper
-                elevation={2}
+                elevation={0}
                 sx={{
-                  p: 3,
+                  p: 3.5,
                   height: '100%',
-                  borderRadius: 3,
-                  bgcolor: '#ffffff',
+                  borderRadius: '20px',
+                  bgcolor: '#FFFFFF',
+                  border: '1px solid rgba(15, 23, 42, 0.08)',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: 2.5
+                  gap: 2.2
                 }}
               >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, pb: 1, borderBottom: '2px solid #e3f2fd' }}>
-                  <QrCodeScannerIcon sx={{ fontSize: 32, color: '#0d47a1' }} />
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, pb: 1.5, borderBottom: '1px solid #E2E8F0' }}>
+                  <QrCodeScannerIcon sx={{ fontSize: 32, color: '#0284C7' }} />
                   <Box>
-                    <Typography variant="h6" sx={{ fontWeight: 800, color: '#0d47a1' }}>
+                    <Typography variant="h6" sx={{ fontWeight: 900, color: '#0F172A', fontSize: '1.15rem' }}>
                       NHẬP THÔNG TIN CHECK-IN
                     </Typography>
-                    <Typography variant="caption" sx={{ color: '#666' }}>
-                      Nhập Số điện thoại đăng ký hoặc Mã đặt hẹn (VD: BK-xxxx hoặc 09xxxxxxx)
+                    <Typography variant="caption" sx={{ color: '#64748B' }}>
+                      Nhập Số điện thoại hoặc Mã đặt hẹn (VD: BK-xxxx hoặc 09xxxxxxx)
                     </Typography>
                   </Box>
                 </Box>
@@ -729,18 +819,19 @@ export default function KioskPage() {
                     value={checkInCodeOrPhone}
                     onChange={(e) => setCheckInCodeOrPhone(e.target.value.toUpperCase())}
                     inputProps={{
-                      style: { fontSize: '1.4rem', fontWeight: 800, letterSpacing: 1.5, textAlign: 'center' }
+                      style: { fontSize: '1.35rem', fontWeight: 900, letterSpacing: '0.08em', textAlign: 'center', fontFamily: 'monospace' }
                     }}
-                    helperText="Quý khách có thể bấm bàn phím số cảm ứng bên dưới hoặc dùng bàn phím máy tính"
+                    sx={{ bgcolor: '#F8FAFC' }}
+                    helperText="Bấm bàn phím số cảm ứng bên dưới hoặc dùng bàn phím máy tính"
                   />
                 </Box>
 
                 {/* Bàn phím cảm ứng Kiosk */}
-                <Box sx={{ p: 2, bgcolor: '#f8f9fa', borderRadius: 2.5, border: '1px solid #e0e0e0' }}>
-                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#666', mb: 1, display: 'block', textAlign: 'center' }}>
+                <Box sx={{ p: 2, bgcolor: '#F1F5F9', borderRadius: '16px', border: '1px solid #E2E8F0' }}>
+                  <Typography variant="caption" sx={{ fontWeight: 800, color: '#64748B', mb: 1.2, display: 'block', textAlign: 'center', textTransform: 'uppercase' }}>
                     BÀN PHÍM CẢM ỨNG
                   </Typography>
-                  <Grid container spacing={1.5}>
+                  <Grid container spacing={1.2}>
                     {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(num => (
                       <Grid item xs={4} key={num}>
                         <Button
@@ -748,12 +839,15 @@ export default function KioskPage() {
                           variant="outlined"
                           onClick={() => handleCheckInKeypadPress(num)}
                           sx={{
-                            fontSize: '1.6rem',
-                            fontWeight: 800,
-                            py: 1.5,
-                            borderRadius: 2,
-                            bgcolor: '#fff',
-                            color: '#1a237e'
+                            fontSize: '1.5rem',
+                            fontWeight: 900,
+                            py: 1.3,
+                            borderRadius: '10px',
+                            bgcolor: '#FFFFFF',
+                            color: '#0F172A',
+                            border: '1px solid #CBD5E1',
+                            boxShadow: '0 2px 4px rgba(15, 23, 42, 0.05)',
+                            '&:hover': { bgcolor: '#F8FAFC', borderColor: '#0284C7' }
                           }}
                         >
                           {num}
@@ -766,7 +860,7 @@ export default function KioskPage() {
                         variant="outlined"
                         color="error"
                         onClick={handleCheckInKeypadClear}
-                        sx={{ fontSize: '1rem', fontWeight: 800, py: 1.5, borderRadius: 2 }}
+                        sx={{ fontSize: '0.85rem', fontWeight: 800, py: 1.4, borderRadius: '10px', bgcolor: '#FFFFFF' }}
                       >
                         XÓA HẾT
                       </Button>
@@ -776,7 +870,15 @@ export default function KioskPage() {
                         fullWidth
                         variant="outlined"
                         onClick={() => handleCheckInKeypadPress('0')}
-                        sx={{ fontSize: '1.6rem', fontWeight: 800, py: 1.5, borderRadius: 2, bgcolor: '#fff', color: '#1a237e' }}
+                        sx={{
+                          fontSize: '1.5rem',
+                          fontWeight: 900,
+                          py: 1.3,
+                          borderRadius: '10px',
+                          bgcolor: '#FFFFFF',
+                          color: '#0F172A',
+                          border: '1px solid #CBD5E1'
+                        }}
                       >
                         0
                       </Button>
@@ -787,9 +889,9 @@ export default function KioskPage() {
                         variant="outlined"
                         color="warning"
                         onClick={handleCheckInKeypadDelete}
-                        sx={{ py: 1.5, borderRadius: 2 }}
+                        sx={{ py: 1.4, borderRadius: '10px', bgcolor: '#FFFFFF' }}
                       >
-                        <BackspaceIcon sx={{ fontSize: 28 }} />
+                        <BackspaceIcon sx={{ fontSize: 24 }} />
                       </Button>
                     </Grid>
                   </Grid>
@@ -802,17 +904,17 @@ export default function KioskPage() {
                   size="large"
                   disabled={checkInSubmitting}
                   onClick={handleCheckInSubmit}
-                  startIcon={checkInSubmitting ? <CircularProgress size={28} color="inherit" /> : <CheckCircleOutlineIcon sx={{ fontSize: 32 }} />}
+                  startIcon={checkInSubmitting ? <CircularProgress size={24} color="inherit" /> : <CheckCircleOutlineIcon sx={{ fontSize: 28 }} />}
                   sx={{
                     mt: 'auto',
-                    py: 2.2,
-                    fontSize: '1.35rem',
+                    py: 1.8,
+                    fontSize: '1.25rem',
                     fontWeight: 900,
-                    letterSpacing: 1,
-                    borderRadius: 3,
-                    bgcolor: '#0d47a1',
-                    '&:hover': { bgcolor: '#08306b' },
-                    boxShadow: '0 6px 20px rgba(13,71,161,0.35)'
+                    letterSpacing: '0.04em',
+                    borderRadius: '14px',
+                    bgcolor: '#0284C7',
+                    boxShadow: '0 8px 24px rgba(2, 132, 199, 0.35)',
+                    '&:hover': { bgcolor: '#0369A1' }
                   }}
                 >
                   {checkInSubmitting ? 'ĐANG XÁC THỰC CHECK-IN...' : 'XÁC NHẬN CHECK-IN & IN PHIẾU'}
@@ -823,10 +925,12 @@ export default function KioskPage() {
         )}
       </Container>
 
-      {/* Footer Banner */}
-      <Box sx={{ py: 1.5, textAlign: 'center', bgcolor: '#e8eaf6', borderTop: '1px solid #c5cae9' }}>
-        <Typography variant="body2" sx={{ color: '#3949ab', fontWeight: 600 }}>
-          💡 Quý khách cần hỗ trợ vui lòng liên hệ Nhân viên Chăm sóc Khách hàng tại Quầy tiếp đón hoặc Hotline: 1900 6868
+      {/* =========================================================================
+          4. FOOTER BANNER
+      ========================================================================= */}
+      <Box sx={{ py: 1.5, textAlign: 'center', bgcolor: '#FFFFFF', borderTop: '1px solid #E2E8F0' }}>
+        <Typography variant="body2" sx={{ color: '#64748B', fontWeight: 600, fontSize: '0.85rem' }}>
+          💡 Quý khách cần hỗ trợ vui lòng liên hệ Nhân viên Chăm sóc Khách hàng tại Quầy Tiếp Đón hoặc Hotline: <b>1900 8888</b>
         </Typography>
       </Box>
 
