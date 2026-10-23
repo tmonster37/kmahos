@@ -20,4 +20,12 @@ public interface TimeSlotRepository extends JpaRepository<TimeSlot, UUID> {
     Optional<TimeSlot> findByIdWithLock(@Param("id") UUID id);
 
     java.util.List<TimeSlot> findAllByDoctorSchedule_DoctorScheduleIdAndDeletedFalseOrderByStartTimeAsc(UUID doctorScheduleId);
+
+    @Query("SELECT ts FROM TimeSlot ts JOIN FETCH ts.doctorSchedule ds " +
+            "JOIN FETCH ds.doctor d JOIN FETCH d.account " +
+            "LEFT JOIN FETCH ds.room " +
+            "WHERE ds.scheduleDate = :date AND d.department.departmentId = :departmentId " +
+            "AND ds.deleted = false AND ts.deleted = false ORDER BY ts.startTime ASC")
+    java.util.List<TimeSlot> findAllForDepartmentAndDate(@Param("departmentId") Integer departmentId,
+                                                         @Param("date") java.time.LocalDate date);
 }

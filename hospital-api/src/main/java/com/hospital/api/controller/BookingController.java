@@ -5,11 +5,14 @@ import com.hospital.api.dto.request.BookingCreateRequest;
 import com.hospital.api.dto.response.BookingResponse;
 import com.hospital.api.security.UserPrincipal;
 import com.hospital.api.service.BookingService;
+import com.hospital.api.service.AuditLogService;
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,6 +25,7 @@ public class BookingController {
 
     private final BookingService bookingService;
     private final com.hospital.api.service.SlotReservationService slotReservationService;
+    private final AuditLogService auditLogService;
 
     // Giữ chỗ khung giờ tạm thời trong 10 phút (chống đặt trùng đồng thời)
     @PostMapping("/reserve-slot")
@@ -77,11 +81,15 @@ public class BookingController {
 
     // Bệnh nhân hủy lịch khám đã đặt
     @PutMapping("/{bookingId}/cancel")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> cancelBooking(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
-            @PathVariable UUID bookingId
+            @PathVariable UUID bookingId,
+            HttpServletRequest servletRequest
     ) {
-        bookingService.cancelBooking(userPrincipal.getId(), bookingId);
+        bookingService.adminCancelBooking(bookingId);
+        auditLogService.log(userPrincipal.getId(), userPrincipal.getPhoneNumber(), "ROLE_ADMIN", "BOOKING_CANCEL",
+                "BOOKING", bookingId.toString(), "Cancelled booking", servletRequest.getRemoteAddr());
         return ResponseEntity.ok(ApiResponse.ok(null, "Đã hủy lịch khám thành công"));
     }
 }

@@ -2,6 +2,7 @@
 // Chạy bằng Node.js: node test_counter_kiosk_workflow.js
 
 const BASE_URL = 'http://localhost:8080';
+const { randomUUID } = require("crypto");
 
 async function runCounterAndKioskTests() {
     console.log("==========================================================================");
@@ -97,7 +98,8 @@ async function runCounterAndKioskTests() {
             birthYear: 1954,
             isPriority: true,
             priorityReason: "Người cao tuổi (72 tuổi)",
-            hasInsurance: false
+            hasInsurance: false,
+            idempotencyKey: randomUUID()
         };
         const res = await fetch(`${BASE_URL}/api/counters/kiosk/dispatch`, {
             method: "POST",
@@ -127,7 +129,8 @@ async function runCounterAndKioskTests() {
             departmentId: 2,
             birthYear: 1988,
             hasInsurance: true,
-            isPriority: false
+            isPriority: false,
+            idempotencyKey: randomUUID()
         };
         const res = await fetch(`${BASE_URL}/api/counters/kiosk/dispatch`, {
             method: "POST",
@@ -173,7 +176,8 @@ async function runCounterAndKioskTests() {
             phoneNumber: "0905123987",
             departmentId: 1,
             birthYear: 1995,
-            bookingCode: appointmentBookingCode
+            bookingCode: appointmentBookingCode,
+            idempotencyKey: randomUUID()
         };
         const res = await fetch(`${BASE_URL}/api/counters/kiosk/dispatch`, {
             method: "POST",
@@ -204,7 +208,8 @@ async function runCounterAndKioskTests() {
                 departmentId: 1,
                 birthYear: 1998,
                 hasInsurance: false,
-                isPriority: false
+                isPriority: false,
+                idempotencyKey: randomUUID()
             })
         });
         if (!res1.ok) throw new Error("Dispatch vé thường 1 thất bại");
@@ -221,7 +226,8 @@ async function runCounterAndKioskTests() {
                 departmentId: 1,
                 birthYear: 1996,
                 hasInsurance: false,
-                isPriority: false
+                isPriority: false,
+                idempotencyKey: randomUUID()
             })
         });
         if (!res2.ok) throw new Error("Dispatch vé thường 2 thất bại");

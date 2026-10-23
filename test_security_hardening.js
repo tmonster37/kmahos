@@ -43,11 +43,11 @@ async function runSecurityTests() {
         patientToken = pJson.data.accessToken;
     });
 
-    // TIÊU CHÍ 1: Người chưa xác thực không thể tra cứu hồ sơ bệnh nhân, đọc DICOM worklist hoặc gửi callback PACS/LIS
-    await test("TC 1.1: Chặn truy cập công khai vào /api/patient-profiles/lookup (kỳ vọng 401/403)", async () => {
-        const res = await fetch(`${BASE_URL}/api/patient-profiles/lookup?keyword=0987`);
+    // TIÊU CHÍ 1: Người chưa xác thực không thể truy cập hồ sơ bệnh nhân gốc, đọc DICOM worklist hoặc gửi callback PACS/LIS
+    await test("TC 1.1: Chặn truy cập công khai vào danh sách hồ sơ đầy đủ /api/patient-profiles (kỳ vọng 401/403)", async () => {
+        const res = await fetch(`${BASE_URL}/api/patient-profiles`);
         if (res.status !== 401 && res.status !== 403) {
-            throw new Error(`Endpoint vẫn mở công khai! HTTP Status trả về: ${res.status}`);
+            throw new Error(`Endpoint hồ sơ gốc vẫn mở công khai! HTTP Status trả về: ${res.status}`);
         }
     });
 

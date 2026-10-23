@@ -1,0 +1,31 @@
+sequenceDiagram
+    autonumber
+    actor Nurse as Điều dưỡng
+    participant Controller as NurseReceptionController
+    participant Service as NurseReceptionServiceImpl
+    participant BookingRepo as BookingRepository
+    participant RecordRepo as MedicalExaminationRecordRepository
+
+    Nurse->>Controller: POST /api/nurse/check-in/qr
+    Note over Controller: Chỉ ROLE_NURSE hoặc ROLE_ADMIN
+    Controller->>Service: checkInByQr(request, nurseUserId)
+    Service->>Service: lấy mã đặt khám từ QR / request
+    Service->>BookingRepo: findByBookingCode(code)
+    BookingRepo-->>Service: Booking
+    alt Không tìm thấy mã hoặc lượt đã hủy
+        Service-->>Controller: lỗi 404 / 400
+        Controller-->>Nurse: thông báo không thể tiếp nhận
+    else Lượt khám hợp lệ
+        Service->>BookingRepo: cập nhật status = IN_PROGRESS
+        Service->>RecordRepo: tìm hồ sơ theo bookingId
+        alt Chưa có hồ sơ khám
+            Service->>RecordRepo: tạo hồ sơ WAITING từ Booking
+            RecordRepo-->>Service: MedicalExaminationRecord
+        else Đã có hồ sơ
+            RecordRepo-->>Service: hồ sơ hiện có
+        end
+        Service->>Service: tính BMI nếu có chiều cao và cân nặng
+        Service->>RecordRepo: lưu triệu chứng, ghi chú và sinh hiệu
+        Service-->>Controller: số thứ tự, phòng, khoa, bác sĩ, BMI
+        Controller-->>Nurse: tiếp nhận thành công
+    end

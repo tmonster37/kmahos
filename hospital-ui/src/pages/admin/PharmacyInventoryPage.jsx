@@ -379,64 +379,101 @@ export default function PharmacyInventoryPage() {
 
     return (
         <Container maxWidth="xl" sx={{ py: 3 }}>
-            {/* Header Tiêu Đề */}
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={2}>
-                <Box>
-                    <Box display="flex" alignItems="center" gap={1.5}>
-                        <Box
-                            sx={{
-                                width: 44,
-                                height: 44,
-                                borderRadius: "12px",
-                                background: "linear-gradient(135deg, #0088D6 0%, #00C292 100%)",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                color: "white",
-                                boxShadow: "0 6px 16px rgba(0, 136, 214, 0.3)"
-                            }}
-                        >
-                            <Inventory2Icon sx={{ fontSize: 26 }} />
-                        </Box>
-                        <Box>
-                            <Typography variant="h5" fontWeight="800" color="#1E293B">
+            {/* Header Banner (Apple HIG + Linear) */}
+            <Paper
+                elevation={0}
+                sx={{
+                    p: { xs: 2.5, md: 3 },
+                    mb: 3,
+                    borderRadius: 3.5,
+                    bgcolor: "#FFFFFF",
+                    border: "1px solid rgba(15, 23, 42, 0.08)",
+                    boxShadow: "0 4px 20px rgba(15, 23, 42, 0.03)",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    gap: 2
+                }}
+            >
+                <Box display="flex" alignItems="center" gap={2}>
+                    <Box
+                        sx={{
+                            width: 48,
+                            height: 48,
+                            borderRadius: "14px",
+                            bgcolor: "rgba(0, 136, 214, 0.1)",
+                            color: "#0088D6",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            boxShadow: "0 4px 14px rgba(0, 136, 214, 0.2)"
+                        }}
+                    >
+                        <Inventory2Icon sx={{ fontSize: 26 }} />
+                    </Box>
+                    <Box>
+                        <Box display="flex" alignItems="center" gap={1}>
+                            <Typography variant="h6" fontWeight={800} color="#0F172A" letterSpacing="-0.02em">
                                 Quản Lý Kho Dược Đa Cấp & FEFO
                             </Typography>
-                            <Typography variant="body2" color="#64748B">
-                                Kiến trúc Kho chẵn $\rightarrow$ Kho lẻ $\rightarrow$ Tủ trực cấp cứu & Thuật toán xuất kho FEFO (Bahmni + Odoo ERP)
-                            </Typography>
+                            <Chip
+                                label="SmartHIS Pharmacy Pro"
+                                size="small"
+                                sx={{
+                                    height: 22,
+                                    fontSize: "0.72rem",
+                                    fontWeight: 700,
+                                    bgcolor: "rgba(0, 136, 214, 0.1)",
+                                    color: "#0088D6",
+                                    border: "1px solid rgba(0, 136, 214, 0.2)"
+                                }}
+                            />
                         </Box>
+                        <Typography variant="body2" sx={{ color: "#64748B", mt: 0.2 }}>
+                            Kiến trúc Kho chẵn $\rightarrow$ Kho lẻ $\rightarrow$ Tủ trực cấp cứu & Thuật toán xuất kho chuẩn First-Expiry First-Out
+                        </Typography>
                     </Box>
                 </Box>
 
-                <Stack direction="row" spacing={1.5} flexWrap="wrap" sx={{ gap: 1 }}>
+                <Stack direction="row" spacing={1.2} flexWrap="wrap">
                     <Button
                         variant="outlined"
                         startIcon={<RefreshIcon />}
                         onClick={loadAllData}
-                        sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none" }}
+                        sx={{
+                            borderRadius: 2.2,
+                            fontWeight: 700,
+                            textTransform: "none",
+                            fontSize: "0.85rem",
+                            color: "#475569",
+                            borderColor: "rgba(15, 23, 42, 0.15)",
+                            "&:hover": { borderColor: "#0F172A", bgcolor: "rgba(15, 23, 42, 0.04)" }
+                        }}
                     >
                         Làm Mới
                     </Button>
                     <Button
                         variant="contained"
-                        color="primary"
                         startIcon={<AddCircleIcon />}
                         onClick={() => {
                             setReceiveData(prev => ({ ...prev, warehouseId: selectedWarehouseId || (warehouses[0]?.warehouseId || "") }));
                             setOpenReceiveBatch(true);
                         }}
                         sx={{
-                            borderRadius: 2,
+                            borderRadius: 2.2,
                             fontWeight: 700,
-                            textTransform: "none"
+                            textTransform: "none",
+                            fontSize: "0.85rem",
+                            bgcolor: "#0088D6",
+                            boxShadow: "0 4px 14px rgba(0, 136, 214, 0.25)",
+                            "&:hover": { bgcolor: "#0073B7" }
                         }}
                     >
                         Nhập Lô Mới
                     </Button>
                     <Button
                         variant="outlined"
-                        color="secondary"
                         startIcon={<SwapHorizIcon />}
                         onClick={() => {
                             setTransferData(prev => ({
@@ -446,13 +483,20 @@ export default function PharmacyInventoryPage() {
                             }));
                             setOpenTransferDialog(true);
                         }}
-                        sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none" }}
+                        sx={{
+                            borderRadius: 2.2,
+                            fontWeight: 700,
+                            textTransform: "none",
+                            fontSize: "0.85rem",
+                            color: "#8B5CF6",
+                            borderColor: "rgba(139, 92, 246, 0.3)",
+                            "&:hover": { borderColor: "#8B5CF6", bgcolor: "rgba(139, 92, 246, 0.04)" }
+                        }}
                     >
                         Điều Chuyển Kho
                     </Button>
                     <Button
                         variant="contained"
-                        color="success"
                         startIcon={<AssignmentTurnedInIcon />}
                         onClick={() => {
                             setDispenseData(prev => ({
@@ -462,35 +506,63 @@ export default function PharmacyInventoryPage() {
                             setDispenseResult(null);
                             setOpenDispenseDialog(true);
                         }}
-                        sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none" }}
+                        sx={{
+                            borderRadius: 2.2,
+                            fontWeight: 700,
+                            textTransform: "none",
+                            fontSize: "0.85rem",
+                            bgcolor: "#10B981",
+                            boxShadow: "0 4px 14px rgba(16, 185, 129, 0.25)",
+                            "&:hover": { bgcolor: "#059669" }
+                        }}
                     >
                         Cấp Phát FEFO
                     </Button>
                 </Stack>
-            </Box>
+            </Paper>
 
             {/* Thông báo Feedback */}
             {feedback.message && (
                 <Alert
                     severity={feedback.type || "info"}
                     onClose={() => setFeedback({ type: "", message: "" })}
-                    sx={{ mb: 2.5, borderRadius: 2 }}
+                    sx={{ mb: 2.5, borderRadius: 2.5 }}
                 >
                     {feedback.message}
                 </Alert>
             )}
 
-            {/* Thanh điều hướng Tabs */}
-            <Paper elevation={0} sx={{ borderRadius: 3, mb: 3, border: "1px solid #E2E8F0" }}>
+            {/* Thanh điều hướng Tabs (Apple HIG) */}
+            <Paper
+                elevation={0}
+                sx={{
+                    borderRadius: 3.5,
+                    mb: 3,
+                    border: "1px solid rgba(15, 23, 42, 0.08)",
+                    bgcolor: "#FFFFFF",
+                    boxShadow: "0 2px 10px rgba(15, 23, 42, 0.02)"
+                }}
+            >
                 <Tabs
                     value={currentTab}
                     onChange={(e, val) => setCurrentTab(val)}
                     variant="scrollable"
                     scrollButtons="auto"
                     sx={{
-                        px: 2,
-                        "& .MuiTab-root": { fontWeight: 700, fontSize: "0.9rem", py: 2, textTransform: "none" },
-                        "& .Mui-selected": { color: "#0088D6" }
+                        px: 1.5,
+                        "& .MuiTabs-indicator": {
+                            height: 3,
+                            borderRadius: 3,
+                            bgcolor: "#0088D6"
+                        },
+                        "& .MuiTab-root": {
+                            fontWeight: 700,
+                            fontSize: "0.88rem",
+                            py: 1.8,
+                            textTransform: "none",
+                            color: "#64748B"
+                        },
+                        "& .Mui-selected": { color: "#0088D6 !important" }
                     }}
                 >
                     <Tab icon={<AssignmentTurnedInIcon />} iconPosition="start" label={`1. Hàng Đợi Cấp Phát (${prescriptions.filter(p => !p.isDispensed).length})`} />
@@ -502,7 +574,7 @@ export default function PharmacyInventoryPage() {
                         icon={<WarningAmberIcon />}
                         iconPosition="start"
                         label={`6. Cảnh Báo Dược (${expiringAlerts.length + lowStockAlerts.length})`}
-                        sx={{ color: (expiringAlerts.length + lowStockAlerts.length) > 0 ? "#E11D48 !important" : "inherit" }}
+                        sx={{ color: (expiringAlerts.length + lowStockAlerts.length) > 0 ? "#EF4444 !important" : "inherit" }}
                     />
                 </Tabs>
             </Paper>
@@ -513,13 +585,22 @@ export default function PharmacyInventoryPage() {
             {/* TAB 0: HÀNG ĐỢI ĐƠN THUỐC CẦN CẤP PHÁT (PRESCRIPTION QUEUE)    */}
             {/* ============================================================== */}
             {currentTab === 0 && (
-                <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: "1px solid #E2E8F0" }}>
+                <Paper 
+                    elevation={0} 
+                    sx={{ 
+                        p: 2.5, 
+                        borderRadius: 3.5, 
+                        border: "1px solid rgba(15, 23, 42, 0.08)",
+                        boxShadow: "0 4px 20px rgba(15, 23, 42, 0.03)",
+                        bgcolor: "#FFFFFF"
+                    }}
+                >
                     <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2} mb={2.5}>
                         <Box>
-                            <Typography variant="h6" fontWeight="800" color="#1E293B">
+                            <Typography variant="h6" fontWeight={800} color="#0F172A">
                                 Hàng Đợi Cấp Phát Thuốc Ngoại Trú (Prescription Dispensing Queue)
                             </Typography>
-                            <Typography variant="caption" color="#64748B">
+                            <Typography variant="caption" sx={{ color: "#64748B" }}>
                                 Tiếp nhận đơn thuốc điện tử từ Bác sĩ, kiểm soát thanh toán viện phí & tự động trích xuất theo lô FEFO
                             </Typography>
                         </Box>
@@ -528,36 +609,64 @@ export default function PharmacyInventoryPage() {
                             <Button
                                 size="small"
                                 variant={rxFilter === "PENDING" ? "contained" : "outlined"}
-                                color="error"
                                 onClick={() => setRxFilter("PENDING")}
-                                sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none" }}
+                                sx={{ 
+                                    borderRadius: 2, 
+                                    fontWeight: 700, 
+                                    textTransform: "none",
+                                    fontSize: "0.8rem",
+                                    ...(rxFilter === "PENDING"
+                                        ? { bgcolor: "#EF4444", color: "#FFFFFF" }
+                                        : { color: "#EF4444", borderColor: "rgba(239, 68, 68, 0.3)" })
+                                }}
                             >
                                 Chờ Cấp Phát ({prescriptions.filter(p => !p.isDispensed).length})
                             </Button>
                             <Button
                                 size="small"
                                 variant={rxFilter === "PAID" ? "contained" : "outlined"}
-                                color="success"
                                 onClick={() => setRxFilter("PAID")}
-                                sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none" }}
+                                sx={{ 
+                                    borderRadius: 2, 
+                                    fontWeight: 700, 
+                                    textTransform: "none",
+                                    fontSize: "0.8rem",
+                                    ...(rxFilter === "PAID"
+                                        ? { bgcolor: "#10B981", color: "#FFFFFF" }
+                                        : { color: "#10B981", borderColor: "rgba(16, 185, 129, 0.3)" })
+                                }}
                             >
                                 Đã Thu Viện Phí ({prescriptions.filter(p => p.isPaid && !p.isDispensed).length})
                             </Button>
                             <Button
                                 size="small"
                                 variant={rxFilter === "DISPENSED" ? "contained" : "outlined"}
-                                color="primary"
                                 onClick={() => setRxFilter("DISPENSED")}
-                                sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none" }}
+                                sx={{ 
+                                    borderRadius: 2, 
+                                    fontWeight: 700, 
+                                    textTransform: "none",
+                                    fontSize: "0.8rem",
+                                    ...(rxFilter === "DISPENSED"
+                                        ? { bgcolor: "#0088D6", color: "#FFFFFF" }
+                                        : { color: "#0088D6", borderColor: "rgba(0, 136, 214, 0.3)" })
+                                }}
                             >
                                 Đã Phát Thuốc ({prescriptions.filter(p => p.isDispensed).length})
                             </Button>
                             <Button
                                 size="small"
                                 variant={rxFilter === "ALL" ? "contained" : "outlined"}
-                                color="inherit"
                                 onClick={() => setRxFilter("ALL")}
-                                sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none" }}
+                                sx={{ 
+                                    borderRadius: 2, 
+                                    fontWeight: 700, 
+                                    textTransform: "none",
+                                    fontSize: "0.8rem",
+                                    ...(rxFilter === "ALL"
+                                        ? { bgcolor: "#0F172A", color: "#FFFFFF" }
+                                        : { color: "#475569", borderColor: "rgba(15, 23, 42, 0.2)" })
+                                }}
                             >
                                 Tất Cả ({prescriptions.length})
                             </Button>
@@ -575,7 +684,7 @@ export default function PharmacyInventoryPage() {
                             InputProps={{
                                 startAdornment: (
                                     <InputAdornment position="start">
-                                        <SearchIcon color="action" />
+                                        <SearchIcon fontSize="small" sx={{ color: "#64748B" }} />
                                     </InputAdornment>
                                 ),
                                 endAdornment: searchKeyword && (
@@ -586,19 +695,19 @@ export default function PharmacyInventoryPage() {
                                     </InputAdornment>
                                 )
                             }}
-                            sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "#F8FAFC" } }}
+                            sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2.2, bgcolor: "#F8FAFC" } }}
                         />
                     </Box>
 
                     {/* Bảng danh sách đơn thuốc */}
-                    <TableContainer>
+                    <TableContainer sx={{ borderRadius: 2.5, overflow: "hidden", border: "1px solid rgba(15, 23, 42, 0.06)" }}>
                         <Table size="small">
                             <TableHead>
-                                <TableRow sx={{ "& th": { bgcolor: "#F8FAFC", fontWeight: 800, color: "#334155" } }}>
+                                <TableRow sx={{ "& th": { bgcolor: "#F8FAFC", fontWeight: 700, color: "#64748B", fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em", py: 1.2 } }}>
                                     <TableCell>Mã Đơn / Mã Khám</TableCell>
                                     <TableCell>Người Bệnh</TableCell>
                                     <TableCell>Bác Sĩ & Chẩn Đoán</TableCell>
-                                    <TableCell>Số Mặt Hàng</TableCell>
+                                    <TableCell align="center">Số Mặt Hàng</TableCell>
                                     <TableCell align="right">Tiền Thuốc</TableCell>
                                     <TableCell align="center">Viện Phí</TableCell>
                                     <TableCell align="center">Trạng Thái</TableCell>

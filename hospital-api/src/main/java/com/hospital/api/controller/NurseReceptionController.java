@@ -4,7 +4,7 @@ import com.hospital.api.common.ApiResponse;
 import com.hospital.api.dto.request.NurseCheckInRequest;
 import com.hospital.api.dto.request.PayAtClinicRequest;
 import com.hospital.api.dto.response.ClinicReceiptResponse;
-import com.hospital.api.dto.response.DoctorQueueResponse;
+import com.hospital.api.dto.response.NurseQueueResponse;
 import com.hospital.api.dto.response.NurseCheckInResponse;
 import com.hospital.api.security.UserPrincipal;
 import com.hospital.api.service.NurseReceptionService;
@@ -44,10 +44,10 @@ public class NurseReceptionController {
      */
     @GetMapping({"/reception/queue", "/queue"})
     @PreAuthorize("hasAnyRole('NURSE', 'ADMIN')")
-    public ResponseEntity<ApiResponse<List<DoctorQueueResponse>>> getReceptionQueue(
+    public ResponseEntity<ApiResponse<List<NurseQueueResponse>>> getReceptionQueue(
             @RequestParam(required = false) Integer departmentId
     ) {
-        List<DoctorQueueResponse> queue = nurseReceptionService.getReceptionQueue(departmentId);
+        List<NurseQueueResponse> queue = nurseReceptionService.getReceptionQueue(departmentId);
         return ResponseEntity.ok(ApiResponse.ok(queue, "Lấy danh sách tiếp đón thành công"));
     }
 
@@ -62,5 +62,18 @@ public class NurseReceptionController {
     ) {
         ClinicReceiptResponse response = nurseReceptionService.payAtClinic(request, userPrincipal.getId());
         return ResponseEntity.ok(ApiResponse.ok(response, response.message()));
+    }
+
+    /**
+     * Cập nhật trạng thái lượt khám (CONFIRMED, IN_PROGRESS, COMPLETED, CANCELLED)
+     */
+    @PutMapping({"/reception/bookings/{id}/status", "/bookings/{id}/status"})
+    @PreAuthorize("hasAnyRole('NURSE', 'ADMIN')")
+    public ResponseEntity<ApiResponse<com.hospital.api.dto.response.BookingResponse>> updateBookingStatus(
+            @PathVariable java.util.UUID id,
+            @RequestParam com.hospital.api.constant.BookingStatus status
+    ) {
+        com.hospital.api.dto.response.BookingResponse response = nurseReceptionService.updateBookingStatus(id, status);
+        return ResponseEntity.ok(ApiResponse.ok(response, "Cập nhật trạng thái lượt khám thành công"));
     }
 }

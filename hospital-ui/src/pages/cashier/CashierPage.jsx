@@ -412,6 +412,7 @@ export default function CashierPage() {
     // Đếm số lượng theo loại hóa đơn
     const examBillsCount = pendingBills.filter(b => b.billId?.endsWith("-EXAM")).length;
     const treatmentBillsCount = pendingBills.filter(b => b.billId?.endsWith("-TREATMENT") || b.billType === "TEST" || b.billType === "PRESCRIPTION").length;
+    const inpatientBillsCount = pendingBills.filter(b => b.billId?.startsWith("BILL-INPATIENT-") || b.billType === "INPATIENT").length;
 
     // Lọc danh sách chờ thu
     const filteredPending = pendingBills.filter(b => {
@@ -429,6 +430,9 @@ export default function CashierPage() {
         }
         if (billTypeFilter === "TREATMENT") {
             return b.billId?.endsWith("-TREATMENT") || b.billType === "TEST" || b.billType === "PRESCRIPTION" || b.billType === "ALL";
+        }
+        if (billTypeFilter === "INPATIENT") {
+            return b.billId?.startsWith("BILL-INPATIENT-") || b.billType === "INPATIENT";
         }
         return true;
     });
@@ -500,41 +504,77 @@ export default function CashierPage() {
 
     return (
         <Container maxWidth="xl" sx={{ py: 3 }}>
-            {/* Header Banner Cao Cấp */}
+            {/* Header Banner Cao Cấp (Apple HIG + Linear) */}
             <Paper
                 elevation={0}
                 sx={{
-                    p: 2.5,
+                    p: { xs: 2.5, md: 3 },
                     mb: 3,
-                    borderRadius: 3,
-                    background: "linear-gradient(135deg, #0088D6 0%, #005A9C 100%)",
-                    color: "white",
+                    borderRadius: 3.5,
+                    bgcolor: "#FFFFFF",
+                    border: "1px solid rgba(15, 23, 42, 0.08)",
+                    boxShadow: "0 4px 20px rgba(15, 23, 42, 0.03)",
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
                     flexWrap: "wrap",
-                    gap: 2,
-                    boxShadow: "0 10px 25px -5px rgba(0, 136, 214, 0.25)"
+                    gap: 2
                 }}
             >
-                <Box display="flex" alignItems="center" gap={1.8}>
-                    <Avatar sx={{ width: 48, height: 48, bgcolor: "rgba(255,255,255,0.2)" }}>
-                        <PointOfSaleIcon sx={{ fontSize: 28 }} />
-                    </Avatar>
+                <Box display="flex" alignItems="center" gap={2}>
+                    <Box
+                        sx={{
+                            width: 48,
+                            height: 48,
+                            borderRadius: "14px",
+                            bgcolor: "rgba(0, 136, 214, 0.1)",
+                            color: "#0088D6",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            boxShadow: "0 4px 14px rgba(0, 136, 214, 0.2)"
+                        }}
+                    >
+                        <PointOfSaleIcon sx={{ fontSize: 26 }} />
+                    </Box>
                     <Box>
-                        <Typography variant="h6" fontWeight="bold" sx={{ fontSize: "1.15rem", letterSpacing: "0.2px" }}>
-                            💳 Quầy Thu Ngân & Cổng Thanh Toán PayOS (VietQR)
-                        </Typography>
-                        <Typography variant="body2" sx={{ opacity: 0.9, fontSize: "0.85rem" }}>
-                            Hệ thống tiếp nhận viện phí điện tử: Tiền mặt, Quẹt thẻ POS & Cổng PayOS Open Banking tự động
+                        <Box display="flex" alignItems="center" gap={1}>
+                            <Typography variant="h6" fontWeight={800} color="#0F172A" letterSpacing="-0.02em">
+                                Quầy Thu Ngân & Viện Phí Điện Tử
+                            </Typography>
+                            <Chip
+                                label="PayOS VietQR Napas 247"
+                                size="small"
+                                sx={{
+                                    height: 22,
+                                    fontSize: "0.72rem",
+                                    fontWeight: 700,
+                                    bgcolor: "rgba(16, 185, 129, 0.1)",
+                                    color: "#059669",
+                                    border: "1px solid rgba(16, 185, 129, 0.2)"
+                                }}
+                            />
+                        </Box>
+                        <Typography variant="body2" sx={{ color: "#64748B", mt: 0.2 }}>
+                            Tiếp nhận thanh toán viện phí tức thì: Tiền mặt tại quầy, Thẻ POS & Cổng Open Banking PayOS tự động gạch nợ.
                         </Typography>
                     </Box>
                 </Box>
-                <Box display="flex" gap={1.5} alignItems="center">
+                <Box display="flex" gap={1.2} alignItems="center">
                     <Button
-                        variant="contained"
+                        variant="outlined"
                         size="small"
-                        sx={{ bgcolor: "#F59E0B", color: "white", fontWeight: "bold", whiteSpace: "nowrap", "&:hover": { bgcolor: "#D97706" } }}
+                        sx={{
+                            borderRadius: 2.2,
+                            borderColor: "rgba(245, 158, 11, 0.4)",
+                            color: "#B45309",
+                            bgcolor: "#FFFBEB",
+                            fontWeight: 700,
+                            textTransform: "none",
+                            fontSize: "0.85rem",
+                            px: 1.8,
+                            "&:hover": { bgcolor: "#FEF3C7", borderColor: "#F59E0B" }
+                        }}
                         startIcon={<AssessmentIcon />}
                         onClick={() => setOpenReconciliationModal(true)}
                     >
@@ -543,7 +583,17 @@ export default function CashierPage() {
                     <Button
                         variant="contained"
                         size="small"
-                        sx={{ bgcolor: "white", color: "#0088D6", fontWeight: "bold", whiteSpace: "nowrap", "&:hover": { bgcolor: "#F0F9FF" } }}
+                        sx={{
+                            borderRadius: 2.2,
+                            bgcolor: "#0088D6",
+                            color: "white",
+                            fontWeight: 700,
+                            textTransform: "none",
+                            fontSize: "0.85rem",
+                            px: 2,
+                            boxShadow: "0 4px 14px rgba(0, 136, 214, 0.25)",
+                            "&:hover": { bgcolor: "#0073B7" }
+                        }}
                         startIcon={<RefreshIcon />}
                         onClick={loadData}
                         disabled={loading}
@@ -554,47 +604,103 @@ export default function CashierPage() {
             </Paper>
 
             {pageError && (
-                <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
+                <Alert severity="error" sx={{ mb: 3, borderRadius: 2.5 }}>
                     {pageError}
                 </Alert>
             )}
 
             {pendingError && (
-                <Alert severity="warning" sx={{ mb: 3, borderRadius: 2 }}>
+                <Alert severity="warning" sx={{ mb: 3, borderRadius: 2.5 }}>
                     {pendingError}
                 </Alert>
             )}
 
-            {/* Thẻ Thống Kê Ca Trực Thu Ngân */}
+            {/* Thẻ Thống Kê Ca Trực Thu Ngân (Apple HIG Metric Cards) */}
             <Grid container spacing={2.5} mb={3}>
                 <Grid item xs={12} sm={6} md={3}>
-                    <Paper elevation={0} sx={{ p: 2, borderRadius: 3, border: "1px solid #E2E8F0", borderLeft: "5px solid #0088D6", boxShadow: "0 2px 10px rgba(0,0,0,0.03)" }}>
-                        <Typography variant="caption" color="text.secondary" fontWeight="bold" sx={{ whiteSpace: "nowrap", display: "block" }}>TỔNG THU TRONG CA</Typography>
-                        <Typography variant="h6" fontWeight="bold" color="#0088D6" mt={0.5} sx={{ whiteSpace: "nowrap", fontSize: "1.25rem" }}>
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 2.5,
+                            borderRadius: 3.5,
+                            bgcolor: "#FFFFFF",
+                            border: "1px solid rgba(15, 23, 42, 0.08)",
+                            boxShadow: "0 2px 10px rgba(15, 23, 42, 0.02)",
+                            position: "relative",
+                            overflow: "hidden"
+                        }}
+                    >
+                        <Box sx={{ position: "absolute", top: 0, left: 0, width: "100%", height: 3, bgcolor: "#0088D6" }} />
+                        <Typography variant="caption" sx={{ color: "#64748B", fontWeight: 700, letterSpacing: "0.04em", display: "block" }}>
+                            TỔNG THU TRONG CA
+                        </Typography>
+                        <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: "monospace", color: "#0088D6", mt: 0.8 }}>
                             {shiftStats.hasError ? "--" : formatCurrency(shiftStats.totalCollected)}
                         </Typography>
                     </Paper>
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
-                    <Paper elevation={0} sx={{ p: 2, borderRadius: 3, border: "1px solid #E2E8F0", borderLeft: "5px solid #16A34A", boxShadow: "0 2px 10px rgba(0,0,0,0.03)" }}>
-                        <Typography variant="caption" color="text.secondary" fontWeight="bold" sx={{ whiteSpace: "nowrap", display: "block" }}>TIỀN MẶT TẠI KÉT</Typography>
-                        <Typography variant="h6" fontWeight="bold" color="#16A34A" mt={0.5} sx={{ whiteSpace: "nowrap", fontSize: "1.25rem" }}>
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 2.5,
+                            borderRadius: 3.5,
+                            bgcolor: "#FFFFFF",
+                            border: "1px solid rgba(15, 23, 42, 0.08)",
+                            boxShadow: "0 2px 10px rgba(15, 23, 42, 0.02)",
+                            position: "relative",
+                            overflow: "hidden"
+                        }}
+                    >
+                        <Box sx={{ position: "absolute", top: 0, left: 0, width: "100%", height: 3, bgcolor: "#10B981" }} />
+                        <Typography variant="caption" sx={{ color: "#64748B", fontWeight: 700, letterSpacing: "0.04em", display: "block" }}>
+                            TIỀN MẶT TẠI KÉT
+                        </Typography>
+                        <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: "monospace", color: "#059669", mt: 0.8 }}>
                             {shiftStats.hasError ? "--" : formatCurrency(shiftStats.cashTotal)}
                         </Typography>
                     </Paper>
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
-                    <Paper elevation={0} sx={{ p: 2, borderRadius: 3, border: "1px solid #E2E8F0", borderLeft: "5px solid #0284C7", boxShadow: "0 2px 10px rgba(0,0,0,0.03)" }}>
-                        <Typography variant="caption" color="text.secondary" fontWeight="bold" sx={{ whiteSpace: "nowrap", display: "block" }}>CỔNG PAYOS & THẺ POS</Typography>
-                        <Typography variant="h6" fontWeight="bold" color="#0284C7" mt={0.5} sx={{ whiteSpace: "nowrap", fontSize: "1.25rem" }}>
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 2.5,
+                            borderRadius: 3.5,
+                            bgcolor: "#FFFFFF",
+                            border: "1px solid rgba(15, 23, 42, 0.08)",
+                            boxShadow: "0 2px 10px rgba(15, 23, 42, 0.02)",
+                            position: "relative",
+                            overflow: "hidden"
+                        }}
+                    >
+                        <Box sx={{ position: "absolute", top: 0, left: 0, width: "100%", height: 3, bgcolor: "#6366F1" }} />
+                        <Typography variant="caption" sx={{ color: "#64748B", fontWeight: 700, letterSpacing: "0.04em", display: "block" }}>
+                            CỔNG PAYOS & THẺ POS
+                        </Typography>
+                        <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: "monospace", color: "#4F46E5", mt: 0.8 }}>
                             {shiftStats.hasError ? "--" : formatCurrency(shiftStats.digitalTotal)}
                         </Typography>
                     </Paper>
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
-                    <Paper elevation={0} sx={{ p: 2, borderRadius: 3, border: "1px solid #E2E8F0", borderLeft: "5px solid #EA580C", boxShadow: "0 2px 10px rgba(0,0,0,0.03)" }}>
-                        <Typography variant="caption" color="text.secondary" fontWeight="bold" sx={{ whiteSpace: "nowrap", display: "block" }}>SỐ LƯỢT GIAO DỊCH</Typography>
-                        <Typography variant="h6" fontWeight="bold" color="#EA580C" mt={0.5} sx={{ whiteSpace: "nowrap", fontSize: "1.25rem" }}>
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 2.5,
+                            borderRadius: 3.5,
+                            bgcolor: "#FFFFFF",
+                            border: "1px solid rgba(15, 23, 42, 0.08)",
+                            boxShadow: "0 2px 10px rgba(15, 23, 42, 0.02)",
+                            position: "relative",
+                            overflow: "hidden"
+                        }}
+                    >
+                        <Box sx={{ position: "absolute", top: 0, left: 0, width: "100%", height: 3, bgcolor: "#F59E0B" }} />
+                        <Typography variant="caption" sx={{ color: "#64748B", fontWeight: 700, letterSpacing: "0.04em", display: "block" }}>
+                            SỐ LƯỢT GIAO DỊCH
+                        </Typography>
+                        <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: "monospace", color: "#D97706", mt: 0.8 }}>
                             {shiftStats.hasError ? "--" : `${shiftStats.transactionCount} lượt`}
                         </Typography>
                     </Paper>
@@ -602,10 +708,55 @@ export default function CashierPage() {
             </Grid>
 
             {/* Thanh Điều Hướng & Tìm Kiếm */}
-            <Paper elevation={0} sx={{ p: 2, mb: 3, borderRadius: 3, border: "1px solid #E2E8F0", boxShadow: "0 2px 10px rgba(0,0,0,0.03)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 2 }}>
-                <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)}>
-                    <Tab label={`⏳ Chờ Thu Tiền (${pendingBills.length})`} icon={<ReceiptLongIcon />} iconPosition="start" sx={{ fontWeight: "bold" }} />
-                    <Tab label={`✅ Lịch Sử Đã Thu (${paidHistory.length})`} icon={<CheckCircleIcon />} iconPosition="start" sx={{ fontWeight: "bold" }} />
+            <Paper
+                elevation={0}
+                sx={{
+                    p: 1.5,
+                    mb: 3,
+                    borderRadius: 3.5,
+                    bgcolor: "#FFFFFF",
+                    border: "1px solid rgba(15, 23, 42, 0.08)",
+                    boxShadow: "0 2px 10px rgba(15, 23, 42, 0.02)",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    gap: 2
+                }}
+            >
+                <Tabs
+                    value={activeTab}
+                    onChange={(_, v) => setActiveTab(v)}
+                    sx={{
+                        "& .MuiTabs-indicator": {
+                            height: 3,
+                            borderRadius: 3,
+                            bgcolor: "#0088D6"
+                        }
+                    }}
+                >
+                    <Tab
+                        label={`Chờ Thu Tiền (${pendingBills.length})`}
+                        icon={<ReceiptLongIcon sx={{ fontSize: 18 }} />}
+                        iconPosition="start"
+                        sx={{
+                            fontWeight: 700,
+                            textTransform: "none",
+                            fontSize: "0.9rem",
+                            color: activeTab === 0 ? "#0088D6 !important" : "#64748B"
+                        }}
+                    />
+                    <Tab
+                        label={`Lịch Sử Đã Thu (${paidHistory.length})`}
+                        icon={<CheckCircleIcon sx={{ fontSize: 18 }} />}
+                        iconPosition="start"
+                        sx={{
+                            fontWeight: 700,
+                            textTransform: "none",
+                            fontSize: "0.9rem",
+                            color: activeTab === 1 ? "#0088D6 !important" : "#64748B"
+                        }}
+                    />
                 </Tabs>
 
                 <TextField
@@ -614,12 +765,18 @@ export default function CashierPage() {
                     value={searchKeyword}
                     onChange={(e) => setSearchKeyword(e.target.value)}
                     onKeyDown={handleSearchKeyDown}
-                    sx={{ width: { xs: "100%", md: 380 } }}
+                    sx={{
+                        width: { xs: "100%", md: 380 },
+                        "& .MuiOutlinedInput-root": {
+                            borderRadius: 2.2,
+                            bgcolor: "#F8FAFC"
+                        }
+                    }}
                     helperText={activeTab === 0 && filteredPending.length === 1 ? "💡 Nhấn [Enter] để mở ngay phiếu thu" : ""}
                     InputProps={{
                         startAdornment: (
                             <InputAdornment position="start">
-                                <SearchIcon color="action" />
+                                <SearchIcon sx={{ color: "#94A3B8" }} />
                             </InputAdornment>
                         ),
                     }}
@@ -657,6 +814,14 @@ export default function CashierPage() {
                                 color={billTypeFilter === "TREATMENT" ? "secondary" : "default"}
                                 variant={billTypeFilter === "TREATMENT" ? "filled" : "outlined"}
                                 onClick={() => setBillTypeFilter("TREATMENT")}
+                                sx={{ fontWeight: "bold" }}
+                            />
+                            <Chip
+                                label={`HĐ 03: Xuất Viện Nội Trú (${inpatientBillsCount})`}
+                                clickable
+                                color={billTypeFilter === "INPATIENT" ? "warning" : "default"}
+                                variant={billTypeFilter === "INPATIENT" ? "filled" : "outlined"}
+                                onClick={() => setBillTypeFilter("INPATIENT")}
                                 sx={{ fontWeight: "bold" }}
                             />
                         </Box>
@@ -712,6 +877,7 @@ export default function CashierPage() {
                                     {filteredPending.map((bill) => {
                                         const isExam = bill.billId?.endsWith("-EXAM");
                                         const isTreatment = bill.billId?.endsWith("-TREATMENT");
+                                        const isInpatient = bill.billId?.startsWith("BILL-INPATIENT-") || bill.billType === "INPATIENT";
 
                                         return (
                                             <TableRow key={bill.billId} hover sx={{ "&:last-child td, &:last-child th": { border: 0 } }}>
@@ -721,12 +887,13 @@ export default function CashierPage() {
                                                     </Typography>
                                                     <Chip
                                                         label={
+                                                            isInpatient ? "HĐ 03: Viện phí nội trú" :
                                                             isExam ? "HĐ 01: Khám ban đầu" :
                                                             isTreatment ? "HĐ 02: CLS & Thuốc" :
                                                             bill.billType === "ALL" ? "Khám & CLS & Thuốc" : "Viện phí ca khám"
                                                         }
                                                         size="small"
-                                                        color={isExam ? "primary" : isTreatment ? "secondary" : "info"}
+                                                        color={isInpatient ? "warning" : isExam ? "primary" : isTreatment ? "secondary" : "info"}
                                                         sx={{ fontWeight: "bold", fontSize: "0.7rem", height: 22, mt: 0.5 }}
                                                     />
                                                 </TableCell>
@@ -802,6 +969,7 @@ export default function CashierPage() {
                             {filteredPending.map((bill) => {
                                 const isExam = bill.billId?.endsWith("-EXAM");
                                 const isTreatment = bill.billId?.endsWith("-TREATMENT");
+                                const isInpatient = bill.billId?.startsWith("BILL-INPATIENT-") || bill.billType === "INPATIENT";
 
                                 return (
                                     <Grid item xs={12} md={6} lg={4} key={bill.billId}>
@@ -809,7 +977,7 @@ export default function CashierPage() {
                                             elevation={2}
                                             sx={{
                                                 borderRadius: 3,
-                                                borderTop: isExam ? "5px solid #0088D6" : isTreatment ? "5px solid #9333EA" : "5px solid #0D9488",
+                                                borderTop: isInpatient ? "5px solid #F59E0B" : isExam ? "5px solid #0088D6" : isTreatment ? "5px solid #9333EA" : "5px solid #0D9488",
                                                 height: "100%",
                                                 display: "flex",
                                                 flexDirection: "column",
@@ -823,11 +991,12 @@ export default function CashierPage() {
                                                     </Typography>
                                                     <Chip
                                                         label={
+                                                            isInpatient ? "HĐ 03: Xuất viện nội trú" :
                                                             isExam ? "HĐ 01: Công khám" :
                                                             isTreatment ? "HĐ 02: CLS & Thuốc" : "Tổng hợp"
                                                         }
                                                         size="small"
-                                                        color={isExam ? "primary" : isTreatment ? "secondary" : "default"}
+                                                        color={isInpatient ? "warning" : isExam ? "primary" : isTreatment ? "secondary" : "default"}
                                                         sx={{ fontWeight: "bold", fontSize: "0.75rem" }}
                                                     />
                                                 </Box>

@@ -7,6 +7,7 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
@@ -60,10 +61,13 @@ public class Booking extends BaseEntity {
 
     @Column(name = "is_priority", nullable = false)
     @Builder.Default
-    private Boolean isPriority = false; // Luồng ưu tiên (Người già > 75t, Phụ nữ mang thai, Trẻ em...)
+    private Boolean isPriority = false; // Luồng ưu tiên (Người già từ 65 tuổi, Phụ nữ mang thai, Trẻ em...)
 
     @Column(name = "priority_reason", length = 150)
     private String priorityReason;
+
+    @Column(name = "checked_in_at")
+    private LocalDateTime checkedInAt;
 }
 
 

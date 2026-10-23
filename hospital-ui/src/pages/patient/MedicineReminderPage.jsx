@@ -188,38 +188,113 @@ export default function MedicineReminderPage() {
     ];
 
     return (
-        <Container maxWidth="md" sx={{ py: 4 }}>
-            {/* Header */}
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-                <Box>
-                    <Typography variant="h5" fontWeight="bold" color="#0f172a">
-                        ⏰ Nhắc Thuốc & Lịch Tái Khám
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                        Theo dõi lịch uống thuốc hàng ngày và các cuộc hẹn tái khám
-                    </Typography>
+        <Container maxWidth="md" sx={{ py: 3 }}>
+            {/* Header Banner - Apple HIG + Linear Elevated Header */}
+            <Paper
+                elevation={0}
+                sx={{
+                    p: { xs: 2.5, md: 3 },
+                    mb: 3,
+                    borderRadius: 3.5,
+                    bgcolor: "#FFFFFF",
+                    border: "1px solid rgba(15, 23, 42, 0.08)",
+                    boxShadow: "0 2px 10px rgba(0,0,0,0.03)",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    gap: 2
+                }}
+            >
+                <Box display="flex" alignItems="center" gap={2}>
+                    <Box
+                        sx={{
+                            width: 54,
+                            height: 54,
+                            borderRadius: 3,
+                            bgcolor: "rgba(0, 136, 214, 0.1)",
+                            color: "#0088D6",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            border: "1px solid rgba(0, 136, 214, 0.2)"
+                        }}
+                    >
+                        <LocalPharmacyIcon sx={{ fontSize: 30 }} />
+                    </Box>
+                    <Box>
+                        <Box display="flex" alignItems="center" gap={1.2} mb={0.5} flexWrap="wrap">
+                            <Chip
+                                label="QUẢN LÝ UỐNG THUỐC • MEDICATION ADHERENCE PRO"
+                                size="small"
+                                sx={{
+                                    height: 22,
+                                    fontSize: "0.68rem",
+                                    fontWeight: 700,
+                                    letterSpacing: "0.06em",
+                                    bgcolor: "#EBF5FF",
+                                    color: "#0088D6",
+                                    borderRadius: 1.5,
+                                    border: "1px solid rgba(0, 136, 214, 0.2)"
+                                }}
+                            />
+                            <Chip
+                                label="NHẮC NHỞ TỰ ĐỘNG"
+                                size="small"
+                                sx={{
+                                    height: 22,
+                                    fontSize: "0.68rem",
+                                    fontWeight: 700,
+                                    bgcolor: "rgba(16, 185, 129, 0.1)",
+                                    color: "#059669",
+                                    borderRadius: 1.5
+                                }}
+                            />
+                        </Box>
+                        <Typography variant="h5" fontWeight={800} color="#0F172A" sx={{ letterSpacing: "-0.02em" }}>
+                            Nhắc Thuốc & Lịch Tái Khám Thông Minh
+                        </Typography>
+                        <Typography variant="body2" color="#64748B" sx={{ mt: 0.25 }}>
+                            Theo dõi lịch uống thuốc hàng ngày, liều dùng theo cữ và các cuộc hẹn tái khám.
+                        </Typography>
+                    </Box>
                 </Box>
-                <Stack direction="row" spacing={1}>
+                <Stack direction="row" spacing={1.5}>
                     <Button
                         size="small"
                         variant="outlined"
                         startIcon={<StarIcon fontSize="small" />}
                         onClick={() => setOpenRateModal(true)}
-                        sx={{ borderRadius: 2, textTransform: "none" }}
+                        sx={{
+                            borderRadius: 2.5,
+                            textTransform: "none",
+                            fontWeight: 700,
+                            borderColor: "rgba(15, 23, 42, 0.12)",
+                            color: "#334155",
+                            bgcolor: "#FFFFFF",
+                            "&:hover": { bgcolor: "#F8FAFC", borderColor: "#CBD5E1" }
+                        }}
                     >
-                        Đánh giá
+                        Đánh Giá Bác Sĩ
                     </Button>
                     <Button
                         size="small"
                         variant="contained"
                         startIcon={<AddIcon fontSize="small" />}
                         onClick={() => setOpenAddModal(true)}
-                        sx={{ borderRadius: 2, textTransform: "none", bgcolor: "#0284c7" }}
+                        sx={{
+                            borderRadius: 2.5,
+                            textTransform: "none",
+                            fontWeight: 700,
+                            bgcolor: "#0088D6",
+                            "&:hover": { bgcolor: "#0077BE" },
+                            px: 2
+                        }}
                     >
-                        Thêm cữ thuốc
+                        Thêm Cữ Thuốc
                     </Button>
                 </Stack>
-            </Box>
+            </Paper>
 
             {/* Progress Box */}
             <Paper elevation={0} sx={{ p: 2, borderRadius: 2.5, border: "1px solid #e2e8f0", bgcolor: "#f8fafc", mb: 3 }}>

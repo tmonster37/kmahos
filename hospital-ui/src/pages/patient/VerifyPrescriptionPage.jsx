@@ -74,26 +74,92 @@ export default function VerifyPrescriptionPage() {
     }, [urlCode, urlHash]);
 
     return (
-        <Box sx={{ bgcolor: "#f4f6f9", minHeight: "85vh", py: 5 }}>
+        <Box sx={{ bgcolor: "#F8FAFC", minHeight: "85vh", py: 4 }}>
             <Container maxWidth="md">
-                {/* Header */}
-                <Box textAlign="center" mb={4}>
-                    <Box display="inline-flex" alignItems="center" gap={1} bgcolor="primary.main" color="white" px={3} py={1} borderRadius={4} mb={2}>
-                        <SecurityIcon fontSize="small" />
-                        <Typography variant="subtitle2" fontWeight={600} letterSpacing={0.5}>
-                            CỔNG XÁC THỰC CHỮ KÝ SỐ Y TẾ QUỐC GIA
-                        </Typography>
+                {/* Header Banner - Apple HIG + Linear Elevated Header */}
+                <Paper
+                    elevation={0}
+                    sx={{
+                        p: { xs: 2.5, md: 3 },
+                        mb: 3,
+                        borderRadius: 3.5,
+                        bgcolor: "#FFFFFF",
+                        border: "1px solid rgba(15, 23, 42, 0.08)",
+                        boxShadow: "0 2px 10px rgba(0,0,0,0.03)",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                        gap: 2
+                    }}
+                >
+                    <Box display="flex" alignItems="center" gap={2}>
+                        <Box
+                            sx={{
+                                width: 54,
+                                height: 54,
+                                borderRadius: 3,
+                                bgcolor: "rgba(0, 136, 214, 0.1)",
+                                color: "#0088D6",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                border: "1px solid rgba(0, 136, 214, 0.2)"
+                            }}
+                        >
+                            <SecurityIcon sx={{ fontSize: 30 }} />
+                        </Box>
+                        <Box>
+                            <Box display="flex" alignItems="center" gap={1.2} mb={0.5} flexWrap="wrap">
+                                <Chip
+                                    label="CỔNG XÁC THỰC CHỮ KÝ SỐ Y TẾ • INTEGRITY PRO"
+                                    size="small"
+                                    sx={{
+                                        height: 22,
+                                        fontSize: "0.68rem",
+                                        fontWeight: 700,
+                                        letterSpacing: "0.06em",
+                                        bgcolor: "#EBF5FF",
+                                        color: "#0088D6",
+                                        borderRadius: 1.5,
+                                        border: "1px solid rgba(0, 136, 214, 0.2)"
+                                    }}
+                                />
+                                <Chip
+                                    label="SHA-256 DIGITAL SIGNATURE"
+                                    size="small"
+                                    sx={{
+                                        height: 22,
+                                        fontSize: "0.68rem",
+                                        fontWeight: 700,
+                                        bgcolor: "rgba(16, 185, 129, 0.1)",
+                                        color: "#059669",
+                                        borderRadius: 1.5
+                                    }}
+                                />
+                            </Box>
+                            <Typography variant="h5" fontWeight={800} color="#0F172A" sx={{ letterSpacing: "-0.02em" }}>
+                                Tra Cứu & Xác Thực Đơn Thuốc Điện Tử
+                            </Typography>
+                            <Typography variant="body2" color="#64748B" sx={{ mt: 0.25 }}>
+                                Xác minh tính nguyên vẹn, chống làm giả đơn thuốc bằng thuật toán mật mã SHA-256 theo chuẩn Bộ Y tế.
+                            </Typography>
+                        </Box>
                     </Box>
-                    <Typography variant="h4" fontWeight={800} color="primary.dark" gutterBottom>
-                        Tra Cứu & Xác Thực Đơn Thuốc Điện Tử
-                    </Typography>
-                    <Typography variant="body1" color="text.secondary">
-                        Xác minh tính nguyên vẹn, chống làm giả đơn thuốc ngoại trú bằng thuật toán mật mã SHA-256 theo chuẩn Bộ Y tế
-                    </Typography>
-                </Box>
+                </Paper>
 
                 {/* Form tra cứu */}
-                <Paper elevation={3} sx={{ p: 3, mb: 4, borderRadius: 3 }}>
+                <Paper
+                    elevation={0}
+                    sx={{
+                        p: 3,
+                        mb: 4,
+                        borderRadius: 3.5,
+                        bgcolor: "#FFFFFF",
+                        border: "1px solid rgba(15, 23, 42, 0.08)",
+                        boxShadow: "0 2px 10px rgba(0,0,0,0.03)"
+                    }}
+                >
                     <Grid container spacing={2} alignItems="center">
                         <Grid item xs={12} sm={5}>
                             <TextField
@@ -103,6 +169,7 @@ export default function VerifyPrescriptionPage() {
                                 value={prescriptionCode}
                                 onChange={(e) => setPrescriptionCode(e.target.value)}
                                 size="small"
+                                InputProps={{ sx: { borderRadius: 2 } }}
                             />
                         </Grid>
                         <Grid item xs={12} sm={5}>
@@ -113,24 +180,31 @@ export default function VerifyPrescriptionPage() {
                                 value={signatureHash}
                                 onChange={(e) => setSignatureHash(e.target.value)}
                                 size="small"
+                                InputProps={{ sx: { borderRadius: 2 } }}
                             />
                         </Grid>
                         <Grid item xs={12} sm={2}>
                             <Button
                                 fullWidth
                                 variant="contained"
-                                color="primary"
                                 startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <SearchIcon />}
                                 onClick={() => handleVerify()}
                                 disabled={loading}
-                                sx={{ height: 40, fontWeight: 700 }}
+                                sx={{
+                                    height: 40,
+                                    fontWeight: 700,
+                                    borderRadius: 2,
+                                    textTransform: "none",
+                                    bgcolor: "#0088D6",
+                                    "&:hover": { bgcolor: "#0077BE" }
+                                }}
                             >
                                 Xác Thực
                             </Button>
                         </Grid>
                     </Grid>
                     {errorMsg && (
-                        <Alert severity="error" sx={{ mt: 2, borderRadius: 2 }}>
+                        <Alert severity="error" sx={{ mt: 2, borderRadius: 2.5 }}>
                             {errorMsg}
                         </Alert>
                     )}

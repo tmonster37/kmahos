@@ -449,49 +449,58 @@ export default function LabTestResultsPage() {
 
     return (
         <Container maxWidth="xl" sx={{ py: 3 }}>
-            {/* Header Banner */}
+            {/* Header Banner Cao Cấp (Apple HIG + Linear) */}
             <Paper
                 elevation={0}
                 sx={{
-                    p: 3,
+                    p: { xs: 2.5, md: 3 },
                     mb: 3,
-                    borderRadius: 3,
-                    background: "linear-gradient(135deg, #0088D6 0%, #005A9C 100%)",
-                    color: "white",
+                    borderRadius: 3.5,
+                    bgcolor: "#FFFFFF",
+                    border: "1px solid rgba(15, 23, 42, 0.08)",
+                    boxShadow: "0 4px 20px rgba(15, 23, 42, 0.03)",
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
                     flexWrap: "wrap",
-                    gap: 2,
-                    boxShadow: "0 10px 25px -5px rgba(0, 136, 214, 0.25)"
+                    gap: 2
                 }}
             >
-                <Box display="flex" alignItems="center" gap={1.8}>
+                <Box display="flex" alignItems="center" gap={2}>
                     <Box
                         sx={{
                             width: 48,
                             height: 48,
-                            borderRadius: "50%",
-                            bgcolor: "rgba(255,255,255,0.2)",
+                            borderRadius: "14px",
+                            bgcolor: "rgba(0, 136, 214, 0.1)",
+                            color: "#0088D6",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
+                            boxShadow: "0 4px 14px rgba(0, 136, 214, 0.2)"
                         }}
                     >
-                        <ScienceIcon sx={{ fontSize: 28 }} />
+                        <ScienceIcon sx={{ fontSize: 26 }} />
                     </Box>
                     <Box>
                         <Box display="flex" alignItems="center" gap={1}>
-                            <Typography variant="h6" fontWeight="bold" sx={{ fontSize: "1.15rem" }}>
+                            <Typography variant="h6" fontWeight={800} color="#0F172A" letterSpacing="-0.02em">
                                 Phân Hệ Xét Nghiệm (LIS) & Chẩn Đoán Hình Ảnh (PACS)
                             </Typography>
                             <Chip
                                 label="SmartHos LIS & PACS PRO"
                                 size="small"
-                                sx={{ bgcolor: "rgba(255,255,255,0.25)", color: "#fff", fontWeight: 700 }}
+                                sx={{
+                                    height: 22,
+                                    fontSize: "0.72rem",
+                                    fontWeight: 700,
+                                    bgcolor: "rgba(0, 136, 214, 0.1)",
+                                    color: "#0088D6",
+                                    border: "1px solid rgba(0, 136, 214, 0.2)"
+                                }}
                             />
                         </Box>
-                        <Typography variant="body2" sx={{ opacity: 0.9, fontSize: "0.825rem", mt: 0.3 }}>
+                        <Typography variant="body2" sx={{ color: "#64748B", mt: 0.2 }}>
                             Khoảng tham chiếu Min-Max tự động cảnh báo bất thường • Viewer xem ảnh CĐHA (DICOM) chuyên dụng
                         </Typography>
                     </Box>
@@ -501,13 +510,15 @@ export default function LabTestResultsPage() {
                     variant="contained"
                     size="small"
                     sx={{
-                        bgcolor: "white",
-                        color: "#0088D6",
-                        fontWeight: "bold",
-                        whiteSpace: "nowrap",
-                        borderRadius: 2,
+                        borderRadius: 2.2,
+                        bgcolor: "#0088D6",
+                        color: "white",
+                        fontWeight: 700,
+                        textTransform: "none",
+                        fontSize: "0.85rem",
                         px: 2,
-                        "&:hover": { bgcolor: "#F0F9FF" }
+                        boxShadow: "0 4px 14px rgba(0, 136, 214, 0.25)",
+                        "&:hover": { bgcolor: "#0073B7" }
                     }}
                     startIcon={<RefreshIcon />}
                     onClick={fetchLabTests}
@@ -517,73 +528,135 @@ export default function LabTestResultsPage() {
             </Paper>
 
             {message && (
-                <Alert severity="success" sx={{ mb: 3, borderRadius: 2 }} onClose={() => setMessage("")}>
+                <Alert severity="success" sx={{ mb: 3, borderRadius: 2.5 }} onClose={() => setMessage("")}>
                     {message}
                 </Alert>
             )}
 
-            {/* Statistics Cards */}
+            {/* Statistics Cards (Apple HIG Metric Cards) */}
             <Grid container spacing={2.5} mb={3}>
                 <Grid item xs={12} sm={3}>
-                    <Card sx={{ borderRadius: 3, border: "1px solid #E2E8F0", borderLeft: "5px solid #0088D6", boxShadow: "0 2px 10px rgba(0,0,0,0.03)" }}>
-                        <CardContent sx={{ py: 1.8, "&:last-child": { pb: 1.8 } }}>
-                            <Typography variant="caption" color="text.secondary" fontWeight="bold" sx={{ display: "block" }}>
-                                Tổng số chỉ định
-                            </Typography>
-                            <Typography variant="h6" fontWeight="bold" color="#0088D6" mt={0.5} sx={{ fontSize: "1.3rem" }}>
-                                {tests.length}
-                            </Typography>
-                        </CardContent>
-                    </Card>
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 2.5,
+                            borderRadius: 3.5,
+                            bgcolor: "#FFFFFF",
+                            border: "1px solid rgba(15, 23, 42, 0.08)",
+                            boxShadow: "0 2px 10px rgba(15, 23, 42, 0.02)",
+                            position: "relative",
+                            overflow: "hidden"
+                        }}
+                    >
+                        <Box sx={{ position: "absolute", top: 0, left: 0, width: "100%", height: 3, bgcolor: "#0088D6" }} />
+                        <Typography variant="caption" sx={{ color: "#64748B", fontWeight: 700, letterSpacing: "0.04em", display: "block" }}>
+                            TỔNG SỐ CHỈ ĐỊNH
+                        </Typography>
+                        <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: "monospace", color: "#0088D6", mt: 0.8 }}>
+                            {tests.length}
+                        </Typography>
+                    </Paper>
                 </Grid>
                 <Grid item xs={12} sm={3}>
-                    <Card sx={{ borderRadius: 3, border: "1px solid #E2E8F0", borderLeft: "5px solid #F59E0B", boxShadow: "0 2px 10px rgba(0,0,0,0.03)" }}>
-                        <CardContent sx={{ py: 1.8, "&:last-child": { pb: 1.8 } }}>
-                            <Typography variant="caption" color="text.secondary" fontWeight="bold" sx={{ display: "block" }}>
-                                Chờ thực hiện / Chưa có KQ
-                            </Typography>
-                            <Typography variant="h6" fontWeight="bold" color="#D97706" mt={0.5} sx={{ fontSize: "1.3rem" }}>
-                                {waitingCount}
-                            </Typography>
-                        </CardContent>
-                    </Card>
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 2.5,
+                            borderRadius: 3.5,
+                            bgcolor: "#FFFFFF",
+                            border: "1px solid rgba(15, 23, 42, 0.08)",
+                            boxShadow: "0 2px 10px rgba(15, 23, 42, 0.02)",
+                            position: "relative",
+                            overflow: "hidden"
+                        }}
+                    >
+                        <Box sx={{ position: "absolute", top: 0, left: 0, width: "100%", height: 3, bgcolor: "#F59E0B" }} />
+                        <Typography variant="caption" sx={{ color: "#64748B", fontWeight: 700, letterSpacing: "0.04em", display: "block" }}>
+                            CHỜ THỰC HIỆN / CHƯA CÓ KQ
+                        </Typography>
+                        <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: "monospace", color: "#D97706", mt: 0.8 }}>
+                            {waitingCount}
+                        </Typography>
+                    </Paper>
                 </Grid>
                 <Grid item xs={12} sm={3}>
-                    <Card sx={{ borderRadius: 3, border: "1px solid #E2E8F0", borderLeft: "5px solid #10B981", boxShadow: "0 2px 10px rgba(0,0,0,0.03)" }}>
-                        <CardContent sx={{ py: 1.8, "&:last-child": { pb: 1.8 } }}>
-                            <Typography variant="caption" color="text.secondary" fontWeight="bold" sx={{ display: "block" }}>
-                                Đã trả kết quả
-                            </Typography>
-                            <Typography variant="h6" fontWeight="bold" color="#059669" mt={0.5} sx={{ fontSize: "1.3rem" }}>
-                                {completedCount}
-                            </Typography>
-                        </CardContent>
-                    </Card>
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 2.5,
+                            borderRadius: 3.5,
+                            bgcolor: "#FFFFFF",
+                            border: "1px solid rgba(15, 23, 42, 0.08)",
+                            boxShadow: "0 2px 10px rgba(15, 23, 42, 0.02)",
+                            position: "relative",
+                            overflow: "hidden"
+                        }}
+                    >
+                        <Box sx={{ position: "absolute", top: 0, left: 0, width: "100%", height: 3, bgcolor: "#10B981" }} />
+                        <Typography variant="caption" sx={{ color: "#64748B", fontWeight: 700, letterSpacing: "0.04em", display: "block" }}>
+                            ĐÃ TRẢ KẾT QUẢ
+                        </Typography>
+                        <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: "monospace", color: "#059669", mt: 0.8 }}>
+                            {completedCount}
+                        </Typography>
+                    </Paper>
                 </Grid>
                 <Grid item xs={12} sm={3}>
-                    <Card sx={{ borderRadius: 3, border: "1px solid #E2E8F0", borderLeft: "5px solid #EF4444", boxShadow: "0 2px 10px rgba(0,0,0,0.03)" }}>
-                        <CardContent sx={{ py: 1.8, "&:last-child": { pb: 1.8 } }}>
-                            <Box display="flex" alignItems="center" justifyContent="space-between">
-                                <Typography variant="caption" color="error.dark" fontWeight="bold" sx={{ display: "block" }}>
-                                    ⚠️ Có cảnh báo bất thường
-                                </Typography>
-                                <WarningAmberIcon color="error" sx={{ fontSize: 18 }} />
-                            </Box>
-                            <Typography variant="h6" fontWeight="bold" color="#DC2626" mt={0.5} sx={{ fontSize: "1.3rem" }}>
-                                {abnormalCount}
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 2.5,
+                            borderRadius: 3.5,
+                            bgcolor: "#FFFFFF",
+                            border: "1px solid rgba(15, 23, 42, 0.08)",
+                            boxShadow: "0 2px 10px rgba(15, 23, 42, 0.02)",
+                            position: "relative",
+                            overflow: "hidden"
+                        }}
+                    >
+                        <Box sx={{ position: "absolute", top: 0, left: 0, width: "100%", height: 3, bgcolor: "#EF4444" }} />
+                        <Box display="flex" alignItems="center" justifyContent="space-between">
+                            <Typography variant="caption" sx={{ color: "#DC2626", fontWeight: 700, letterSpacing: "0.04em", display: "block" }}>
+                                CẢNH BÁO BẤT THƯỜNG
                             </Typography>
-                        </CardContent>
-                    </Card>
+                            <WarningAmberIcon sx={{ color: "#DC2626", fontSize: 18 }} />
+                        </Box>
+                        <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: "monospace", color: "#DC2626", mt: 0.8 }}>
+                            {abnormalCount}
+                        </Typography>
+                    </Paper>
                 </Grid>
             </Grid>
 
             {/* Table Paper */}
-            <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: "1px solid #E2E8F0", boxShadow: "0 2px 12px rgba(0,0,0,0.03)" }}>
+            <Paper elevation={0} sx={{ p: 3, borderRadius: 3.5, bgcolor: "#FFFFFF", border: "1px solid rgba(15, 23, 42, 0.08)", boxShadow: "0 4px 20px rgba(15, 23, 42, 0.03)" }}>
                 <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2} mb={2.5}>
-                    <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)}>
-                        <Tab label={`Tất cả (${tests.length})`} value="ALL" sx={{ fontWeight: 700 }} />
-                        <Tab label={`Chờ xử lý (${waitingCount})`} value="WAITING" sx={{ fontWeight: 700 }} />
-                        <Tab label={`Đã hoàn tất (${completedCount})`} value="COMPLETED" sx={{ fontWeight: 700 }} />
+                    <Tabs
+                        value={tabValue}
+                        onChange={(_, v) => setTabValue(v)}
+                        sx={{
+                            "& .MuiTabs-indicator": {
+                                height: 3,
+                                borderRadius: 3,
+                                bgcolor: "#0088D6"
+                            }
+                        }}
+                    >
+                        <Tab
+                            label={`Tất cả (${tests.length})`}
+                            value="ALL"
+                            sx={{ fontWeight: 700, textTransform: "none", fontSize: "0.9rem" }}
+                        />
+                        <Tab
+                            label={`Chờ xử lý (${waitingCount})`}
+                            value="WAITING"
+                            sx={{ fontWeight: 700, textTransform: "none", fontSize: "0.9rem" }}
+                        />
+                        <Tab
+                            label={`Đã hoàn tất (${completedCount})`}
+                            value="COMPLETED"
+                            sx={{ fontWeight: 700, textTransform: "none", fontSize: "0.9rem" }}
+                        />
                     </Tabs>
 
                     <TextField
@@ -594,9 +667,10 @@ export default function LabTestResultsPage() {
                         InputProps={{
                             startAdornment: (
                                 <InputAdornment position="start">
-                                    <SearchIcon color="action" />
+                                    <SearchIcon sx={{ color: "#94A3B8" }} />
                                 </InputAdornment>
                             ),
+                            sx: { borderRadius: 2.2, bgcolor: "#F8FAFC" }
                         }}
                         sx={{ minWidth: 320 }}
                     />

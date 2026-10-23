@@ -5,7 +5,7 @@
 
 ## 🎯 1. MỤC TIÊU KIỂM THỬ
 Xác minh tính chính xác của các chức năng:
-1. Cây Kiosk tự phục vụ sảnh (`/kiosk`): Bệnh nhân tự chọn chuyên khoa, chọn đối tượng ưu tiên (người già > 75 tuổi, trẻ em < 6 tuổi, phụ nữ có thai).
+1. Cây Kiosk tự phục vụ sảnh (`/kiosk`): Bệnh nhân tự chọn chuyên khoa; ngưỡng ưu tiên người cao tuổi là 65 tuổi, còn các điều kiện ưu tiên khác theo luật backend hiện hành.
 2. Tự động cấp số thứ tự khám (STT thường và STT ưu tiên) và in phiếu E-Ticket kèm mã QR.
 3. Điều dưỡng tiếp đón tại quầy (`/nurse/reception`): Xác nhận thông tin bệnh nhân từ lịch hẹn trực tuyến hoặc vãng lai.
 4. Điều dưỡng điều phối chuyển buồng khám và cập nhật trạng thái hàng đợi.
@@ -22,6 +22,8 @@ Xác minh tính chính xác của các chức năng:
 | **TC-03** | Điều dưỡng tiếp đón bệnh nhân | `bookingCode` | Trạng thái chuyển sang `CHECKED_IN` | ✅ PASS |
 | **TC-04** | Điều dưỡng chuyển phòng khám | `bookingId`, `targetRoomId` | Bệnh nhân chuyển sang hàng đợi của phòng khám mới | ✅ PASS |
 | **TC-05** | API Màn hình hiển thị LED công cộng | `GET /api/clinical/queue/public` | Trả về số đang khám và các số tiếp theo của từng phòng | ✅ PASS |
+
+Kiểm thử hồi quy chi tiết cho tạo booking + counter ticket nguyên tử, idempotency khi retry, sức chứa đồng thời, check-in bền vững và thao tác lịch Admin được lưu tại [`kiosk_booking_hardening.md`](kiosk_booking_hardening.md). Các kiểm thử DB integration/concurrency ở tài liệu đó chưa được chạy trên datasource disposable.
 
 ---
 

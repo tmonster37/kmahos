@@ -154,9 +154,9 @@ public class DoctorAdminController {
         return ResponseEntity.ok(ApiResponse.ok(null, "Đã xóa bác sĩ thành công"));
     }
 
-    // 5. Phân công khoa cho Bác sĩ
+    // 5. Phân công khoa cho Bác sĩ (Admin + Trưởng khoa)
     @PatchMapping("/{doctorId}/assign-department")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_OF_DEPARTMENT')")
     @Transactional
     public ResponseEntity<ApiResponse<DoctorAdminResponse>> assignDepartment(
             @PathVariable UUID doctorId,

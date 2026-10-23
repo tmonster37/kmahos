@@ -2,6 +2,7 @@ package com.hospital.api.service.impl;
 
 import com.hospital.api.config.PayOSConfig;
 import com.hospital.api.config.VNPayConfig;
+import com.hospital.api.constant.BookingStatus;
 import com.hospital.api.constant.PaymentMethod;
 import com.hospital.api.constant.TransactionType;
 import com.hospital.api.dto.request.PayOSWebhookRequest;
@@ -67,12 +68,22 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     @Transactional
     public String createVNPayUrl(UUID accountId, BigDecimal amount, TransactionType type, String ipAddress) {
+        return createVNPayUrl(accountId, amount, type, ipAddress, null);
+    }
+
+    @Override
+    @Transactional
+    public String createVNPayUrl(UUID accountId, BigDecimal amount, TransactionType type, String ipAddress, String bookingCode) {
         validatePaymentAmount(amount);
 
         Account account = accountRepository.findById(accountId)
                 .orElseThrow(() -> new AppException("Không tìm thấy tài khoản", HttpStatus.NOT_FOUND));
 
         String txnRef = "VNP" + (System.currentTimeMillis() % 1000000000L);
+        String desc = "Thanh toán VNPay: " + type.name();
+        if (bookingCode != null && !bookingCode.isBlank()) {
+            desc += " - " + bookingCode.trim();
+        }
 
         Transaction transaction = Transaction.builder()
                 .account(account)
@@ -81,7 +92,7 @@ public class PaymentServiceImpl implements PaymentService {
                 .paymentMethod(PaymentMethod.VNPAY)
                 .status("PENDING")
                 .vnpayTxnRef(txnRef)
-                .description("Thanh toán VNPay: " + type.name())
+                .description(desc)
                 .build();
 
         transactionRepository.save(transaction);
@@ -96,6 +107,12 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     @Transactional
     public PaymentGatewayResponse createVietQRPayment(UUID accountId, BigDecimal amount, TransactionType type) {
+        return createVietQRPayment(accountId, amount, type, null);
+    }
+
+    @Override
+    @Transactional
+    public PaymentGatewayResponse createVietQRPayment(UUID accountId, BigDecimal amount, TransactionType type, String bookingCode) {
         validatePaymentAmount(amount);
 
         Account account = null;
@@ -108,6 +125,10 @@ public class PaymentServiceImpl implements PaymentService {
 
         long orderCode = (System.currentTimeMillis() % 10000000000L) * 1000L + java.util.concurrent.ThreadLocalRandom.current().nextInt(100, 999);
         String txnRef = "TNT" + orderCode;
+        String desc = "Thanh toán VietQR / PayOS: " + type.name();
+        if (bookingCode != null && !bookingCode.isBlank()) {
+            desc += " - " + bookingCode.trim();
+        }
 
         Transaction transaction = Transaction.builder()
                 .account(account)
@@ -118,7 +139,7 @@ public class PaymentServiceImpl implements PaymentService {
                 .vnpayTxnRef(txnRef)
                 .orderCode(orderCode)
                 .isVerified(false)
-                .description("Thanh toán VietQR / PayOS: " + type.name())
+                .description(desc)
                 .build();
 
         transaction = transactionRepository.save(transaction);
@@ -176,6 +197,12 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     @Transactional
     public PaymentGatewayResponse createMoMoPayment(UUID accountId, BigDecimal amount, TransactionType type) {
+        return createMoMoPayment(accountId, amount, type, null);
+    }
+
+    @Override
+    @Transactional
+    public PaymentGatewayResponse createMoMoPayment(UUID accountId, BigDecimal amount, TransactionType type, String bookingCode) {
         validatePaymentAmount(amount);
 
         Account account = null;
@@ -187,6 +214,10 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         String txnRef = "MM" + (System.currentTimeMillis() % 1000000000L);
+        String desc = "Thanh toán Ví MoMo: " + type.name();
+        if (bookingCode != null && !bookingCode.isBlank()) {
+            desc += " - " + bookingCode.trim();
+        }
 
         Transaction transaction = Transaction.builder()
                 .account(account)
@@ -195,7 +226,7 @@ public class PaymentServiceImpl implements PaymentService {
                 .paymentMethod(PaymentMethod.MOMO)
                 .status("PENDING")
                 .vnpayTxnRef(txnRef)
-                .description("Thanh toán Ví MoMo: " + type.name())
+                .description(desc)
                 .build();
 
         transaction = transactionRepository.save(transaction);
@@ -321,6 +352,7 @@ public class PaymentServiceImpl implements PaymentService {
         if ("00".equals(responseCode)) {
             transaction.setStatus("SUCCESS");
             transaction.setIsVerified(true);
+            updateBookingOnPaymentSuccess(transaction);
             if (transaction.getTransactionType() == TransactionType.DEPOSIT_WALLET) {
                 Account account = transaction.getAccount();
                 if (account != null) {
@@ -426,6 +458,7 @@ public class PaymentServiceImpl implements PaymentService {
                 }
             }
             transactionRepository.save(transaction);
+            updateBookingOnPaymentSuccess(transaction);
             log.info("VNPay IPN: Xác nhận thanh toán thành công cho đơn hàng {}", txnRef);
             return VnpayIpnResponse.success();
         } else {
@@ -513,6 +546,7 @@ public class PaymentServiceImpl implements PaymentService {
         transaction.setPaymentMethod(PaymentMethod.VIETQR);
         transaction.setDescription(transaction.getDescription() + " (Khớp tự động qua PayOS Webhook: Ref=" + data.reference() + ")");
         transactionRepository.save(transaction);
+        updateBookingOnPaymentSuccess(transaction);
 
         // Nạp tiền vào ví nếu là DEPOSIT_WALLET
         if (transaction.getTransactionType() == TransactionType.DEPOSIT_WALLET) {
@@ -562,6 +596,7 @@ public class PaymentServiceImpl implements PaymentService {
                 }
             }
             transactionRepository.save(transaction);
+            updateBookingOnPaymentSuccess(transaction);
         }
 
         return TransactionResponse.fromEntity(transaction);
@@ -630,6 +665,7 @@ public class PaymentServiceImpl implements PaymentService {
                 }
             }
             transaction = transactionRepository.save(transaction);
+            updateBookingOnPaymentSuccess(transaction);
             log.info("[PayOS Sync] Đồng bộ thành công giao dịch orderCode={} sang trạng thái SUCCESS", orderCode);
         } else {
             log.info("[PayOS Sync] Giao dịch orderCode={} tại PayOS chưa thanh toán hoặc đang chờ xử lý", orderCode);
@@ -786,5 +822,22 @@ public class PaymentServiceImpl implements PaymentService {
             cleanTitle = cleanTitle.substring(0, 50);
         }
         return List.of(new PayOSItemRequest(cleanTitle.isBlank() ? "Thanh toan vien phi TNT" : cleanTitle, 1, amount.longValue()));
+    }
+
+    private void updateBookingOnPaymentSuccess(Transaction transaction) {
+        if (transaction == null || transaction.getDescription() == null) return;
+        String desc = transaction.getDescription();
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("(BK\\d{8}[A-Za-z0-9]{4,10})");
+        java.util.regex.Matcher matcher = pattern.matcher(desc);
+        if (matcher.find()) {
+            String bookingCode = matcher.group(1);
+            bookingRepository.findByBookingCode(bookingCode).ifPresent(booking -> {
+                if (booking.getStatus() == BookingStatus.PENDING_PAYMENT) {
+                    booking.setStatus(BookingStatus.CONFIRMED);
+                    bookingRepository.save(booking);
+                    log.info("Cập nhật trạng thái Booking {} sang CONFIRMED sau khi thanh toán thành công", bookingCode);
+                }
+            });
+        }
     }
 }

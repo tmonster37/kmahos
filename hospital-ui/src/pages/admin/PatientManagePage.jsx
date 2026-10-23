@@ -259,139 +259,222 @@ export default function PatientManagePage() {
     const totalBalance = patients.reduce((sum, p) => sum + (Number(p.balance) || 0), 0);
 
     return (
-        <Container maxWidth="xl" sx={{ py: 3 }}>
-            {/* 1. Header Title & Actions */}
-            <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2} mb={3}>
-                <Box>
-                    <Typography
-                        variant="h5"
-                        fontWeight="800"
-                        color="#0F172A"
-                        sx={{ letterSpacing: "-0.5px", display: "flex", alignItems: "center", gap: 1.5 }}
-                    >
-                        <Box
+        <Container maxWidth="xl" sx={{ py: 3.5 }}>
+            {/* 1. Header Banner Apple HIG */}
+            <Paper
+                elevation={0}
+                sx={{
+                    p: { xs: 2.5, md: 3 },
+                    mb: 3,
+                    borderRadius: 3.5,
+                    border: "1px solid rgba(15, 23, 42, 0.08)",
+                    background: "linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%)",
+                    boxShadow: "0 2px 10px rgba(0,0,0,0.03)"
+                }}
+            >
+                <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2}>
+                    <Box>
+                        <Chip
+                            label="HỆ THỐNG QUẢN LÝ DÂN SỐ Y TẾ • SMARTHIS REGISTRY PRO"
+                            size="small"
                             sx={{
-                                width: 44,
-                                height: 44,
+                                height: 22,
+                                fontSize: "0.68rem",
+                                fontWeight: 800,
+                                letterSpacing: "0.06em",
+                                bgcolor: "rgba(0, 136, 214, 0.08)",
+                                color: "#0088D6",
+                                mb: 1
+                            }}
+                        />
+                        <Typography
+                            variant="h5"
+                            fontWeight="800"
+                            color="#0F172A"
+                            sx={{ letterSpacing: "-0.5px", display: "flex", alignItems: "center", gap: 1.5 }}
+                        >
+                            <Box
+                                sx={{
+                                    width: 42,
+                                    height: 42,
+                                    borderRadius: 2.5,
+                                    bgcolor: "#EBF6FE",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    border: "1px solid rgba(0, 136, 214, 0.2)"
+                                }}
+                            >
+                                <PeopleAltIcon sx={{ color: "#0088D6", fontSize: 24 }} />
+                            </Box>
+                            Quản Lý Danh Sách & Hồ Sơ Bệnh Nhân
+                        </Typography>
+                        <Typography variant="body2" color="#64748B" sx={{ mt: 0.5, maxWidth: 760 }}>
+                            Cơ sở dữ liệu bệnh nhân tập trung, định danh CCCD/VNeID, tra cứu thẻ BHYT quốc gia và theo dõi lịch sử khám lâm sàng
+                        </Typography>
+                    </Box>
+                    <Stack direction="row" spacing={1.5}>
+                        <Button
+                            variant="outlined"
+                            startIcon={<RefreshIcon />}
+                            onClick={loadPatients}
+                            disabled={loading}
+                            sx={{
                                 borderRadius: 2.5,
-                                bgcolor: "#EBF6FE",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center"
+                                fontWeight: 700,
+                                textTransform: "none",
+                                px: 2.5,
+                                borderColor: "rgba(15, 23, 42, 0.15)",
+                                color: "#334155",
+                                "&:hover": { borderColor: "#0088D6", bgcolor: "rgba(0, 136, 214, 0.04)" }
                             }}
                         >
-                            <PeopleAltIcon sx={{ color: "#0088D6", fontSize: 26 }} />
-                        </Box>
-                        Quản Lý Danh Sách & Hồ Sơ Bệnh Nhân
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                        Cơ sở dữ liệu bệnh nhân bệnh viện, lịch sử khám bệnh, định danh CCCD và thẻ BHYT quốc gia
-                    </Typography>
+                            {loading ? "Đang tải..." : "Làm mới"}
+                        </Button>
+                        <Button
+                            variant="contained"
+                            startIcon={<PersonAddIcon />}
+                            onClick={handleOpenAdd}
+                            sx={{
+                                borderRadius: 2.5,
+                                fontWeight: 700,
+                                textTransform: "none",
+                                bgcolor: "#0088D6",
+                                "&:hover": { bgcolor: "#0070BA" },
+                                px: 3,
+                                boxShadow: "0 4px 14px rgba(0, 136, 214, 0.25)"
+                            }}
+                        >
+                            Thêm Bệnh Nhân Mới
+                        </Button>
+                    </Stack>
                 </Box>
-                <Stack direction="row" spacing={1.5}>
-                    <Button
-                        variant="outlined"
-                        startIcon={<RefreshIcon />}
-                        onClick={loadPatients}
-                        disabled={loading}
-                        sx={{ borderRadius: 2.5, fontWeight: 700, textTransform: "none", px: 2.5 }}
-                    >
-                        {loading ? "Đang tải..." : "Làm mới"}
-                    </Button>
-                    <Button
-                        variant="contained"
-                        startIcon={<PersonAddIcon />}
-                        onClick={handleOpenAdd}
-                        sx={{
-                            borderRadius: 2.5,
-                            fontWeight: 700,
-                            textTransform: "none",
-                            bgcolor: "#0088D6",
-                            "&:hover": { bgcolor: "#0070BA" },
-                            px: 3,
-                            boxShadow: "0 4px 14px rgba(0, 136, 214, 0.25)"
-                        }}
-                    >
-                        Thêm Bệnh Nhân Mới
-                    </Button>
-                </Stack>
-            </Box>
+            </Paper>
 
-            {/* 2. Thống kê nhanh (KPI Bento Cards) */}
+            {/* 2. Thống kê nhanh (Apple HIG KPI Cards with Color Accents) */}
             <Grid container spacing={2.5} mb={3}>
                 <Grid item xs={12} sm={6} md={3}>
-                    <Card elevation={0} sx={{ border: "1px solid #E2E8F0", borderRadius: 3, bgcolor: "#F8FAFC" }}>
-                        <CardContent sx={{ display: "flex", alignItems: "center", gap: 2, py: 2 }}>
-                            <Avatar sx={{ bgcolor: "#0088D6", width: 46, height: 46, borderRadius: 2 }}>
-                                <PeopleAltIcon />
-                            </Avatar>
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 2.5,
+                            borderRadius: 3,
+                            bgcolor: "#FFFFFF",
+                            border: "1px solid rgba(15, 23, 42, 0.08)",
+                            borderTop: "3px solid #0088D6",
+                            boxShadow: "0 1px 3px rgba(0,0,0,0.02)"
+                        }}
+                    >
+                        <Box display="flex" justifyContent="space-between" alignItems="center">
                             <Box>
-                                <Typography variant="caption" color="text.secondary" fontWeight={700}>
+                                <Typography variant="caption" sx={{ color: "#64748B", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", fontSize: "0.72rem" }}>
                                     TỔNG BỆNH NHÂN
                                 </Typography>
-                                <Typography variant="h5" fontWeight="800" color="#0F172A">
+                                <Typography variant="h4" fontWeight="800" color="#0F172A" sx={{ mt: 0.5, letterSpacing: "-0.5px" }}>
                                     {totalPatients}
                                 </Typography>
+                                <Typography variant="caption" color="#64748B" sx={{ mt: 0.5, display: "block" }}>
+                                    Hồ sơ đăng ký trong hệ thống
+                                </Typography>
                             </Box>
-                        </CardContent>
-                    </Card>
+                            <Avatar sx={{ bgcolor: "rgba(0, 136, 214, 0.1)", color: "#0088D6", width: 48, height: 48, borderRadius: 2.5 }}>
+                                <PeopleAltIcon />
+                            </Avatar>
+                        </Box>
+                    </Paper>
                 </Grid>
 
                 <Grid item xs={12} sm={6} md={3}>
-                    <Card elevation={0} sx={{ border: "1px solid #E2E8F0", borderRadius: 3, bgcolor: "#F0FDF4" }}>
-                        <CardContent sx={{ display: "flex", alignItems: "center", gap: 2, py: 2 }}>
-                            <Avatar sx={{ bgcolor: "#16A34A", width: 46, height: 46, borderRadius: 2 }}>
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 2.5,
+                            borderRadius: 3,
+                            bgcolor: "#FFFFFF",
+                            border: "1px solid rgba(15, 23, 42, 0.08)",
+                            borderTop: "3px solid #10B981",
+                            boxShadow: "0 1px 3px rgba(0,0,0,0.02)"
+                        }}
+                    >
+                        <Box display="flex" justifyContent="space-between" alignItems="center">
+                            <Box>
+                                <Typography variant="caption" sx={{ color: "#059669", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", fontSize: "0.72rem" }}>
+                                    CÓ THẺ BHYT HỢP LỆ
+                                </Typography>
+                                <Typography variant="h4" fontWeight="800" color="#065F46" sx={{ mt: 0.5, letterSpacing: "-0.5px" }}>
+                                    {insuredCount}
+                                </Typography>
+                                <Typography variant="caption" color="#059669" sx={{ mt: 0.5, display: "block", fontWeight: 600 }}>
+                                    Tỷ lệ: {totalPatients > 0 ? Math.round((insuredCount / totalPatients) * 100) : 0}% tổng hồ sơ
+                                </Typography>
+                            </Box>
+                            <Avatar sx={{ bgcolor: "rgba(16, 185, 129, 0.1)", color: "#10B981", width: 48, height: 48, borderRadius: 2.5 }}>
                                 <ReceiptIcon />
                             </Avatar>
-                            <Box>
-                                <Typography variant="caption" color="#16A34A" fontWeight={700}>
-                                    CÓ THẺ BHYT
-                                </Typography>
-                                <Typography variant="h5" fontWeight="800" color="#15803D">
-                                    {insuredCount}{" "}
-                                    <Typography component="span" variant="body2" color="#16A34A">
-                                        ({totalPatients > 0 ? Math.round((insuredCount / totalPatients) * 100) : 0}%)
-                                    </Typography>
-                                </Typography>
-                            </Box>
-                        </CardContent>
-                    </Card>
+                        </Box>
+                    </Paper>
                 </Grid>
 
                 <Grid item xs={12} sm={6} md={3}>
-                    <Card elevation={0} sx={{ border: "1px solid #E2E8F0", borderRadius: 3, bgcolor: "#EFF6FF" }}>
-                        <CardContent sx={{ display: "flex", alignItems: "center", gap: 2, py: 2 }}>
-                            <Avatar sx={{ bgcolor: "#3B82F6", width: 46, height: 46, borderRadius: 2 }}>
-                                <MedicalServicesIcon />
-                            </Avatar>
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 2.5,
+                            borderRadius: 3,
+                            bgcolor: "#FFFFFF",
+                            border: "1px solid rgba(15, 23, 42, 0.08)",
+                            borderTop: "3px solid #8B5CF6",
+                            boxShadow: "0 1px 3px rgba(0,0,0,0.02)"
+                        }}
+                    >
+                        <Box display="flex" justifyContent="space-between" alignItems="center">
                             <Box>
-                                <Typography variant="caption" color="#1E40AF" fontWeight={700}>
-                                    TỔNG LƯỢT KHÁM BỆNH
+                                <Typography variant="caption" sx={{ color: "#7C3AED", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", fontSize: "0.72rem" }}>
+                                    LƯỢT KHÁM LÂM SÀNG
                                 </Typography>
-                                <Typography variant="h5" fontWeight="800" color="#1E3A8A">
+                                <Typography variant="h4" fontWeight="800" color="#5B21B6" sx={{ mt: 0.5, letterSpacing: "-0.5px" }}>
                                     {totalVisitsCount}
                                 </Typography>
+                                <Typography variant="caption" color="#7C3AED" sx={{ mt: 0.5, display: "block" }}>
+                                    Lượt tiếp đón & thăm khám
+                                </Typography>
                             </Box>
-                        </CardContent>
-                    </Card>
+                            <Avatar sx={{ bgcolor: "rgba(139, 92, 246, 0.1)", color: "#8B5CF6", width: 48, height: 48, borderRadius: 2.5 }}>
+                                <MedicalServicesIcon />
+                            </Avatar>
+                        </Box>
+                    </Paper>
                 </Grid>
 
                 <Grid item xs={12} sm={6} md={3}>
-                    <Card elevation={0} sx={{ border: "1px solid #E2E8F0", borderRadius: 3, bgcolor: "#FFFBEB" }}>
-                        <CardContent sx={{ display: "flex", alignItems: "center", gap: 2, py: 2 }}>
-                            <Avatar sx={{ bgcolor: "#D97706", width: 46, height: 46, borderRadius: 2 }}>
-                                <AccountBalanceWalletIcon />
-                            </Avatar>
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 2.5,
+                            borderRadius: 3,
+                            bgcolor: "#FFFFFF",
+                            border: "1px solid rgba(15, 23, 42, 0.08)",
+                            borderTop: "3px solid #F59E0B",
+                            boxShadow: "0 1px 3px rgba(0,0,0,0.02)"
+                        }}
+                    >
+                        <Box display="flex" justifyContent="space-between" alignItems="center">
                             <Box>
-                                <Typography variant="caption" color="#B45309" fontWeight={700}>
-                                    TỔNG SỐ DƯ KÝ QUỸ
+                                <Typography variant="caption" sx={{ color: "#D97706", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", fontSize: "0.72rem" }}>
+                                    SỐ DƯ VÍ TẠM ỨNG
                                 </Typography>
-                                <Typography variant="h5" fontWeight="800" color="#92400E">
+                                <Typography variant="h4" fontWeight="800" color="#92400E" sx={{ mt: 0.5, letterSpacing: "-0.5px", fontSize: "1.5rem" }}>
                                     {formatCurrency(totalBalance)}
                                 </Typography>
+                                <Typography variant="caption" color="#B45309" sx={{ mt: 0.5, display: "block" }}>
+                                    Tài khoản ký quỹ bệnh viện
+                                </Typography>
                             </Box>
-                        </CardContent>
-                    </Card>
+                            <Avatar sx={{ bgcolor: "rgba(245, 158, 11, 0.1)", color: "#F59E0B", width: 48, height: 48, borderRadius: 2.5 }}>
+                                <AccountBalanceWalletIcon />
+                            </Avatar>
+                        </Box>
+                    </Paper>
                 </Grid>
             </Grid>
 
@@ -399,7 +482,7 @@ export default function PatientManagePage() {
             {errorMsg && (
                 <Alert
                     severity="warning"
-                    sx={{ mb: 3, borderRadius: 2.5 }}
+                    sx={{ mb: 3, borderRadius: 2.5, border: "1px solid rgba(245, 158, 11, 0.3)" }}
                     action={
                         <Button color="inherit" size="small" onClick={loadPatients}>
                             Thử lại
@@ -410,8 +493,17 @@ export default function PatientManagePage() {
                 </Alert>
             )}
 
-            {/* 3. Bảng Dữ Liệu & Bộ Lọc */}
-            <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: "1px solid #E2E8F0", bgcolor: "#FFFFFF" }}>
+            {/* 3. Bảng Dữ Liệu & Bộ Lọc Apple HIG */}
+            <Paper
+                elevation={0}
+                sx={{
+                    p: { xs: 2, md: 2.5 },
+                    borderRadius: 3.5,
+                    border: "1px solid rgba(15, 23, 42, 0.08)",
+                    bgcolor: "#FFFFFF",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.02)"
+                }}
+            >
                 <Box mb={2.5} display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2}>
                     <Box display="flex" gap={1.5} flexWrap="wrap" flexGrow={1}>
                         <TextField
@@ -426,7 +518,7 @@ export default function PatientManagePage() {
                                         <SearchIcon sx={{ color: "#94A3B8" }} />
                                     </InputAdornment>
                                 ),
-                                sx: { borderRadius: 2 }
+                                sx: { borderRadius: 2.5, bgcolor: "#F8FAFC" }
                             }}
                         />
 
@@ -435,8 +527,8 @@ export default function PatientManagePage() {
                             size="small"
                             value={insuranceFilter}
                             onChange={(e) => setInsuranceFilter(e.target.value)}
-                            sx={{ minWidth: 160 }}
-                            InputProps={{ sx: { borderRadius: 2 } }}
+                            sx={{ minWidth: 170 }}
+                            InputProps={{ sx: { borderRadius: 2.5, bgcolor: "#F8FAFC" } }}
                         >
                             <MenuItem value="ALL">Tất cả bảo hiểm</MenuItem>
                             <MenuItem value="HAS_INSURANCE">Đã có thẻ BHYT</MenuItem>
@@ -448,8 +540,8 @@ export default function PatientManagePage() {
                             size="small"
                             value={genderFilter}
                             onChange={(e) => setGenderFilter(e.target.value)}
-                            sx={{ minWidth: 140 }}
-                            InputProps={{ sx: { borderRadius: 2 } }}
+                            sx={{ minWidth: 150 }}
+                            InputProps={{ sx: { borderRadius: 2.5, bgcolor: "#F8FAFC" } }}
                         >
                             <MenuItem value="ALL">Tất cả giới tính</MenuItem>
                             <MenuItem value="MALE">Nam</MenuItem>
@@ -458,24 +550,32 @@ export default function PatientManagePage() {
                         </TextField>
                     </Box>
 
-                    <Typography variant="body2" color="text.secondary" fontWeight={600}>
-                        Hiển thị: <b>{filteredPatients.length}</b> / {totalPatients} hồ sơ
-                    </Typography>
+                    <Chip
+                        label={`Hiển thị: ${filteredPatients.length} / ${totalPatients} hồ sơ`}
+                        size="small"
+                        sx={{
+                            fontWeight: 700,
+                            bgcolor: "#F1F5F9",
+                            color: "#475569",
+                            height: 28,
+                            fontSize: "0.78rem"
+                        }}
+                    />
                 </Box>
 
-                <TableContainer sx={{ borderRadius: 2, border: "1px solid #F1F5F9" }}>
+                <TableContainer sx={{ borderRadius: 2.5, border: "1px solid rgba(15, 23, 42, 0.08)" }}>
                     <Table>
                         <TableHead sx={{ bgcolor: "#F8FAFC" }}>
                             <TableRow>
-                                <TableCell sx={{ fontWeight: 700, color: "#334155" }}>Mã BN</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: "#334155" }}>Họ Và Tên</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: "#334155" }}>Số Điện Thoại</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: "#334155" }}>CCCD / BHYT</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: "#334155" }}>Ngày Sinh / Giới Tính</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: "#334155", textAlign: "center" }}>Lượt Khám</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: "#334155", textAlign: "center" }}>Số Dư Ví</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: "#334155" }}>Khám Gần Nhất</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: "#334155", textAlign: "center" }}>Thao Tác</TableCell>
+                                <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", color: "#475569", py: 1.5 }}>MÃ BN</TableCell>
+                                <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", color: "#475569", py: 1.5 }}>HỌ VÀ TÊN</TableCell>
+                                <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", color: "#475569", py: 1.5 }}>SỐ ĐIỆN THOẠI</TableCell>
+                                <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", color: "#475569", py: 1.5 }}>CCCD / BHYT</TableCell>
+                                <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", color: "#475569", py: 1.5 }}>NGÀY SINH / GIỚI TÍNH</TableCell>
+                                <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", color: "#475569", py: 1.5, textAlign: "center" }}>LƯỢT KHÁM</TableCell>
+                                <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", color: "#475569", py: 1.5, textAlign: "right" }}>SỐ DƯ VÍ</TableCell>
+                                <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", color: "#475569", py: 1.5 }}>KHÁM GẦN NHẤT</TableCell>
+                                <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", color: "#475569", py: 1.5, textAlign: "center" }}>THAO TÁC</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -521,49 +621,106 @@ export default function PatientManagePage() {
                                     const hasInsurance = Boolean(p.healthInsuranceNumber);
                                     return (
                                         <TableRow key={p.patientProfileId} hover sx={{ "&:hover": { bgcolor: "#F8FAFC" } }}>
-                                            <TableCell sx={{ fontWeight: 800, color: "#0088D6" }}>
-                                                {p.patientCode || "BN-" + p.patientProfileId.substring(0, 6).toUpperCase()}
+                                            <TableCell>
+                                                <Box
+                                                    component="span"
+                                                    sx={{
+                                                        fontFamily: "monospace",
+                                                        fontWeight: 700,
+                                                        fontSize: "0.8rem",
+                                                        bgcolor: "rgba(0, 136, 214, 0.08)",
+                                                        color: "#0088D6",
+                                                        px: 1,
+                                                        py: 0.4,
+                                                        borderRadius: 1.5,
+                                                        display: "inline-block"
+                                                    }}
+                                                >
+                                                    {p.patientCode || "BN-" + p.patientProfileId.substring(0, 6).toUpperCase()}
+                                                </Box>
                                             </TableCell>
-                                            <TableCell sx={{ fontWeight: 700 }}>
-                                                {p.fullName}
+                                            <TableCell>
+                                                <Box display="flex" alignItems="center" gap={1.5}>
+                                                    <Avatar
+                                                        sx={{
+                                                            width: 34,
+                                                            height: 34,
+                                                            bgcolor: p.gender === "FEMALE" ? "rgba(236, 72, 153, 0.12)" : "rgba(0, 136, 214, 0.12)",
+                                                            color: p.gender === "FEMALE" ? "#DB2777" : "#0088D6",
+                                                            fontSize: "0.85rem",
+                                                            fontWeight: 800
+                                                        }}
+                                                    >
+                                                        {p.fullName?.charAt(0) || "B"}
+                                                    </Avatar>
+                                                    <Box>
+                                                        <Typography variant="body2" fontWeight={700} color="#0F172A">
+                                                            {p.fullName}
+                                                        </Typography>
+                                                        {p.email && (
+                                                            <Typography variant="caption" color="#94A3B8" sx={{ display: "block" }}>
+                                                                {p.email}
+                                                            </Typography>
+                                                        )}
+                                                    </Box>
+                                                </Box>
                                             </TableCell>
-                                            <TableCell sx={{ fontWeight: 500 }}>
+                                            <TableCell sx={{ fontWeight: 600, color: "#334155", fontFamily: "monospace", fontSize: "0.85rem" }}>
                                                 {p.phoneNumber}
                                             </TableCell>
                                             <TableCell>
-                                                <Typography variant="body2" fontSize="0.85rem" fontWeight={500}>
+                                                <Typography variant="body2" fontSize="0.82rem" fontWeight={600} color="#334155" sx={{ fontFamily: "monospace" }}>
                                                     {p.identityNumber || "Chưa cập nhật"}
                                                 </Typography>
                                                 <Chip
                                                     label={hasInsurance ? `BHYT: ${p.healthInsuranceNumber}` : "Chưa BHYT"}
                                                     size="small"
-                                                    color={hasInsurance ? "info" : "default"}
-                                                    variant="outlined"
-                                                    sx={{ height: 20, fontSize: "0.7rem", fontWeight: 700, mt: 0.5 }}
+                                                    sx={{
+                                                        height: 20,
+                                                        fontSize: "0.68rem",
+                                                        fontWeight: 700,
+                                                        mt: 0.5,
+                                                        bgcolor: hasInsurance ? "rgba(16, 185, 129, 0.1)" : "#F1F5F9",
+                                                        color: hasInsurance ? "#059669" : "#64748B",
+                                                        border: `1px solid ${hasInsurance ? "rgba(16, 185, 129, 0.3)" : "rgba(100, 116, 139, 0.2)"}`
+                                                    }}
                                                 />
                                             </TableCell>
-                                            <TableCell>
-                                                {formatDate(p.dateOfBirth)} (
-                                                {p.gender === "MALE" ? "Nam" : p.gender === "FEMALE" ? "Nữ" : "Khác"})
+                                            <TableCell sx={{ fontSize: "0.85rem", color: "#334155" }}>
+                                                {formatDate(p.dateOfBirth)}{" "}
+                                                <Chip
+                                                    icon={p.gender === "FEMALE" ? <FemaleIcon sx={{ fontSize: "14px !important" }} /> : <MaleIcon sx={{ fontSize: "14px !important" }} />}
+                                                    label={p.gender === "MALE" ? "Nam" : p.gender === "FEMALE" ? "Nữ" : "Khác"}
+                                                    size="small"
+                                                    sx={{
+                                                        height: 20,
+                                                        fontSize: "0.68rem",
+                                                        fontWeight: 700,
+                                                        bgcolor: p.gender === "FEMALE" ? "rgba(236, 72, 153, 0.08)" : "rgba(59, 130, 246, 0.08)",
+                                                        color: p.gender === "FEMALE" ? "#DB2777" : "#2563EB",
+                                                        ml: 0.5
+                                                    }}
+                                                />
                                             </TableCell>
                                             <TableCell align="center">
                                                 <Chip
                                                     label={`${p.totalVisits || 0} lần`}
                                                     size="small"
-                                                    color={(p.totalVisits || 0) > 0 ? "primary" : "default"}
-                                                    sx={{ fontWeight: 700, height: 22 }}
+                                                    sx={{
+                                                        fontWeight: 700,
+                                                        height: 22,
+                                                        fontSize: "0.75rem",
+                                                        bgcolor: (p.totalVisits || 0) > 0 ? "rgba(0, 136, 214, 0.1)" : "#F1F5F9",
+                                                        color: (p.totalVisits || 0) > 0 ? "#0088D6" : "#64748B"
+                                                    }}
                                                 />
                                             </TableCell>
-                                            <TableCell align="center">
-                                                <Chip
-                                                    label={formatCurrency(p.balance || 0)}
-                                                    size="small"
-                                                    color={(p.balance || 0) > 0 ? "success" : "default"}
-                                                    variant="outlined"
-                                                    sx={{ fontWeight: 700 }}
-                                                />
+                                            <TableCell align="right">
+                                                <Typography variant="body2" sx={{ fontWeight: 700, color: (p.balance || 0) > 0 ? "#059669" : "#64748B", fontFamily: "monospace" }}>
+                                                    {formatCurrency(p.balance || 0)}
+                                                </Typography>
                                             </TableCell>
-                                            <TableCell sx={{ fontSize: "0.85rem", color: "#64748B" }}>
+                                            <TableCell sx={{ fontSize: "0.82rem", color: "#64748B" }}>
                                                 {p.lastVisitDate || "---"}
                                             </TableCell>
                                             <TableCell align="center">
@@ -571,12 +728,16 @@ export default function PatientManagePage() {
                                                     <Tooltip title="Xem chi tiết hồ sơ & lịch sử khám">
                                                         <IconButton
                                                             size="small"
-                                                            color="primary"
                                                             onClick={() => {
                                                                 setSelectedPatient(p);
                                                                 setOpenDetailModal(true);
                                                             }}
-                                                            sx={{ bgcolor: "#EBF6FE", borderRadius: 1.5, "&:hover": { bgcolor: "#BAE6FD" } }}
+                                                            sx={{
+                                                                bgcolor: "rgba(0, 136, 214, 0.08)",
+                                                                color: "#0088D6",
+                                                                borderRadius: 2,
+                                                                "&:hover": { bgcolor: "rgba(0, 136, 214, 0.16)" }
+                                                            }}
                                                         >
                                                             <VisibilityIcon fontSize="small" />
                                                         </IconButton>
@@ -584,9 +745,13 @@ export default function PatientManagePage() {
                                                     <Tooltip title="Chỉnh sửa thông tin">
                                                         <IconButton
                                                             size="small"
-                                                            color="secondary"
                                                             onClick={() => handleOpenEdit(p)}
-                                                            sx={{ bgcolor: "#F5F3FF", borderRadius: 1.5, "&:hover": { bgcolor: "#EDE9FE" } }}
+                                                            sx={{
+                                                                bgcolor: "rgba(139, 92, 246, 0.08)",
+                                                                color: "#7C3AED",
+                                                                borderRadius: 2,
+                                                                "&:hover": { bgcolor: "rgba(139, 92, 246, 0.16)" }
+                                                            }}
                                                         >
                                                             <EditIcon fontSize="small" />
                                                         </IconButton>
@@ -594,9 +759,13 @@ export default function PatientManagePage() {
                                                     <Tooltip title="Xóa hồ sơ">
                                                         <IconButton
                                                             size="small"
-                                                            color="error"
                                                             onClick={() => handleOpenDelete(p)}
-                                                            sx={{ bgcolor: "#FEF2F2", borderRadius: 1.5, "&:hover": { bgcolor: "#FEE2E2" } }}
+                                                            sx={{
+                                                                bgcolor: "rgba(239, 68, 68, 0.08)",
+                                                                color: "#DC2626",
+                                                                borderRadius: 2,
+                                                                "&:hover": { bgcolor: "rgba(239, 68, 68, 0.16)" }
+                                                            }}
                                                         >
                                                             <DeleteIcon fontSize="small" />
                                                         </IconButton>
@@ -612,59 +781,102 @@ export default function PatientManagePage() {
                 </TableContainer>
             </Paper>
 
-            {/* 4. Modal Chi Tiết Hồ Sơ Bệnh Nhân (Bento Grid) */}
+            {/* 4. Modal Chi Tiết Hồ Sơ Bệnh Nhân (Apple HIG Bento Grid) */}
             <Dialog
                 open={openDetailModal}
                 onClose={() => setOpenDetailModal(false)}
                 maxWidth="md"
                 fullWidth
-                PaperProps={{ sx: { borderRadius: 3 } }}
+                PaperProps={{
+                    sx: {
+                        borderRadius: 4,
+                        border: "1px solid rgba(15, 23, 42, 0.08)",
+                        boxShadow: "0 20px 40px rgba(0, 0, 0, 0.12)",
+                        overflow: "hidden"
+                    }
+                }}
             >
                 <DialogTitle
                     sx={{
                         fontWeight: 800,
-                        borderBottom: "1px solid #E2E8F0",
-                        color: "#0088D6",
+                        borderBottom: "1px solid rgba(15, 23, 42, 0.08)",
+                        color: "#0F172A",
                         display: "flex",
                         alignItems: "center",
-                        gap: 1
+                        gap: 1.5,
+                        py: 2,
+                        bgcolor: "#F8FAFC"
                     }}
                 >
-                    <PeopleAltIcon /> Chi Tiết Hồ Sơ Bệnh Nhân: {selectedPatient?.fullName}
+                    <Box
+                        sx={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 2,
+                            bgcolor: "rgba(0, 136, 214, 0.1)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center"
+                        }}
+                    >
+                        <PeopleAltIcon sx={{ color: "#0088D6", fontSize: 20 }} />
+                    </Box>
+                    <Box>
+                        <Typography variant="subtitle1" fontWeight={800} color="#0F172A">
+                            Chi Tiết Hồ Sơ Bệnh Nhân: {selectedPatient?.fullName}
+                        </Typography>
+                        <Typography variant="caption" color="#64748B">
+                            Mã định danh: {selectedPatient?.patientCode || "BN-HỒ SƠ"} • Cơ sở dữ liệu y tế quốc gia
+                        </Typography>
+                    </Box>
                 </DialogTitle>
-                <DialogContent sx={{ pt: 3 }}>
+                <DialogContent sx={{ p: 3, bgcolor: "#FFFFFF" }}>
                     {selectedPatient && (
                         <Grid container spacing={3} mt={0.5}>
                             {/* Cột trái: Thông tin hành chính & liên hệ */}
                             <Grid item xs={12} md={5}>
-                                <Paper elevation={0} sx={{ p: 2.5, bgcolor: "#F8FAFC", borderRadius: 3, border: "1px solid #E2E8F0" }}>
+                                <Paper elevation={0} sx={{ p: 2.5, bgcolor: "#F8FAFC", borderRadius: 3, border: "1px solid rgba(15, 23, 42, 0.08)" }}>
                                     <Box textAlign="center" mb={2}>
                                         <Avatar
                                             sx={{
                                                 width: 64,
                                                 height: 64,
                                                 mx: "auto",
-                                                bgcolor: "#0088D6",
+                                                bgcolor: selectedPatient.gender === "FEMALE" ? "rgba(236, 72, 153, 0.12)" : "rgba(0, 136, 214, 0.12)",
+                                                color: selectedPatient.gender === "FEMALE" ? "#DB2777" : "#0088D6",
                                                 fontSize: "1.5rem",
-                                                fontWeight: "bold"
+                                                fontWeight: 800,
+                                                border: "2px solid #FFFFFF",
+                                                boxShadow: "0 2px 8px rgba(0,0,0,0.06)"
                                             }}
                                         >
                                             {selectedPatient.fullName?.charAt(0) || "B"}
                                         </Avatar>
-                                        <Typography variant="h6" fontWeight="bold" mt={1}>
+                                        <Typography variant="h6" fontWeight="800" color="#0F172A" mt={1}>
                                             {selectedPatient.fullName}
                                         </Typography>
-                                        <Chip
-                                            label={selectedPatient.patientCode || "BN-HỒ SƠ"}
-                                            size="small"
-                                            color="primary"
-                                            sx={{ fontWeight: "bold", mt: 0.5 }}
-                                        />
+                                        <Box
+                                            component="span"
+                                            sx={{
+                                                fontFamily: "monospace",
+                                                fontWeight: 700,
+                                                fontSize: "0.78rem",
+                                                bgcolor: "rgba(0, 136, 214, 0.08)",
+                                                color: "#0088D6",
+                                                px: 1.2,
+                                                py: 0.3,
+                                                borderRadius: 1.5,
+                                                display: "inline-block",
+                                                mt: 0.5
+                                            }}
+                                        >
+                                            {selectedPatient.patientCode || "BN-HỒ SƠ"}
+                                        </Box>
                                     </Box>
                                     <Divider sx={{ my: 1.5 }} />
                                     <Typography variant="body2" sx={{ mb: 1.2, display: "flex", alignItems: "center", gap: 1 }}>
                                         <PhoneIcon fontSize="small" sx={{ color: "#64748B" }} /> <b>SĐT:</b>{" "}
-                                        {selectedPatient.phoneNumber}
+                                        <span style={{ fontFamily: "monospace" }}>{selectedPatient.phoneNumber}</span>
                                     </Typography>
                                     {selectedPatient.email && (
                                         <Typography variant="body2" sx={{ mb: 1.2, display: "flex", alignItems: "center", gap: 1 }}>
@@ -674,7 +886,7 @@ export default function PatientManagePage() {
                                     )}
                                     <Typography variant="body2" sx={{ mb: 1.2, display: "flex", alignItems: "center", gap: 1 }}>
                                         <BadgeIcon fontSize="small" sx={{ color: "#64748B" }} /> <b>CCCD:</b>{" "}
-                                        {selectedPatient.identityNumber || "Chưa cập nhật"}
+                                        <span style={{ fontFamily: "monospace" }}>{selectedPatient.identityNumber || "Chưa cập nhật"}</span>
                                     </Typography>
                                     <Typography variant="body2" sx={{ mb: 1.2, display: "flex", alignItems: "center", gap: 1 }}>
                                         <ReceiptIcon fontSize="small" sx={{ color: "#64748B" }} /> <b>BHYT:</b>{" "}
@@ -686,7 +898,7 @@ export default function PatientManagePage() {
                                     </Typography>
                                     <Typography variant="body2" sx={{ mb: 1.2, display: "flex", alignItems: "center", gap: 1 }}>
                                         <AccountBalanceWalletIcon fontSize="small" sx={{ color: "#D97706" }} /> <b>Ví viện phí:</b>{" "}
-                                        {formatCurrency(selectedPatient.balance || 0)}
+                                        <b style={{ color: "#059669", fontFamily: "monospace" }}>{formatCurrency(selectedPatient.balance || 0)}</b>
                                     </Typography>
                                     <Typography variant="body2" sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
                                         <LocationOnIcon fontSize="small" sx={{ color: "#64748B", mt: 0.2 }} /> <b>Địa chỉ:</b>{" "}
@@ -707,32 +919,32 @@ export default function PatientManagePage() {
                                     Lịch Sử Khám Bệnh & Chỉ Định Cận Lâm Sàng
                                 </Typography>
                                 {selectedPatient.history && selectedPatient.history.length > 0 ? (
-                                    <TableContainer component={Paper} elevation={0} sx={{ border: "1px solid #E2E8F0", borderRadius: 2 }}>
+                                    <TableContainer component={Paper} elevation={0} sx={{ border: "1px solid rgba(15, 23, 42, 0.08)", borderRadius: 2.5 }}>
                                         <Table size="small">
                                             <TableHead sx={{ bgcolor: "#F8FAFC" }}>
                                                 <TableRow>
-                                                    <TableCell sx={{ fontWeight: 700 }}>Ngày</TableCell>
-                                                    <TableCell sx={{ fontWeight: 700 }}>Khoa & Bác Sĩ</TableCell>
-                                                    <TableCell sx={{ fontWeight: 700 }}>Chẩn Đoán</TableCell>
-                                                    <TableCell sx={{ fontWeight: 700, textAlign: "right" }}>Viện Phí</TableCell>
+                                                    <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", textTransform: "uppercase", color: "#475569" }}>Ngày</TableCell>
+                                                    <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", textTransform: "uppercase", color: "#475569" }}>Khoa & Bác Sĩ</TableCell>
+                                                    <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", textTransform: "uppercase", color: "#475569" }}>Chẩn Đoán</TableCell>
+                                                    <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", textTransform: "uppercase", color: "#475569", textAlign: "right" }}>Viện Phí</TableCell>
                                                 </TableRow>
                                             </TableHead>
                                             <TableBody>
                                                 {selectedPatient.history.map((h, idx) => (
                                                     <TableRow key={idx}>
-                                                        <TableCell sx={{ fontWeight: 600 }}>{h.visitDate}</TableCell>
+                                                        <TableCell sx={{ fontWeight: 600, fontSize: "0.82rem" }}>{h.visitDate}</TableCell>
                                                         <TableCell>
-                                                            <Typography variant="body2" fontWeight={600}>
+                                                            <Typography variant="body2" fontWeight={700} color="#0F172A">
                                                                 {h.departmentName}
                                                             </Typography>
                                                             <Typography variant="caption" color="text.secondary">
                                                                 {h.doctorName}
                                                             </Typography>
                                                         </TableCell>
-                                                        <TableCell sx={{ color: "#0088D6", fontWeight: 500 }}>
+                                                        <TableCell sx={{ color: "#0088D6", fontWeight: 600, fontSize: "0.82rem" }}>
                                                             {h.diagnosis}
                                                         </TableCell>
-                                                        <TableCell align="right" sx={{ fontWeight: 700, color: "#16A34A" }}>
+                                                        <TableCell align="right" sx={{ fontWeight: 700, color: "#059669", fontFamily: "monospace" }}>
                                                             {formatCurrency(h.cost)}
                                                         </TableCell>
                                                     </TableRow>
@@ -744,8 +956,8 @@ export default function PatientManagePage() {
                                     <Box
                                         sx={{
                                             p: 4,
-                                            border: "1px dashed #CBD5E1",
-                                            borderRadius: 2.5,
+                                            border: "1px dashed rgba(15, 23, 42, 0.15)",
+                                            borderRadius: 3,
                                             textAlign: "center",
                                             bgcolor: "#F8FAFC"
                                         }}
@@ -763,32 +975,39 @@ export default function PatientManagePage() {
                         </Grid>
                     )}
                 </DialogContent>
-                <DialogActions sx={{ p: 2, borderTop: "1px solid #E2E8F0" }}>
+                <DialogActions sx={{ p: 2, px: 3, borderTop: "1px solid rgba(15, 23, 42, 0.08)", bgcolor: "#F8FAFC" }}>
                     <Button
                         onClick={() => setOpenDetailModal(false)}
                         variant="contained"
-                        sx={{ borderRadius: 2, textTransform: "none", fontWeight: 700 }}
+                        sx={{ borderRadius: 2.5, textTransform: "none", fontWeight: 700, px: 3, bgcolor: "#0088D6" }}
                     >
                         Đóng cửa sổ
                     </Button>
                 </DialogActions>
             </Dialog>
 
-            {/* 5. Modal Thêm / Chỉnh Sửa Hồ Sơ Bệnh Nhân */}
+            {/* 5. Modal Thêm / Chỉnh Sửa Hồ Sơ Bệnh Nhân Apple HIG */}
             <Dialog
                 open={openFormModal}
                 onClose={() => !submitting && setOpenFormModal(false)}
                 maxWidth="md"
                 fullWidth
-                PaperProps={{ sx: { borderRadius: 3 } }}
+                PaperProps={{
+                    sx: {
+                        borderRadius: 4,
+                        border: "1px solid rgba(15, 23, 42, 0.08)",
+                        boxShadow: "0 20px 40px rgba(0, 0, 0, 0.12)",
+                        overflow: "hidden"
+                    }
+                }}
             >
-                <DialogTitle sx={{ fontWeight: 800, borderBottom: "1px solid #E2E8F0", color: "#0088D6" }}>
+                <DialogTitle sx={{ fontWeight: 800, borderBottom: "1px solid rgba(15, 23, 42, 0.08)", color: "#0F172A", bgcolor: "#F8FAFC", py: 2 }}>
                     {editingPatient ? `Chỉnh Sửa Hồ Sơ Bệnh Nhân: ${editingPatient.fullName}` : "Thêm Mới Hồ Sơ Bệnh Nhân"}
                 </DialogTitle>
                 <Box component="form" onSubmit={handleSavePatient}>
-                    <DialogContent sx={{ pt: 3 }}>
+                    <DialogContent sx={{ p: 3, bgcolor: "#FFFFFF" }}>
                         {formError && (
-                            <Alert severity="error" sx={{ mb: 2.5, borderRadius: 2 }}>
+                            <Alert severity="error" sx={{ mb: 2.5, borderRadius: 2.5 }}>
                                 {formError}
                             </Alert>
                         )}
@@ -802,6 +1021,7 @@ export default function PatientManagePage() {
                                     placeholder="Ví dụ: NGUYỄN VĂN AN"
                                     required
                                     size="small"
+                                    InputProps={{ sx: { borderRadius: 2 } }}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={6}>
@@ -813,6 +1033,7 @@ export default function PatientManagePage() {
                                     placeholder="Ví dụ: 0987654321"
                                     required
                                     size="small"
+                                    InputProps={{ sx: { borderRadius: 2 } }}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={6}>
@@ -823,6 +1044,7 @@ export default function PatientManagePage() {
                                     onChange={(e) => setFormData({ ...formData, identityNumber: e.target.value })}
                                     placeholder="12 chữ số CCCD (hoặc 9 số CMND)"
                                     size="small"
+                                    InputProps={{ sx: { borderRadius: 2 } }}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={6}>
@@ -833,6 +1055,7 @@ export default function PatientManagePage() {
                                     onChange={(e) => setFormData({ ...formData, healthInsuranceNumber: e.target.value })}
                                     placeholder="Ví dụ: DN4010900123456"
                                     size="small"
+                                    InputProps={{ sx: { borderRadius: 2 } }}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={6}>
@@ -845,6 +1068,7 @@ export default function PatientManagePage() {
                                     InputLabelProps={{ shrink: true }}
                                     required
                                     size="small"
+                                    InputProps={{ sx: { borderRadius: 2 } }}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={6}>
@@ -855,6 +1079,7 @@ export default function PatientManagePage() {
                                     value={formData.gender}
                                     onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
                                     size="small"
+                                    InputProps={{ sx: { borderRadius: 2 } }}
                                 >
                                     <MenuItem value="MALE">Nam</MenuItem>
                                     <MenuItem value="FEMALE">Nữ</MenuItem>
@@ -868,6 +1093,7 @@ export default function PatientManagePage() {
                                     value={formData.province}
                                     onChange={(e) => setFormData({ ...formData, province: e.target.value })}
                                     size="small"
+                                    InputProps={{ sx: { borderRadius: 2 } }}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
@@ -877,6 +1103,7 @@ export default function PatientManagePage() {
                                     value={formData.district}
                                     onChange={(e) => setFormData({ ...formData, district: e.target.value })}
                                     size="small"
+                                    InputProps={{ sx: { borderRadius: 2 } }}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
@@ -886,6 +1113,7 @@ export default function PatientManagePage() {
                                     value={formData.ward}
                                     onChange={(e) => setFormData({ ...formData, ward: e.target.value })}
                                     size="small"
+                                    InputProps={{ sx: { borderRadius: 2 } }}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={8}>
@@ -895,6 +1123,7 @@ export default function PatientManagePage() {
                                     value={formData.streetAddress}
                                     onChange={(e) => setFormData({ ...formData, streetAddress: e.target.value })}
                                     size="small"
+                                    InputProps={{ sx: { borderRadius: 2 } }}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
@@ -905,15 +1134,16 @@ export default function PatientManagePage() {
                                     value={formData.email}
                                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                                     size="small"
+                                    InputProps={{ sx: { borderRadius: 2 } }}
                                 />
                             </Grid>
                         </Grid>
                     </DialogContent>
-                    <DialogActions sx={{ p: 2.5, borderTop: "1px solid #E2E8F0" }}>
+                    <DialogActions sx={{ p: 2.5, borderTop: "1px solid rgba(15, 23, 42, 0.08)", bgcolor: "#F8FAFC" }}>
                         <Button
                             onClick={() => setOpenFormModal(false)}
                             disabled={submitting}
-                            sx={{ borderRadius: 2, textTransform: "none", fontWeight: 700 }}
+                            sx={{ borderRadius: 2, textTransform: "none", fontWeight: 700, color: "#64748B" }}
                         >
                             Hủy bỏ
                         </Button>
@@ -922,7 +1152,7 @@ export default function PatientManagePage() {
                             variant="contained"
                             disabled={submitting}
                             sx={{
-                                borderRadius: 2,
+                                borderRadius: 2.5,
                                 textTransform: "none",
                                 fontWeight: 700,
                                 bgcolor: "#0088D6",
@@ -936,18 +1166,24 @@ export default function PatientManagePage() {
                 </Box>
             </Dialog>
 
-            {/* 6. Modal Xác Nhận Xóa Hồ Sơ */}
+            {/* 6. Modal Xác Nhận Xóa Hồ Sơ Apple HIG */}
             <Dialog
                 open={openDeleteModal}
                 onClose={() => !deleting && setOpenDeleteModal(false)}
                 maxWidth="xs"
                 fullWidth
-                PaperProps={{ sx: { borderRadius: 3 } }}
+                PaperProps={{
+                    sx: {
+                        borderRadius: 4,
+                        border: "1px solid rgba(239, 68, 68, 0.2)",
+                        boxShadow: "0 20px 40px rgba(0, 0, 0, 0.12)"
+                    }
+                }}
             >
-                <DialogTitle sx={{ fontWeight: 800, color: "#DC2626" }}>
+                <DialogTitle sx={{ fontWeight: 800, color: "#DC2626", bgcolor: "#FEF2F2", py: 2 }}>
                     Xác Nhận Xóa Hồ Sơ Bệnh Nhân
                 </DialogTitle>
-                <DialogContent>
+                <DialogContent sx={{ pt: 3 }}>
                     <Typography variant="body1">
                         Bạn có chắc chắn muốn xóa hồ sơ bệnh nhân <b>{patientToDelete?.fullName}</b> (Mã BN:{" "}
                         <b>{patientToDelete?.patientCode}</b>, SĐT: <b>{patientToDelete?.phoneNumber}</b>)?
@@ -956,11 +1192,11 @@ export default function PatientManagePage() {
                         Hồ sơ sẽ được chuyển vào trạng thái ngừng hoạt động mà không làm mất lịch sử các đơn thuốc hay xét nghiệm đã thực hiện.
                     </Typography>
                 </DialogContent>
-                <DialogActions sx={{ p: 2, borderTop: "1px solid #E2E8F0" }}>
+                <DialogActions sx={{ p: 2, borderTop: "1px solid rgba(15, 23, 42, 0.08)", bgcolor: "#F8FAFC" }}>
                     <Button
                         onClick={() => setOpenDeleteModal(false)}
                         disabled={deleting}
-                        sx={{ borderRadius: 2, textTransform: "none", fontWeight: 700 }}
+                        sx={{ borderRadius: 2, textTransform: "none", fontWeight: 700, color: "#64748B" }}
                     >
                         Hủy
                     </Button>
@@ -969,7 +1205,7 @@ export default function PatientManagePage() {
                         color="error"
                         variant="contained"
                         disabled={deleting}
-                        sx={{ borderRadius: 2, textTransform: "none", fontWeight: 700 }}
+                        sx={{ borderRadius: 2.5, textTransform: "none", fontWeight: 700, px: 2.5 }}
                     >
                         {deleting ? "Đang xóa..." : "Xác Nhận Xóa"}
                     </Button>

@@ -36,11 +36,14 @@ axiosInstance.interceptors.response.use(
             localStorage.removeItem("accessToken");
             localStorage.removeItem("user");
             
-            // Lưu lại đường dẫn hiện tại để sau khi đăng nhập có thể quay lại đúng trang đang làm việc
-            if (window.location.pathname !== "/login" && window.location.pathname !== "/register") {
+            // Lưu lại đường dẫn hiện tại và chuyển hướng an toàn không gây vòng lặp reload
+            if (window.location.pathname !== "/login" && window.location.pathname !== "/register" && !window.__isRedirectingToLogin) {
+                window.__isRedirectingToLogin = true;
                 const currentPath = window.location.pathname + window.location.search;
                 sessionStorage.setItem("redirectUrl", currentPath);
-                window.location.href = "/login?expired=true";
+                setTimeout(() => {
+                    window.location.href = "/login?expired=true";
+                }, 150);
             }
         }
 

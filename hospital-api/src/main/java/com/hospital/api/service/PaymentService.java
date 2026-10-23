@@ -13,8 +13,11 @@ import java.util.UUID;
 
 public interface PaymentService {
     String createVNPayUrl(UUID accountId, BigDecimal amount, TransactionType type, String ipAddress);
+    String createVNPayUrl(UUID accountId, BigDecimal amount, TransactionType type, String ipAddress, String bookingCode);
     PaymentGatewayResponse createVietQRPayment(UUID accountId, BigDecimal amount, TransactionType type);
+    PaymentGatewayResponse createVietQRPayment(UUID accountId, BigDecimal amount, TransactionType type, String bookingCode);
     PaymentGatewayResponse createMoMoPayment(UUID accountId, BigDecimal amount, TransactionType type);
+    PaymentGatewayResponse createMoMoPayment(UUID accountId, BigDecimal amount, TransactionType type, String bookingCode);
     void payWithInternalWallet(UUID accountId, BigDecimal amount, TransactionType type);
     TransactionResponse processVNPayCallback(Map<String, String> queryParams);
     com.hospital.api.dto.response.VnpayIpnResponse processVNPayIpn(Map<String, String> queryParams);

@@ -216,52 +216,121 @@ export default function EhrAndGatewayPage() {
     };
 
     return (
-        <Container maxWidth="xl" sx={{ py: 3 }}>
-            {/* Header Tiêu Đề */}
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={2}>
-                <Box>
-                    <Typography variant="h5" fontWeight={800} sx={{ color: "#0088D6", display: "flex", alignItems: "center", gap: 1 }}>
-                        <HubIcon sx={{ fontSize: 28, color: "#0088D6" }} /> Cổng Tích Hợp LIS/RIS Gateway & EHR Concept Dictionary
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: "#64748B", mt: 0.5 }}>
-                        Kiến trúc Middleware tích hợp máy cận lâm sàng & Bệnh án điện tử cấu trúc theo chuẩn OpenMRS & HAPI FHIR
-                    </Typography>
-                </Box>
+        <Container maxWidth="xl" sx={{ py: 3.5 }}>
+            {/* 1. Header Banner Apple HIG */}
+            <Paper
+                elevation={0}
+                sx={{
+                    p: { xs: 2.5, md: 3 },
+                    mb: 3,
+                    borderRadius: 3.5,
+                    border: "1px solid rgba(15, 23, 42, 0.08)",
+                    background: "linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%)",
+                    boxShadow: "0 2px 10px rgba(0,0,0,0.03)"
+                }}
+            >
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={1} flexWrap="wrap" gap={2}>
+                    <Box>
+                        <Chip
+                            label="TRỤC LIÊN THÔNG CẬN LÂM SÀNG • LIS / RIS / PACS & OPENMRS FHIR"
+                            size="small"
+                            sx={{
+                                height: 22,
+                                fontSize: "0.68rem",
+                                fontWeight: 800,
+                                letterSpacing: "0.06em",
+                                bgcolor: "rgba(0, 136, 214, 0.08)",
+                                color: "#0088D6",
+                                mb: 1
+                            }}
+                        />
+                        <Typography
+                            variant="h5"
+                            fontWeight="800"
+                            color="#0F172A"
+                            sx={{ letterSpacing: "-0.5px", display: "flex", alignItems: "center", gap: 1.5 }}
+                        >
+                            <Box
+                                sx={{
+                                    width: 42,
+                                    height: 42,
+                                    borderRadius: 2.5,
+                                    bgcolor: "#EBF6FE",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    border: "1px solid rgba(0, 136, 214, 0.2)"
+                                }}
+                            >
+                                <HubIcon sx={{ color: "#0088D6", fontSize: 24 }} />
+                            </Box>
+                            Cổng Tích Hợp LIS/RIS Gateway & EHR Concept Dictionary
+                        </Typography>
+                        <Typography variant="body2" color="#64748B" sx={{ mt: 0.5, maxWidth: 780 }}>
+                            Kiến trúc Middleware chuẩn y tế: kết nối máy xét nghiệm tự động, máy chẩn đoán hình ảnh DICOM/PACS và từ điển bệnh án điện tử OpenMRS / HL7 FHIR
+                        </Typography>
+                    </Box>
 
-                <Stack direction="row" spacing={1.5} flexWrap="wrap">
-                    <Button
-                        variant="outlined"
-                        startIcon={<RefreshIcon />}
-                        onClick={loadAllData}
-                        sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none" }}
-                    >
-                        Làm Mới
-                    </Button>
-                    <Button
-                        variant="contained"
-                        color="secondary"
-                        startIcon={<SyncIcon />}
-                        onClick={handleMigrateToEhr}
-                        sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none" }}
-                    >
-                        Đồng Bộ Bệnh Án Cũ Sang EHR
-                    </Button>
-                </Stack>
-            </Box>
+                    <Stack direction="row" spacing={1.5} flexWrap="wrap">
+                        <Button
+                            variant="outlined"
+                            startIcon={<RefreshIcon />}
+                            onClick={loadAllData}
+                            sx={{
+                                borderRadius: 2.5,
+                                fontWeight: 700,
+                                textTransform: "none",
+                                px: 2.5,
+                                borderColor: "rgba(15, 23, 42, 0.15)",
+                                color: "#334155",
+                                "&:hover": { borderColor: "#0088D6", bgcolor: "rgba(0, 136, 214, 0.04)" }
+                            }}
+                        >
+                            Làm Mới
+                        </Button>
+                        <Button
+                            variant="contained"
+                            startIcon={<SyncIcon />}
+                            onClick={handleMigrateToEhr}
+                            sx={{
+                                borderRadius: 2.5,
+                                fontWeight: 700,
+                                textTransform: "none",
+                                bgcolor: "#8B5CF6",
+                                "&:hover": { bgcolor: "#7C3AED" },
+                                px: 2.5,
+                                boxShadow: "0 4px 14px rgba(139, 92, 246, 0.25)"
+                            }}
+                        >
+                            Đồng Bộ Bệnh Án Cũ Sang EHR
+                        </Button>
+                    </Stack>
+                </Box>
+            </Paper>
 
             {/* Thông báo Feedback */}
             {feedback.message && (
                 <Alert
                     severity={feedback.type || "info"}
                     onClose={() => setFeedback({ type: "", message: "" })}
-                    sx={{ mb: 2.5, borderRadius: 2 }}
+                    sx={{ mb: 2.5, borderRadius: 2.5 }}
                 >
                     {feedback.message}
                 </Alert>
             )}
 
-            {/* Tabs Điều Hướng */}
-            <Paper elevation={0} sx={{ borderRadius: 3, mb: 3, border: "1px solid #E2E8F0" }}>
+            {/* Tabs Điều Hướng Apple HIG */}
+            <Paper
+                elevation={0}
+                sx={{
+                    borderRadius: 3.5,
+                    mb: 3,
+                    border: "1px solid rgba(15, 23, 42, 0.08)",
+                    bgcolor: "#FFFFFF",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.02)",
+                    overflow: "hidden"
+                }}
+            >
                 <Tabs
                     value={currentTab}
                     onChange={(e, val) => setCurrentTab(val)}
@@ -269,62 +338,88 @@ export default function EhrAndGatewayPage() {
                     scrollButtons="auto"
                     sx={{
                         px: 2,
-                        "& .MuiTab-root": { fontWeight: 700, fontSize: "0.9rem", py: 2, textTransform: "none" },
-                        "& .Mui-selected": { color: "#0284C7" }
+                        minHeight: 52,
+                        "& .MuiTab-root": {
+                            fontWeight: 700,
+                            fontSize: "0.88rem",
+                            py: 1.8,
+                            textTransform: "none",
+                            color: "#64748B",
+                            minHeight: 52
+                        },
+                        "& .Mui-selected": { color: "#0088D6" },
+                        "& .MuiTabs-indicator": { bgcolor: "#0088D6", height: 3, borderRadius: "3px 3px 0 0" }
                     }}
                 >
-                    <Tab icon={<MenuBookIcon />} iconPosition="start" label={`1. Quản Trị Concept Dictionary (${concepts.length})`} />
-                    <Tab icon={<ScienceIcon />} iconPosition="start" label="2. Cổng LIS Gateway & Simulator Máy Xét Nghiệm" />
-                    <Tab icon={<CameraAltIcon />} iconPosition="start" label={`3. Cổng RIS / PACS & DICOM Worklist (${worklist.length})`} />
+                    <Tab icon={<MenuBookIcon sx={{ fontSize: 19 }} />} iconPosition="start" label={`1. Quản Trị Concept Dictionary (${concepts.length})`} />
+                    <Tab icon={<ScienceIcon sx={{ fontSize: 19 }} />} iconPosition="start" label="2. Cổng LIS Gateway & Simulator Máy Xét Nghiệm" />
+                    <Tab icon={<CameraAltIcon sx={{ fontSize: 19 }} />} iconPosition="start" label={`3. Cổng RIS / PACS & DICOM Worklist (${worklist.length})`} />
                 </Tabs>
             </Paper>
 
-            {loading && <LinearProgress sx={{ mb: 2, borderRadius: 1 }} />}
+            {loading && <LinearProgress sx={{ mb: 2, borderRadius: 1, height: 3 }} />}
 
             {/* ============================================================== */}
             {/* TAB 0: TỪ ĐIỂN KHÁI NIỆM Y TẾ (OPENMRS CONCEPT DICTIONARY)     */}
             {/* ============================================================== */}
             {currentTab === 0 && (
                 <Box>
-                    <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: "1px solid #E2E8F0" }}>
-                        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} flexWrap="wrap" gap={1.5}>
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: { xs: 2, md: 2.5 },
+                            borderRadius: 3.5,
+                            border: "1px solid rgba(15, 23, 42, 0.08)",
+                            bgcolor: "#FFFFFF",
+                            boxShadow: "0 2px 8px rgba(0,0,0,0.02)"
+                        }}
+                    >
+                        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2.5} flexWrap="wrap" gap={1.5}>
                             <Box>
-                                <Typography variant="h6" fontWeight="800" color="#1E293B">
+                                <Typography variant="h6" fontWeight="800" color="#0F172A">
                                     Từ Điển Khái Niệm Y Tế Chuẩn Hóa (OpenMRS Concept Dictionary)
                                 </Typography>
-                                <Typography variant="caption" color="#64748B">
-                                    Mọi chỉ số lâm sàng và cận lâm sàng đều là một "Concept", cho phép bác sĩ mở rộng chỉ số chuyên khoa động mà không sửa Database
+                                <Typography variant="body2" color="#64748B">
+                                    Mọi chỉ số lâm sàng và cận lâm sàng đều là một "Concept", cho phép bác sĩ mở rộng chỉ số chuyên khoa động mà không cần sửa cấu trúc Database
                                 </Typography>
                             </Box>
                             <Button
                                 variant="contained"
                                 startIcon={<AddCircleIcon />}
                                 onClick={() => setOpenAddConcept(true)}
-                                sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none" }}
+                                sx={{
+                                    borderRadius: 2.5,
+                                    fontWeight: 700,
+                                    textTransform: "none",
+                                    bgcolor: "#0088D6",
+                                    "&:hover": { bgcolor: "#0070BA" },
+                                    px: 2.5,
+                                    boxShadow: "0 4px 14px rgba(0, 136, 214, 0.25)"
+                                }}
                             >
                                 Thêm Concept Mới
                             </Button>
                         </Box>
 
-                        <TableContainer sx={{ maxHeight: 540 }}>
+                        <TableContainer sx={{ maxHeight: 560, borderRadius: 2.5, border: "1px solid rgba(15, 23, 42, 0.08)" }}>
                             <Table stickyHeader size="small">
                                 <TableHead>
-                                    <TableRow sx={{ "& th": { bgcolor: "#F8FAFC", fontWeight: 800, color: "#334155" } }}>
-                                        <TableCell>UUID Mã Khái Niệm</TableCell>
-                                        <TableCell>Tên Khái Niệm Y Tế</TableCell>
-                                        <TableCell>Phân Lớp (Class)</TableCell>
-                                        <TableCell>Kiểu Dữ Liệu</TableCell>
-                                        <TableCell>Đơn Vị Đo</TableCell>
-                                        <TableCell>Khoảng Bình Thường</TableCell>
-                                        <TableCell>Mô Tả / Ý Nghĩa</TableCell>
-                                        <TableCell align="center">Trạng Thái</TableCell>
+                                    <TableRow sx={{ "& th": { bgcolor: "#F8FAFC", fontWeight: 700, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", color: "#475569", py: 1.5 } }}>
+                                        <TableCell>UUID MÃ KHÁI NIỆM</TableCell>
+                                        <TableCell>TÊN KHÁI NIỆM Y TẾ</TableCell>
+                                        <TableCell>PHÂN LỚP (CLASS)</TableCell>
+                                        <TableCell>KIỂU DỮ LIỆU</TableCell>
+                                        <TableCell>ĐƠN VỊ ĐO</TableCell>
+                                        <TableCell>KHOẢNG BÌNH THƯỜNG</TableCell>
+                                        <TableCell>MÔ TẢ / Ý NGHĨA</TableCell>
+                                        <TableCell align="center">TRẠNG THÁI</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
                                     {concepts.length === 0 ? (
                                         <TableRow>
                                             <TableCell colSpan={8} align="center" sx={{ py: 6, color: "#64748B" }}>
-                                                <MenuBookIcon sx={{ fontSize: 44, color: "#94A3B8", mb: 1 }} />
+                                                <MenuBookIcon sx={{ fontSize: 48, color: "#CBD5E1", mb: 1 }} />
                                                 <Typography variant="subtitle1" fontWeight={700} sx={{ color: "#334155" }}>
                                                     Chưa có Concept y tế nào trong từ điển
                                                 </Typography>
@@ -336,7 +431,7 @@ export default function EhrAndGatewayPage() {
                                                     size="small"
                                                     startIcon={<AddCircleIcon />}
                                                     onClick={() => setOpenAddConcept(true)}
-                                                    sx={{ borderRadius: 2 }}
+                                                    sx={{ borderRadius: 2, textTransform: "none", fontWeight: 700 }}
                                                 >
                                                     Thêm Concept Mới
                                                 </Button>
@@ -344,33 +439,64 @@ export default function EhrAndGatewayPage() {
                                         </TableRow>
                                     ) : (
                                         concepts.map((c) => (
-                                            <TableRow key={c.conceptId} hover>
+                                            <TableRow key={c.conceptId} hover sx={{ "&:hover": { bgcolor: "#F8FAFC" } }}>
                                                 <TableCell>
-                                                    <Chip label={c.uuid} size="small" variant="outlined" sx={{ fontWeight: 800 }} />
+                                                    <Box
+                                                        component="span"
+                                                        sx={{
+                                                            fontFamily: "monospace",
+                                                            fontSize: "0.78rem",
+                                                            fontWeight: 700,
+                                                            bgcolor: "#F1F5F9",
+                                                            color: "#475569",
+                                                            px: 1,
+                                                            py: 0.35,
+                                                            borderRadius: 1.5,
+                                                            display: "inline-block"
+                                                        }}
+                                                    >
+                                                        {c.uuid}
+                                                    </Box>
                                                 </TableCell>
                                                 <TableCell sx={{ fontWeight: 800, color: "#0088D6" }}>
                                                     {c.conceptName}
                                                 </TableCell>
-                                            <TableCell>
-                                                <Chip
-                                                    label={c.conceptClass}
-                                                    size="small"
-                                                    color={c.conceptClass === "TEST" ? "info" : c.conceptClass === "FINDING" ? "primary" : "default"}
-                                                    sx={{ fontWeight: 700 }}
-                                                />
-                                            </TableCell>
-                                            <TableCell sx={{ fontWeight: 700 }}>{c.dataType}</TableCell>
-                                            <TableCell>{c.units || "-"}</TableCell>
-                                            <TableCell sx={{ color: "#059669", fontWeight: 700 }}>
-                                                {c.lowNormal != null && c.highNormal != null ? `${c.lowNormal} - ${c.highNormal}` : "-"}
-                                            </TableCell>
-                                            <TableCell sx={{ color: "#64748B" }}>{c.description || "-"}</TableCell>
-                                            <TableCell align="center">
-                                                <Chip label="ACTIVE" size="small" color="success" sx={{ fontWeight: 800 }} />
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                )}
+                                                <TableCell>
+                                                    <Chip
+                                                        label={c.conceptClass}
+                                                        size="small"
+                                                        sx={{
+                                                            height: 22,
+                                                            fontSize: "0.7rem",
+                                                            fontWeight: 800,
+                                                            bgcolor: c.conceptClass === "TEST" ? "rgba(0, 136, 214, 0.1)" : c.conceptClass === "FINDING" ? "rgba(139, 92, 246, 0.1)" : "#F1F5F9",
+                                                            color: c.conceptClass === "TEST" ? "#0088D6" : c.conceptClass === "FINDING" ? "#7C3AED" : "#475569"
+                                                        }}
+                                                    />
+                                                </TableCell>
+                                                <TableCell sx={{ fontWeight: 700, fontSize: "0.82rem", color: "#334155" }}>{c.dataType}</TableCell>
+                                                <TableCell sx={{ fontSize: "0.82rem", color: "#64748B", fontFamily: "monospace" }}>{c.units || "-"}</TableCell>
+                                                <TableCell sx={{ color: "#059669", fontWeight: 700, fontFamily: "monospace", fontSize: "0.82rem" }}>
+                                                    {c.lowNormal != null && c.highNormal != null ? `${c.lowNormal} - ${c.highNormal}` : "-"}
+                                                </TableCell>
+                                                <TableCell sx={{ color: "#64748B", fontSize: "0.82rem" }}>{c.description || "-"}</TableCell>
+                                                <TableCell align="center">
+                                                    <Chip
+                                                        label="HOẠT ĐỘNG"
+                                                        size="small"
+                                                        sx={{
+                                                            height: 20,
+                                                            fontSize: "0.68rem",
+                                                            fontWeight: 800,
+                                                            bgcolor: "rgba(16, 185, 129, 0.1)",
+                                                            color: "#059669",
+                                                            border: "1px solid rgba(16, 185, 129, 0.3)"
+                                                        }}
+                                                    />
+                                                </TableCell>
+                                            </TableRow>
+                                        ))
+                                    )}
                                 </TableBody>
                             </Table>
                         </TableContainer>
@@ -383,17 +509,39 @@ export default function EhrAndGatewayPage() {
             {/* ============================================================== */}
             {currentTab === 1 && (
                 <Grid container spacing={3}>
-                    {/* Panel cấu hình & Simulator */}
+                    {/* Panel cấu hình & Simulator Apple HIG */}
                     <Grid item xs={12} md={5}>
-                        <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: "1px solid #E2E8F0" }}>
-                            <Box display="flex" alignItems="center" gap={1.2} mb={2}>
-                                <ScienceIcon sx={{ color: "#0284C7", fontSize: 26 }} />
+                        <Paper
+                            elevation={0}
+                            sx={{
+                                p: 3,
+                                borderRadius: 3.5,
+                                border: "1px solid rgba(15, 23, 42, 0.08)",
+                                bgcolor: "#FFFFFF",
+                                boxShadow: "0 2px 8px rgba(0,0,0,0.02)"
+                            }}
+                        >
+                            <Box display="flex" alignItems="center" gap={1.5} mb={2.5}>
+                                <Box
+                                    sx={{
+                                        width: 40,
+                                        height: 40,
+                                        borderRadius: 2.5,
+                                        bgcolor: "rgba(0, 136, 214, 0.1)",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        color: "#0088D6"
+                                    }}
+                                >
+                                    <ScienceIcon sx={{ fontSize: 24 }} />
+                                </Box>
                                 <Box>
-                                    <Typography variant="h6" fontWeight="800" color="#1E293B">
+                                    <Typography variant="h6" fontWeight="800" color="#0F172A">
                                         LIS Machine Webhook Simulator
                                     </Typography>
                                     <Typography variant="caption" color="#64748B">
-                                        Mô phỏng máy xét nghiệm tự động gửi kết quả phân tích qua Webhook
+                                        Mô phỏng máy phân tích huyết học / sinh hoá tự động gửi kết quả
                                     </Typography>
                                 </Box>
                             </Box>
@@ -401,29 +549,44 @@ export default function EhrAndGatewayPage() {
                             <Stack spacing={2}>
                                 <TextField
                                     fullWidth
+                                    size="small"
                                     label="Model Máy Xét Nghiệm"
                                     value={lisAnalyzerModel}
                                     onChange={(e) => setLisAnalyzerModel(e.target.value)}
+                                    InputProps={{ sx: { borderRadius: 2 } }}
                                 />
                                 <TextField
                                     fullWidth
+                                    size="small"
                                     label="Mã Vạch Ống Nghiệm (Specimen Barcode)"
                                     value={lisBarcode}
                                     onChange={(e) => setLisBarcode(e.target.value)}
                                     helperText="Mã vạch trên tem dán ống nghiệm vừa lấy mẫu"
+                                    InputProps={{ sx: { borderRadius: 2, fontFamily: "monospace" } }}
                                 />
 
                                 <Typography variant="subtitle2" fontWeight="800" color="#334155" mt={1}>
-                                    Dữ Liệu Chỉ Số Máy Vừa Đo:
+                                    Dữ Liệu Chỉ Số Máy Vừa Phân Tích:
                                 </Typography>
                                 {lisItems.map((item, idx) => (
-                                    <Box key={idx} p={1.5} sx={{ bgcolor: "#F8FAFC", borderRadius: 2, border: "1px solid #E2E8F0" }}>
+                                    <Box key={idx} p={1.8} sx={{ bgcolor: "#F8FAFC", borderRadius: 2.5, border: "1px solid rgba(15, 23, 42, 0.08)" }}>
                                         <Box display="flex" justifyContent="space-between" alignItems="center">
-                                            <Typography variant="body2" fontWeight="700">
+                                            <Typography variant="body2" fontWeight="700" color="#0F172A">
                                                 {item.testCode} - {item.testName}
                                             </Typography>
                                             {item.isAbnormal && (
-                                                <Chip label="BẤT THƯỜNG" size="small" color="error" sx={{ fontWeight: 800 }} />
+                                                <Chip
+                                                    label="BẤT THƯỜNG"
+                                                    size="small"
+                                                    sx={{
+                                                        height: 20,
+                                                        fontSize: "0.68rem",
+                                                        fontWeight: 800,
+                                                        bgcolor: "rgba(239, 68, 68, 0.1)",
+                                                        color: "#DC2626",
+                                                        border: "1px solid rgba(239, 68, 68, 0.3)"
+                                                    }}
+                                                />
                                             )}
                                         </Box>
                                         <Box display="flex" gap={2} mt={1}>
@@ -436,12 +599,14 @@ export default function EhrAndGatewayPage() {
                                                     updated[idx].resultValue = e.target.value;
                                                     setLisItems(updated);
                                                 }}
+                                                InputProps={{ sx: { borderRadius: 1.5, fontFamily: "monospace", fontWeight: 700 } }}
                                             />
                                             <TextField
                                                 size="small"
                                                 label="Đơn vị"
                                                 value={item.unit}
                                                 disabled
+                                                InputProps={{ sx: { borderRadius: 1.5 } }}
                                             />
                                         </Box>
                                     </Box>
@@ -450,15 +615,16 @@ export default function EhrAndGatewayPage() {
                                 <Button
                                     fullWidth
                                     variant="contained"
-                                    color="primary"
                                     startIcon={<SendIcon />}
                                     onClick={handleSendLisResults}
                                     sx={{
-                                        py: 1.2,
+                                        py: 1.4,
                                         fontWeight: 800,
-                                        borderRadius: 2,
-                                        background: "linear-gradient(135deg, #0284C7 0%, #0D9488 100%)",
-                                        boxShadow: "0 4px 12px rgba(2, 132, 199, 0.25)"
+                                        borderRadius: 2.5,
+                                        textTransform: "none",
+                                        bgcolor: "#0088D6",
+                                        "&:hover": { bgcolor: "#0070BA" },
+                                        boxShadow: "0 4px 14px rgba(0, 136, 214, 0.25)"
                                     }}
                                 >
                                     Bắn Kết Quả LIS Vào Hệ Thống
@@ -467,10 +633,19 @@ export default function EhrAndGatewayPage() {
                         </Paper>
                     </Grid>
 
-                    {/* Sơ đồ kiến trúc LIS Middleware */}
+                    {/* Sơ đồ kiến trúc LIS Middleware Apple HIG */}
                     <Grid item xs={12} md={7}>
-                        <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: "1px solid #E2E8F0", bgcolor: "#F8FAFC" }}>
-                            <Typography variant="h6" fontWeight="800" color="#1E293B" mb={1.5}>
+                        <Paper
+                            elevation={0}
+                            sx={{
+                                p: 3,
+                                borderRadius: 3.5,
+                                border: "1px solid rgba(15, 23, 42, 0.08)",
+                                bgcolor: "#FFFFFF",
+                                boxShadow: "0 2px 8px rgba(0,0,0,0.02)"
+                            }}
+                        >
+                            <Typography variant="h6" fontWeight="800" color="#0F172A" mb={1.5}>
                                 Kiến Trúc Tích Hợp LIS Middleware (Tham khảo Bahmni Core / OpenELIS)
                             </Typography>
                             <Typography variant="body2" color="#64748B" paragraph>
@@ -486,7 +661,7 @@ export default function EhrAndGatewayPage() {
                                 4. <strong>Tự động ánh xạ sang EHR</strong>: Cổng Gateway tự động phân tích chỉ số, so sánh khoảng tham chiếu và đồng bộ ngay thành một <code>MedicalObservation</code> trong hồ sơ bệnh án điện tử của người bệnh.
                             </Typography>
 
-                            <Box p={2} sx={{ bgcolor: "#0F172A", borderRadius: 2, color: "#38BDF8", fontFamily: "monospace", fontSize: "0.825rem", overflowX: "auto" }}>
+                            <Box p={2.5} sx={{ bgcolor: "#0F172A", borderRadius: 2.5, color: "#38BDF8", fontFamily: "monospace", fontSize: "0.825rem", overflowX: "auto", border: "1px solid rgba(255,255,255,0.08)" }}>
                                 {`// Chuẩn Webhook JSON từ máy xét nghiệm máu:
 POST /api/gateway/lis/results
 {
@@ -507,26 +682,37 @@ POST /api/gateway/lis/results
             {/* ============================================================== */}
             {currentTab === 2 && (
                 <Box>
-                    {/* Bảng Modality Worklist */}
-                    <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: "1px solid #E2E8F0", mb: 3 }}>
-                        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} flexWrap="wrap" gap={1.5}>
+                    {/* Bảng Modality Worklist Apple HIG */}
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: { xs: 2, md: 2.5 },
+                            borderRadius: 3.5,
+                            border: "1px solid rgba(15, 23, 42, 0.08)",
+                            bgcolor: "#FFFFFF",
+                            boxShadow: "0 2px 8px rgba(0,0,0,0.02)",
+                            mb: 3
+                        }}
+                    >
+                        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2.5} flexWrap="wrap" gap={1.5}>
                             <Box>
-                                <Typography variant="h6" fontWeight="800" color="#1E293B">
+                                <Typography variant="h6" fontWeight="800" color="#0F172A">
                                     DICOM Modality Worklist (MWL) - Danh Sách Chờ Chụp
                                 </Typography>
-                                <Typography variant="caption" color="#64748B">
+                                <Typography variant="body2" color="#64748B">
                                     Cung cấp danh sách người bệnh và mã ca chụp (Accession Number) cho máy X-Quang, CT, MRI tự động load thông tin
                                 </Typography>
                             </Box>
 
                             <Stack direction="row" spacing={1.5} alignItems="center">
-                                <Typography variant="body2" fontWeight="700">Lọc theo Modality:</Typography>
+                                <Typography variant="body2" fontWeight="700" color="#475569">Lọc theo Modality:</Typography>
                                 <TextField
                                     select
                                     size="small"
                                     value={selectedModality}
                                     onChange={(e) => setSelectedModality(e.target.value)}
-                                    sx={{ minWidth: 140 }}
+                                    sx={{ minWidth: 150 }}
+                                    InputProps={{ sx: { borderRadius: 2, bgcolor: "#F8FAFC" } }}
                                 >
                                     <MenuItem value="DX">X-Quang Số (DX)</MenuItem>
                                     <MenuItem value="CR">X-Quang CR</MenuItem>
@@ -537,24 +723,24 @@ POST /api/gateway/lis/results
                             </Stack>
                         </Box>
 
-                        <TableContainer>
+                        <TableContainer sx={{ borderRadius: 2.5, border: "1px solid rgba(15, 23, 42, 0.08)" }}>
                             <Table size="small">
-                                <TableHead>
-                                    <TableRow sx={{ "& th": { bgcolor: "#F8FAFC", fontWeight: 800, color: "#334155" } }}>
-                                        <TableCell>Mã Ca Chụp (Accession Number)</TableCell>
-                                        <TableCell>Modality</TableCell>
-                                        <TableCell>Bệnh Nhân</TableCell>
-                                        <TableCell>Mã Hồ Sơ Bệnh Án</TableCell>
-                                        <TableCell>Dịch Vụ Chỉ Định</TableCell>
-                                        <TableCell>Study Instance UID (PACS)</TableCell>
-                                        <TableCell align="center">Hành Động</TableCell>
+                                <TableHead sx={{ bgcolor: "#F8FAFC" }}>
+                                    <TableRow sx={{ "& th": { fontWeight: 700, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", color: "#475569", py: 1.5 } }}>
+                                        <TableCell>MÃ CA CHỤP (ACCESSION NUMBER)</TableCell>
+                                        <TableCell>MODALITY</TableCell>
+                                        <TableCell>BỆNH NHÂN</TableCell>
+                                        <TableCell>MÃ HỒ SƠ BỆNH ÁN</TableCell>
+                                        <TableCell>DỊCH VỤ CHỈ ĐỊNH</TableCell>
+                                        <TableCell>STUDY INSTANCE UID (PACS)</TableCell>
+                                        <TableCell align="center">HÀNH ĐỘNG</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
                                     {worklist.length === 0 ? (
                                         <TableRow>
                                             <TableCell colSpan={7} align="center" sx={{ py: 6, color: "#64748B" }}>
-                                                <CameraAltIcon sx={{ fontSize: 44, color: "#94A3B8", mb: 1 }} />
+                                                <CameraAltIcon sx={{ fontSize: 48, color: "#CBD5E1", mb: 1 }} />
                                                 <Typography variant="subtitle1" fontWeight={700} sx={{ color: "#334155" }}>
                                                     Không có ca chụp nào đang chờ máy {selectedModality}
                                                 </Typography>
@@ -565,34 +751,77 @@ POST /api/gateway/lis/results
                                         </TableRow>
                                     ) : (
                                         worklist.map((item) => (
-                                            <TableRow key={item.testId} hover>
-                                                <TableCell sx={{ fontWeight: 800, color: "#0284C7" }}>
-                                                    {item.accessionNumber}
+                                            <TableRow key={item.testId} hover sx={{ "&:hover": { bgcolor: "#F8FAFC" } }}>
+                                                <TableCell>
+                                                    <Box
+                                                        component="span"
+                                                        sx={{
+                                                            fontFamily: "monospace",
+                                                            fontSize: "0.8rem",
+                                                            fontWeight: 700,
+                                                            bgcolor: "rgba(0, 136, 214, 0.08)",
+                                                            color: "#0088D6",
+                                                            px: 1,
+                                                            py: 0.35,
+                                                            borderRadius: 1.5,
+                                                            display: "inline-block"
+                                                        }}
+                                                    >
+                                                        {item.accessionNumber}
+                                                    </Box>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Chip label={item.modality} size="small" color="primary" sx={{ fontWeight: 800 }} />
+                                                    <Chip
+                                                        label={item.modality}
+                                                        size="small"
+                                                        sx={{
+                                                            height: 22,
+                                                            fontSize: "0.7rem",
+                                                            fontWeight: 800,
+                                                            bgcolor: "rgba(0, 136, 214, 0.1)",
+                                                            color: "#0088D6"
+                                                        }}
+                                                    />
                                                 </TableCell>
-                                                <TableCell sx={{ fontWeight: 700 }}>{item.patientName}</TableCell>
-                                                <TableCell>{item.medicalRecordCode}</TableCell>
-                                                <TableCell sx={{ fontWeight: 700 }}>{item.serviceName}</TableCell>
+                                                <TableCell sx={{ fontWeight: 700, color: "#0F172A" }}>{item.patientName}</TableCell>
+                                                <TableCell sx={{ fontFamily: "monospace", fontSize: "0.82rem", color: "#64748B" }}>{item.medicalRecordCode}</TableCell>
+                                                <TableCell sx={{ fontWeight: 600, color: "#334155" }}>{item.serviceName}</TableCell>
                                                 <TableCell>
                                                     {item.studyInstanceUid ? (
-                                                        <Chip label={item.studyInstanceUid.substring(0, 22) + "..."} size="small" variant="outlined" />
+                                                        <Typography variant="caption" sx={{ fontFamily: "monospace", bgcolor: "#F1F5F9", px: 1, py: 0.35, borderRadius: 1.5, color: "#475569" }}>
+                                                            {item.studyInstanceUid.substring(0, 22) + "..."}
+                                                        </Typography>
                                                     ) : (
-                                                        <Chip label="Chờ Máy Chụp Gửi Về" size="small" color="warning" />
+                                                        <Chip
+                                                            label="Chờ Máy Chụp Gửi Về"
+                                                            size="small"
+                                                            sx={{
+                                                                height: 20,
+                                                                fontSize: "0.68rem",
+                                                                fontWeight: 700,
+                                                                bgcolor: "rgba(245, 158, 11, 0.1)",
+                                                                color: "#D97706",
+                                                                border: "1px solid rgba(245, 158, 11, 0.3)"
+                                                            }}
+                                                        />
                                                     )}
                                                 </TableCell>
                                                 <TableCell align="center">
                                                     <Button
                                                         size="small"
                                                         variant="contained"
-                                                        color="info"
                                                         startIcon={<VisibilityIcon />}
                                                         onClick={() => {
                                                             setActiveStudy(item);
                                                             setPacsModalOpen(true);
                                                         }}
-                                                        sx={{ textTransform: "none", fontWeight: 700, borderRadius: 1.5 }}
+                                                        sx={{
+                                                            textTransform: "none",
+                                                            fontWeight: 700,
+                                                            borderRadius: 2,
+                                                            bgcolor: "#0088D6",
+                                                            "&:hover": { bgcolor: "#0070BA" }
+                                                        }}
                                                     >
                                                         Xem Ảnh OHIF Viewer
                                                     </Button>
@@ -605,12 +834,21 @@ POST /api/gateway/lis/results
                         </TableContainer>
                     </Paper>
 
-                    {/* Bộ công cụ PACS Webhook Callback Simulator */}
-                    <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: "1px solid #E2E8F0" }}>
-                        <Typography variant="h6" fontWeight="800" color="#1E293B" mb={1.5}>
+                    {/* Bộ công cụ PACS Webhook Callback Simulator Apple HIG */}
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 3,
+                            borderRadius: 3.5,
+                            border: "1px solid rgba(15, 23, 42, 0.08)",
+                            bgcolor: "#FFFFFF",
+                            boxShadow: "0 2px 8px rgba(0,0,0,0.02)"
+                        }}
+                    >
+                        <Typography variant="h6" fontWeight="800" color="#0F172A" mb={1}>
                             PACS Server (dcm4chee) Webhook Simulator
                         </Typography>
-                        <Typography variant="body2" color="#64748B" mb={2}>
+                        <Typography variant="body2" color="#64748B" mb={2.5}>
                             Mô phỏng máy chủ lưu trữ hình ảnh PACS gửi thông báo khi kỹ thuật viên chụp xong và hoàn tất lưu file DICOM
                         </Typography>
 
@@ -622,6 +860,7 @@ POST /api/gateway/lis/results
                                     label="Accession Number (Mã ca chụp)"
                                     value={pacsAccessionNumber}
                                     onChange={(e) => setPacsAccessionNumber(e.target.value)}
+                                    InputProps={{ sx: { borderRadius: 2, fontFamily: "monospace" } }}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={5}>
@@ -631,16 +870,23 @@ POST /api/gateway/lis/results
                                     label="Study Instance UID (Định danh ảnh quốc tế DICOM)"
                                     value={pacsStudyUid}
                                     onChange={(e) => setPacsStudyUid(e.target.value)}
+                                    InputProps={{ sx: { borderRadius: 2, fontFamily: "monospace" } }}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={3}>
                                 <Button
                                     fullWidth
                                     variant="contained"
-                                    color="success"
                                     startIcon={<SendIcon />}
                                     onClick={handleSendPacsCallback}
-                                    sx={{ height: 40, fontWeight: 700, textTransform: "none" }}
+                                    sx={{
+                                        height: 40,
+                                        fontWeight: 700,
+                                        textTransform: "none",
+                                        borderRadius: 2,
+                                        bgcolor: "#10B981",
+                                        "&:hover": { bgcolor: "#059669" }
+                                    }}
                                 >
                                     Gửi Webhook PACS
                                 </Button>

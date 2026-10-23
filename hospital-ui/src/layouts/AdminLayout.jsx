@@ -49,7 +49,7 @@ import CircleIcon from "@mui/icons-material/Circle";
 import { useAuth } from "../context/AuthContext";
 import designTokens from "../theme/designTokens";
 
-const DRAWER_WIDTH_EXPANDED = 265;
+const DRAWER_WIDTH_EXPANDED = 280;
 const DRAWER_WIDTH_COLLAPSED = 76;
 
 export default function AdminLayout() {
@@ -89,52 +89,59 @@ export default function AdminLayout() {
         navigate("/login");
     };
 
-    // Phân nhóm danh mục quản trị theo khối nghiệp vụ y tế chuẩn mực
+    // Phân nhóm danh mục quản trị theo khối nghiệp vụ y tế chuẩn mực Enterprise HIS
     const adminMenuGroups = [
         {
             title: "Tổng Quan & Điều Hành",
             items: [
-                { text: "Dashboard Thống Kê", icon: <DashboardIcon />, path: "/admin/dashboard" }
+                { text: "Dashboard Chỉ Huy", icon: <DashboardIcon />, path: "/admin/dashboard" },
+                { text: "Quản Lý Lịch Hẹn", icon: <EventIcon />, path: "/admin/bookings" }
             ]
         },
         {
             title: "Khám Chữa Bệnh & Lâm Sàng",
             items: [
-                { text: "Quản Lý Bệnh Nhân", icon: <PeopleAltIcon />, path: "/admin/patients" },
-                { text: "Quản Lý Buồng Bệnh Nội Trú", icon: <HotelIcon />, path: "/doctor/inpatient" },
-                { text: "Quầy Thu Ngân Viện Phí", icon: <PointOfSaleIcon />, path: "/cashier" }
+                { text: "Bàn Khám Lâm Sàng", icon: <MedicalServicesIcon />, path: "/doctor/examinations" },
+                { text: "Buồng Bệnh Nội Trú", icon: <HotelIcon />, path: "/doctor/inpatient" },
+                { text: "Xét Nghiệm & CĐHA", icon: <ScienceIcon />, path: "/doctor/lab-tests" },
+                { text: "Hồ Sơ Bệnh Nhân", icon: <PeopleAltIcon />, path: "/admin/patients" }
             ]
         },
         {
             title: "Tiếp Đón & Thiết Bị Sảnh",
             items: [
                 { text: "Bàn Tiếp Đón & STT", icon: <HowToRegIcon />, path: "/nurse/reception" },
-                { text: "Cây Kiosk Bốc Số Sảnh", icon: <QrCodeScannerIcon />, path: "/kiosk", external: true },
-                { text: "Màn Hình LED TV Gọi Số", icon: <TvIcon />, path: "/queue-display", external: true }
+                { text: "Cây Kiosk Bốc Số", icon: <QrCodeScannerIcon />, path: "/kiosk", external: true },
+                { text: "Màn Hình LED Gọi Số", icon: <TvIcon />, path: "/queue-display", external: true }
+            ]
+        },
+        {
+            title: "Dược Phẩm & Kho FEFO",
+            items: [
+                { text: "Kho Dược Đa Cấp & FEFO", icon: <Inventory2Icon />, path: "/admin/pharmacy-inventory" },
+                { text: "Danh Mục Thuốc & Dược", icon: <MedicationIcon />, path: "/admin/medicines" }
             ]
         },
         {
             title: "Nhân Lực & Khoa Phòng",
             items: [
-                { text: "Quản Lý Bác Sĩ & CCHN", icon: <PersonSearchIcon />, path: "/admin/doctors" },
+                { text: "Bác Sĩ & CCHN", icon: <PersonSearchIcon />, path: "/admin/doctors" },
                 { text: "Phân Lịch Trực Ca", icon: <EventIcon />, path: "/admin/schedules" },
-                { text: "Quản Lý Khoa Khám", icon: <LocalHospitalIcon />, path: "/admin/departments" },
-                { text: "Quản Lý Buồng Phòng", icon: <MeetingRoomIcon />, path: "/admin/rooms" }
+                { text: "Danh Mục Khoa & Buồng", icon: <LocalHospitalIcon />, path: "/admin/departments" }
             ]
         },
         {
-            title: "Dược & Kho FEFO",
+            title: "Tài Chính & Viện Phí",
             items: [
-                { text: "Danh Mục Thuốc & Dược", icon: <MedicationIcon />, path: "/admin/medicines" },
-                { text: "Kho Dược Đa Cấp & FEFO", icon: <Inventory2Icon />, path: "/admin/pharmacy-inventory" }
+                { text: "Quầy Thu Ngân Viện Phí", icon: <PointOfSaleIcon />, path: "/cashier" },
+                { text: "Đối Soát Giao Dịch", icon: <ReceiptLongIcon />, path: "/admin/transactions" },
+                { text: "Bảng Giá Dịch Vụ Khám", icon: <ScienceIcon />, path: "/admin/services" }
             ]
         },
         {
-            title: "Tài Chính & Hệ Thống",
+            title: "Hạ Tầng Kỹ Thuật & Bảo Mật",
             items: [
-                { text: "Dịch Vụ Khám & CLS", icon: <ScienceIcon />, path: "/admin/services" },
-                { text: "Đối Soát Giao Dịch Viện Phí", icon: <ReceiptLongIcon />, path: "/admin/transactions" },
-                { text: "Cổng LIS/RIS & Concept", icon: <HubIcon />, path: "/admin/ehr-gateway" },
+                { text: "Cổng LIS/RIS & EHR", icon: <HubIcon />, path: "/admin/ehr-gateway" },
                 { text: "Tài Khoản & Phân Quyền", icon: <ManageAccountsIcon />, path: "/admin/accounts" }
             ]
         }
@@ -217,21 +224,18 @@ export default function AdminLayout() {
             >
                 <Box display="flex" alignItems="center" gap={1.2}>
                     <Box
+                        component="img"
+                        src="/images/logo.png"
+                        alt="Logo Bệnh Viện TNT"
                         sx={{
                             width: 38,
                             height: 38,
                             borderRadius: "10px",
-                            background: `linear-gradient(135deg, ${designTokens.brand.primary} 0%, ${designTokens.secondary.main} 100%)`,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            color: "white",
-                            boxShadow: "0 4px 10px rgba(0, 136, 214, 0.25)",
+                            objectFit: "contain",
+                            filter: "drop-shadow(0 2px 6px rgba(13, 148, 136, 0.25))",
                             flexShrink: 0
                         }}
-                    >
-                        <LocalHospitalIcon sx={{ fontSize: 22 }} />
-                    </Box>
+                    />
                     {(!collapsed || isMobile) && (
                         <Box>
                             <Typography
@@ -244,7 +248,7 @@ export default function AdminLayout() {
                                     fontSize: "1.05rem"
                                 }}
                             >
-                                YouMed HMS
+                                TNT Hospital
                             </Typography>
                             <Typography variant="caption" sx={{ color: designTokens.neutral.textMuted, fontWeight: 700, fontSize: "0.68rem" }}>
                                 {user?.role === "ROLE_HEAD_OF_DEPARTMENT" ? "CỔNG TRƯỞNG KHOA" : "QUẢN TRỊ BỆNH VIỆN"}
@@ -469,7 +473,7 @@ export default function AdminLayout() {
                                     {getCurrentPageTitle()}
                                 </Typography>
                                 <Typography variant="caption" color="text.secondary" sx={{ display: { xs: "none", sm: "block" }, fontSize: "0.72rem" }}>
-                                    Hệ Thống Quản Lý Bệnh Viện Thông Minh YouMed HMS
+                                    Hệ Thống Quản Lý Bệnh Viện Thông Minh TNT Hospital
                                 </Typography>
                             </Box>
                         </Box>

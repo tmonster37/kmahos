@@ -22,7 +22,10 @@ hospital-api (1)/
 │   ├── module_04_kiosk_reception.md
 │   ├── module_05_ai_triage.md
 │   ├── module_06_pharmacy_inventory.md
-│   └── module_07_payment_cashier.md
+│   ├── module_07_payment_cashier.md
+│   ├── module_12_payos_idempotency.md
+│   ├── module_13_ehealthcare_improvements.md
+│   └── kiosk_booking_hardening.md  # Đặt kiosk, idempotency, sức chứa & quản lý lịch admin
 │
 ├── hospital-api/                 # BACKEND: Spring Boot 3.4.3 & Java 21
 │   ├── pom.xml                   # Cấu hình Maven Dependencies
@@ -32,7 +35,7 @@ hospital-api (1)/
 │       ├── common/               # Response chuẩn ApiResponse<T>, BaseEntity
 │       ├── config/               # SecurityConfig, CorsConfig, WebMvcConfig
 │       ├── constant/             # Enums: Role, BookingState, MedicalTestState, ShiftType
-│       ├── controller/           # 17 REST API Controllers
+│       ├── controller/           # REST API Controllers
 │       ├── dto/                  # Request / Response DTOs
 │       ├── entity/               # 38 JPA Entities (PostgreSQL)
 │       ├── exception/            # GlobalExceptionHandler, CustomExceptions
@@ -62,7 +65,7 @@ hospital-api (1)/
 │       │   ├── admin/            # DashboardPage, DoctorManagePage, ScheduleManagePage,
 │       │   │                     # DepartmentManagePage, AccountManagePage, PatientManagePage,
 │       │   │                     # MedicineManagePage, PharmacyInventoryPage, MedicalServiceManagePage,
-│       │   │                     # TransactionManagePage, EhrAndGatewayPage
+│       │   │                     # TransactionManagePage, EhrAndGatewayPage, BookingManagePage
 │       │   ├── KioskPage.jsx     # Cây Kiosk sảnh tự phục vụ (chọn khoa, đối tượng, in STT)
 │       │   ├── QueueDisplayPage.jsx # Màn hình LED TV gọi số phòng khám có chuông & phát âm
 │       │   ├── ChatConsultationPage.jsx # AI Trợ lý Y tế Triage 24/7
@@ -104,7 +107,7 @@ graph TD
     end
 ```
 
-### 2.1 Danh Sách 17 REST API Controllers:
+### 2.1 Danh sách REST API Controllers:
 
 | STT | Controller | Prefix URL | Mục đích & Nghiệp vụ |
 | :---: | :--- | :--- | :--- |
@@ -113,6 +116,7 @@ graph TD
 | **3** | [`DoctorAdminController`](file:///c:/Users/ASUS/Downloads/hospital-api%20%281%29/hospital-api/src/main/java/com/hospital/api/controller/DoctorAdminController.java) | `/api/admin/doctors` | Quản lý danh sách bác sĩ, học vị, chuyên môn, giá khám |
 | **4** | [`ScheduleController`](file:///c:/Users/ASUS/Downloads/hospital-api%20%281%29/hospital-api/src/main/java/com/hospital/api/controller/ScheduleController.java) | `/api/schedules` | Phân lịch trực theo ca/buổi (Sáng/Chiều/Tối), sinh TimeSlots |
 | **5** | [`BookingController`](file:///c:/Users/ASUS/Downloads/hospital-api%20%281%29/hospital-api/src/main/java/com/hospital/api/controller/BookingController.java) | `/api/bookings` | Đặt lịch khám 4 bước, cấp STT, tra cứu phiếu khám |
+| **18** | [`AdminBookingController`](file:///c:/Users/ASUS/Downloads/hospital-api%20%281%29/hospital-api/src/main/java/com/hospital/api/controller/AdminBookingController.java) | `/api/admin/bookings` | Admin liệt kê lịch, khung giờ, đổi/hủy lịch; controller yêu cầu `ROLE_ADMIN` |
 | **6** | [`ClinicalExaminationController`](file:///c:/Users/ASUS/Downloads/hospital-api%20%281%29/hospital-api/src/main/java/com/hospital/api/controller/ClinicalExaminationController.java) | `/api/clinical` | Hàng đợi gọi số bác sĩ, phiếu khám, kê đơn thuốc, chỉ định CLS |
 | **7** | [`InpatientController`](file:///c:/Users/ASUS/Downloads/hospital-api%20%281%29/hospital-api/src/main/java/com/hospital/api/controller/InpatientController.java) | `/api/inpatient` | Quản lý bệnh nhân nội trú, nhập viện, y lệnh, chăm sóc, xuất viện |
 | **8** | [`PharmacyInventoryController`](file:///c:/Users/ASUS/Downloads/hospital-api%20%281%29/hospital-api/src/main/java/com/hospital/api/controller/PharmacyInventoryController.java) | `/api/pharmacy` | Quản lý kho dược đa kho, lô thuốc, hạn dùng, cấp phát toa thuốc |
@@ -175,6 +179,12 @@ classDiagram
         int queueNumber
         BookingState state
         PaymentStatus paymentStatus
+        LocalDateTime checkedInAt
+    }
+    class CounterTicket {
+        Long ticketId
+        String idempotencyKey
+        CounterTicketStatus status
     }
     class PatientProfile {
         UUID profileId
@@ -221,6 +231,7 @@ classDiagram
     Doctor "1" <-- "*" DoctorSchedule
     DoctorSchedule "1" <-- "*" TimeSlot
     TimeSlot "1" <-- "*" Booking
+    Booking "1" <-- "*" CounterTicket
     PatientProfile "1" <-- "*" Booking
     Booking "1" <-- "1" MedicalExaminationRecord
     MedicalExaminationRecord "1" <-- "1" Prescription
@@ -230,6 +241,13 @@ classDiagram
     Room "1" <-- "*" Bed
     HospitalAdmission "1" <-- "*" Bed
 ```
+
+### 3.1 Đặt lịch kiosk và thời gian
+
+- Kiosk gửi `POST /api/counters/kiosk/dispatch`; `KioskDispatchTransactionService` ghi booking và phiếu quầy trong cùng transaction. Idempotency key được giữ lại khi retry; slot được khóa trong lúc kiểm tra sức chứa, và cấp số quầy được tuần tự hóa.
+- Mapping `CounterTicket.booking` là many-to-one. Luồng kiosk tạo một phiếu cho một dispatch thành công và trả lại phiếu cũ khi idempotency key lặp; đây là đảm bảo của luồng ứng dụng, không phải ràng buộc one-to-one trong schema.
+- `Booking.checkedInAt` lưu thời điểm check-in để phản hồi lặp theo booking code hoặc phone không cấp số mới. Check-in details được dùng trong hàng đợi dành cho nhân viên.
+- Booking/check-in/dispatch dùng `Clock` cấu hình `Asia/Ho_Chi_Minh`. Test DB integration/concurrency chưa chạy trong lần cập nhật này; schema deployment dùng `ddl-auto:validate` cần migration tương ứng trước khi áp dụng.
 
 ---
 
@@ -246,7 +264,7 @@ graph TD
     Routes --> Doctor["Doctor Portal (ROLE_DOCTOR / HEAD_OF_DEPT)\n- ExaminationPage (Bàn khám & Gọi loa AI)\n- LabTestResultsPage (KTV Trả kết quả)\n- InpatientPage (Nội trú EMR)"]
     Routes --> Nurse["Nurse Portal (ROLE_NURSE)\n- NurseReceptionPage (Tiếp đón & Cấp STT)"]
     Routes --> Cashier["Cashier Portal (ROLE_CASHIER)\n- CashierPage (Quầy thu ngân viện phí)"]
-    Routes --> Admin["Admin Portal (ROLE_ADMIN)\n- DashboardPage\n- DoctorManagePage\n- ScheduleManagePage\n- DepartmentManagePage\n- AccountManagePage\n- PatientManagePage\n- PharmacyInventoryPage"]
+    Routes --> Admin["Admin Portal (ROLE_ADMIN)\n- DashboardPage\n- DoctorManagePage\n- ScheduleManagePage\n- BookingManagePage\n- DepartmentManagePage\n- AccountManagePage\n- PatientManagePage\n- PharmacyInventoryPage"]
     Routes --> Devices["Smart Devices & Displays\n- KioskPage (/kiosk)\n- QueueDisplayPage (/queue-display)"]
 ```
 

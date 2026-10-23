@@ -954,131 +954,159 @@ export default function ExaminationPage() {
                     }}
                 />
 
-                <Grid container spacing={1.5} alignItems="center">
+                <Box
+                    sx={{
+                        display: "flex",
+                        flexDirection: { xs: "column", lg: "row" },
+                        alignItems: { xs: "flex-start", lg: "center" },
+                        justifyContent: "space-between",
+                        gap: 2
+                    }}
+                >
                     {/* Left: Department & Title */}
-                    <Grid item xs={12} md={5.5}>
-                        <Box display="flex" alignItems="center" gap={1.5}>
-                            <Box
-                                sx={{
-                                    width: 42,
-                                    height: 42,
-                                    borderRadius: 2.5,
-                                    bgcolor: "rgba(56, 189, 248, 0.15)",
-                                    border: "1px solid rgba(56, 189, 248, 0.3)",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    color: "#38bdf8",
-                                    flexShrink: 0
-                                }}
-                            >
-                                <LocalHospitalIcon sx={{ fontSize: 24 }} />
-                            </Box>
-                            <Box sx={{ minWidth: 0 }}>
-                                <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
-                                    <Typography variant="h6" fontWeight={800} sx={{ letterSpacing: "-0.3px", fontSize: "1.1rem", whiteSpace: "nowrap" }}>
-                                        Bàn Khám Bác Sĩ & Lâm Sàng
-                                    </Typography>
-                                    <Chip
-                                        label="Live Cockpit"
-                                        size="small"
-                                        sx={{
-                                            bgcolor: "#0284c7",
-                                            color: "#ffffff",
-                                            fontWeight: 700,
-                                            fontSize: "0.65rem",
-                                            height: 18
-                                        }}
-                                    />
-                                </Box>
-                                <Typography variant="caption" sx={{ color: "#94a3b8", display: "block", mt: 0.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                    BV Đa khoa TNT • Khoa Khám Bệnh • Ca: <CockpitLiveClock />
-                                </Typography>
-                            </Box>
+                    <Box display="flex" alignItems="center" gap={1.5} sx={{ minWidth: 0, flexShrink: 0 }}>
+                        <Box
+                            sx={{
+                                width: 44,
+                                height: 44,
+                                borderRadius: 2.5,
+                                bgcolor: "rgba(56, 189, 248, 0.15)",
+                                border: "1px solid rgba(56, 189, 248, 0.3)",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                color: "#38bdf8",
+                                flexShrink: 0
+                            }}
+                        >
+                            <LocalHospitalIcon sx={{ fontSize: 24 }} />
                         </Box>
-                    </Grid>
+                        <Box sx={{ minWidth: 0 }}>
+                            <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+                                <Typography variant="h6" fontWeight={800} sx={{ letterSpacing: "-0.3px", fontSize: "1.15rem", whiteSpace: "nowrap", color: "#ffffff !important" }}>
+                                    Bàn Khám Bác Sĩ & Lâm Sàng
+                                </Typography>
+                                <Chip
+                                    label="Live Cockpit"
+                                    size="small"
+                                    sx={{
+                                        bgcolor: "#0284c7",
+                                        color: "#ffffff",
+                                        fontWeight: 700,
+                                        fontSize: "0.65rem",
+                                        height: 18
+                                    }}
+                                />
+                            </Box>
+                            <Typography variant="caption" sx={{ color: "rgba(226, 232, 240, 0.9)", display: "block", mt: 0.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                BV Đa khoa TNT • Khoa Khám Bệnh • Ca: <CockpitLiveClock />
+                            </Typography>
+                        </Box>
+                    </Box>
 
                     {/* Middle: Live Queue Counters */}
-                    <Grid item xs={12} md={3.5}>
-                        <Stack direction="row" spacing={0.8} justifyContent={{ xs: "flex-start", md: "center" }}>
-                            <Box sx={{ px: 1.2, py: 0.5, borderRadius: 2, bgcolor: "rgba(245, 158, 11, 0.15)", border: "1px solid rgba(245, 158, 11, 0.3)", textAlign: "center", minWidth: 62 }}>
-                                <Typography variant="caption" sx={{ color: "#fbbf24", fontWeight: 700, display: "block", fontSize: "0.62rem", whiteSpace: "nowrap" }}>CHỜ KHÁM</Typography>
-                                <Typography variant="subtitle1" fontWeight={800} sx={{ color: "#fef08a", lineHeight: 1.1, fontSize: "1.05rem" }}>{waitingCount}</Typography>
+                    <Stack
+                        direction="row"
+                        spacing={1}
+                        alignItems="center"
+                        justifyContent={{ xs: "flex-start", sm: "center" }}
+                        sx={{ flexShrink: 0, my: { xs: 0.5, lg: 0 } }}
+                    >
+                        <Box sx={{ px: 1.4, py: 0.6, borderRadius: 2, bgcolor: "rgba(245, 158, 11, 0.15)", border: "1px solid rgba(245, 158, 11, 0.3)", textAlign: "center", minWidth: 68 }}>
+                            <Typography variant="caption" sx={{ color: "#fbbf24", fontWeight: 700, display: "block", fontSize: "0.65rem", whiteSpace: "nowrap" }}>CHỜ KHÁM</Typography>
+                            <Typography variant="subtitle1" fontWeight={800} sx={{ color: "#fef08a", lineHeight: 1.1, fontSize: "1.1rem" }}>{waitingCount}</Typography>
+                        </Box>
+                        <Box sx={{ px: 1.4, py: 0.6, borderRadius: 2, bgcolor: "rgba(56, 189, 248, 0.15)", border: "1px solid rgba(56, 189, 248, 0.3)", textAlign: "center", minWidth: 68 }}>
+                            <Typography variant="caption" sx={{ color: "#38bdf8", fontWeight: 700, display: "block", fontSize: "0.65rem", whiteSpace: "nowrap" }}>ĐANG KHÁM</Typography>
+                            <Typography variant="subtitle1" fontWeight={800} sx={{ color: "#e0f2fe", lineHeight: 1.1, fontSize: "1.1rem" }}>{inProgressCount}</Typography>
+                        </Box>
+                        <Box sx={{ px: 1.4, py: 0.6, borderRadius: 2, bgcolor: "rgba(34, 197, 94, 0.15)", border: "1px solid rgba(34, 197, 94, 0.3)", textAlign: "center", minWidth: 68 }}>
+                            <Typography variant="caption" sx={{ color: "#4ade80", fontWeight: 700, display: "block", fontSize: "0.65rem", whiteSpace: "nowrap" }}>ĐÃ KHÁM</Typography>
+                            <Typography variant="subtitle1" fontWeight={800} sx={{ color: "#bbf7d0", lineHeight: 1.1, fontSize: "1.1rem" }}>{completedCount}</Typography>
+                        </Box>
+                        {priorityCount > 0 && (
+                            <Box sx={{ px: 1.4, py: 0.6, borderRadius: 2, bgcolor: "rgba(239, 68, 68, 0.2)", border: "1px solid rgba(239, 68, 68, 0.4)", textAlign: "center", minWidth: 68 }}>
+                                <Typography variant="caption" sx={{ color: "#fca5a5", fontWeight: 800, display: "block", fontSize: "0.65rem", whiteSpace: "nowrap" }}>ƯU TIÊN</Typography>
+                                <Typography variant="subtitle1" fontWeight={800} sx={{ color: "#fee2e2", lineHeight: 1.1, fontSize: "1.1rem" }}>{priorityCount}</Typography>
                             </Box>
-                            <Box sx={{ px: 1.2, py: 0.5, borderRadius: 2, bgcolor: "rgba(56, 189, 248, 0.15)", border: "1px solid rgba(56, 189, 248, 0.3)", textAlign: "center", minWidth: 62 }}>
-                                <Typography variant="caption" sx={{ color: "#38bdf8", fontWeight: 700, display: "block", fontSize: "0.62rem", whiteSpace: "nowrap" }}>ĐANG KHÁM</Typography>
-                                <Typography variant="subtitle1" fontWeight={800} sx={{ color: "#e0f2fe", lineHeight: 1.1, fontSize: "1.05rem" }}>{inProgressCount}</Typography>
-                            </Box>
-                            <Box sx={{ px: 1.2, py: 0.5, borderRadius: 2, bgcolor: "rgba(34, 197, 94, 0.15)", border: "1px solid rgba(34, 197, 94, 0.3)", textAlign: "center", minWidth: 62 }}>
-                                <Typography variant="caption" sx={{ color: "#4ade80", fontWeight: 700, display: "block", fontSize: "0.62rem", whiteSpace: "nowrap" }}>ĐÃ KHÁM</Typography>
-                                <Typography variant="subtitle1" fontWeight={800} sx={{ color: "#bbf7d0", lineHeight: 1.1, fontSize: "1.05rem" }}>{completedCount}</Typography>
-                            </Box>
-                            {priorityCount > 0 && (
-                                <Box sx={{ px: 1.2, py: 0.5, borderRadius: 2, bgcolor: "rgba(239, 68, 68, 0.2)", border: "1px solid rgba(239, 68, 68, 0.4)", textAlign: "center", minWidth: 62 }}>
-                                    <Typography variant="caption" sx={{ color: "#fca5a5", fontWeight: 800, display: "block", fontSize: "0.62rem", whiteSpace: "nowrap" }}>ƯU TIÊN</Typography>
-                                    <Typography variant="subtitle1" fontWeight={800} sx={{ color: "#fee2e2", lineHeight: 1.1, fontSize: "1.05rem" }}>{priorityCount}</Typography>
-                                </Box>
-                            )}
-                        </Stack>
-                    </Grid>
+                        )}
+                    </Stack>
 
                     {/* Right: Actions */}
-                    <Grid item xs={12} md={3}>
-                        <Stack direction="row" spacing={1.2} justifyContent={{ xs: "flex-start", md: "flex-end" }} alignItems="center">
-                            <Tooltip title="Xem lịch phân công trực">
-                                <Button
-                                    variant="outlined"
-                                    size="small"
-                                    onClick={handleOpenMySchedule}
-                                    sx={{
-                                        color: "#e2e8f0",
-                                        borderColor: "#475569",
-                                        bgcolor: "rgba(15, 23, 42, 0.6)",
-                                        borderRadius: 2,
-                                        fontWeight: 600,
-                                        textTransform: "none",
-                                        "&:hover": { borderColor: "#94a3b8", bgcolor: "rgba(30, 41, 59, 0.8)" }
-                                    }}
-                                    startIcon={<CalendarMonthIcon fontSize="small" />}
-                                >
-                                    Lịch Trực
-                                </Button>
-                            </Tooltip>
-
+                    <Stack
+                        direction="row"
+                        spacing={1.2}
+                        alignItems="center"
+                        justifyContent={{ xs: "flex-start", lg: "flex-end" }}
+                        sx={{ flexShrink: 0 }}
+                    >
+                        <Tooltip title="Xem lịch phân công trực">
                             <Button
-                                variant="contained"
-                                size="medium"
-                                startIcon={<VolumeUpIcon />}
-                                onClick={handleCallNext}
+                                variant="outlined"
+                                size="small"
+                                onClick={handleOpenMySchedule}
                                 sx={{
-                                    bgcolor: "#f59e0b",
-                                    color: "#0f172a",
-                                    fontWeight: 800,
-                                    borderRadius: 2.5,
-                                    px: 2.2,
-                                    boxShadow: "0 4px 15px rgba(245, 158, 11, 0.4)",
+                                    color: "#e2e8f0",
+                                    borderColor: "#475569",
+                                    bgcolor: "rgba(15, 23, 42, 0.6)",
+                                    borderRadius: 2,
+                                    fontWeight: 600,
                                     textTransform: "none",
-                                    "&:hover": { bgcolor: "#d97706" }
+                                    whiteSpace: "nowrap",
+                                    height: "36px",
+                                    px: 1.5,
+                                    "&:hover": { borderColor: "#94a3b8", bgcolor: "rgba(30, 41, 59, 0.8)" }
+                                }}
+                                startIcon={<CalendarMonthIcon fontSize="small" />}
+                            >
+                                Lịch Trực
+                            </Button>
+                        </Tooltip>
+
+                        <Button
+                            variant="contained"
+                            size="medium"
+                            startIcon={<VolumeUpIcon />}
+                            onClick={handleCallNext}
+                            sx={{
+                                background: "linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important",
+                                bgcolor: "#0284c7 !important",
+                                backgroundImage: "none !important",
+                                color: "#ffffff !important",
+                                fontWeight: 800,
+                                borderRadius: 2,
+                                height: "36px",
+                                px: 2.2,
+                                whiteSpace: "nowrap",
+                                boxShadow: "0 4px 15px rgba(2, 132, 199, 0.4)",
+                                textTransform: "none",
+                                "&:hover": {
+                                    background: "linear-gradient(135deg, #0369a1 0%, #075985 100%) !important",
+                                    boxShadow: "0 6px 20px rgba(2, 132, 199, 0.5)"
+                                }
+                            }}
+                        >
+                            Gọi Số Tiếp ({waitingCount})
+                        </Button>
+
+                        <Tooltip title="Làm mới hàng đợi">
+                            <IconButton
+                                onClick={fetchDoctorQueue}
+                                size="small"
+                                sx={{
+                                    color: "#e2e8f0",
+                                    bgcolor: "rgba(255,255,255,0.1)",
+                                    width: 36,
+                                    height: 36,
+                                    borderRadius: 2,
+                                    "&:hover": { bgcolor: "rgba(255,255,255,0.2)" }
                                 }}
                             >
-                                Gọi Số Tiếp ({waitingCount})
-                            </Button>
-
-                            <Tooltip title="Làm mới hàng đợi">
-                                <IconButton
-                                    onClick={fetchDoctorQueue}
-                                    sx={{
-                                        color: "#e2e8f0",
-                                        bgcolor: "rgba(255,255,255,0.1)",
-                                        "&:hover": { bgcolor: "rgba(255,255,255,0.2)" }
-                                    }}
-                                >
-                                    <RefreshIcon />
-                                </IconButton>
-                            </Tooltip>
-                        </Stack>
-                    </Grid>
-                </Grid>
+                                <RefreshIcon fontSize="small" />
+                            </IconButton>
+                        </Tooltip>
+                    </Stack>
+                </Box>
             </Paper>
 
             {message && (

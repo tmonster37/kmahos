@@ -181,20 +181,17 @@ export default function Navbar() {
                         sx={{ textDecoration: "none", mr: 2 }}
                     >
                         <Box
+                            component="img"
+                            src="/images/logo.png"
+                            alt="Logo Bệnh Viện TNT"
                             sx={{
-                                width: 40,
-                                height: 40,
+                                width: 42,
+                                height: 42,
                                 borderRadius: "10px",
-                                background: `linear-gradient(135deg, ${designTokens.brand.primary} 0%, ${designTokens.secondary.main} 100%)`,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                color: "#FFFFFF",
-                                boxShadow: "0 4px 12px rgba(0, 136, 214, 0.2)"
+                                objectFit: "contain",
+                                filter: "drop-shadow(0 2px 8px rgba(13, 148, 136, 0.25))"
                             }}
-                        >
-                            <LocalHospitalIcon sx={{ fontSize: 24, m: "auto" }} />
-                        </Box>
+                        />
                         <Box>
                             <Typography
                                 variant="h6"

@@ -4,13 +4,17 @@
  */
 
 export const designTokens = {
-    // 1. Thương hiệu & màu chủ đạo (Medical Brand)
+    // 1. Thương hiệu & màu chủ đạo (Medical Brand - Chuẩn hóa theo Logo Xanh mòng két & Trái tim đỏ)
     brand: {
-        primary: "#0088D6",       // Xanh YouMed signature (Contrast 4.68:1 trên nền trắng)
-        primaryHover: "#0070BA",  // Hover đậm hơn
-        primaryDark: "#0062A3",   // Nhấn mạnh / tiêu đề
-        primaryLight: "#EBF6FE",  // Nền nhạt / badge / active state
-        primaryBorder: "#BAE6FD",
+        primary: "#0D9488",       // Xanh mòng két / Modern Medical Teal (Đạt WCAG AA 4.58:1)
+        primaryHover: "#0F766E",  // Teal-700 đậm hơn khi hover
+        primaryDark: "#115E59",   // Teal-800: Tiêu đề & thanh điều hướng
+        primaryLight: "#F0FDFA",  // Teal-50: Nền thẻ, chip phân hệ
+        primaryBorder: "#99F6E4", // Teal-200
+        accent: "#F43F5E",        // Đỏ trái tim ấm áp từ logo (Rose-500)
+        accentHover: "#E11D48",   // Rose-600
+        accentLight: "#FFF1F2",   // Rose-50
+        accentBorder: "#FECDD3",  // Rose-200
     },
 
     // 2. Màu thứ cấp (Emerald Health Accent)

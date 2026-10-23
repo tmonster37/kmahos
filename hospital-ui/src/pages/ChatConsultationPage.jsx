@@ -188,15 +188,105 @@ export default function ChatConsultationPage() {
     });
 
     return (
-        <Container maxWidth="xl" sx={{ py: 3, height: "calc(100vh - 110px)", display: "flex", flexDirection: "column" }}>
+        <Container maxWidth="xl" sx={{ py: 3, height: "calc(100vh - 90px)", display: "flex", flexDirection: "column" }}>
+            {/* Header Banner - Apple HIG + Linear Elevated Header */}
             <Paper
-                elevation={4}
+                elevation={0}
+                sx={{
+                    p: { xs: 2, md: 2.5 },
+                    mb: 2.5,
+                    borderRadius: 3.5,
+                    bgcolor: "#FFFFFF",
+                    border: "1px solid rgba(15, 23, 42, 0.08)",
+                    boxShadow: "0 2px 10px rgba(0,0,0,0.03)",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    gap: 2,
+                    flexShrink: 0
+                }}
+            >
+                <Box display="flex" alignItems="center" gap={2}>
+                    <Avatar
+                        sx={{
+                            width: 48,
+                            height: 48,
+                            bgcolor: "rgba(0, 136, 214, 0.1)",
+                            color: "#0088D6",
+                            border: "1px solid rgba(0, 136, 214, 0.2)"
+                        }}
+                    >
+                        <SupportAgentIcon sx={{ fontSize: 28 }} />
+                    </Avatar>
+                    <Box>
+                        <Box display="flex" alignItems="center" gap={1.2} mb={0.25} flexWrap="wrap">
+                            <Chip
+                                label="TƯ VẤN Y TẾ TRỰC TUYẾN • TELEHEALTH PRO"
+                                size="small"
+                                sx={{
+                                    height: 20,
+                                    fontSize: "0.68rem",
+                                    fontWeight: 700,
+                                    letterSpacing: "0.06em",
+                                    bgcolor: "#EBF5FF",
+                                    color: "#0088D6",
+                                    borderRadius: 1.5,
+                                    border: "1px solid rgba(0, 136, 214, 0.2)"
+                                }}
+                            />
+                            <Chip
+                                label="LIVE 24/7"
+                                size="small"
+                                sx={{
+                                    height: 20,
+                                    fontSize: "0.68rem",
+                                    fontWeight: 700,
+                                    bgcolor: "rgba(16, 185, 129, 0.1)",
+                                    color: "#059669",
+                                    borderRadius: 1.5
+                                }}
+                            />
+                        </Box>
+                        <Typography variant="h6" fontWeight={800} color="#0F172A" sx={{ letterSpacing: "-0.02em" }}>
+                            Kênh Tư Vấn Sức Khỏe & Trao Đổi Lâm Sàng
+                        </Typography>
+                        <Typography variant="caption" color="#64748B">
+                            Kết nối trực tiếp giữa Bệnh nhân và Đội ngũ Bác sĩ chuyên khoa Bệnh viện Đa khoa TNT
+                        </Typography>
+                    </Box>
+                </Box>
+                <Box display="flex" gap={1.5} alignItems="center">
+                    <Button
+                        variant="outlined"
+                        size="small"
+                        sx={{
+                            borderRadius: 2.5,
+                            textTransform: "none",
+                            fontWeight: 700,
+                            borderColor: "rgba(15, 23, 42, 0.12)",
+                            color: "#334155",
+                            bgcolor: "#FFFFFF",
+                            "&:hover": { bgcolor: "#F8FAFC", borderColor: "#CBD5E1" }
+                        }}
+                        startIcon={<RefreshIcon />}
+                        onClick={() => { fetchConversations(); fetchConsultants(); }}
+                    >
+                        Làm Mới
+                    </Button>
+                </Box>
+            </Paper>
+
+            <Paper
+                elevation={0}
                 sx={{
                     flexGrow: 1,
-                    borderRadius: 3,
+                    borderRadius: 3.5,
                     overflow: "hidden",
                     display: "flex",
-                    border: "1px solid #E2E8F0",
+                    border: "1px solid rgba(15, 23, 42, 0.08)",
+                    boxShadow: "0 4px 20px rgba(0,0,0,0.03)",
+                    minHeight: 0
                 }}
             >
                 {/* LEFT: Conversation List & Doctor Directory */}
@@ -205,43 +295,61 @@ export default function ChatConsultationPage() {
                         width: { xs: "100%", md: 380 },
                         display: { xs: activePartner ? "none" : "flex", md: "flex" },
                         bgcolor: "#FFFFFF",
-                        borderRight: "1px solid #E2E8F0",
+                        borderRight: "1px solid rgba(15, 23, 42, 0.08)",
                         flexDirection: "column",
                         height: "100%",
                         flexShrink: 0
                     }}
                 >
                     {/* Header */}
-                    <Box p={2} borderBottom="1px solid #E2E8F0">
-                        <Box display="flex" justifyContent="space-between" alignItems="center" mb={1.5}>
-                            <Typography variant="h6" fontWeight="bold" color="primary.main">
-                                💬 Tư Vấn Y Tế Trực Tuyến
-                            </Typography>
-                            <Tooltip title="Làm mới">
-                                <IconButton size="small" onClick={() => { fetchConversations(); fetchConsultants(); }}>
-                                    <RefreshIcon fontSize="small" />
-                                </IconButton>
-                            </Tooltip>
-                        </Box>
-
+                    <Box p={2} borderBottom="1px solid rgba(15, 23, 42, 0.08)">
                         {/* Switch Tabs */}
                         <Tabs
                             value={sidebarTab}
                             onChange={(e, v) => setSidebarTab(v)}
                             variant="fullWidth"
-                            sx={{ minHeight: 36, mb: 1.5 }}
+                            sx={{
+                                minHeight: 40,
+                                mb: 1.5,
+                                bgcolor: "#F8FAFC",
+                                borderRadius: 2,
+                                p: 0.5,
+                                "& .MuiTabs-indicator": { display: "none" }
+                            }}
                         >
                             <Tab
-                                icon={<ForumIcon fontSize="small" />}
+                                icon={<ForumIcon sx={{ fontSize: 18 }} />}
                                 iconPosition="start"
                                 label={`Hội thoại (${conversations.length})`}
-                                sx={{ textTransform: "none", fontWeight: 700, minHeight: 36, py: 0.5, fontSize: "0.8rem" }}
+                                sx={{
+                                    textTransform: "none",
+                                    fontWeight: 700,
+                                    minHeight: 32,
+                                    py: 0.5,
+                                    fontSize: "0.8rem",
+                                    borderRadius: 1.5,
+                                    color: sidebarTab === 0 ? "#0088D6" : "#64748B",
+                                    bgcolor: sidebarTab === 0 ? "#FFFFFF" : "transparent",
+                                    boxShadow: sidebarTab === 0 ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                                    transition: "0.2s"
+                                }}
                             />
                             <Tab
-                                icon={<PeopleAltIcon fontSize="small" />}
+                                icon={<PeopleAltIcon sx={{ fontSize: 18 }} />}
                                 iconPosition="start"
                                 label={`Bác sĩ (${consultants.length})`}
-                                sx={{ textTransform: "none", fontWeight: 700, minHeight: 36, py: 0.5, fontSize: "0.8rem" }}
+                                sx={{
+                                    textTransform: "none",
+                                    fontWeight: 700,
+                                    minHeight: 32,
+                                    py: 0.5,
+                                    fontSize: "0.8rem",
+                                    borderRadius: 1.5,
+                                    color: sidebarTab === 1 ? "#0088D6" : "#64748B",
+                                    bgcolor: sidebarTab === 1 ? "#FFFFFF" : "transparent",
+                                    boxShadow: sidebarTab === 1 ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                                    transition: "0.2s"
+                                }}
                             />
                         </Tabs>
 
@@ -257,27 +365,28 @@ export default function ChatConsultationPage() {
                                         <SearchIcon fontSize="small" color="action" />
                                     </InputAdornment>
                                 ),
+                                sx: { borderRadius: 2, bgcolor: "#F8FAFC" }
                             }}
                         />
                     </Box>
 
                     {/* TAB 0: CONVERSATIONS LIST */}
                     {sidebarTab === 0 && (
-                        <List sx={{ flexGrow: 1, overflowY: "auto", p: 1 }}>
+                        <List sx={{ flexGrow: 1, overflowY: "auto", p: 1.5 }}>
                             {loadingConversations && conversations.length === 0 ? (
                                 <Box textAlign="center" py={4}>
                                     <CircularProgress size={28} />
                                 </Box>
                             ) : filteredConversations.length === 0 ? (
                                 <Box textAlign="center" py={6} px={2} color="text.secondary">
-                                    <ChatBubbleOutlineIcon sx={{ fontSize: 40, opacity: 0.4, mb: 1 }} />
-                                    <Typography variant="body2" mb={1.5}>Chưa có cuộc hội thoại nào</Typography>
+                                    <ChatBubbleOutlineIcon sx={{ fontSize: 44, opacity: 0.3, mb: 1, color: "#64748B" }} />
+                                    <Typography variant="body2" mb={1.5} color="#64748B">Chưa có cuộc hội thoại nào</Typography>
                                     <Button
                                         size="small"
                                         variant="outlined"
                                         startIcon={<PeopleAltIcon />}
                                         onClick={() => setSidebarTab(1)}
-                                        sx={{ textTransform: "none" }}
+                                        sx={{ textTransform: "none", borderRadius: 2, fontWeight: 700 }}
                                     >
                                         Xem danh bạ bác sĩ trực tuyến
                                     </Button>
@@ -291,11 +400,14 @@ export default function ChatConsultationPage() {
                                             onClick={() => setActivePartner(c)}
                                             selected={isSelected}
                                             sx={{
-                                                borderRadius: 2,
-                                                mb: 0.5,
+                                                borderRadius: 2.5,
+                                                mb: 0.75,
                                                 p: 1.5,
-                                                border: isSelected ? "1.5px solid #2563EB" : "1px solid transparent",
-                                                bgcolor: isSelected ? "rgba(37, 99, 235, 0.08)" : "transparent",
+                                                border: isSelected ? "1px solid rgba(0, 136, 214, 0.3)" : "1px solid transparent",
+                                                bgcolor: isSelected ? "rgba(0, 136, 214, 0.06)" : "transparent",
+                                                "&:hover": {
+                                                    bgcolor: isSelected ? "rgba(0, 136, 214, 0.08)" : "#F8FAFC"
+                                                }
                                             }}
                                         >
                                             <ListItemAvatar>
@@ -305,7 +417,7 @@ export default function ChatConsultationPage() {
                                                     variant="dot"
                                                     color="success"
                                                 >
-                                                    <Avatar sx={{ bgcolor: isSelected ? "primary.main" : "#E2E8F0", color: isSelected ? "white" : "#1E293B", fontWeight: "bold" }}>
+                                                    <Avatar sx={{ bgcolor: isSelected ? "#0088D6" : "#F1F5F9", color: isSelected ? "white" : "#334155", fontWeight: 700, width: 42, height: 42 }}>
                                                         {c.partnerName?.charAt(0) || "U"}
                                                     </Avatar>
                                                 </Badge>
@@ -313,7 +425,7 @@ export default function ChatConsultationPage() {
                                             <ListItemText
                                                 primary={
                                                     <Box display="flex" justifyContent="space-between" alignItems="center">
-                                                        <Typography variant="subtitle2" fontWeight="bold" noWrap sx={{ maxWidth: 160 }}>
+                                                        <Typography variant="subtitle2" fontWeight={700} color="#0F172A" noWrap sx={{ maxWidth: 160 }}>
                                                             {c.partnerName}
                                                         </Typography>
                                                         {c.unreadCount > 0 && (
@@ -322,7 +434,7 @@ export default function ChatConsultationPage() {
                                                     </Box>
                                                 }
                                                 secondary={
-                                                    <Typography variant="caption" color="text.secondary" noWrap display="block">
+                                                    <Typography variant="caption" color="#64748B" noWrap display="block" sx={{ mt: 0.25 }}>
                                                         {c.lastMessage || (c.partnerRole === "ROLE_DOCTOR" ? "Bác sĩ chuyên khoa" : "Bệnh nhân")}
                                                     </Typography>
                                                 }
@@ -336,15 +448,15 @@ export default function ChatConsultationPage() {
 
                     {/* TAB 1: DOCTOR CONSULTANTS DIRECTORY */}
                     {sidebarTab === 1 && (
-                        <List sx={{ flexGrow: 1, overflowY: "auto", p: 1 }}>
+                        <List sx={{ flexGrow: 1, overflowY: "auto", p: 1.5 }}>
                             {loadingConsultants ? (
                                 <Box textAlign="center" py={4}>
                                     <CircularProgress size={28} />
                                 </Box>
                             ) : filteredConsultants.length === 0 ? (
                                 <Box textAlign="center" py={6} color="text.secondary">
-                                    <MedicalServicesIcon sx={{ fontSize: 40, opacity: 0.4, mb: 1 }} />
-                                    <Typography variant="body2">Không tìm thấy bác sĩ phù hợp</Typography>
+                                    <MedicalServicesIcon sx={{ fontSize: 44, opacity: 0.3, mb: 1, color: "#64748B" }} />
+                                    <Typography variant="body2" color="#64748B">Không tìm thấy bác sĩ phù hợp</Typography>
                                 </Box>
                             ) : (
                                 filteredConsultants.map((doc, idx) => (
@@ -352,31 +464,37 @@ export default function ChatConsultationPage() {
                                         key={doc.partnerId || doc.doctorId || idx}
                                         elevation={0}
                                         sx={{
-                                            mb: 1,
-                                            borderRadius: 2,
-                                            border: "1px solid #E2E8F0",
+                                            mb: 1.2,
+                                            borderRadius: 2.5,
+                                            border: "1px solid rgba(15, 23, 42, 0.08)",
                                             transition: "0.2s",
-                                            "&:hover": { borderColor: "#0088D6", bgcolor: "#F8FAFC" }
+                                            "&:hover": { borderColor: "#0088D6", bgcolor: "#F8FAFC", transform: "translateY(-1px)" }
                                         }}
                                     >
-                                        <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
-                                            <Box display="flex" alignItems="center" gap={1.2} mb={1}>
-                                                <Avatar sx={{ bgcolor: "#0088D6", width: 36, height: 36, fontSize: "0.875rem", fontWeight: "bold" }}>
+                                        <CardContent sx={{ p: 1.75, "&:last-child": { pb: 1.75 } }}>
+                                            <Box display="flex" alignItems="center" gap={1.2} mb={1.2}>
+                                                <Avatar sx={{ bgcolor: "rgba(0, 136, 214, 0.1)", color: "#0088D6", width: 40, height: 40, fontSize: "0.95rem", fontWeight: 700, border: "1px solid rgba(0, 136, 214, 0.2)" }}>
                                                     {(doc.partnerName || doc.fullName)?.charAt(0) || "B"}
                                                 </Avatar>
                                                 <Box flex={1}>
-                                                    <Typography variant="subtitle2" fontWeight="bold" color="textPrimary">
+                                                    <Typography variant="subtitle2" fontWeight={700} color="#0F172A">
                                                         {doc.degree ? `${doc.degree} ` : ""}{doc.partnerName || doc.fullName}
                                                     </Typography>
-                                                    <Typography variant="caption" color="textSecondary">
+                                                    <Typography variant="caption" color="#64748B">
                                                         {doc.departmentName || "Khoa Khám Bệnh"}
                                                     </Typography>
                                                 </Box>
                                                 <Chip
                                                     label="Online"
-                                                    color="success"
                                                     size="small"
-                                                    sx={{ height: 18, fontSize: "0.65rem", fontWeight: "bold" }}
+                                                    sx={{
+                                                        height: 20,
+                                                        fontSize: "0.68rem",
+                                                        fontWeight: 700,
+                                                        bgcolor: "rgba(16, 185, 129, 0.1)",
+                                                        color: "#059669",
+                                                        borderRadius: 1
+                                                    }}
                                                 />
                                             </Box>
                                             <Button
@@ -385,7 +503,15 @@ export default function ChatConsultationPage() {
                                                 variant="contained"
                                                 startIcon={<ForumIcon fontSize="small" />}
                                                 onClick={() => handleSelectDoctorToChat(doc)}
-                                                sx={{ borderRadius: 1.5, textTransform: "none", fontSize: "0.75rem", py: 0.5 }}
+                                                sx={{
+                                                    borderRadius: 2,
+                                                    textTransform: "none",
+                                                    fontSize: "0.78rem",
+                                                    fontWeight: 700,
+                                                    py: 0.6,
+                                                    bgcolor: "#0088D6",
+                                                    "&:hover": { bgcolor: "#0077BE" }
+                                                }}
                                             >
                                                 Nhắn tin tư vấn ngay
                                             </Button>
@@ -414,7 +540,7 @@ export default function ChatConsultationPage() {
                                 sx={{
                                     p: 2,
                                     bgcolor: "#FFFFFF",
-                                    borderBottom: "1px solid #E2E8F0",
+                                    borderBottom: "1px solid rgba(15, 23, 42, 0.08)",
                                     display: "flex",
                                     justifyContent: "space-between",
                                     alignItems: "center",
@@ -428,16 +554,16 @@ export default function ChatConsultationPage() {
                                     >
                                         <ArrowBackIcon fontSize="small" />
                                     </IconButton>
-                                    <Avatar sx={{ bgcolor: "primary.main", color: "white", fontWeight: "bold" }}>
+                                    <Avatar sx={{ bgcolor: "rgba(0, 136, 214, 0.1)", color: "#0088D6", fontWeight: 700, border: "1px solid rgba(0, 136, 214, 0.2)" }}>
                                         {activePartner.partnerName?.charAt(0) || "U"}
                                     </Avatar>
                                     <Box>
-                                        <Typography variant="subtitle1" fontWeight="bold">
+                                        <Typography variant="subtitle1" fontWeight={800} color="#0F172A">
                                             {activePartner.partnerName}
                                         </Typography>
-                                        <Typography variant="caption" color="text.secondary">
+                                        <Typography variant="caption" color="#64748B">
                                             {activePartner.departmentName ? `${activePartner.departmentName} • ` : ""}
-                                            {activePartner.partnerRole === "ROLE_DOCTOR" ? "Bác sĩ chuyên khoa" : "Bệnh nhân"} • <span style={{ color: "#10B981", fontWeight: "bold" }}>Trực tuyến</span>
+                                            {activePartner.partnerRole === "ROLE_DOCTOR" ? "Bác sĩ chuyên khoa" : "Bệnh nhân"} • <span style={{ color: "#10B981", fontWeight: 700 }}>Trực tuyến</span>
                                         </Typography>
                                     </Box>
                                 </Box>
@@ -447,11 +573,11 @@ export default function ChatConsultationPage() {
                             <Box ref={messagesContainerRef} sx={{ flexGrow: 1, overflowY: "auto", p: 3 }}>
                                 {messages.length === 0 ? (
                                     <Box textAlign="center" py={8} color="text.secondary">
-                                        <SupportAgentIcon sx={{ fontSize: 56, opacity: 0.4, mb: 1.5, color: "primary.main" }} />
-                                        <Typography variant="h6" fontWeight="bold">
+                                        <SupportAgentIcon sx={{ fontSize: 56, opacity: 0.3, mb: 1.5, color: "#0088D6" }} />
+                                        <Typography variant="h6" fontWeight={800} color="#0F172A">
                                             Kênh Tư Vấn Sức Khỏe Trực Tuyến
                                         </Typography>
-                                        <Typography variant="body2" sx={{ maxWidth: 450, margin: "0 auto", mt: 0.5 }}>
+                                        <Typography variant="body2" color="#64748B" sx={{ maxWidth: 450, margin: "0 auto", mt: 0.5 }}>
                                             Trao đổi trực tiếp, giải đáp thắc mắc đơn thuốc, kết quả xét nghiệm và hướng dẫn khám chữa bệnh cùng <b>{activePartner.partnerName}</b>.
                                         </Typography>
                                     </Box>
@@ -471,19 +597,19 @@ export default function ChatConsultationPage() {
                                                     sx={{
                                                         maxWidth: "70%",
                                                         p: 1.8,
-                                                        borderRadius: 3,
-                                                        bgcolor: isMe ? "primary.main" : "#FFFFFF",
-                                                        color: isMe ? "white" : "#1E293B",
-                                                        boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
-                                                        border: isMe ? "none" : "1px solid #E2E8F0",
+                                                        borderRadius: isMe ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
+                                                        bgcolor: isMe ? "#0088D6" : "#FFFFFF",
+                                                        color: isMe ? "#FFFFFF" : "#0F172A",
+                                                        boxShadow: isMe ? "0 2px 8px rgba(0, 136, 214, 0.25)" : "0 1px 3px rgba(0,0,0,0.03)",
+                                                        border: isMe ? "none" : "1px solid rgba(15, 23, 42, 0.08)",
                                                     }}
                                                 >
                                                     {!isMe && (
-                                                        <Typography variant="caption" fontWeight="bold" display="block" color="primary.main" mb={0.5}>
+                                                        <Typography variant="caption" fontWeight={700} display="block" color="#0088D6" mb={0.5}>
                                                             {m.senderName || activePartner.partnerName}
                                                         </Typography>
                                                     )}
-                                                    <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                                                    <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", wordBreak: "break-word", lineHeight: 1.5 }}>
                                                         {m.content}
                                                     </Typography>
                                                     <Typography
@@ -492,8 +618,8 @@ export default function ChatConsultationPage() {
                                                             display: "block",
                                                             textAlign: "right",
                                                             mt: 0.5,
-                                                            opacity: 0.7,
-                                                            fontSize: "0.7rem",
+                                                            opacity: isMe ? 0.8 : 0.6,
+                                                            fontSize: "0.68rem",
                                                         }}
                                                     >
                                                         {m.createdAt ? new Date(m.createdAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : ""}
@@ -507,14 +633,14 @@ export default function ChatConsultationPage() {
 
                             {/* Doctor Clinical Fast Templates */}
                             {(user?.role === "ROLE_DOCTOR" || user?.role === "ROLE_HEAD_OF_DEPARTMENT") && (
-                                <Box px={2} py={1} bgcolor="#FFFFFF" borderTop="1px solid #E2E8F0" display="flex" gap={1} overflow="auto">
+                                <Box px={2} py={1} bgcolor="#FFFFFF" borderTop="1px solid rgba(15, 23, 42, 0.08)" display="flex" gap={1} overflow="auto">
                                     {CLINICAL_TEMPLATES.map((tmpl, idx) => (
                                         <Chip
                                             key={idx}
                                             label={tmpl}
                                             size="small"
                                             onClick={() => setInputMessage(tmpl)}
-                                            sx={{ maxWidth: 300, cursor: "pointer", fontSize: "0.75rem" }}
+                                            sx={{ maxWidth: 300, cursor: "pointer", fontSize: "0.75rem", borderRadius: 1.5 }}
                                             variant="outlined"
                                         />
                                     ))}
@@ -522,7 +648,7 @@ export default function ChatConsultationPage() {
                             )}
 
                             {/* Message Input Bar */}
-                            <Box p={2} bgcolor="#FFFFFF" borderTop="1px solid #E2E8F0" display="flex" gap={1.5} alignItems="center">
+                            <Box p={2} bgcolor="#FFFFFF" borderTop="1px solid rgba(15, 23, 42, 0.08)" display="flex" gap={1.5} alignItems="center">
                                 <TextField
                                     fullWidth
                                     size="small"
@@ -535,14 +661,23 @@ export default function ChatConsultationPage() {
                                             handleSendMessage();
                                         }
                                     }}
+                                    InputProps={{
+                                        sx: { borderRadius: 2.5, bgcolor: "#F8FAFC" }
+                                    }}
                                 />
                                 <Button
                                     variant="contained"
-                                    color="primary"
                                     endIcon={<SendIcon />}
                                     disabled={!inputMessage.trim() || sending}
                                     onClick={handleSendMessage}
-                                    sx={{ px: 3, fontWeight: "bold", borderRadius: 2 }}
+                                    sx={{
+                                        px: 3,
+                                        fontWeight: 700,
+                                        borderRadius: 2.5,
+                                        textTransform: "none",
+                                        bgcolor: "#0088D6",
+                                        "&:hover": { bgcolor: "#0077BE" }
+                                    }}
                                 >
                                     Gửi
                                 </Button>
@@ -551,10 +686,10 @@ export default function ChatConsultationPage() {
                     ) : (
                         <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" height="100%" color="text.secondary">
                             <LocalHospitalIcon sx={{ fontSize: 64, color: "#CBD5E1", mb: 2 }} />
-                            <Typography variant="h6" fontWeight="bold">
+                            <Typography variant="h6" fontWeight={800} color="#0F172A">
                                 Chọn một cuộc trò chuyện hoặc bác sĩ để bắt đầu
                             </Typography>
-                            <Typography variant="body2" color="textSecondary" mt={0.5}>
+                            <Typography variant="body2" color="#64748B" mt={0.5}>
                                 Bệnh viện Đa khoa TNT luôn sẵn sàng đồng hành tư vấn y tế 24/7.
                             </Typography>
                         </Box>

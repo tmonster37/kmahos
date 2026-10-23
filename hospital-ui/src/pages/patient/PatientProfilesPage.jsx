@@ -381,40 +381,93 @@ export default function PatientProfilesPage() {
     const availableWards = getWardsByProvince(formData.province);
 
     return (
-        <Box sx={{ bgcolor: "#F4F7FB", minHeight: "100vh", pb: 8 }}>
-            {/* 1. BREADCRUMB THANH ĐIỀU HƯỚNG TRÊN CÙNG */}
-            <Box sx={{ bgcolor: "#FFFFFF", borderBottom: "1px solid #E2E8F0", py: 1.5 }}>
-                <Container maxWidth="lg">
-                    <Breadcrumbs separator="›" aria-label="breadcrumb">
-                        <MuiLink
-                            component={Link}
-                            to="/"
-                            underline="hover"
-                            sx={{ color: "#64748B", fontSize: "0.875rem", fontWeight: 500 }}
-                        >
-                            Trang chủ
-                        </MuiLink>
-                        <Typography color="#0F172A" sx={{ fontSize: "0.875rem", fontWeight: 600 }}>
-                            {activeTab === 0 && "Hồ sơ bệnh nhân"}
-                            {activeTab === 1 && "Phiếu khám bệnh"}
-                            {activeTab === 2 && "Thông báo"}
-                            {activeTab === 3 && "Lịch sử khám bệnh"}
-                        </Typography>
-                    </Breadcrumbs>
-                </Container>
-            </Box>
+        <Box sx={{ bgcolor: "#F8FAFC", minHeight: "100vh", pb: 8 }}>
+            {/* 1. ELEVATED HEADER BANNER */}
+            <Container maxWidth="lg" sx={{ pt: 3 }}>
+                <Paper
+                    elevation={0}
+                    sx={{
+                        p: { xs: 2.5, md: 3 },
+                        borderRadius: 3.5,
+                        bgcolor: "#FFFFFF",
+                        border: "1px solid rgba(15, 23, 42, 0.08)",
+                        boxShadow: "0 2px 10px rgba(0,0,0,0.03)",
+                        mb: 3
+                    }}
+                >
+                    <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2}>
+                        <Box>
+                            <Box display="flex" alignItems="center" gap={1.5} mb={0.5}>
+                                <Chip
+                                    label="CỔNG BỆNH NHÂN • PATIENT PORTAL PRO"
+                                    size="small"
+                                    sx={{
+                                        fontWeight: 800,
+                                        fontSize: "0.68rem",
+                                        letterSpacing: "0.06em",
+                                        bgcolor: "rgba(0, 136, 214, 0.08)",
+                                        color: "#0088D6",
+                                        borderRadius: 1.5
+                                    }}
+                                />
+                                <Breadcrumbs separator="›" aria-label="breadcrumb">
+                                    <MuiLink
+                                        component={Link}
+                                        to="/"
+                                        underline="hover"
+                                        sx={{ color: "#64748B", fontSize: "0.8rem", fontWeight: 500 }}
+                                    >
+                                        Trang chủ
+                                    </MuiLink>
+                                    <Typography color="#0F172A" sx={{ fontSize: "0.8rem", fontWeight: 600 }}>
+                                        {activeTab === 0 && "Hồ sơ bệnh nhân"}
+                                        {activeTab === 1 && "Phiếu khám bệnh"}
+                                        {activeTab === 2 && "Thông báo"}
+                                        {activeTab === 3 && "Lịch sử khám bệnh"}
+                                    </Typography>
+                                </Breadcrumbs>
+                            </Box>
+                            <Typography variant="h5" fontWeight="800" color="#0F172A" sx={{ letterSpacing: "-0.5px" }}>
+                                Trung Tâm Hồ Sơ & Phiếu Khám Điện Tử
+                            </Typography>
+                            <Typography variant="body2" color="#64748B" mt={0.2}>
+                                Quản lý thông tin định danh y tế, tra cứu phiếu khám số và theo dõi tiến trình y tế cá nhân
+                            </Typography>
+                        </Box>
 
-            <Container maxWidth="lg" sx={{ mt: 3 }}>
+                        <Stack direction="row" spacing={1.5}>
+                            <Button
+                                variant="outlined"
+                                startIcon={<CalendarMonthIcon />}
+                                onClick={() => navigate("/booking")}
+                                sx={{
+                                    borderRadius: 2.5,
+                                    textTransform: "none",
+                                    fontWeight: 700,
+                                    color: "#0088D6",
+                                    borderColor: "#BAE6FD",
+                                    "&:hover": { borderColor: "#0088D6", bgcolor: "#F0F9FF" }
+                                }}
+                            >
+                                + Đặt Lịch Khám Mới
+                            </Button>
+                        </Stack>
+                    </Box>
+                </Paper>
+            </Container>
+
+            <Container maxWidth="lg">
                 <Grid container spacing={3}>
-                    {/* 2. CỘT TRÁI: SIDEBAR MENU ĐIỀU HƯỚNG CỦA BỆNH NHÂN (THE DUCK HOSPITAL) */}
+                    {/* 2. CỘT TRÁI: SIDEBAR MENU ĐIỀU HƯỚNG CỦA BỆNH NHÂN */}
                     <Grid item xs={12} md={3.2}>
                         <Paper
                             elevation={0}
                             sx={{
                                 p: 2,
-                                borderRadius: 3,
+                                borderRadius: 3.5,
                                 bgcolor: "#FFFFFF",
-                                border: "1px solid #E2E8F0",
+                                border: "1px solid rgba(15, 23, 42, 0.08)",
+                                boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
                                 position: { md: "sticky" },
                                 top: { md: 80 }
                             }}
@@ -582,13 +635,15 @@ export default function PatientProfilesPage() {
                                                     key={p.patientProfileId}
                                                     elevation={0}
                                                     sx={{
-                                                        borderRadius: 3,
-                                                        border: "1px solid #E2E8F0",
+                                                        borderRadius: 3.5,
+                                                        border: "1px solid rgba(15, 23, 42, 0.08)",
+                                                        borderTop: "3px solid #0088D6",
                                                         bgcolor: "#FFFFFF",
                                                         p: 3,
+                                                        boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
                                                         transition: "all 0.2s ease-in-out",
                                                         "&:hover": {
-                                                            boxShadow: "0 6px 20px rgba(0,0,0,0.04)",
+                                                            boxShadow: "0 8px 24px rgba(0,0,0,0.05)",
                                                             borderColor: "#CBD5E1"
                                                         }
                                                     }}
@@ -1123,15 +1178,15 @@ export default function PatientProfilesPage() {
                                         </Grid>
 
                                         {/* 4. Mục: Bảng Đơn Thuốc chuẩn Hình 3 */}
-                                        <TableContainer sx={{ border: "1px solid #E2E8F0", borderRadius: 2, mb: 2 }}>
+                                        <TableContainer sx={{ border: "1px solid rgba(15, 23, 42, 0.08)", borderRadius: 3, mb: 2, overflow: "hidden" }}>
                                             <Table>
-                                                <TableHead sx={{ bgcolor: "#F8FAFC" }}>
+                                                <TableHead>
                                                     <TableRow>
-                                                        <TableCell sx={{ fontWeight: 700, width: 60 }}>STT</TableCell>
-                                                        <TableCell sx={{ fontWeight: 700 }}>Tên thuốc</TableCell>
-                                                        <TableCell sx={{ fontWeight: 700, width: 120 }}>Số lượng</TableCell>
-                                                        <TableCell sx={{ fontWeight: 700, width: 140, textAlign: "right" }}>Đơn giá</TableCell>
-                                                        <TableCell sx={{ fontWeight: 700, width: 160, textAlign: "right" }}>Thành tiền</TableCell>
+                                                        <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", color: "#475569", py: 1.5, bgcolor: "#F8FAFC", width: 60 }}>STT</TableCell>
+                                                        <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", color: "#475569", py: 1.5, bgcolor: "#F8FAFC" }}>Tên thuốc</TableCell>
+                                                        <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", color: "#475569", py: 1.5, bgcolor: "#F8FAFC", width: 120 }}>Số lượng</TableCell>
+                                                        <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", color: "#475569", py: 1.5, bgcolor: "#F8FAFC", width: 140, textAlign: "right" }}>Đơn giá</TableCell>
+                                                        <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", color: "#475569", py: 1.5, bgcolor: "#F8FAFC", width: 160, textAlign: "right" }}>Thành tiền</TableCell>
                                                     </TableRow>
                                                 </TableHead>
                                                 <TableBody>
@@ -1247,9 +1302,9 @@ export default function PatientProfilesPage() {
                 onClose={() => setOpenSelectSessionModal(false)}
                 maxWidth="xs"
                 fullWidth
-                PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
+                PaperProps={{ sx: { borderRadius: 3.5, overflow: "hidden" } }}
             >
-                <DialogTitle sx={{ fontWeight: 800, color: "#0F172A", fontSize: "1.2rem", pb: 1 }}>
+                <DialogTitle sx={{ fontWeight: 800, color: "#0F172A", fontSize: "1.15rem", py: 2, px: 2.5, borderBottom: "1px solid rgba(15, 23, 42, 0.08)" }}>
                     Chọn buổi khám bệnh
                 </DialogTitle>
                 <DialogContent>
@@ -1365,9 +1420,9 @@ export default function PatientProfilesPage() {
                 onClose={() => !submitting && setOpenAddEditModal(false)}
                 maxWidth="sm"
                 fullWidth
-                PaperProps={{ sx: { borderRadius: 3 } }}
+                PaperProps={{ sx: { borderRadius: 3.5, overflow: "hidden" } }}
             >
-                <DialogTitle sx={{ fontWeight: 800, color: "#0088D6", borderBottom: "1px solid #E2E8F0" }}>
+                <DialogTitle sx={{ fontWeight: 800, color: "#0088D6", borderBottom: "1px solid rgba(15, 23, 42, 0.08)", py: 2, px: 3 }}>
                     {editingProfileId ? "Cập Nhật Hồ Sơ Bệnh Nhân" : "Thêm Mới Hồ Sơ Bệnh Nhân"}
                 </DialogTitle>
                 <Box component="form" onSubmit={handleSaveProfile}>

@@ -17,5 +17,8 @@ public record KioskDispatchRequest(
         Boolean isPriority,
         String priorityReason,
         Boolean hasInsurance,
-        String bookingCode // Mã đặt hẹn nếu là check-in đặt trước
+        String bookingCode, // Mã đặt hẹn nếu là check-in đặt trước
+        @NotBlank(message = "Mã gửi yêu cầu không được để trống")
+        @jakarta.validation.constraints.Size(max = 64, message = "Mã gửi yêu cầu tối đa 64 ký tự")
+        String idempotencyKey
 ) {}

@@ -99,6 +99,7 @@ Hệ thống y tế thông minh **YOUMED TNT HOSPITAL** tích hợp toàn diện
     - *Chuẩn hóa thương hiệu*: Đồng bộ 100% thương hiệu Bệnh viện Đa khoa Quốc tế TNT (Bình Yên, Sơn Dương, Tuyên Quang), loại bỏ các địa chỉ/tên bệnh viện giả định.
     - *Quản lý Bác sĩ*: Tối ưu hóa UI gọn gàng với bộ lọc 1 dòng tinh gọn, chế độ chuyển đổi linh hoạt Dạng Bảng (Table view) & Dạng Thẻ (Grid view), dialog xác nhận vô hiệu hóa an toàn.
     - *Quản lý Bệnh nhân Admin*: Bổ sung API & Controller quản lý bệnh nhân chuẩn RBAC (`/api/admin/patients/**`).
+16. **Kiosk Booking Hardening (23/10/2026)**: Hoàn thành triển khai đường đi kiosk qua `POST /api/counters/kiosk/dispatch`, tạo lịch hẹn và phiếu quầy nguyên tử, giữ idempotency key khi thử lại, khóa sức chứa khung giờ, lưu check-in và dùng ngưỡng ưu tiên 65 tuổi. Bổ sung quản lý lịch hẹn admin (danh sách, đổi, hủy) với RBAC và audit; dùng `Clock` theo `Asia/Ho_Chi_Minh`. Kiểm thử unit Maven tập trung đạt 20/20, frontend build thành công (có cảnh báo bundle >500 KB), và `node --check` thành công cho `test_counter_kiosk_workflow.js` cùng `test_module4_kiosk.js`. Chưa chạy DB integration hoặc kiểm thử cạnh tranh thật do datasource mặc định trỏ `localhost:5432/kmahos` với `ddl-auto:update`; xem `test-plans/kiosk_booking_hardening.md` và kế hoạch đã lưu ở `process/general-plans/completed/kiosk-booking-hardening_PLAN_23-10-26.md` để biết giới hạn và bước kiểm chứng còn lại.
 
 
 

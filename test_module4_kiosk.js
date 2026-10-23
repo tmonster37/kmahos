@@ -55,7 +55,8 @@ async function runTests() {
       phoneNumber: "0988776655",
       departmentId: deptId,
       isPriority: true,
-      priorityReason: "Người cao tuổi (≥ 75 tuổi)",
+      birthYear: 1944,
+      priorityReason: "Người cao tuổi (≥ 65 tuổi)",
       symptoms: "Tăng huyết áp, đau khớp gối"
     };
     const priorityRes = await fetch(`${BASE_URL}/bookings/kiosk`, {

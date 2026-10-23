@@ -17,7 +17,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DataIntegrityViolationException;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -34,6 +36,8 @@ public class CounterServiceImpl implements CounterService {
     private final BookingRepository bookingRepository;
     private final RoomRepository roomRepository;
     private final com.hospital.api.service.BookingService bookingService;
+    private final KioskDispatchTransactionService kioskDispatchTransactionService;
+    private final Clock clock;
 
     @PostConstruct
     @Transactional
@@ -101,7 +105,7 @@ public class CounterServiceImpl implements CounterService {
     @Override
     @Transactional(readOnly = true)
     public List<CounterResponse> getAllCounters() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
         List<Counter> counters = counterRepository.findAllByDeletedFalseOrderByDisplayOrderAsc();
         return counters.stream().map(counter -> {
             int waiting = counterTicketRepository.countByCounter_CounterIdAndTicketDateAndStatus(
@@ -124,7 +128,7 @@ public class CounterServiceImpl implements CounterService {
         assignmentRepository.findByCounter_CounterIdAndIsActiveTrueAndDeletedFalse(counterId)
                 .ifPresent(oldAssign -> {
                     oldAssign.setIsActive(false);
-                    oldAssign.setShiftEnd(LocalDateTime.now());
+                    oldAssign.setShiftEnd(LocalDateTime.now(clock));
                     assignmentRepository.save(oldAssign);
                 });
 
@@ -132,7 +136,7 @@ public class CounterServiceImpl implements CounterService {
         CounterAssignment newAssign = CounterAssignment.builder()
                 .counter(counter)
                 .staff(staff)
-                .shiftStart(LocalDateTime.now())
+                .shiftStart(LocalDateTime.now(clock))
                 .isActive(true)
                 .build();
         assignmentRepository.save(newAssign);
@@ -142,7 +146,7 @@ public class CounterServiceImpl implements CounterService {
         Counter saved = counterRepository.save(counter);
 
         int waiting = counterTicketRepository.countByCounter_CounterIdAndTicketDateAndStatus(
-                counterId, LocalDate.now(), CounterTicketStatus.WAITING
+                counterId, LocalDate.now(clock), CounterTicketStatus.WAITING
         );
         return CounterResponse.fromEntity(saved, waiting);
     }
@@ -156,7 +160,7 @@ public class CounterServiceImpl implements CounterService {
         assignmentRepository.findByCounter_CounterIdAndIsActiveTrueAndDeletedFalse(counterId)
                 .ifPresent(assign -> {
                     assign.setIsActive(false);
-                    assign.setShiftEnd(LocalDateTime.now());
+                    assign.setShiftEnd(LocalDateTime.now(clock));
                     assignmentRepository.save(assign);
                 });
 
@@ -165,7 +169,7 @@ public class CounterServiceImpl implements CounterService {
         Counter saved = counterRepository.save(counter);
 
         int waiting = counterTicketRepository.countByCounter_CounterIdAndTicketDateAndStatus(
-                counterId, LocalDate.now(), CounterTicketStatus.WAITING
+                counterId, LocalDate.now(clock), CounterTicketStatus.WAITING
         );
         return CounterResponse.fromEntity(saved, waiting);
     }
@@ -180,144 +184,36 @@ public class CounterServiceImpl implements CounterService {
         Counter saved = counterRepository.save(counter);
 
         int waiting = counterTicketRepository.countByCounter_CounterIdAndTicketDateAndStatus(
-                counterId, LocalDate.now(), CounterTicketStatus.WAITING
+                counterId, LocalDate.now(clock), CounterTicketStatus.WAITING
         );
         return CounterResponse.fromEntity(saved, waiting);
     }
 
     @Override
-    @Transactional
     public CounterTicketResponse dispatchFromKiosk(KioskDispatchRequest request) {
-        LocalDate today = LocalDate.now();
-
-        // 1. Phân loại đối tượng và loại quầy (Thuật toán Triage học từ revita-be)
-        CounterType targetType = CounterType.GENERAL;
-        String prefix = "TH-";
-        boolean isPriority = Boolean.TRUE.equals(request.isPriority());
-        String priorityReason = request.priorityReason();
-
-        int age = -1;
-        if (request.birthYear() != null && request.birthYear() > 1900 && request.birthYear() <= today.getYear()) {
-            age = today.getYear() - request.birthYear();
+        String key = request.idempotencyKey();
+        CounterTicket existing = counterTicketRepository.findByIdempotencyKeyAndDeletedFalse(key).orElse(null);
+        if (existing != null) {
+            int waitingBefore = existing.getWaitingBefore() != null ? existing.getWaitingBefore() : 0;
+            return CounterTicketResponse.fromEntity(existing, waitingBefore);
         }
 
-        if (age >= 65) {
-            isPriority = true;
-            priorityReason = (priorityReason != null && !priorityReason.isBlank())
-                    ? priorityReason : "Người cao tuổi (" + age + " tuổi)";
-        } else if (age >= 0 && age < 6) {
-            isPriority = true;
-            priorityReason = (priorityReason != null && !priorityReason.isBlank())
-                    ? priorityReason : "Trẻ nhỏ dưới 6 tuổi (" + age + " tuổi)";
-        }
-
-        if (isPriority) {
-            targetType = CounterType.PRIORITY;
-            prefix = "UT-";
-        } else if (request.bookingCode() != null && !request.bookingCode().isBlank()) {
-            targetType = CounterType.APPOINTMENT;
-            prefix = "AP-";
-        } else if (Boolean.TRUE.equals(request.hasInsurance())) {
-            targetType = CounterType.INSURANCE;
-            prefix = "BH-";
-        }
-
-        final CounterType finalTargetType = targetType;
-
-        // 2. Thuật toán Định tuyến Quầy & Cân bằng tải (Least-loaded Dispatching)
-        List<Counter> candidates = counterRepository.findAllByCounterTypeAndStatusAndDeletedFalse(finalTargetType, CounterStatus.OPEN);
-        if (candidates.isEmpty()) {
-            // Thử tìm các quầy đang BUSY
-            candidates = counterRepository.findAllByCounterTypeAndStatusAndDeletedFalse(finalTargetType, CounterStatus.BUSY);
-        }
-
-        // Nếu quầy chuyên biệt chưa mở, thử định tuyến sang các quầy GENERAL đang OPEN
-        if (candidates.isEmpty()) {
-            candidates = counterRepository.findAllByCounterTypeAndStatusAndDeletedFalse(CounterType.GENERAL, CounterStatus.OPEN);
-        }
-
-        // Nếu toàn bộ quầy đều đóng, lấy bất kỳ quầy phù hợp nào theo loại
-        if (candidates.isEmpty()) {
-            candidates = counterRepository.findAllByDeletedFalseOrderByDisplayOrderAsc().stream()
-                    .filter(c -> c.getCounterType() == finalTargetType)
-                    .toList();
-        }
-
-        // Fallback cuối cùng
-        if (candidates.isEmpty()) {
-            candidates = counterRepository.findAllByDeletedFalseOrderByDisplayOrderAsc();
-        }
-
-        if (candidates.isEmpty()) {
-            throw new AppException("Hệ thống quầy tiếp đón chưa được thiết lập!", HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-
-        // Chọn quầy có số người đang chờ ít nhất (Cân bằng tải)
-        Counter selectedCounter = candidates.stream()
-                .min(Comparator.comparingInt(c -> counterTicketRepository.countByCounter_CounterIdAndTicketDateAndStatus(
-                        c.getCounterId(), today, CounterTicketStatus.WAITING
-                )))
-                .orElse(candidates.get(0));
-
-        // 3. Cấp số thứ tự trong ngày theo loại quầy
-        int totalForType = counterTicketRepository.countByTicketDateAndCounterType(today, targetType);
-        int queueNumber = totalForType + 1;
-        String ticketCode = prefix + String.format("%02d", queueNumber);
-
-        // 4. Số người đang chờ trước
-        int waitingBefore = counterTicketRepository.countByCounter_CounterIdAndTicketDateAndStatus(
-                selectedCounter.getCounterId(), today, CounterTicketStatus.WAITING
-        );
-
-        Booking linkedBooking = null;
-        if (request.bookingCode() != null && !request.bookingCode().isBlank()) {
-            linkedBooking = bookingRepository.findByBookingCode(request.bookingCode()).orElse(null);
-        } else if (request.departmentId() != null) {
-            try {
-                com.hospital.api.dto.request.KioskBookingRequest kioskReq = new com.hospital.api.dto.request.KioskBookingRequest(
-                        request.fullName(),
-                        request.phoneNumber(),
-                        request.departmentId(),
-                        request.birthYear(),
-                        isPriority,
-                        priorityReason,
-                        Boolean.TRUE.equals(request.hasInsurance()) ? "Đăng ký khám BHYT" : "Khám dịch vụ tự động từ Kiosk"
-                );
-                com.hospital.api.dto.response.BookingResponse bkResp = bookingService.createKioskBooking(kioskReq);
-                if (bkResp != null && bkResp.bookingCode() != null) {
-                    linkedBooking = bookingRepository.findByBookingCode(bkResp.bookingCode()).orElse(null);
-                }
-            } catch (Exception e) {
-                log.warn("Không thể tạo tự động ca khám liên kết cho phiếu Kiosk: {}", e.getMessage());
+        try {
+            return kioskDispatchTransactionService.dispatch(request);
+        } catch (DataIntegrityViolationException duplicateKey) {
+            CounterTicket committed = counterTicketRepository.findByIdempotencyKeyAndDeletedFalse(key).orElse(null);
+            if (committed == null) {
+                throw duplicateKey;
             }
+            int waitingBefore = committed.getWaitingBefore() != null ? committed.getWaitingBefore() : 0;
+            return CounterTicketResponse.fromEntity(committed, waitingBefore);
         }
-
-        CounterTicket ticket = CounterTicket.builder()
-                .ticketCode(ticketCode)
-                .queueNumber(queueNumber)
-                .ticketDate(today)
-                .counterType(targetType)
-                .counter(selectedCounter)
-                .booking(linkedBooking)
-                .patientName(request.fullName())
-                .phoneNumber(request.phoneNumber())
-                .isPriority(isPriority)
-                .priorityReason(priorityReason)
-                .hasInsurance(Boolean.TRUE.equals(request.hasInsurance()))
-                .status(CounterTicketStatus.WAITING)
-                .build();
-
-        CounterTicket savedTicket = counterTicketRepository.save(ticket);
-        log.info("Cây Kiosk đã cấp phiếu {} định tuyến vào {} (Trước mặt: {} người)",
-                ticketCode, selectedCounter.getCounterName(), waitingBefore);
-
-        return CounterTicketResponse.fromEntity(savedTicket, waitingBefore);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<CounterTicketResponse> getQueueForCounter(Integer counterId) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
         List<CounterTicket> tickets = counterTicketRepository.findAllByCounter_CounterIdAndTicketDateOrderByQueueNumberAsc(
                 counterId, today
         );
@@ -335,7 +231,7 @@ public class CounterServiceImpl implements CounterService {
     @Override
     @Transactional
     public CounterTicketResponse callNextTicket(Integer counterId, UUID staffId) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
         Counter counter = counterRepository.findById(counterId)
                 .orElseThrow(() -> new AppException("Quầy không tồn tại", HttpStatus.NOT_FOUND));
 
@@ -346,7 +242,7 @@ public class CounterServiceImpl implements CounterService {
                 .orElseThrow(() -> new AppException("Hiện không còn bệnh nhân nào đang chờ tại quầy này!", HttpStatus.BAD_REQUEST));
 
         nextTicket.setStatus(CounterTicketStatus.CALLING);
-        nextTicket.setCalledAt(LocalDateTime.now());
+        nextTicket.setCalledAt(LocalDateTime.now(clock));
         CounterTicket saved = counterTicketRepository.save(nextTicket);
 
         // Cập nhật trạng thái hiển thị của quầy
@@ -366,7 +262,7 @@ public class CounterServiceImpl implements CounterService {
                 .orElseThrow(() -> new AppException("Phiếu tiếp đón không tồn tại", HttpStatus.NOT_FOUND));
 
         ticket.setStatus(CounterTicketStatus.SERVED);
-        ticket.setServedAt(LocalDateTime.now());
+        ticket.setServedAt(LocalDateTime.now(clock));
         if (request != null && request.targetRoomId() != null) {
             ticket.setDispatchedRoomId(request.targetRoomId());
         }

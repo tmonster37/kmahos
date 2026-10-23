@@ -153,6 +153,7 @@ const MOCK_RETURNING_PATIENTS = [
 export default function NurseReceptionPage() {
     const [queueList, setQueueList] = useState([]);
     const [departments, setDepartments] = useState([]);
+    const [allRooms, setAllRooms] = useState([]);
     const [selectedDepartment, setSelectedDepartment] = useState("ALL");
     const [searchKeyword, setSearchKeyword] = useState("");
     const [feedback, setFeedback] = useState({ type: "", message: "" });
@@ -359,7 +360,7 @@ export default function NurseReceptionPage() {
 
     const fetchQueueOnly = async () => {
         try {
-            const queueRes = await axiosInstance.get("/api/clinical/queue/public").catch(() => null);
+            const queueRes = await axiosInstance.get("/api/nurse/reception/queue").catch(() => null);
             if (queueRes && queueRes.data && Array.isArray(queueRes.data)) {
                 if (queueRes.data.length === 0) {
                     setQueueList([]);
@@ -374,8 +375,9 @@ export default function NurseReceptionPage() {
                         departmentId: item.departmentId,
                         roomName: item.roomName || "Phòng 101",
                         doctorName: item.doctorName || "BS. Phụ trách",
-                        status: item.status === "IN_PROGRESS" ? "EXAMINING" : item.status,
-                        checkInTime: item.appointmentTime ? item.appointmentTime.slice(11, 16) : "08:00",
+                        status: item.status === "IN_PROGRESS" ? "EXAMINING" : item.status === "CONFIRMED" ? "WAITING" : item.status,
+                        checkedInAt: item.checkedInAt || null,
+                        checkInTime: item.checkedInAt?.slice(11, 16) || item.startTime || "08:00",
                         symptoms: item.symptoms || "Khám theo chuyên khoa"
                     }));
                     setQueueList(mapped);
@@ -388,9 +390,14 @@ export default function NurseReceptionPage() {
 
     const loadData = async () => {
         try {
-            const deptRes = await axiosInstance.get("/api/departments").catch(() => ({ data: [] }));
-            if (deptRes.data && Array.isArray(deptRes.data) && deptRes.data.length > 0) {
-                setDepartments(deptRes.data);
+            const [deptRes, roomRes] = await Promise.all([
+                axiosInstance.get("/api/departments").catch(() => ({ data: [] })),
+                axiosInstance.get("/api/departments/rooms/all").catch(() => ({ data: [] }))
+            ]);
+
+            const deptData = deptRes.data?.data || deptRes.data || [];
+            if (Array.isArray(deptData) && deptData.length > 0) {
+                setDepartments(deptData);
             } else {
                 setDepartments([
                     { departmentId: "1", departmentName: "Khoa Nội Tổng Quát" },
@@ -399,6 +406,11 @@ export default function NurseReceptionPage() {
                     { departmentId: "4", departmentName: "Khoa Tai Mũi Họng" },
                     { departmentId: "5", departmentName: "Khoa Tim Mạch" },
                 ]);
+            }
+
+            const roomData = roomRes.data?.data || roomRes.data || [];
+            if (Array.isArray(roomData) && roomData.length > 0) {
+                setAllRooms(roomData);
             }
 
             await fetchQueueOnly();
@@ -411,10 +423,15 @@ export default function NurseReceptionPage() {
     // Thống kê tải thực tế của từng phòng theo DepartmentId
     const getDepartmentRoomStats = (deptId) => {
         const idStr = String(deptId || "1");
-        const defaultRooms = DEPARTMENT_ROOMS[idStr] || [
+        const deptRooms = allRooms.filter(r => String(r.departmentId) === idStr && r.isActive !== false);
+        const defaultRooms = deptRooms.length > 0 ? deptRooms.map(r => ({
+            roomId: String(r.roomId),
+            roomName: r.roomName,
+            doctorName: "Bác sĩ phụ trách"
+        })) : (DEPARTMENT_ROOMS[idStr] || [
             { roomId: "101", roomName: "Phòng 101", doctorName: "BS. Trực Buồng" },
             { roomId: "102", roomName: "Phòng 102", doctorName: "BS. Khám 2" }
-        ];
+        ]);
 
         return defaultRooms.map(room => {
             const waitingCount = queueList.filter(q => 
@@ -673,7 +690,7 @@ export default function NurseReceptionPage() {
     };
 
     // Cập nhật số thứ tự & trạng thái hàng đợi
-    const handleUpdateStatus = (bookingId, newStatus) => {
+    const handleUpdateStatus = async (bookingId, newStatus) => {
         setQueueList(prev => prev.map(item => {
             if (item.bookingId === bookingId) {
                 return { ...item, status: newStatus };
@@ -681,8 +698,16 @@ export default function NurseReceptionPage() {
             return item;
         }));
 
+        try {
+            const backendStatus = newStatus === "EXAMINING" ? "IN_PROGRESS" : newStatus;
+            await axiosInstance.put(`/api/nurse/reception/bookings/${bookingId}/status?status=${backendStatus}`);
+        } catch (err) {
+            console.error("Lỗi cập nhật trạng thái lên máy chủ:", err);
+        }
+
         const statusLabels = {
             EXAMINING: "ĐANG KHÁM TẠI PHÒNG",
+            IN_PROGRESS: "ĐANG KHÁM TẠI PHÒNG",
             COMPLETED: "ĐÃ KHÁM XONG",
             CANCELLED: "VẮNG MẶT / HỦY"
         };
@@ -721,19 +746,64 @@ export default function NurseReceptionPage() {
 
     return (
         <Container maxWidth="xl" sx={{ py: 3 }}>
-            {/* Header Phân Hệ Điều Dưỡng */}
-            <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2} mb={3}>
-                <Box>
-                    <Typography variant="h5" fontWeight="900" color="#0F172A" sx={{ letterSpacing: "-0.5px", display: "flex", alignItems: "center", gap: 1 }}>
-                        <HowToRegIcon sx={{ color: "#0088D6", fontSize: 32 }} />
-                        Phân Hệ Tiếp Đón & Điều Phối Bệnh Nhân Thông Minh (SmartHIS)
-                    </Typography>
-                    <Typography variant="body2" color="textSecondary">
-                        Tra cứu nhanh lịch sử bệnh nhân cũ, cân bằng tải buồng khám tự động, in phiếu nhiệt mã vạch check-in
-                    </Typography>
+            {/* Header Phân Hệ Điều Dưỡng (Apple HIG + Linear) */}
+            <Paper
+                elevation={0}
+                sx={{
+                    p: { xs: 2.5, md: 3 },
+                    mb: 3,
+                    borderRadius: 3.5,
+                    bgcolor: "#FFFFFF",
+                    border: "1px solid rgba(15, 23, 42, 0.08)",
+                    boxShadow: "0 4px 20px rgba(15, 23, 42, 0.03)",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    gap: 2
+                }}
+            >
+                <Box display="flex" alignItems="center" gap={2}>
+                    <Box
+                        sx={{
+                            width: 48,
+                            height: 48,
+                            borderRadius: "14px",
+                            bgcolor: "rgba(0, 136, 214, 0.1)",
+                            color: "#0088D6",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            boxShadow: "0 4px 14px rgba(0, 136, 214, 0.2)"
+                        }}
+                    >
+                        <HowToRegIcon sx={{ fontSize: 28 }} />
+                    </Box>
+                    <Box>
+                        <Box display="flex" alignItems="center" gap={1}>
+                            <Typography variant="h6" fontWeight={800} color="#0F172A" letterSpacing="-0.02em">
+                                Tiếp Đón & Điều Phối Khám Bệnh
+                            </Typography>
+                            <Chip
+                                label="SmartHIS Nurse Pro"
+                                size="small"
+                                sx={{
+                                    height: 22,
+                                    fontSize: "0.72rem",
+                                    fontWeight: 700,
+                                    bgcolor: "rgba(0, 136, 214, 0.1)",
+                                    color: "#0088D6",
+                                    border: "1px solid rgba(0, 136, 214, 0.2)"
+                                }}
+                            />
+                        </Box>
+                        <Typography variant="body2" sx={{ color: "#64748B", mt: 0.2 }}>
+                            Tra cứu hồ sơ cũ tái khám, cân bằng tải buồng khám tự động & in phiếu nhiệt mã vạch check-in
+                        </Typography>
+                    </Box>
                 </Box>
 
-                <Box display="flex" gap={1.2} flexWrap="wrap">
+                <Box display="flex" gap={1.2} flexWrap="wrap" alignItems="center">
                     {/* CỤM NÚT KHỞI CHẠY THIẾT BỊ SẢNH (KIOSK & TV) */}
                     <Button
                         variant="outlined"
@@ -742,8 +812,10 @@ export default function NurseReceptionPage() {
                         target="_blank"
                         startIcon={<QrCodeScannerIcon sx={{ color: "#D97706" }} />}
                         sx={{
-                            borderRadius: 2.5,
+                            borderRadius: 2.2,
                             fontWeight: 700,
+                            textTransform: "none",
+                            fontSize: "0.82rem",
                             color: "#B45309",
                             borderColor: "#FDE68A",
                             bgcolor: "#FFFBEB",
@@ -759,8 +831,10 @@ export default function NurseReceptionPage() {
                         target="_blank"
                         startIcon={<TvIcon sx={{ color: "#6366F1" }} />}
                         sx={{
-                            borderRadius: 2.5,
+                            borderRadius: 2.2,
                             fontWeight: 700,
+                            textTransform: "none",
+                            fontSize: "0.82rem",
                             color: "#4338CA",
                             borderColor: "#C7D2FE",
                             bgcolor: "#EEF2FF",
@@ -769,12 +843,19 @@ export default function NurseReceptionPage() {
                     >
                         Mở LED TV Gọi Số
                     </Button>
-                    <Divider orientation="vertical" flexItem sx={{ height: 32, my: "auto" }} />
+                    <Divider orientation="vertical" flexItem sx={{ height: 28, my: "auto" }} />
                     <Button
                         variant="outlined"
                         startIcon={<RefreshIcon />}
                         onClick={loadData}
-                        sx={{ borderRadius: 2.5, fontWeight: 700 }}
+                        sx={{
+                            borderRadius: 2.2,
+                            fontWeight: 700,
+                            textTransform: "none",
+                            fontSize: "0.82rem",
+                            color: "#475569",
+                            borderColor: "rgba(15, 23, 42, 0.15)"
+                        }}
                     >
                         Làm mới
                     </Button>
@@ -789,33 +870,37 @@ export default function NurseReceptionPage() {
                             }
                         }}
                         sx={{
-                            borderRadius: 2.5,
+                            borderRadius: 2.2,
                             fontWeight: 700,
+                            textTransform: "none",
+                            fontSize: "0.85rem",
                             bgcolor: "#0088D6",
-                            boxShadow: "0 6px 16px rgba(0, 136, 214, 0.25)",
-                            "&:hover": { bgcolor: "#0077BC" }
+                            boxShadow: "0 4px 14px rgba(0, 136, 214, 0.25)",
+                            "&:hover": { bgcolor: "#0073B7" }
                         }}
                     >
-                        Tiếp Nhận & Cấp STT Mới
+                        Tiếp Nhận & Cấp STT
                     </Button>
 
-                    {/* NÚT QUÉT QR TIẾP ĐÓN TRONG 5S (ROLE_NURSE / ROLE_ADMIN) */}
+                    {/* NÚT QUÉT QR TIẾP ĐÓN TRONG 5S */}
                     <Button
                         variant="contained"
                         startIcon={<QrCodeScannerIcon />}
                         onClick={() => setOpenQrCheckInDialog(true)}
                         sx={{
-                            borderRadius: 2.5,
+                            borderRadius: 2.2,
                             fontWeight: 700,
+                            textTransform: "none",
+                            fontSize: "0.85rem",
                             bgcolor: "#059669",
-                            boxShadow: "0 6px 16px rgba(5, 150, 105, 0.25)",
+                            boxShadow: "0 4px 14px rgba(5, 150, 105, 0.25)",
                             "&:hover": { bgcolor: "#047857" }
                         }}
                     >
-                        Quét QR Tiếp Đón (5s)
+                        Quét QR Tiếp Đón
                     </Button>
 
-                    {/* NÚT THU VIỆN PHÍ TẠI QUẦY (PAY_AT_CLINIC) XUẤT HÓA ĐƠN A5 */}
+                    {/* NÚT THU VIỆN PHÍ TẠI QUẦY */}
                     <Button
                         variant="contained"
                         startIcon={<ReceiptLongIcon />}
@@ -831,17 +916,19 @@ export default function NurseReceptionPage() {
                             setOpenPayDialog(true);
                         }}
                         sx={{
-                            borderRadius: 2.5,
+                            borderRadius: 2.2,
                             fontWeight: 700,
+                            textTransform: "none",
+                            fontSize: "0.85rem",
                             bgcolor: "#7C3AED",
-                            boxShadow: "0 6px 16px rgba(124, 58, 237, 0.25)",
+                            boxShadow: "0 4px 14px rgba(124, 58, 237, 0.25)",
                             "&:hover": { bgcolor: "#6D28D9" }
                         }}
                     >
-                        Thu Viện Phí Tại Quầy
+                        Thu Viện Phí
                     </Button>
                 </Box>
-            </Box>
+            </Paper>
 
             {feedback.message && (
                 <Alert severity={feedback.type || "info"} sx={{ mb: 2.5, borderRadius: 2 }} onClose={() => setFeedback({ type: "", message: "" })}>
@@ -1317,7 +1404,15 @@ export default function NurseReceptionPage() {
                                             {item.symptoms}
                                         </TableCell>
                                         <TableCell sx={{ fontWeight: 600, color: "#64748B" }}>
-                                            {item.checkInTime}
+                                            <Stack spacing={0.5} alignItems="flex-start">
+                                                <Typography variant="body2">{item.checkInTime}</Typography>
+                                                <Chip
+                                                    label={item.checkedInAt ? "Đã check-in kiosk" : "Chưa check-in kiosk"}
+                                                    size="small"
+                                                    color={item.checkedInAt ? "success" : "default"}
+                                                    variant={item.checkedInAt ? "filled" : "outlined"}
+                                                />
+                                            </Stack>
                                         </TableCell>
                                         <TableCell align="center">
                                             {item.status === "WAITING" && <Chip label="Đang chờ gọi" color="warning" size="small" sx={{ fontWeight: 700 }} />}

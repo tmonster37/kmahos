@@ -124,11 +124,34 @@ public class ClinicalExaminationServiceImpl implements ClinicalExaminationServic
         } catch (Exception ignored) {}
     }
 
+    private boolean isConsultationFeePaid(Booking booking) {
+        if (booking == null) return true;
+        if (booking.getPrice() == null || booking.getPrice().compareTo(BigDecimal.ZERO) <= 0) {
+            return true;
+        }
+        if (Boolean.TRUE.equals(booking.getIsPriority())) {
+            return true;
+        }
+        if (booking.getStatus() == BookingStatus.IN_PROGRESS || booking.getStatus() == BookingStatus.COMPLETED) {
+            return true;
+        }
+        String code = booking.getBookingCode();
+        return transactionRepository.existsByDescriptionContainingAndStatus(code, "SUCCESS");
+    }
+
     @Override
     @Transactional
     public MedicalRecordResponse startExamination(UUID doctorAccountId, StartExaminationRequest request) {
         Booking booking = bookingRepository.findByBookingCode(request.bookingCode())
                 .orElseThrow(() -> new AppException("Không tìm thấy mã đặt khám: " + request.bookingCode(), HttpStatus.NOT_FOUND));
+
+        if (!isConsultationFeePaid(booking)) {
+            throw new AppException(
+                    "Lượt khám [" + booking.getBookingCode() + "] chưa hoàn tất thanh toán tiền công khám ban đầu ("
+                    + (booking.getPrice() != null ? booking.getPrice() : BigDecimal.ZERO) + " VNĐ). Vui lòng hướng dẫn bệnh nhân thanh toán tại quầy tiếp đón hoặc qua VietQR trước khi vào khám.",
+                    HttpStatus.PAYMENT_REQUIRED
+            );
+        }
 
         Doctor doctor = doctorRepository.findByAccount_UserId(doctorAccountId)
                 .orElseGet(() -> doctorRepository.findAll().stream().findFirst()
@@ -265,10 +288,11 @@ public class ClinicalExaminationServiceImpl implements ClinicalExaminationServic
                 "TEST_RESULT_READY"
         );
 
-        // Kiểm tra xem tất cả các xét nghiệm của record này đã xong chưa
+        // Kiểm tra xem tất cả các xét nghiệm của record này đã xong hoặc hủy chưa
         MedicalExaminationRecord record = test.getMedicalRecord();
-        boolean allDone = record.getMedicalTests().stream().allMatch(t -> t.getState() == MedicalTestState.COMPLETED);
-        if (allDone) {
+        boolean allDone = record.getMedicalTests().stream()
+                .allMatch(t -> t.getState() == MedicalTestState.COMPLETED || t.getState() == MedicalTestState.CANCELLED);
+        if (allDone && record.getState() == MedicalExamState.IN_TESTING) {
             record.setState(MedicalExamState.DIAGNOSING);
             recordRepository.save(record);
         }
@@ -376,6 +400,7 @@ public class ClinicalExaminationServiceImpl implements ClinicalExaminationServic
         record.setCompletedAt(LocalDateTime.now());
         if (record.getBooking() != null) {
             record.getBooking().setStatus(BookingStatus.COMPLETED);
+            bookingRepository.save(record.getBooking());
         }
 
         MedicalExaminationRecord saved = recordRepository.save(record);
@@ -470,9 +495,11 @@ public class ClinicalExaminationServiceImpl implements ClinicalExaminationServic
         prescription.setPrescriptionItems(items);
         Prescription savedPrescription = prescriptionRepository.save(prescription);
 
-        // Đánh dấu hoàn thành buổi khám
         record.setState(MedicalExamState.DONE);
-        record.getBooking().setStatus(BookingStatus.COMPLETED);
+        if (record.getBooking() != null) {
+            record.getBooking().setStatus(BookingStatus.COMPLETED);
+            bookingRepository.save(record.getBooking());
+        }
         if (record.getCompletedAt() == null) {
             record.setCompletedAt(LocalDateTime.now());
         }
@@ -810,10 +837,11 @@ public class ClinicalExaminationServiceImpl implements ClinicalExaminationServic
             }
         }
 
-        // Kiểm tra xem tất cả các xét nghiệm của record này đã xong chưa
+        // Kiểm tra xem tất cả các xét nghiệm của record này đã xong hoặc hủy chưa
         MedicalExaminationRecord record = test.getMedicalRecord();
-        boolean allDone = record.getMedicalTests().stream().allMatch(t -> t.getState() == MedicalTestState.COMPLETED);
-        if (allDone) {
+        boolean allDone = record.getMedicalTests().stream()
+                .allMatch(t -> t.getState() == MedicalTestState.COMPLETED || t.getState() == MedicalTestState.CANCELLED);
+        if (allDone && record.getState() == MedicalExamState.IN_TESTING) {
             record.setState(MedicalExamState.DIAGNOSING);
             recordRepository.save(record);
         }
@@ -840,6 +868,46 @@ public class ClinicalExaminationServiceImpl implements ClinicalExaminationServic
         );
 
         return LabTestDetailResponse.fromEntity(savedTest, isTestPaid(savedTest));
+    }
+
+    @Override
+    @Transactional
+    public MedicalTestResponse cancelMedicalTest(UUID testId, String reason) {
+        MedicalTest test = testRepository.findById(testId)
+                .orElseThrow(() -> new AppException("Không tìm thấy chỉ định xét nghiệm", HttpStatus.NOT_FOUND));
+
+        if (test.getState() == MedicalTestState.COMPLETED) {
+            throw new AppException("Không thể hủy chỉ định xét nghiệm đã có kết quả hoàn tất!", HttpStatus.BAD_REQUEST);
+        }
+
+        test.setState(MedicalTestState.CANCELLED);
+        String cancelNote = "[ĐÃ HỦY CHỈ ĐỊNH]: " + (reason != null && !reason.isBlank() ? reason.trim() : "Bác sĩ / Bệnh nhân yêu cầu hủy");
+        test.setTestResult(cancelNote);
+        MedicalTest saved = testRepository.save(test);
+
+        // Kiểm tra xem các xét nghiệm còn lại đã hoàn tất hoặc bị hủy hết chưa để chuyển sang DIAGNOSING
+        MedicalExaminationRecord record = test.getMedicalRecord();
+        if (record != null && record.getMedicalTests() != null) {
+            boolean allDone = record.getMedicalTests().stream()
+                    .allMatch(t -> t.getState() == MedicalTestState.COMPLETED || t.getState() == MedicalTestState.CANCELLED);
+            if (allDone && record.getState() == MedicalExamState.IN_TESTING) {
+                record.setState(MedicalExamState.DIAGNOSING);
+                recordRepository.save(record);
+            }
+        }
+
+        auditLogService.log(
+                null,
+                "Bác sĩ / KTV",
+                "ROLE_DOCTOR",
+                "CANCEL_MEDICAL_TEST",
+                "MEDICAL_TEST",
+                test.getMedicalTestId().toString(),
+                "Hủy chỉ định xét nghiệm " + test.getMedicalService().getServiceName() + ". Lý do: " + cancelNote,
+                null
+        );
+
+        return MedicalTestResponse.fromEntity(saved, isTestPaid(saved));
     }
 
 

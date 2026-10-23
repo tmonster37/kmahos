@@ -57,6 +57,7 @@ export default function ClinicalLayout() {
 
     const [userMenuAnchor, setUserMenuAnchor] = useState(null);
     const [deviceMenuAnchor, setDeviceMenuAnchor] = useState(null);
+    const [pharmacyMenuAnchor, setPharmacyMenuAnchor] = useState(null);
     const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -64,6 +65,8 @@ export default function ClinicalLayout() {
     const handleUserMenuClose = () => setUserMenuAnchor(null);
     const handleDeviceMenuOpen = (e) => setDeviceMenuAnchor(e.currentTarget);
     const handleDeviceMenuClose = () => setDeviceMenuAnchor(null);
+    const handlePharmacyMenuOpen = (e) => setPharmacyMenuAnchor(e.currentTarget);
+    const handlePharmacyMenuClose = () => setPharmacyMenuAnchor(null);
 
     const handleLogout = () => {
         handleUserMenuClose();
@@ -109,23 +112,23 @@ export default function ClinicalLayout() {
             });
         }
 
-        // 3. Phân hệ Buồng Bệnh Nội Trú (Bác sĩ, Điều dưỡng, Trưởng khoa, Admin)
-        if (role === "ROLE_DOCTOR" || role === "ROLE_HEAD_OF_DEPARTMENT" || role === "ROLE_NURSE" || role === "ROLE_ADMIN") {
-            items.push({
-                text: "Nội trú",
-                fullName: "Quản Lý Điều Trị Nội Trú",
-                path: "/doctor/inpatient",
-                icon: <HotelIcon sx={{ fontSize: 17 }} />
-            });
-        }
-
-        // 4. Phân hệ Xét Nghiệm CLS (KTV Xét nghiệm, Bác sĩ, Trưởng khoa, Admin)
+        // 3. Phân hệ Xét Nghiệm CLS (KTV Xét nghiệm, Bác sĩ, Trưởng khoa, Admin)
         if (role === "ROLE_LAB_TECHNICIAN" || role === "ROLE_DOCTOR" || role === "ROLE_HEAD_OF_DEPARTMENT" || role === "ROLE_ADMIN") {
             items.push({
                 text: "Xét nghiệm",
                 fullName: "Phòng Xét Nghiệm & Kết Quả",
                 path: "/doctor/lab-tests",
                 icon: <ScienceIcon sx={{ fontSize: 17 }} />
+            });
+        }
+
+        // 4. Phân hệ Buồng Bệnh Nội Trú (Bác sĩ, Điều dưỡng, Trưởng khoa, Admin)
+        if (role === "ROLE_DOCTOR" || role === "ROLE_HEAD_OF_DEPARTMENT" || role === "ROLE_NURSE" || role === "ROLE_ADMIN") {
+            items.push({
+                text: "Nội trú",
+                fullName: "Quản Lý Điều Trị Nội Trú",
+                path: "/doctor/inpatient",
+                icon: <HotelIcon sx={{ fontSize: 17 }} />
             });
         }
 
@@ -139,30 +142,37 @@ export default function ClinicalLayout() {
             });
         }
 
-        // 6. Phân hệ Chat Bác Sĩ (Bác sĩ, Trưởng khoa)
+        // 6. Phân hệ Dược sĩ & Kho Dược (Dược sĩ, Admin) - Gom thành nhóm phân hệ Dược thông minh, tiết kiệm diện tích
+        if (role === "ROLE_PHARMACIST" || role === "ROLE_ADMIN") {
+            items.push({
+                id: "pharmacy",
+                text: "Dược & Kho",
+                fullName: "Quản Lý Dược Phẩm & Kho Thuốc",
+                icon: <MedicationIcon sx={{ fontSize: 17 }} />,
+                children: [
+                    {
+                        text: "Kho Dược Đa Cấp & FEFO",
+                        desc: "Nhập, xuất, tồn & quản lý hạn dùng lô",
+                        path: "/admin/pharmacy-inventory",
+                        icon: <Inventory2Icon sx={{ fontSize: 18, color: "#7C3AED" }} />
+                    },
+                    {
+                        text: "Danh Mục Thuốc & Hoạt Chất",
+                        desc: "Hoạt chất, biệt dược & giá bán",
+                        path: "/admin/medicines",
+                        icon: <MedicationIcon sx={{ fontSize: 18, color: "#0088D6" }} />
+                    }
+                ]
+            });
+        }
+
+        // 7. Phân hệ Chat Bác Sĩ (Bác sĩ, Trưởng khoa)
         if (role === "ROLE_DOCTOR" || role === "ROLE_HEAD_OF_DEPARTMENT") {
             items.push({
                 text: "Tư vấn",
                 fullName: "Phòng Tư Vấn Bệnh Nhân",
                 path: "/doctor/chat",
                 icon: <ChatIcon sx={{ fontSize: 17 }} />
-            });
-        }
-
-
-        // 8. Phân hệ Dược sĩ & Kho Dược (Dược sĩ, Admin)
-        if (role === "ROLE_PHARMACIST" || role === "ROLE_ADMIN") {
-            items.push({
-                text: "Kho dược",
-                fullName: "Kho Dược Đa Cấp & FEFO",
-                path: "/admin/pharmacy-inventory",
-                icon: <Inventory2Icon sx={{ fontSize: 17 }} />
-            });
-            items.push({
-                text: "Danh mục thuốc",
-                fullName: "Quản Lý Thuốc & Dược Phẩm",
-                path: "/admin/medicines",
-                icon: <MedicationIcon sx={{ fontSize: 17 }} />
             });
         }
 
@@ -187,7 +197,7 @@ export default function ClinicalLayout() {
             case "ROLE_PHARMACIST":
                 return { label: "Dược Sĩ", bgColor: "#F5F3FF", textColor: "#7C3AED", borderColor: "#DDD6FE" };
             case "ROLE_ADMIN":
-                return { label: "Quản Trị", bgColor: "#FEE2E2", textColor: "#DC2626", borderColor: "#FECACA" };
+                return { label: "Quản Trị", bgColor: "#EEF2FF", textColor: "#4F46E5", borderColor: "#C7D2FE" };
             default:
                 return { label: "Nhân Viên", bgColor: "#F1F5F9", textColor: "#475569", borderColor: "#E2E8F0" };
         }
@@ -195,10 +205,13 @@ export default function ClinicalLayout() {
 
     const roleBadge = getRoleBadge();
 
-    // Rút gọn tên nhân viên hiển thị thông minh (tránh lỗi ngắt chữ "Viên (Tài)")
+    // Rút gọn tên nhân viên hiển thị thông minh (giữ nguyên "Quản Trị Viên" thay vì bị ngắt thành "Trị Viên")
     const getDisplayName = () => {
         if (!user?.fullName) return "Nhân viên";
         const cleanName = user.fullName.replace(/\s*\(.*?\)\s*/g, "").trim();
+        if (cleanName === "Quản Trị Viên" || cleanName.length <= 14) {
+            return cleanName;
+        }
         const parts = cleanName.split(/\s+/);
         if (parts.length >= 2) {
             return parts.slice(-2).join(" ");
@@ -267,20 +280,17 @@ export default function ClinicalLayout() {
                             }}
                         >
                             <Box
+                                component="img"
+                                src="/images/logo.png"
+                                alt="Logo Bệnh Viện TNT"
                                 sx={{
-                                    width: 30,
-                                    height: 30,
+                                    width: 32,
+                                    height: 32,
                                     borderRadius: "8px",
-                                    background: `linear-gradient(135deg, ${designTokens.brand.primary} 0%, ${designTokens.secondary.main} 100%)`,
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    color: "#FFFFFF",
-                                    boxShadow: "0 2px 6px rgba(0, 136, 214, 0.25)"
+                                    objectFit: "contain",
+                                    filter: "drop-shadow(0 2px 6px rgba(13, 148, 136, 0.25))"
                                 }}
-                            >
-                                <LocalHospitalIcon sx={{ fontSize: 18 }} />
-                            </Box>
+                            />
                             <Box sx={{ display: { xs: "none", sm: "block" } }}>
                                 <Typography
                                     variant="subtitle2"
@@ -325,6 +335,89 @@ export default function ClinicalLayout() {
                             }}
                         >
                             {navItems.map((item) => {
+                                if (item.children) {
+                                    const isChildActive = item.children.some((child) => isActive(child.path));
+                                    return (
+                                        <React.Fragment key={item.id || item.text}>
+                                            <Tooltip title={item.fullName} arrow enterDelay={400}>
+                                                <Button
+                                                    size="small"
+                                                    startIcon={item.icon}
+                                                    endIcon={<KeyboardArrowDownIcon sx={{ fontSize: 13 }} />}
+                                                    onClick={handlePharmacyMenuOpen}
+                                                    sx={{
+                                                        textTransform: "none",
+                                                        fontWeight: isChildActive ? 700 : 600,
+                                                        fontSize: "0.825rem",
+                                                        borderRadius: "20px",
+                                                        px: 1.2,
+                                                        py: 0.45,
+                                                        minHeight: "32px",
+                                                        whiteSpace: "nowrap",
+                                                        flexShrink: 0,
+                                                        bgcolor: isChildActive ? designTokens.brand.primaryLight : "transparent",
+                                                        color: isChildActive ? designTokens.brand.primaryDark : designTokens.neutral.textSecondary,
+                                                        border: isChildActive ? `1px solid ${designTokens.brand.primaryBorder}` : "1px solid transparent",
+                                                        boxShadow: isChildActive ? "0 1px 3px rgba(0, 136, 214, 0.12)" : "none",
+                                                        transition: "all 0.15s ease-in-out",
+                                                        "&:hover": {
+                                                            bgcolor: isChildActive ? designTokens.brand.primaryLight : designTokens.neutral.hoverBg,
+                                                            color: designTokens.brand.primary
+                                                        }
+                                                    }}
+                                                >
+                                                    {item.text}
+                                                </Button>
+                                            </Tooltip>
+                                            <Menu
+                                                anchorEl={pharmacyMenuAnchor}
+                                                open={Boolean(pharmacyMenuAnchor)}
+                                                onClose={handlePharmacyMenuClose}
+                                                anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+                                                transformOrigin={{ vertical: "top", horizontal: "left" }}
+                                                PaperProps={{
+                                                    elevation: 4,
+                                                    sx: {
+                                                        borderRadius: 2.5,
+                                                        minWidth: 260,
+                                                        mt: 0.8,
+                                                        boxShadow: "0 10px 25px rgba(0,0,0,0.08)",
+                                                        border: "1px solid rgba(226, 232, 240, 0.9)",
+                                                        p: 0.5
+                                                    }
+                                                }}
+                                            >
+                                                {item.children.map((child) => {
+                                                    const childActive = isActive(child.path);
+                                                    return (
+                                                        <MenuItem
+                                                            key={child.path}
+                                                            component={Link}
+                                                            to={child.path}
+                                                            onClick={handlePharmacyMenuClose}
+                                                            selected={childActive}
+                                                            sx={{
+                                                                borderRadius: 2,
+                                                                my: 0.3,
+                                                                bgcolor: childActive ? designTokens.brand.primaryLight : "transparent",
+                                                                "&:hover": { bgcolor: designTokens.neutral.hoverBg }
+                                                            }}
+                                                        >
+                                                            <ListItemIcon sx={{ minWidth: 32 }}>{child.icon}</ListItemIcon>
+                                                            <ListItemText
+                                                                primary={child.text}
+                                                                secondary={child.desc}
+                                                                primaryTypographyProps={{ fontSize: "0.825rem", fontWeight: childActive ? 700 : 600 }}
+                                                                secondaryTypographyProps={{ fontSize: "0.7rem" }}
+                                                            />
+                                                        </MenuItem>
+                                                    );
+                                                })}
+                                            </Menu>
+                                        </React.Fragment>
+                                    );
+                                }
+
                                 const active = isActive(item.path);
                                 return (
                                     <Tooltip key={item.path} title={item.fullName} arrow enterDelay={400}>
@@ -338,7 +431,7 @@ export default function ClinicalLayout() {
                                                 fontWeight: active ? 700 : 600,
                                                 fontSize: "0.825rem",
                                                 borderRadius: "20px",
-                                                px: 1.5,
+                                                px: 1.2,
                                                 py: 0.45,
                                                 minHeight: "32px",
                                                 whiteSpace: "nowrap",
@@ -363,10 +456,10 @@ export default function ClinicalLayout() {
                     </Box>
 
                     {/* CỤM PHẢI: Chuyển cổng, Toàn màn hình, Thông báo, Tài khoản (Gọn gàng, không tràn mép) */}
-                    <Box display="flex" alignItems="center" gap={1} sx={{ flexShrink: 0 }}>
+                    <Box display="flex" alignItems="center" gap={0.8} sx={{ flexShrink: 0 }}>
                         {/* Nút sang Cổng Quản Trị dành riêng cho Admin / Trưởng khoa */}
                         {(role === "ROLE_ADMIN" || role === "ROLE_HEAD_OF_DEPARTMENT") && (
-                            <Tooltip title="Mở Cổng Quản Trị Hệ Thống">
+                            <Tooltip title="Chuyển sang Cổng Quản Trị Hệ Thống">
                                 <Button
                                     component={Link}
                                     to="/admin/dashboard"
@@ -378,16 +471,23 @@ export default function ClinicalLayout() {
                                         textTransform: "none",
                                         fontWeight: 700,
                                         fontSize: "0.78rem",
-                                        py: 0.4,
-                                        px: 1.2,
+                                        py: 0.35,
+                                        px: 1.1,
                                         height: "30px",
                                         borderRadius: "8px",
                                         whiteSpace: "nowrap",
                                         flexShrink: 0,
-                                        display: { xs: "none", sm: "inline-flex" }
+                                        bgcolor: "#EEF2FF",
+                                        color: "#4F46E5",
+                                        borderColor: "#C7D2FE",
+                                        display: { xs: "none", sm: "inline-flex" },
+                                        "&:hover": {
+                                            bgcolor: "#E0E7FF",
+                                            borderColor: "#818CF8"
+                                        }
                                     }}
                                 >
-                                    Cổng Quản Trị
+                                    Quản Trị
                                 </Button>
                             </Tooltip>
                         )}
@@ -395,44 +495,48 @@ export default function ClinicalLayout() {
                         {/* Phím mở Thiết Bị Sảnh (Kiosk & Màn hình LED TV) */}
                         {(role === "ROLE_NURSE" || role === "ROLE_CASHIER" || role === "ROLE_ADMIN" || role === "ROLE_HEAD_OF_DEPARTMENT") && (
                             <>
-                                <Tooltip title="Mở thiết bị sảnh tiếp đón (Kiosk cảm ứng & Màn hình LED TV)">
+                                <Tooltip title="Thiết Bị Sảnh Tiếp Đón (Cây Kiosk Bốc Số & Màn Hình TV LED Gọi STT)">
                                     <Button
                                         size="small"
                                         variant="outlined"
                                         onClick={handleDeviceMenuOpen}
                                         startIcon={<DevicesIcon sx={{ fontSize: 16 }} />}
-                                        endIcon={<KeyboardArrowDownIcon sx={{ fontSize: 14 }} />}
+                                        endIcon={<KeyboardArrowDownIcon sx={{ fontSize: 13 }} />}
                                         sx={{
                                             textTransform: "none",
                                             fontWeight: 700,
                                             fontSize: "0.78rem",
-                                            py: 0.4,
-                                            px: 1.2,
+                                            py: 0.35,
+                                            px: 1,
                                             height: "30px",
                                             borderRadius: "8px",
-                                            color: "#D97706",
-                                            borderColor: "#FDE68A",
-                                            bgcolor: "#FFFBEB",
+                                            color: designTokens.brand.primaryDark,
+                                            borderColor: designTokens.brand.primaryBorder,
+                                            bgcolor: designTokens.brand.primaryLight,
                                             "&:hover": {
-                                                bgcolor: "#FEF3C7",
-                                                borderColor: "#F59E0B"
+                                                bgcolor: "rgba(0, 136, 214, 0.12)",
+                                                borderColor: designTokens.brand.primary
                                             },
                                             display: { xs: "none", sm: "inline-flex" }
                                         }}
                                     >
-                                        Thiết Bị Sảnh
+                                        Sảnh
                                     </Button>
                                 </Tooltip>
                                 <Menu
                                     anchorEl={deviceMenuAnchor}
                                     open={Boolean(deviceMenuAnchor)}
                                     onClose={handleDeviceMenuClose}
+                                    anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+                                    transformOrigin={{ vertical: "top", horizontal: "right" }}
                                     PaperProps={{
+                                        elevation: 4,
                                         sx: {
                                             borderRadius: 2.5,
-                                            minWidth: 230,
-                                            mt: 1,
+                                            minWidth: 240,
+                                            mt: 0.8,
                                             boxShadow: "0 10px 25px rgba(0,0,0,0.08)",
+                                            border: "1px solid rgba(226, 232, 240, 0.9)",
                                             p: 0.5
                                         }
                                     }}
@@ -442,13 +546,14 @@ export default function ClinicalLayout() {
                                         href="/kiosk"
                                         target="_blank"
                                         onClick={handleDeviceMenuClose}
+                                        sx={{ borderRadius: 1.5, py: 1 }}
                                     >
                                         <ListItemIcon><QrCodeScannerIcon fontSize="small" sx={{ color: "#D97706" }} /></ListItemIcon>
                                         <ListItemText
                                             primary="Cây Kiosk Bốc Số"
-                                            secondary="Màn hình chạm sảnh tầng 1"
-                                            primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 700 }}
-                                            secondaryTypographyProps={{ fontSize: "0.72rem" }}
+                                            secondary="Màn hình chạm tự động tại sảnh"
+                                            primaryTypographyProps={{ fontSize: "0.825rem", fontWeight: 700 }}
+                                            secondaryTypographyProps={{ fontSize: "0.7rem" }}
                                         />
                                     </MenuItem>
                                     <MenuItem
@@ -456,13 +561,14 @@ export default function ClinicalLayout() {
                                         href="/queue-display"
                                         target="_blank"
                                         onClick={handleDeviceMenuClose}
+                                        sx={{ borderRadius: 1.5, py: 1 }}
                                     >
                                         <ListItemIcon><TvIcon fontSize="small" sx={{ color: "#6366F1" }} /></ListItemIcon>
                                         <ListItemText
-                                            primary="Màn Hình LED TV"
-                                            secondary="Hiển thị & Loa gọi STT sảnh"
-                                            primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 700 }}
-                                            secondaryTypographyProps={{ fontSize: "0.72rem" }}
+                                            primary="Màn Hình LED TV Sảnh"
+                                            secondary="Bảng hiển thị & âm thanh gọi STT"
+                                            primaryTypographyProps={{ fontSize: "0.825rem", fontWeight: 700 }}
+                                            secondaryTypographyProps={{ fontSize: "0.7rem" }}
                                         />
                                     </MenuItem>
                                 </Menu>
@@ -483,7 +589,7 @@ export default function ClinicalLayout() {
                         {/* Chuông thông báo */}
                         <NotificationMenu />
 
-                        {/* Huy hiệu vai trò trang nhã */}
+                        {/* Huy hiệu vai trò trang nhã (Chỉ hiện trên màn hình rộng xl để giữ thanh công cụ luôn thoáng) */}
                         <Chip
                             label={roleBadge.label}
                             size="small"
@@ -495,7 +601,7 @@ export default function ClinicalLayout() {
                                 bgcolor: roleBadge.bgColor,
                                 color: roleBadge.textColor,
                                 border: `1px solid ${roleBadge.borderColor}`,
-                                display: { xs: "none", lg: "inline-flex" }
+                                display: { xs: "none", xl: "inline-flex" }
                             }}
                         />
 
@@ -532,7 +638,7 @@ export default function ClinicalLayout() {
                                 color={designTokens.neutral.textPrimary}
                                 sx={{
                                     display: { xs: "none", sm: "block" },
-                                    maxWidth: 100,
+                                    maxWidth: 130,
                                     whiteSpace: "nowrap",
                                     overflow: "hidden",
                                     textOverflow: "ellipsis",
@@ -549,12 +655,16 @@ export default function ClinicalLayout() {
                             anchorEl={userMenuAnchor}
                             open={Boolean(userMenuAnchor)}
                             onClose={handleUserMenuClose}
+                            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+                            transformOrigin={{ vertical: "top", horizontal: "right" }}
                             PaperProps={{
+                                elevation: 4,
                                 sx: {
-                                    borderRadius: 2.5,
-                                    minWidth: 220,
-                                    mt: 1,
-                                    boxShadow: "0 10px 25px rgba(0,0,0,0.08)",
+                                    borderRadius: 3,
+                                    minWidth: 240,
+                                    mt: 0.8,
+                                    boxShadow: "0 12px 30px rgba(15, 23, 42, 0.12)",
+                                    border: "1px solid rgba(226, 232, 240, 0.9)",
                                     p: 0.5
                                 }
                             }}
@@ -707,6 +817,55 @@ export default function ClinicalLayout() {
 
                 <List disablePadding sx={{ py: 1.5, flexGrow: 1 }}>
                     {navItems.map((item) => {
+                        if (item.children) {
+                            return (
+                                <React.Fragment key={item.id || item.text}>
+                                    <Typography
+                                        variant="caption"
+                                        sx={{
+                                            px: 2,
+                                            pt: 1.5,
+                                            pb: 0.5,
+                                            color: designTokens.neutral.textMuted,
+                                            fontWeight: 700,
+                                            textTransform: "uppercase",
+                                            fontSize: "0.68rem",
+                                            display: "block"
+                                        }}
+                                    >
+                                        {item.fullName || item.text}
+                                    </Typography>
+                                    {item.children.map((child) => {
+                                        const active = isActive(child.path);
+                                        return (
+                                            <ListItem key={child.path} disablePadding sx={{ mb: 0.5 }}>
+                                                <ListItemButton
+                                                    component={Link}
+                                                    to={child.path}
+                                                    onClick={() => setMobileDrawerOpen(false)}
+                                                    sx={{
+                                                        borderRadius: 2,
+                                                        bgcolor: active ? designTokens.brand.primaryLight : "transparent",
+                                                        color: active ? designTokens.brand.primary : designTokens.neutral.textPrimary
+                                                    }}
+                                                >
+                                                    <ListItemIcon sx={{ color: active ? designTokens.brand.primary : designTokens.neutral.textMuted, minWidth: 32 }}>
+                                                        {child.icon}
+                                                    </ListItemIcon>
+                                                    <ListItemText
+                                                        primary={child.text}
+                                                        secondary={child.desc}
+                                                        primaryTypographyProps={{ fontSize: "0.825rem", fontWeight: active ? 700 : 500 }}
+                                                        secondaryTypographyProps={{ fontSize: "0.68rem" }}
+                                                    />
+                                                </ListItemButton>
+                                            </ListItem>
+                                        );
+                                    })}
+                                </React.Fragment>
+                            );
+                        }
+
                         const active = isActive(item.path);
                         return (
                             <ListItem key={item.path} disablePadding sx={{ mb: 0.5 }}>

@@ -902,45 +902,83 @@ export default function InpatientPage() {
 
     return (
         <Container maxWidth="xl" sx={{ py: 3 }}>
-            {/* Header Banner Chuẩn SmartHos-365 */}
+            {/* Header Banner - Apple HIG + Linear Elevated Header */}
             <Paper
                 elevation={0}
                 sx={{
-                    p: 3,
+                    p: { xs: 2.5, md: 3 },
                     mb: 3,
-                    borderRadius: 3,
-                    background: "linear-gradient(135deg, #0284C7 0%, #0369A1 100%)",
-                    color: "white",
+                    borderRadius: 3.5,
+                    bgcolor: "#FFFFFF",
+                    border: "1px solid rgba(15, 23, 42, 0.08)",
+                    boxShadow: "0 2px 10px rgba(0,0,0,0.03)",
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
                     flexWrap: "wrap",
-                    gap: 2,
-                    boxShadow: "0 10px 25px -5px rgba(2, 132, 199, 0.3)"
+                    gap: 2
                 }}
             >
                 <Box display="flex" alignItems="center" gap={2}>
-                    <Avatar sx={{ width: 52, height: 52, bgcolor: "rgba(255,255,255,0.2)" }}>
+                    <Avatar
+                        sx={{
+                            width: 54,
+                            height: 54,
+                            bgcolor: "rgba(0, 136, 214, 0.1)",
+                            color: "#0088D6",
+                            border: "1px solid rgba(0, 136, 214, 0.2)"
+                        }}
+                    >
                         <HotelIcon sx={{ fontSize: 32 }} />
                     </Avatar>
                     <Box>
-                        <Typography variant="h5" fontWeight="900" sx={{ letterSpacing: "-0.5px" }}>
-                            QUẢN LÝ ĐIỀU TRỊ NỘI TRÚ & SƠ ĐỒ BUỒNG GIƯỜNG (SMARTHOS-365)
+                        <Box display="flex" alignItems="center" gap={1.2} mb={0.5} flexWrap="wrap">
+                            <Chip
+                                label="QUẢN LÝ ĐIỀU TRỊ NỘI TRÚ • CLINICAL INPATIENT SUITE PRO"
+                                size="small"
+                                sx={{
+                                    height: 22,
+                                    fontSize: "0.68rem",
+                                    fontWeight: 700,
+                                    letterSpacing: "0.06em",
+                                    bgcolor: "#EBF5FF",
+                                    color: "#0088D6",
+                                    borderRadius: 1.5,
+                                    border: "1px solid rgba(0, 136, 214, 0.2)"
+                                }}
+                            />
+                            <Chip
+                                label="SMARTHOS-365"
+                                size="small"
+                                sx={{
+                                    height: 22,
+                                    fontSize: "0.68rem",
+                                    fontWeight: 700,
+                                    bgcolor: "#F1F5F9",
+                                    color: "#475569",
+                                    borderRadius: 1.5
+                                }}
+                            />
+                        </Box>
+                        <Typography variant="h5" fontWeight={800} color="#0F172A" sx={{ letterSpacing: "-0.02em" }}>
+                            Sơ Đồ Buồng Giường & Bệnh Án Nội Trú
                         </Typography>
-                        <Typography variant="body2" sx={{ opacity: 0.9, mt: 0.5 }}>
-                            Sơ đồ giường trực quan thời gian thực • Phiếu điều trị nội trú hàng ngày (Tờ bệnh trình chuẩn Bộ Y Tế)
+                        <Typography variant="body2" color="#64748B" sx={{ mt: 0.25 }}>
+                            Sơ đồ buồng giường thời gian thực • Phiếu điều trị nội trú hàng ngày (Tờ bệnh trình chuẩn Bộ Y Tế)
                         </Typography>
                     </Box>
                 </Box>
                 <Box display="flex" gap={1.5} alignItems="center">
                     <Button
-                        variant="contained"
+                        variant="outlined"
                         sx={{
-                            bgcolor: "white",
-                            color: "#0369A1",
-                            fontWeight: "bold",
-                            whiteSpace: "nowrap",
-                            "&:hover": { bgcolor: "#F0F9FF" }
+                            borderRadius: 2.5,
+                            textTransform: "none",
+                            fontWeight: 700,
+                            borderColor: "rgba(15, 23, 42, 0.12)",
+                            color: "#334155",
+                            bgcolor: "#FFFFFF",
+                            "&:hover": { bgcolor: "#F8FAFC", borderColor: "#CBD5E1" }
                         }}
                         startIcon={<RefreshIcon />}
                         onClick={loadData}
@@ -953,68 +991,68 @@ export default function InpatientPage() {
             {feedback.message && (
                 <Alert
                     severity={feedback.type}
-                    sx={{ mb: 3, borderRadius: 2, fontWeight: "500" }}
+                    sx={{ mb: 3, borderRadius: 2.5, fontWeight: "500" }}
                     onClose={() => setFeedback({ type: "", message: "" })}
                 >
                     {feedback.message}
                 </Alert>
             )}
 
-            {/* KPI METRICS STRIP CHUẨN SLIDE 28 */}
+            {/* KPI METRICS STRIP CHUẨN SLIDE 28 - APPLE HIG + LINEAR */}
             <Grid container spacing={2} sx={{ mb: 3 }}>
                 <Grid item xs={6} sm={4} md={1.71}>
-                    <Paper elevation={1} sx={{ p: 2, borderRadius: 2.5, textAlign: "center", borderTop: "4px solid #0f172a" }}>
-                        <Typography variant="caption" color="text.secondary" fontWeight="bold">TỔNG SỐ GIƯỜNG</Typography>
-                        <Typography variant="h4" fontWeight="900" color="#0f172a">{stats.totalBeds}</Typography>
-                        <Typography variant="caption" color="text.secondary">{stats.totalRooms} buồng bệnh</Typography>
+                    <Paper elevation={0} sx={{ p: 2, borderRadius: 3, bgcolor: "#FFFFFF", border: "1px solid rgba(15, 23, 42, 0.08)", borderTop: "3px solid #475569", boxShadow: "0 1px 3px rgba(0,0,0,0.02)", textAlign: "center" }}>
+                        <Typography variant="caption" sx={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "#64748B", display: "block" }}>TỔNG SỐ GIƯỜNG</Typography>
+                        <Typography variant="h4" fontWeight={800} color="#0F172A" sx={{ my: 0.5 }}>{stats.totalBeds}</Typography>
+                        <Typography variant="caption" color="#64748B" fontWeight={600}>{stats.totalRooms} buồng bệnh</Typography>
                     </Paper>
                 </Grid>
                 <Grid item xs={6} sm={4} md={1.71}>
-                    <Paper elevation={1} sx={{ p: 2, borderRadius: 2.5, textAlign: "center", borderTop: "4px solid #0284c7", bgcolor: "#F0F9FF" }}>
-                        <Typography variant="caption" color="primary.dark" fontWeight="bold">CÓ NGƯỜI NẰM</Typography>
-                        <Typography variant="h4" fontWeight="900" color="#0284c7">{stats.occupiedBeds}</Typography>
-                        <Typography variant="caption" fontWeight="bold" color="primary">Công suất: {stats.occupancyRate}%</Typography>
+                    <Paper elevation={0} sx={{ p: 2, borderRadius: 3, bgcolor: "#FFFFFF", border: "1px solid rgba(15, 23, 42, 0.08)", borderTop: "3px solid #0088D6", boxShadow: "0 1px 3px rgba(0,0,0,0.02)", textAlign: "center" }}>
+                        <Typography variant="caption" sx={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "#0088D6", display: "block" }}>CÓ NGƯỜI NẰM</Typography>
+                        <Typography variant="h4" fontWeight={800} color="#0088D6" sx={{ my: 0.5 }}>{stats.occupiedBeds}</Typography>
+                        <Typography variant="caption" fontWeight={700} color="#0088D6">Công suất: {stats.occupancyRate}%</Typography>
                     </Paper>
                 </Grid>
                 <Grid item xs={6} sm={4} md={1.71}>
-                    <Paper elevation={1} sx={{ p: 2, borderRadius: 2.5, textAlign: "center", borderTop: "4px solid #10b981", bgcolor: "#ECFDF5" }}>
-                        <Typography variant="caption" color="#047857" fontWeight="bold">GIƯỜNG TRỐNG</Typography>
-                        <Typography variant="h4" fontWeight="900" color="#10b981">{stats.availableBeds}</Typography>
-                        <Typography variant="caption" color="#047857">Sẵn sàng nhận BN</Typography>
+                    <Paper elevation={0} sx={{ p: 2, borderRadius: 3, bgcolor: "#FFFFFF", border: "1px solid rgba(15, 23, 42, 0.08)", borderTop: "3px solid #10B981", boxShadow: "0 1px 3px rgba(0,0,0,0.02)", textAlign: "center" }}>
+                        <Typography variant="caption" sx={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "#059669", display: "block" }}>GIƯỜNG TRỐNG</Typography>
+                        <Typography variant="h4" fontWeight={800} color="#10B981" sx={{ my: 0.5 }}>{stats.availableBeds}</Typography>
+                        <Typography variant="caption" color="#059669" fontWeight={600}>Sẵn sàng nhận BN</Typography>
                     </Paper>
                 </Grid>
                 <Grid item xs={6} sm={4} md={1.71}>
-                    <Paper elevation={1} sx={{ p: 2, borderRadius: 2.5, textAlign: "center", borderTop: "4px solid #ef4444", bgcolor: "#FEF2F2" }}>
-                        <Typography variant="caption" color="#b91c1c" fontWeight="bold">BỆNH NẶNG / ICU</Typography>
-                        <Typography variant="h4" fontWeight="900" color="#ef4444">{stats.criticalBeds}</Typography>
-                        <Typography variant="caption" color="#b91c1c">Theo dõi sát</Typography>
+                    <Paper elevation={0} sx={{ p: 2, borderRadius: 3, bgcolor: "#FFFFFF", border: "1px solid rgba(15, 23, 42, 0.08)", borderTop: "3px solid #EF4444", boxShadow: "0 1px 3px rgba(0,0,0,0.02)", textAlign: "center" }}>
+                        <Typography variant="caption" sx={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "#DC2626", display: "block" }}>BỆNH NẶNG / ICU</Typography>
+                        <Typography variant="h4" fontWeight={800} color="#EF4444" sx={{ my: 0.5 }}>{stats.criticalBeds}</Typography>
+                        <Typography variant="caption" color="#DC2626" fontWeight={600}>Theo dõi sát</Typography>
                     </Paper>
                 </Grid>
                 <Grid item xs={6} sm={4} md={1.71}>
-                    <Paper elevation={1} sx={{ p: 2, borderRadius: 2.5, textAlign: "center", borderTop: "4px solid #f59e0b", bgcolor: "#FFFBEB" }}>
-                        <Typography variant="caption" color="#b45309" fontWeight="bold">HẬU PHẪU / MỨC 2</Typography>
-                        <Typography variant="h4" fontWeight="900" color="#f59e0b">{stats.postOpBeds}</Typography>
-                        <Typography variant="caption" color="#b45309">Chăm sóc 1 phần</Typography>
+                    <Paper elevation={0} sx={{ p: 2, borderRadius: 3, bgcolor: "#FFFFFF", border: "1px solid rgba(15, 23, 42, 0.08)", borderTop: "3px solid #F59E0B", boxShadow: "0 1px 3px rgba(0,0,0,0.02)", textAlign: "center" }}>
+                        <Typography variant="caption" sx={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "#D97706", display: "block" }}>HẬU PHẪU / MỨC 2</Typography>
+                        <Typography variant="h4" fontWeight={800} color="#F59E0B" sx={{ my: 0.5 }}>{stats.postOpBeds}</Typography>
+                        <Typography variant="caption" color="#D97706" fontWeight={600}>Chăm sóc 1 phần</Typography>
                     </Paper>
                 </Grid>
                 <Grid item xs={6} sm={4} md={1.71}>
-                    <Paper elevation={1} sx={{ p: 2, borderRadius: 2.5, textAlign: "center", borderTop: "4px solid #8b5cf6", bgcolor: "#F5F3FF" }}>
-                        <Typography variant="caption" color="#6d28d9" fontWeight="bold">CHỜ RA VIỆN ($)</Typography>
-                        <Typography variant="h4" fontWeight="900" color="#8b5cf6">2</Typography>
-                        <Typography variant="caption" color="#6d28d9">Chờ quyết toán</Typography>
+                    <Paper elevation={0} sx={{ p: 2, borderRadius: 3, bgcolor: "#FFFFFF", border: "1px solid rgba(15, 23, 42, 0.08)", borderTop: "3px solid #8B5CF6", boxShadow: "0 1px 3px rgba(0,0,0,0.02)", textAlign: "center" }}>
+                        <Typography variant="caption" sx={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "#7C3AED", display: "block" }}>CHỜ RA VIỆN ($)</Typography>
+                        <Typography variant="h4" fontWeight={800} color="#8B5CF6" sx={{ my: 0.5 }}>2</Typography>
+                        <Typography variant="caption" color="#7C3AED" fontWeight={600}>Chờ quyết toán</Typography>
                     </Paper>
                 </Grid>
                 <Grid item xs={6} sm={4} md={1.71}>
-                    <Paper elevation={1} sx={{ p: 2, borderRadius: 2.5, textAlign: "center", borderTop: "4px solid #d97706", bgcolor: "#FEF3C7" }}>
-                        <Typography variant="caption" color="#92400e" fontWeight="bold">ĐANG KHỬ KHUẨN</Typography>
-                        <Typography variant="h4" fontWeight="900" color="#d97706">{stats.cleaningCount}</Typography>
-                        <Typography variant="caption" color="#92400e">Dọn phòng</Typography>
+                    <Paper elevation={0} sx={{ p: 2, borderRadius: 3, bgcolor: "#FFFFFF", border: "1px solid rgba(15, 23, 42, 0.08)", borderTop: "3px solid #06B6D4", boxShadow: "0 1px 3px rgba(0,0,0,0.02)", textAlign: "center" }}>
+                        <Typography variant="caption" sx={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "#0891B2", display: "block" }}>ĐANG KHỬ KHUẨN</Typography>
+                        <Typography variant="h4" fontWeight={800} color="#06B6D4" sx={{ my: 0.5 }}>{stats.cleaningCount}</Typography>
+                        <Typography variant="caption" color="#0891B2" fontWeight={600}>Dọn buồng</Typography>
                     </Paper>
                 </Grid>
             </Grid>
 
             {/* BỘ LỌC ĐA CHIỀU & TOOLBAR */}
-            <Paper elevation={1} sx={{ p: 2, mb: 3, borderRadius: 2.5 }}>
+            <Paper elevation={0} sx={{ p: 2, mb: 3, borderRadius: 3, bgcolor: "#FFFFFF", border: "1px solid rgba(15, 23, 42, 0.08)", boxShadow: "0 1px 3px rgba(0,0,0,0.02)" }}>
                 <Grid container spacing={2} alignItems="center">
                     <Grid item xs={12} md={4}>
                         <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)}>
@@ -1087,9 +1125,118 @@ export default function InpatientPage() {
                 </Grid>
             </Paper>
 
-            {/* TAB 0: SƠ ĐỒ BUỒNG GIƯỜNG TRỰC QUAN (VISUAL BED GRID - SLIDE 28) */}
+            {/* TAB 0: SƠ ĐỒ BUỒNG GIƯỜNG TRỰC QUAN (VISUAL BED GRID) */}
             {activeTab === 0 && (
                 <Box>
+                    {/* BẢNG CHÚ GIẢI TRỰC QUAN GẮN TRÊN ĐẦU BUỒNG GIƯỜNG (TRIAGE COLOR LEGEND) */}
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 1.5,
+                            px: 2,
+                            mb: 2.5,
+                            borderRadius: 3,
+                            bgcolor: "#FFFFFF",
+                            border: "1px solid rgba(15, 23, 42, 0.08)",
+                            boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            flexWrap: "wrap",
+                            gap: 1.5
+                        }}
+                    >
+                        <Typography variant="caption" fontWeight={800} sx={{ color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "0.72rem" }}>
+                            Phân Tầng Nguy Cơ & Trạng Thái Buồng Giường:
+                        </Typography>
+                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
+                            <Chip
+                                size="small"
+                                onClick={() => setStatusFilter(statusFilter === "AVAILABLE" ? "ALL" : "AVAILABLE")}
+                                label="🟢 Giường trống sẵn sàng"
+                                sx={{
+                                    height: 26,
+                                    fontSize: "0.72rem",
+                                    fontWeight: 700,
+                                    bgcolor: statusFilter === "AVAILABLE" ? "#DCFCE7" : "rgba(16, 185, 129, 0.08)",
+                                    color: "#15803D",
+                                    border: "1px solid",
+                                    borderColor: statusFilter === "AVAILABLE" ? "#16A34A" : "rgba(16, 185, 129, 0.25)",
+                                    cursor: "pointer"
+                                }}
+                            />
+                            <Chip
+                                size="small"
+                                onClick={() => setStatusFilter(statusFilter === "OCCUPIED" ? "ALL" : "OCCUPIED")}
+                                label="🔵 Đang điều trị (Mức 3)"
+                                sx={{
+                                    height: 26,
+                                    fontSize: "0.72rem",
+                                    fontWeight: 700,
+                                    bgcolor: statusFilter === "OCCUPIED" ? "#E0F2FE" : "rgba(2, 132, 199, 0.08)",
+                                    color: "#0369A1",
+                                    border: "1px solid",
+                                    borderColor: statusFilter === "OCCUPIED" ? "#0284C7" : "rgba(2, 132, 199, 0.25)",
+                                    cursor: "pointer"
+                                }}
+                            />
+                            <Chip
+                                size="small"
+                                label="🟠 Hậu phẫu (Mức 2)"
+                                sx={{
+                                    height: 26,
+                                    fontSize: "0.72rem",
+                                    fontWeight: 700,
+                                    bgcolor: "rgba(245, 158, 11, 0.08)",
+                                    color: "#B45309",
+                                    border: "1px solid rgba(245, 158, 11, 0.25)"
+                                }}
+                            />
+                            <Chip
+                                size="small"
+                                onClick={() => setStatusFilter(statusFilter === "CRITICAL" ? "ALL" : "CRITICAL")}
+                                label="🔴 Theo dõi sát / ICU (Mức 1)"
+                                sx={{
+                                    height: 26,
+                                    fontSize: "0.72rem",
+                                    fontWeight: 700,
+                                    bgcolor: statusFilter === "CRITICAL" ? "#FEE2E2" : "rgba(239, 68, 68, 0.08)",
+                                    color: "#B91C1C",
+                                    border: "1px solid",
+                                    borderColor: statusFilter === "CRITICAL" ? "#DC2626" : "rgba(239, 68, 68, 0.25)",
+                                    cursor: "pointer"
+                                }}
+                            />
+                            <Chip
+                                size="small"
+                                onClick={() => setStatusFilter(statusFilter === "CLEANING" ? "ALL" : "CLEANING")}
+                                label="🟡 Đang khử khuẩn"
+                                sx={{
+                                    height: 26,
+                                    fontSize: "0.72rem",
+                                    fontWeight: 700,
+                                    bgcolor: statusFilter === "CLEANING" ? "#FEF3C7" : "rgba(217, 119, 6, 0.08)",
+                                    color: "#92400E",
+                                    border: "1px solid",
+                                    borderColor: statusFilter === "CLEANING" ? "#D97706" : "rgba(217, 119, 6, 0.25)",
+                                    cursor: "pointer"
+                                }}
+                            />
+                            <Chip
+                                size="small"
+                                label="🟣 Chờ viện phí / Ra viện"
+                                sx={{
+                                    height: 26,
+                                    fontSize: "0.72rem",
+                                    fontWeight: 700,
+                                    bgcolor: "rgba(139, 92, 246, 0.08)",
+                                    color: "#6D28D9",
+                                    border: "1px solid rgba(139, 92, 246, 0.25)"
+                                }}
+                            />
+                        </Stack>
+                    </Paper>
+
                     <Grid container spacing={3}>
                         {filteredRooms.map((room) => {
                             const totalBeds = 4;
@@ -1239,40 +1386,57 @@ export default function InpatientPage() {
                                                                 <Box>
                                                                     {/* Tên BN & Tuổi */}
                                                                     <Box display="flex" justifyContent="space-between" alignItems="baseline">
-                                                                        <Typography variant="subtitle2" fontWeight="bold" color="#0f172a" noWrap>
+                                                                        <Typography variant="subtitle2" fontWeight="800" color="#0f172a" noWrap sx={{ textTransform: "uppercase" }}>
                                                                             {patientInBed.patientProfile?.fullName}
                                                                         </Typography>
-                                                                        <Typography variant="caption" fontWeight="bold" color="text.secondary">
-                                                                            ({calculateAge(patientInBed.patientProfile?.dateOfBirth)}) - {patientInBed.patientProfile?.gender === "MALE" ? "Nam" : "Nữ"}
-                                                                        </Typography>
+                                                                        <Chip
+                                                                            label={`${calculateAge(patientInBed.patientProfile?.dateOfBirth)}T • ${patientInBed.patientProfile?.gender === "MALE" ? "Nam" : "Nữ"}`}
+                                                                            size="small"
+                                                                            sx={{ height: 18, fontSize: "0.65rem", fontWeight: 700, bgcolor: "#F1F5F9" }}
+                                                                        />
                                                                     </Box>
 
-                                                                    <Typography variant="caption" color="text.secondary" display="block">
-                                                                        Mã SBA: <b>{patientInBed.admissionCode}</b>
-                                                                    </Typography>
-                                                                    <Typography variant="caption" color="text.secondary" display="block" noWrap>
-                                                                        Bác sĩ: {patientInBed.treatingDoctor?.fullName || "BS. Trực khoa"}
+                                                                    <Box display="flex" alignItems="center" gap={1} mt={0.3}>
+                                                                        <Typography variant="caption" color="text.secondary">
+                                                                            Mã SBA:
+                                                                        </Typography>
+                                                                        <Typography variant="caption" fontFamily="monospace" fontWeight="700" color="#0088D6" sx={{ bgcolor: "rgba(0, 136, 214, 0.08)", px: 0.6, py: 0.1, borderRadius: 1 }}>
+                                                                            {patientInBed.admissionCode}
+                                                                        </Typography>
+                                                                    </Box>
+                                                                    <Typography variant="caption" color="text.secondary" display="block" noWrap mt={0.2}>
+                                                                        BS điều trị: <b>{patientInBed.treatingDoctor?.fullName || "BS. Trực khoa"}</b>
                                                                     </Typography>
 
                                                                     {/* Chẩn đoán & Sinh hiệu tóm tắt */}
                                                                     <Box
                                                                         sx={{
-                                                                            bgcolor: isCritical ? "rgba(239, 68, 68, 0.1)" : "rgba(2, 132, 199, 0.08)",
-                                                                            p: 0.8,
-                                                                            borderRadius: 1.5,
-                                                                            my: 0.8
+                                                                            bgcolor: isCritical ? "rgba(239, 68, 68, 0.08)" : "rgba(2, 132, 199, 0.06)",
+                                                                            border: "1px solid",
+                                                                            borderColor: isCritical ? "rgba(239, 68, 68, 0.2)" : "rgba(2, 132, 199, 0.15)",
+                                                                            p: 1,
+                                                                            borderRadius: 2,
+                                                                            my: 1
                                                                         }}
                                                                     >
-                                                                        <Typography variant="caption" fontWeight="600" color="#334155" display="block" noWrap title={patientInBed.initialDiagnosis}>
+                                                                        <Typography variant="caption" fontWeight="700" color="#1E293B" display="block" noWrap title={patientInBed.initialDiagnosis}>
                                                                             🩺 {patientInBed.initialDiagnosis}
                                                                         </Typography>
-                                                                        <Typography variant="caption" fontWeight="bold" color={isCritical ? "error.main" : "primary.main"} display="block">
-                                                                            HA: {patientInBed.latestVitals?.bloodPressure || "120/80"} • Mạch: {patientInBed.latestVitals?.heartRate || "78"} • SpO2: {patientInBed.latestVitals?.spO2 || "98"}%
-                                                                        </Typography>
+                                                                        <Box display="flex" alignItems="center" gap={1.5} mt={0.4} flexWrap="wrap">
+                                                                            <Typography variant="caption" fontWeight="700" color={isCritical ? "error.main" : "primary.main"} sx={{ fontFamily: "monospace" }}>
+                                                                                HA: {patientInBed.latestVitals?.bloodPressure || "120/80"}
+                                                                            </Typography>
+                                                                            <Typography variant="caption" fontWeight="600" color="#475569" sx={{ fontFamily: "monospace" }}>
+                                                                                Mạch: {patientInBed.latestVitals?.heartRate || "78"} bpm
+                                                                            </Typography>
+                                                                            <Typography variant="caption" fontWeight="700" color={Number(patientInBed.latestVitals?.spO2) < 95 ? "error.main" : "success.main"} sx={{ fontFamily: "monospace" }}>
+                                                                                SpO2: {patientInBed.latestVitals?.spO2 || "98"}%
+                                                                            </Typography>
+                                                                        </Box>
                                                                     </Box>
 
-                                                                    {/* Thao tác 1-Click chuẩn SmartHos-365 */}
-                                                                    <Grid container spacing={0.5} mt={0.5}>
+                                                                    {/* Thao tác 1-Click chuẩn Y tế */}
+                                                                    <Grid container spacing={0.8} mt={0.5}>
                                                                         <Grid item xs={6}>
                                                                             <Button
                                                                                 fullWidth
@@ -1281,7 +1445,7 @@ export default function InpatientPage() {
                                                                                 color="primary"
                                                                                 startIcon={<AssignmentIcon sx={{ fontSize: 14 }} />}
                                                                                 onClick={() => handleOpenTreatmentSheet(patientInBed)}
-                                                                                sx={{ fontSize: "0.68rem", py: 0.4, fontWeight: "bold" }}
+                                                                                sx={{ fontSize: "0.7rem", py: 0.5, fontWeight: 700, borderRadius: 2, textTransform: "none" }}
                                                                             >
                                                                                 Tờ Bệnh Trình
                                                                             </Button>
@@ -1294,7 +1458,7 @@ export default function InpatientPage() {
                                                                                 color="info"
                                                                                 startIcon={<SwapHorizIcon sx={{ fontSize: 14 }} />}
                                                                                 onClick={() => handleOpenTransferModal(patientInBed)}
-                                                                                sx={{ fontSize: "0.68rem", py: 0.4, fontWeight: "bold" }}
+                                                                                sx={{ fontSize: "0.7rem", py: 0.5, fontWeight: 700, borderRadius: 2, textTransform: "none" }}
                                                                             >
                                                                                 Đổi Giường
                                                                             </Button>
@@ -1304,10 +1468,10 @@ export default function InpatientPage() {
                                                                                 fullWidth
                                                                                 size="small"
                                                                                 variant="outlined"
-                                                                                color="secondary"
+                                                                                color="inherit"
                                                                                 startIcon={<BadgeIcon sx={{ fontSize: 14 }} />}
                                                                                 onClick={() => handlePrintBedside(patientInBed)}
-                                                                                sx={{ fontSize: "0.68rem", py: 0.3 }}
+                                                                                sx={{ fontSize: "0.7rem", py: 0.5, fontWeight: 600, borderRadius: 2, textTransform: "none", color: "#475569" }}
                                                                             >
                                                                                 Thẻ Giường
                                                                             </Button>
@@ -1320,7 +1484,7 @@ export default function InpatientPage() {
                                                                                 color="error"
                                                                                 startIcon={<ExitToAppIcon sx={{ fontSize: 14 }} />}
                                                                                 onClick={() => handleOpenDischargeModal(patientInBed)}
-                                                                                sx={{ fontSize: "0.68rem", py: 0.3 }}
+                                                                                sx={{ fontSize: "0.7rem", py: 0.5, fontWeight: 700, borderRadius: 2, textTransform: "none" }}
                                                                             >
                                                                                 Xuất Viện
                                                                             </Button>
@@ -1367,64 +1531,31 @@ export default function InpatientPage() {
                             );
                         })}
                     </Grid>
-
-                    {/* BẢNG CHÚ GIẢI TRỰC QUAN (VISUAL LEGEND - CHUẨN SLIDE 28) */}
-                    <Paper elevation={1} sx={{ p: 2, mt: 3, borderRadius: 2.5, bgcolor: "#F8FAFC" }}>
-                        <Typography variant="subtitle2" fontWeight="bold" color="text.secondary" mb={1}>
-                            📌 Chú giải màu sắc & Ký hiệu trên Sơ đồ buồng giường:
-                        </Typography>
-                        <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
-                            <Box display="flex" alignItems="center" gap={0.8}>
-                                <Box sx={{ width: 14, height: 14, borderRadius: "50%", bgcolor: "#10b981" }} />
-                                <Typography variant="caption" fontWeight="bold">🟢 Giường trống sẵn sàng</Typography>
-                            </Box>
-                            <Box display="flex" alignItems="center" gap={0.8}>
-                                <Box sx={{ width: 14, height: 14, borderRadius: "50%", bgcolor: "#0284c7" }} />
-                                <Typography variant="caption" fontWeight="bold">🔵 Đang điều trị ổn định (Mức 3)</Typography>
-                            </Box>
-                            <Box display="flex" alignItems="center" gap={0.8}>
-                                <Box sx={{ width: 14, height: 14, borderRadius: "50%", bgcolor: "#f59e0b" }} />
-                                <Typography variant="caption" fontWeight="bold">🟠 Hậu phẫu / Chăm sóc cấp II</Typography>
-                            </Box>
-                            <Box display="flex" alignItems="center" gap={0.8}>
-                                <Box sx={{ width: 14, height: 14, borderRadius: "50%", bgcolor: "#ef4444" }} />
-                                <Typography variant="caption" fontWeight="bold">🔴 Cần theo dõi sát / ICU (Mức 1)</Typography>
-                            </Box>
-                            <Box display="flex" alignItems="center" gap={0.8}>
-                                <Box sx={{ width: 14, height: 14, borderRadius: "50%", bgcolor: "#d97706" }} />
-                                <Typography variant="caption" fontWeight="bold">🟡 Đang dọn buồng / Khử khuẩn</Typography>
-                            </Box>
-                            <Box display="flex" alignItems="center" gap={0.8}>
-                                <Box sx={{ width: 14, height: 14, borderRadius: "50%", bgcolor: "#8b5cf6" }} />
-                                <Typography variant="caption" fontWeight="bold">🟣 Chờ thanh toán / Ra viện</Typography>
-                            </Box>
-                        </Stack>
-                    </Paper>
                 </Box>
             )}
 
             {/* TAB 1: DANH SÁCH BỆNH NHÂN NỘI TRÚ ĐANG ĐIỀU TRỊ */}
             {activeTab === 1 && (
-                <TableContainer component={Paper} elevation={2} sx={{ borderRadius: 3 }}>
+                <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 3, border: "1px solid rgba(15, 23, 42, 0.08)", boxShadow: "0 1px 3px rgba(0,0,0,0.02)" }}>
                     <Table>
-                        <TableHead sx={{ bgcolor: "#F8FAFC" }}>
-                            <TableRow>
-                                <TableCell><b>Mã hồ sơ</b></TableCell>
-                                <TableCell><b>Bệnh nhân</b></TableCell>
-                                <TableCell><b>Buồng & Giường</b></TableCell>
-                                <TableCell><b>Mức chăm sóc</b></TableCell>
-                                <TableCell><b>Bác sĩ điều trị</b></TableCell>
-                                <TableCell><b>Ngày nhập viện</b></TableCell>
-                                <TableCell><b>Chẩn đoán ban đầu</b></TableCell>
-                                <TableCell><b>Giá ngày giường</b></TableCell>
-                                <TableCell align="center"><b>Thao tác chuyên môn</b></TableCell>
+                        <TableHead>
+                            <TableRow sx={{ bgcolor: "#F8FAFC" }}>
+                                <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", color: "#475569", py: 1.5 }}>Mã hồ sơ</TableCell>
+                                <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", color: "#475569", py: 1.5 }}>Bệnh nhân</TableCell>
+                                <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", color: "#475569", py: 1.5 }}>Buồng & Giường</TableCell>
+                                <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", color: "#475569", py: 1.5 }}>Mức chăm sóc</TableCell>
+                                <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", color: "#475569", py: 1.5 }}>Bác sĩ điều trị</TableCell>
+                                <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", color: "#475569", py: 1.5 }}>Ngày nhập viện</TableCell>
+                                <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", color: "#475569", py: 1.5 }}>Chẩn đoán ban đầu</TableCell>
+                                <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", color: "#475569", py: 1.5 }}>Giá ngày giường</TableCell>
+                                <TableCell align="center" sx={{ fontWeight: 700, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", color: "#475569", py: 1.5 }}>Thao tác chuyên môn</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
                             {admissions.map((item) => (
-                                <TableRow key={item.admissionId} hover>
+                                <TableRow key={item.admissionId} hover sx={{ "&:hover": { bgcolor: "rgba(0, 136, 214, 0.02)" } }}>
                                     <TableCell sx={{ whiteSpace: "nowrap" }}>
-                                        <Typography variant="body2" fontWeight="bold" color="primary">
+                                        <Typography variant="body2" fontWeight={700} sx={{ fontFamily: "monospace", color: "#0088D6", bgcolor: "rgba(0, 136, 214, 0.08)", px: 1, py: 0.35, borderRadius: 1.5, display: "inline-block" }}>
                                             {item.admissionCode}
                                         </Typography>
                                     </TableCell>
@@ -1520,6 +1651,7 @@ export default function InpatientPage() {
                 onClose={() => setOpenTreatmentSheetModal(false)}
                 maxWidth="xl"
                 fullWidth
+                PaperProps={{ sx: { borderRadius: 3.5, overflow: "hidden" } }}
             >
                 <DialogTitle
                     sx={{
@@ -1985,7 +2117,7 @@ export default function InpatientPage() {
             {/* ======================================================= */}
             {/* MODAL: CHUYỂN BUỒNG / GIƯỜNG ĐIỀU TRỊ                   */}
             {/* ======================================================= */}
-            <Dialog open={openTransferModal} onClose={() => setOpenTransferModal(false)} maxWidth="sm" fullWidth>
+            <Dialog open={openTransferModal} onClose={() => setOpenTransferModal(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3.5, overflow: "hidden" } }}>
                 <DialogTitle fontWeight="bold" color="primary.main">
                     🔄 Chuyển Buồng & Giường Bệnh Nhân
                 </DialogTitle>
@@ -2049,7 +2181,7 @@ export default function InpatientPage() {
             {/* ======================================================= */}
             {/* MODAL: THỦ TỤC XUẤT VIỆN & TỔNG KẾT VIỆN PHÍ           */}
             {/* ======================================================= */}
-            <Dialog open={openDischargeModal} onClose={() => setOpenDischargeModal(false)} maxWidth="sm" fullWidth>
+            <Dialog open={openDischargeModal} onClose={() => setOpenDischargeModal(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3.5, overflow: "hidden" } }}>
                 <DialogTitle fontWeight="bold" color="error.main">
                     🚪 Làm Thủ Tục Xuất Viện & Quyết Toán Ngày Giường
                 </DialogTitle>
@@ -2141,7 +2273,7 @@ export default function InpatientPage() {
             {/* ======================================================= */}
             {/* MODAL: TIẾP NHẬN BỆNH NHÂN VÀO GIƯỜNG BỆNH TRỐNG       */}
             {/* ======================================================= */}
-            <Dialog open={openAdmitModal} onClose={() => setOpenAdmitModal(false)} maxWidth="sm" fullWidth>
+            <Dialog open={openAdmitModal} onClose={() => setOpenAdmitModal(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3.5, overflow: "hidden" } }}>
                 <DialogTitle fontWeight="bold" sx={{ color: "#0284c7", display: "flex", alignItems: "center", gap: 1 }}>
                     <HotelIcon color="primary" /> Tiếp Nhận Người Bệnh Vào Buồng Giường
                 </DialogTitle>

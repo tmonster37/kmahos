@@ -1,5 +1,19 @@
 import React, { useState, useEffect } from "react";
-import { Container, Paper, TextField, Button, Typography, Box, Alert, IconButton, InputAdornment } from "@mui/material";
+import {
+    Container,
+    Paper,
+    TextField,
+    Button,
+    Typography,
+    Box,
+    Alert,
+    IconButton,
+    InputAdornment,
+    Chip,
+    Tooltip,
+    Stack,
+    Divider
+} from "@mui/material";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import LocalHospitalIcon from "@mui/icons-material/LocalHospital";
 import PhoneIphoneIcon from "@mui/icons-material/PhoneIphone";
@@ -7,6 +21,9 @@ import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import KeyIcon from "@mui/icons-material/Key";
+import ShieldIcon from "@mui/icons-material/Shield";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import { useAuth } from "../../context/AuthContext";
 import axiosInstance from "../../services/AxiosInstance";
 
@@ -29,14 +46,14 @@ export default function LoginPage() {
     }, [location]);
 
     const handleLogin = async (e) => {
-        e.preventDefault();
+        if (e) e.preventDefault();
         setError("");
         setLoading(true);
         try {
             const res = await axiosInstance.post("/api/auth/login", { phoneNumber, password });
             if (res.success) {
                 login(res.data);
-                
+
                 // Kiểm tra xem có URL đang dở trước đó không
                 const redirectUrl = sessionStorage.getItem("redirectUrl");
                 if (redirectUrl) {
@@ -67,54 +84,87 @@ export default function LoginPage() {
         }
     };
 
+    const handleQuickFill = (phone, pass) => {
+        setPhoneNumber(phone);
+        setPassword(pass);
+        setError("");
+    };
+
     return (
-        <Box sx={{ minHeight: "85vh", display: "flex", alignItems: "center", justifyContent: "center", py: 4, bgcolor: "#F8FAFC" }}>
-            <Container maxWidth="xs">
+        <Box
+            sx={{
+                minHeight: "90vh",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                py: { xs: 4, md: 6 },
+                bgcolor: "#F8FAFC",
+                position: "relative",
+                overflow: "hidden"
+            }}
+        >
+            {/* Subtle background aura */}
+            <Box
+                sx={{
+                    position: "absolute",
+                    top: "10%",
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    width: 500,
+                    height: 500,
+                    borderRadius: 999,
+                    bgcolor: "rgba(0, 136, 214, 0.05)",
+                    filter: "blur(80px)",
+                    pointerEvents: "none"
+                }}
+            />
+
+            <Container maxWidth="xs" sx={{ position: "relative", zIndex: 1 }}>
                 <Paper
                     elevation={0}
                     sx={{
-                        p: { xs: 3, sm: 4 },
+                        p: { xs: 3.5, sm: 4.5 },
                         borderRadius: 4,
                         textAlign: "center",
-                        border: "1px solid #E2E8F0",
-                        boxShadow: "0 10px 30px rgba(0,0,0,0.06)",
-                        bgcolor: "#FFFFFF"
+                        bgcolor: "#FFFFFF",
+                        border: "1px solid rgba(15, 23, 42, 0.08)",
+                        boxShadow: "0 10px 40px rgba(15, 23, 42, 0.05)"
                     }}
                 >
                     {/* Brand Logo Header */}
-                    <Box display="flex" justifyContent="center" mb={1.5}>
+                    <Box display="flex" justifyContent="center" mb={2}>
                         <Box
                             sx={{
-                                width: 52,
-                                height: 52,
-                                borderRadius: "14px",
+                                width: 56,
+                                height: 56,
+                                borderRadius: "16px",
                                 background: "linear-gradient(135deg, #0088D6 0%, #00C292 100%)",
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
                                 color: "white",
-                                boxShadow: "0 8px 20px rgba(0, 136, 214, 0.3)"
+                                boxShadow: "0 8px 24px rgba(0, 136, 214, 0.28)"
                             }}
                         >
                             <LocalHospitalIcon sx={{ fontSize: 32 }} />
                         </Box>
                     </Box>
 
-                    <Typography variant="h5" fontWeight="900" sx={{ letterSpacing: "-0.5px", color: "#0F172A", mb: 0.5 }}>
+                    <Typography variant="h5" fontWeight={900} sx={{ letterSpacing: "-0.03em", color: "#0F172A", mb: 0.5 }}>
                         Đăng Nhập Cổng Y Tế
                     </Typography>
-                    <Typography variant="body2" color="textSecondary" mb={3}>
-                        Nền tảng quản trị & chăm sóc sức khỏe YouMed TNT
+                    <Typography variant="body2" sx={{ color: "#64748B", mb: 3 }}>
+                        Nền tảng quản trị & tiếp đón bệnh nhân Bệnh viện TNT
                     </Typography>
 
                     {expiredNotice && (
-                        <Alert severity="warning" sx={{ mb: 2.5, textAlign: "left", borderRadius: 2 }}>
-                            Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục.
+                        <Alert severity="warning" sx={{ mb: 2.5, textAlign: "left", borderRadius: 2.5 }}>
+                            Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại để tiếp tục.
                         </Alert>
                     )}
 
                     {error && (
-                        <Alert severity="error" sx={{ mb: 2.5, textAlign: "left", borderRadius: 2 }}>
+                        <Alert severity="error" sx={{ mb: 2.5, textAlign: "left", borderRadius: 2.5 }}>
                             {error}
                         </Alert>
                     )}
@@ -123,7 +173,6 @@ export default function LoginPage() {
                         <TextField
                             fullWidth
                             label="Số điện thoại"
-                            variant="outlined"
                             margin="normal"
                             value={phoneNumber}
                             onChange={(e) => setPhoneNumber(e.target.value)}
@@ -135,7 +184,11 @@ export default function LoginPage() {
                                         <PhoneIphoneIcon sx={{ color: "#94A3B8" }} />
                                     </InputAdornment>
                                 ),
-                                sx: { borderRadius: 2.5 }
+                                sx: {
+                                    borderRadius: 2.5,
+                                    fontFamily: "monospace",
+                                    fontWeight: 700
+                                }
                             }}
                         />
 
@@ -143,7 +196,6 @@ export default function LoginPage() {
                             fullWidth
                             type={showPassword ? "text" : "password"}
                             label="Mật khẩu"
-                            variant="outlined"
                             margin="normal"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
@@ -178,25 +230,62 @@ export default function LoginPage() {
                             disabled={loading}
                             sx={{
                                 mt: 2.5,
-                                py: 1.3,
+                                py: 1.4,
                                 borderRadius: 2.5,
-                                fontWeight: 700,
+                                fontWeight: 800,
                                 fontSize: "0.95rem",
-                                boxShadow: "0 6px 18px rgba(0, 136, 214, 0.35)",
+                                textTransform: "none",
+                                bgcolor: "#0088D6",
+                                boxShadow: "0 6px 20px rgba(0, 136, 214, 0.3)",
                                 "&:hover": {
-                                    boxShadow: "0 8px 24px rgba(0, 136, 214, 0.45)"
+                                    bgcolor: "#0073B7"
                                 }
                             }}
                         >
-                            {loading ? "Đang xử lý..." : "Đăng Nhập Bằng Số Điện Thoại"}
+                            {loading ? "Đang xác thực..." : "Đăng Nhập"}
                         </Button>
 
-                        <Box display="flex" alignItems="center" my={2}>
-                            <Box flexGrow={1} height="1px" bgcolor="#E2E8F0" />
-                            <Typography variant="caption" color="textSecondary" px={1.5} fontWeight={600}>
+                        {/* Quick Demo Role Fillers */}
+                        <Box mt={3} pt={2} borderTop="1px solid rgba(15, 23, 42, 0.08)">
+                            <Typography variant="caption" sx={{ color: "#94A3B8", fontWeight: 700, display: "block", mb: 1 }}>
+                                TÀI KHOẢN MẪU DEMO (CHẠM ĐỂ ĐIỀN):
+                            </Typography>
+                            <Box display="flex" flexWrap="wrap" gap={0.8} justifyContent="center">
+                                {[
+                                    { label: "Admin", phone: "0937050537", pass: "taizz0537", color: "#6366F1" },
+                                    { label: "Trưởng khoa", phone: "0900000002", pass: "taizz0537", color: "#0D9488" },
+                                    { label: "Bác sĩ", phone: "0911000001", pass: "password123", color: "#0088D6" },
+                                    { label: "Điều dưỡng", phone: "0900000004", pass: "password123", color: "#10B981" },
+                                    { label: "Thu ngân", phone: "0900000007", pass: "password123", color: "#F59E0B" },
+                                    { label: "Dược sĩ", phone: "0900000005", pass: "password123", color: "#7C3AED" },
+                                    { label: "Bệnh nhân", phone: "0988889999", pass: "password123", color: "#64748B" }
+                                ].map((item) => (
+                                    <Chip
+                                        key={item.label}
+                                        label={item.label}
+                                        size="small"
+                                        onClick={() => handleQuickFill(item.phone, item.pass)}
+                                        sx={{
+                                            fontWeight: 700,
+                                            fontSize: "0.72rem",
+                                            borderRadius: 1.5,
+                                            bgcolor: "rgba(15, 23, 42, 0.04)",
+                                            color: item.color,
+                                            border: `1px solid ${item.color}33`,
+                                            cursor: "pointer",
+                                            "&:hover": { bgcolor: "rgba(15, 23, 42, 0.08)" }
+                                        }}
+                                    />
+                                ))}
+                            </Box>
+                        </Box>
+
+                        <Box display="flex" alignItems="center" my={2.5}>
+                            <Box flexGrow={1} height="1px" bgcolor="rgba(15, 23, 42, 0.08)" />
+                            <Typography variant="caption" sx={{ color: "#94A3B8", px: 1.5, fontWeight: 700 }}>
                                 HOẶC
                             </Typography>
-                            <Box flexGrow={1} height="1px" bgcolor="#E2E8F0" />
+                            <Box flexGrow={1} height="1px" bgcolor="rgba(15, 23, 42, 0.08)" />
                         </Box>
 
                         {/* Microsoft Account Login Button */}
@@ -205,11 +294,8 @@ export default function LoginPage() {
                             variant="outlined"
                             size="large"
                             onClick={() => {
-                                // Giả lập Microsoft SSO hoặc chuyển hướng Microsoft OAuth
-                                setPhoneNumber("0988889999");
-                                setPassword("password123");
-                                setError("");
-                                alert("Đã kết nối tài khoản Microsoft! Nhấn Đăng Nhập để vào hệ thống.");
+                                handleQuickFill("0988889999", "password123");
+                                alert("Đã liên kết tài khoản Microsoft! Nhấn Đăng Nhập để vào hệ thống.");
                             }}
                             startIcon={
                                 <Box component="svg" width="18" height="18" viewBox="0 0 21 21" fill="none">
@@ -220,28 +306,32 @@ export default function LoginPage() {
                                 </Box>
                             }
                             sx={{
-                                py: 1.1,
+                                py: 1.2,
                                 borderRadius: 2.5,
                                 fontWeight: 700,
                                 fontSize: "0.875rem",
+                                textTransform: "none",
                                 color: "#334155",
-                                borderColor: "#CBD5E1",
+                                borderColor: "rgba(15, 23, 42, 0.15)",
                                 "&:hover": { bgcolor: "#F8FAFC", borderColor: "#94A3B8" }
                             }}
                         >
-                            Đăng nhập bằng Microsoft
+                            Đăng nhập bằng Microsoft Entra ID
                         </Button>
 
-                        <Box textAlign="center" mt={3} pt={2} borderTop="1px solid #F1F5F9">
-                            <Typography variant="body2" color="textSecondary" mb={1}>
-                                Chưa có tài khoản?{" "}
+                        <Box textAlign="center" mt={3} pt={2} borderTop="1px solid rgba(15, 23, 42, 0.06)">
+                            <Typography variant="body2" sx={{ color: "#64748B", mb: 1.5 }}>
+                                Chưa có tài khoản bệnh nhân?{" "}
                                 <Typography
                                     component={Link}
                                     to="/register"
                                     variant="body2"
-                                    color="primary"
-                                    fontWeight="bold"
-                                    sx={{ textDecoration: "none" }}
+                                    sx={{
+                                        color: "#0088D6",
+                                        fontWeight: 800,
+                                        textDecoration: "none",
+                                        "&:hover": { textDecoration: "underline" }
+                                    }}
                                 >
                                     Đăng ký thành viên
                                 </Typography>
@@ -252,7 +342,7 @@ export default function LoginPage() {
                                 to="/"
                                 size="small"
                                 startIcon={<ArrowBackIcon />}
-                                sx={{ color: "#64748B", fontWeight: 600, mt: 1 }}
+                                sx={{ color: "#64748B", fontWeight: 700, textTransform: "none" }}
                             >
                                 Quay về trang chủ
                             </Button>

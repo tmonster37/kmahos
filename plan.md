@@ -1,7 +1,7 @@
 # 📋 PLAN.MD - BẢNG THEO DÕI TRẠNG THÁI CÔNG VIỆC (TASK TRACKER)
 **Hệ Thống Quản Lý Bệnh Viện Thông Minh - YOUMED TNT HOSPITAL**
 
-> **Cập nhật lần cuối:** 13/10/2026 | **Trạng thái hệ thống:** Ổn định (Production-Ready)
+> **Cập nhật lần cuối:** 23/10/2026 | **Trạng thái hệ thống:** Triển khai kiosk hoàn tất; DB integration verification còn chờ môi trường an toàn
 
 ---
 
@@ -25,6 +25,7 @@
 | **TASK-13** | Cải tiến An toàn Đơn thuốc (CDS) & Chuẩn hóa VNPay IPN từ E-healthcare | Medical Safety & Payment | Senior Fullstack | ✅ **DONE** | [`implementation_plan_ref_ehealthcare.md`](file:///c:/Users/ASUS/Downloads/hospital-api%20%281%29/implementation_plan_ref_ehealthcare.md) | [`module_13_ehealthcare_improvements.md`](file:///c:/Users/ASUS/Downloads/hospital-api%20%281%29/test-plans/module_13_ehealthcare_improvements.md) |
 | **TASK-14** | Khung giờ Check-in Kiosk & Ưu tiên Đọc Kết quả Xét nghiệm | Flow & Queue Optimization | Senior Fullstack | ⏳ **WAITING** | [`implementation_plan_kiosk_checkin_window_and_lab_priority.md`](file:///c:/Users/ASUS/Downloads/hospital-api%20%281%29/implementation_plan_kiosk_checkin_window_and_lab_priority.md) | Chờ duyệt kế hoạch |
 | **TASK-16** | Số hóa Toàn diện Quy trình Y tế 4 Phân hệ (E-healthcare & TT 46/2018/TT-BYT) | Enterprise Feature | Senior Fullstack & Medical Solution Architect | ✅ **DONE** | [`implementation_plan_task16_comprehensive_healthcare.md`](file:///c:/Users/ASUS/Downloads/hospital-api%20%281%29/implementation_plan_task16_comprehensive_healthcare.md) | 123/123 assertions PASS (Phase 1: 21, Phase 2: 29, Phase 3: 35, Phase 4: 38) |
+| **TASK-18** | Củng cố đặt lịch Kiosk, check-in & quản lý lịch hẹn Admin | Booking & Queue Integrity | Backend & Frontend | ⚠ **IMPLEMENTED; DB VERIFICATION PENDING** | [`kiosk-booking-hardening_PLAN_23-10-26.md`](file:///c:/Users/ASUS/Downloads/hospital-api%20%281%29/process/general-plans/completed/kiosk-booking-hardening_PLAN_23-10-26.md) | [`kiosk_booking_hardening.md`](file:///c:/Users/ASUS/Downloads/hospital-api%20%281%29/test-plans/kiosk_booking_hardening.md) |
 | **TASK-NEXT**| Chờ yêu cầu mới từ người dùng (Sẵn sàng tiếp nhận) | Backlog | AI Pair Programming | ⏳ **WAITING** | Viết kế hoạch khi có yêu cầu mới | Chờ định nghĩa |
 
 
@@ -130,6 +131,11 @@ sequenceDiagram
     - Cập nhật giao diện `DoctorManagePage.jsx` (Dialog CCHN) và `DashboardPage.jsx` (3 widget KPI mới).
     - Đạt chuẩn kiểm thử: `test_phase4_admin_kpi_audit.js` (38/38 PASS).
   * **Tổng kết nghiệm thu**: Toàn bộ 4 giai đoạn đạt **123/123 assertions PASS (100%)**, Frontend Vite build **1215 modules transformed, 0 errors**.
+* **23/10/2026 - TASK-18 (Kiosk Booking Hardening; verification một phần):**
+  * Kiosk gửi một request `POST /api/counters/kiosk/dispatch`, dùng lại idempotency key khi thử lại; service giao dịch tạo booking và phiếu counter, khóa slot khi kiểm tra sức chứa và tuần tự hóa cấp số quầy.
+  * Chuẩn hóa tuổi ưu tiên từ 65, lưu `checkedInAt` để check-in theo mã/số điện thoại có thể lặp an toàn; thêm `Asia/Ho_Chi_Minh` `Clock`; thêm trang và API admin liệt kê/đổi/hủy lịch.
+  * Maven focused tests: 20/20 PASS (`BookingServiceTest` 11, `CounterServiceIdempotencyTest` 2, `KioskDispatchTransactionServiceTest` 3, `FhirExportServiceTest` 1, `ScheduleServiceTest` 3). Vite production build PASS, có cảnh báo chunk JavaScript 2.318 MB. `node --check` PASS cho hai script kiosk.
+  * Không chạy test context/API integration hoặc DB concurrency trên datasource mặc định vì trỏ `localhost:5432/kmahos` và cấu hình mặc định `ddl-auto:update`; cần DB disposable để xác minh. Chưa có migration được xác minh cho môi trường `ddl-auto:validate`; hủy booking hiện chưa vô hiệu hóa phiếu quầy liên kết. Chi tiết ở [`test-plans/kiosk_booking_hardening.md`](file:///c:/Users/ASUS/Downloads/hospital-api%20%281%29/test-plans/kiosk_booking_hardening.md).
 
 
 

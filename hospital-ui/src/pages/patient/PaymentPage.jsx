@@ -18,11 +18,8 @@ import {
     CircularProgress,
     IconButton,
     Stack,
-    RadioGroup,
-    FormControlLabel,
-    Radio,
-    Tabs,
-    Tab
+    Divider,
+    Tooltip
 } from "@mui/material";
 import QrCodeScannerIcon from "@mui/icons-material/QrCodeScanner";
 import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
@@ -31,9 +28,13 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ErrorIcon from "@mui/icons-material/Error";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
-import PhoneAndroidIcon from "@mui/icons-material/PhoneAndroid";
-import CreditCardIcon from "@mui/icons-material/CreditCard";
 import PointOfSaleIcon from "@mui/icons-material/PointOfSale";
+import SecurityIcon from "@mui/icons-material/Security";
+import FlashOnIcon from "@mui/icons-material/FlashOn";
+import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
+import CreditCardIcon from "@mui/icons-material/CreditCard";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+
 import { useLocation, useNavigate } from "react-router-dom";
 import axiosInstance from "../../services/AxiosInstance";
 import { formatCurrency, formatDateTime } from "../../utils/formatters";
@@ -131,386 +132,556 @@ export default function PaymentPage() {
         }
     };
 
-    const handlePaymentSuccess = (tx) => {
+    const handlePaymentSuccess = () => {
         setOpenQRModal(false);
         loadWalletData();
     };
 
     return (
-        <Container maxWidth="md" sx={{ py: 4 }}>
-            {/* Modal Cổng Thanh Toán PayOS (VietQR) */}
-            <PaymentQRModal
-                open={openQRModal}
-                onClose={() => { setOpenQRModal(false); loadWalletData(); }}
-                paymentData={paymentModalData}
-                onSuccess={handlePaymentSuccess}
-            />
+        <Box sx={{ bgcolor: "#F8FAFC", minHeight: "100vh", py: { xs: 3, md: 5 } }}>
+            <Container maxWidth="lg">
+                {/* Modal Cổng Thanh Toán PayOS (VietQR) */}
+                <PaymentQRModal
+                    open={openQRModal}
+                    onClose={() => { setOpenQRModal(false); loadWalletData(); }}
+                    paymentData={paymentModalData}
+                    onSuccess={handlePaymentSuccess}
+                />
 
-
-            {/* PayOS Return URL Notification (Theo đặc tả https://payos.vn/docs/du-lieu-tra-ve/return-url/) */}
-            {payosOrderCode && (
-                <Box mb={3}>
-                    {payosCancel === "true" || payosStatus === "CANCELLED" ? (
-                        <Alert
-                            severity="info"
-                            icon={<ErrorIcon fontSize="medium" />}
-                            sx={{ borderRadius: 3, border: "1px solid #BAE6FD", bgcolor: "#F0F9FF" }}
-                            action={
-                                <Button color="inherit" size="small" onClick={() => navigate("/payment", { replace: true })}>
-                                    Đóng
-                                </Button>
-                            }
-                        >
-                            <Typography variant="subtitle2" fontWeight="bold" color="#0369A1">
-                                Giao dịch đã được hủy trên Cổng PayOS
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                                Bạn đã chọn hủy thanh toán cho đơn hàng <b>#{payosOrderCode}</b> {payosId ? `(Mã link: ${payosId})` : ""}. Tài khoản ngân hàng của bạn không bị trừ tiền. Quý khách có thể nạp tiền lại bất cứ lúc nào.
-                            </Typography>
-                        </Alert>
-                    ) : (payosCode === "00" || payosStatus === "PAID" || payosStatus === "SUCCESS") ? (
-                        <Alert
-                            severity="success"
-                            icon={<CheckCircleIcon fontSize="medium" />}
-                            sx={{ borderRadius: 3, border: "1px solid #BBF7D0", bgcolor: "#F0FDF4" }}
-                            action={
-                                <Button color="inherit" size="small" onClick={() => navigate("/payment", { replace: true })}>
-                                    Đóng
-                                </Button>
-                            }
-                        >
-                            <Typography variant="subtitle2" fontWeight="bold" color="#15803D">
-                                🎉 Thanh toán thành công qua Cổng PayOS Open Banking!
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                                Đơn hàng <b>#{payosOrderCode}</b> {payosId ? `(Mã PayOS: ${payosId})` : ""} đã được ghi nhận thanh toán thành công (Mã: {payosCode || "00"} - Trạng thái: PAID).
-                                Số dư ví viện phí của bạn đã được cập nhật tự động.
-                            </Typography>
-                        </Alert>
-                    ) : (
-                        <Alert
-                            severity="warning"
-                            icon={<ErrorIcon fontSize="medium" />}
-                            sx={{ borderRadius: 3, border: "1px solid #FED7AA", bgcolor: "#FFFBEB" }}
-                            action={
-                                <Stack direction="row" spacing={1}>
-                                    <Button
-                                        color="warning"
-                                        size="small"
-                                        variant="outlined"
-                                        disabled={syncingReturn}
-                                        onClick={() => handleSyncReturnOrder(payosOrderCode)}
-                                        sx={{ textTransform: "none", fontWeight: "bold" }}
-                                    >
-                                        {syncingReturn ? "Đang đồng bộ..." : "Đồng bộ lại"}
-                                    </Button>
+                {/* PayOS Return URL Notification */}
+                {payosOrderCode && (
+                    <Box mb={3}>
+                        {payosCancel === "true" || payosStatus === "CANCELLED" ? (
+                            <Alert
+                                severity="info"
+                                icon={<ErrorIcon fontSize="medium" />}
+                                sx={{
+                                    borderRadius: 3,
+                                    border: "1px solid #BAE6FD",
+                                    bgcolor: "#F0F9FF"
+                                }}
+                                action={
                                     <Button color="inherit" size="small" onClick={() => navigate("/payment", { replace: true })}>
                                         Đóng
                                     </Button>
-                                </Stack>
-                            }
+                                }
+                            >
+                                <Typography variant="subtitle2" fontWeight={800} color="#0369A1">
+                                    Giao dịch đã hủy trên Cổng PayOS
+                                </Typography>
+                                <Typography variant="body2" color="#64748B">
+                                    Bạn đã hủy giao dịch cho đơn hàng <b>#{payosOrderCode}</b> {payosId ? `(Mã link: ${payosId})` : ""}. Tài khoản ngân hàng của quý khách không bị trừ tiền.
+                                </Typography>
+                            </Alert>
+                        ) : (payosCode === "00" || payosStatus === "PAID" || payosStatus === "SUCCESS") ? (
+                            <Alert
+                                severity="success"
+                                icon={<CheckCircleIcon fontSize="medium" />}
+                                sx={{
+                                    borderRadius: 3,
+                                    border: "1px solid #BBF7D0",
+                                    bgcolor: "#F0FDF4"
+                                }}
+                                action={
+                                    <Button color="inherit" size="small" onClick={() => navigate("/payment", { replace: true })}>
+                                        Đóng
+                                    </Button>
+                                }
+                            >
+                                <Typography variant="subtitle2" fontWeight={800} color="#15803D">
+                                    Thanh toán thành công qua Cổng PayOS Open Banking!
+                                </Typography>
+                                <Typography variant="body2" color="#166534">
+                                    Đơn hàng <b>#{payosOrderCode}</b> {payosId ? `(Mã: ${payosId})` : ""} đã ghi nhận thanh toán thành công. Số dư ví viện phí đã được cộng tự động.
+                                </Typography>
+                            </Alert>
+                        ) : (
+                            <Alert
+                                severity="warning"
+                                icon={<ErrorIcon fontSize="medium" />}
+                                sx={{
+                                    borderRadius: 3,
+                                    border: "1px solid #FED7AA",
+                                    bgcolor: "#FFFBEB"
+                                }}
+                                action={
+                                    <Stack direction="row" spacing={1}>
+                                        <Button
+                                            color="warning"
+                                            size="small"
+                                            variant="outlined"
+                                            disabled={syncingReturn}
+                                            onClick={() => handleSyncReturnOrder(payosOrderCode)}
+                                            sx={{ textTransform: "none", fontWeight: 700 }}
+                                        >
+                                            {syncingReturn ? "Đang đối soát..." : "Đồng bộ lại"}
+                                        </Button>
+                                        <Button color="inherit" size="small" onClick={() => navigate("/payment", { replace: true })}>
+                                            Đóng
+                                        </Button>
+                                    </Stack>
+                                }
+                            >
+                                <Typography variant="subtitle2" fontWeight={800} color="#B45309">
+                                    Giao dịch đang chờ đối soát với Cổng PayOS
+                                </Typography>
+                                <Typography variant="body2" color="#92400E">
+                                    Đơn hàng <b>#{payosOrderCode}</b> - Trạng thái: <b>{payosStatus || "PENDING"}</b>. Nếu bạn đã chuyển khoản thành công, vui lòng bấm nút "Đồng bộ lại" bên cạnh.
+                                </Typography>
+                            </Alert>
+                        )}
+                    </Box>
+                )}
+
+                {/* Header Section */}
+                <Box mb={4}>
+                    <Box display="flex" alignItems="center" gap={1} mb={0.5}>
+                        <Box
+                            sx={{
+                                width: 34,
+                                height: 34,
+                                borderRadius: "8px",
+                                bgcolor: "rgba(0, 136, 214, 0.1)",
+                                color: "#0088D6",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center"
+                            }}
                         >
-                            <Typography variant="subtitle2" fontWeight="bold" color="#B45309">
-                                Giao dịch PayOS đang chờ xử lý hoặc chưa hoàn tất
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                                Đơn hàng <b>#{payosOrderCode}</b> - Trạng thái: <b>{payosStatus || "PENDING"}</b> (Mã: {payosCode || "Chờ xử lý"}).
-                                Nếu bạn đã chuyển khoản trên App ngân hàng, vui lòng bấm nút <b>"Đồng bộ lại"</b> bên cạnh để hệ thống đối soát trực tiếp với PayOS.
-                            </Typography>
-                        </Alert>
-                    )}
-                </Box>
-            )}
-
-            {/* Header */}
-            <Box mb={3}>
-                <Typography variant="h5" fontWeight="bold" color="#0f172a">
-                    💳 Ví Viện Phí & Nạp Tiền
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                    Hỗ trợ Cổng thanh toán PayOS (Chuyển khoản Open Banking / VietQR Napas 247) và nộp Tiền mặt tại Quầy Thu ngân
-                </Typography>
-            </Box>
-
-            {walletError && (
-                <Alert
-                    severity="warning"
-                    sx={{ mb: 2.5, borderRadius: 2 }}
-                    action={
-                        <Button color="inherit" size="small" onClick={loadWalletData}>
-                            Thử lại
-                        </Button>
-                    }
-                >
-                    {walletError}
-                </Alert>
-            )}
-
-            <Grid container spacing={2.5} mb={4}>
-                {/* Balance Card */}
-                <Grid item xs={12} sm={5}>
-                    <Paper
-                        elevation={0}
-                        sx={{
-                            p: 3,
-                            borderRadius: 3,
-                            bgcolor: "#0f172a",
-                            color: "white",
-                            height: "100%",
-                            display: "flex",
-                            flexDirection: "column",
-                            justifyContent: "space-between"
-                        }}
-                    >
-                        <Box>
-                            <Box display="flex" justifyContent="space-between" alignItems="center" mb={1.5}>
-                                <AccountBalanceWalletIcon sx={{ color: "#38bdf8", fontSize: 28 }} />
-                                <Chip label="Sẵn sàng" size="small" color="success" sx={{ height: 20, fontSize: "0.7rem", fontWeight: "600" }} />
-                            </Box>
-                            <Typography variant="caption" sx={{ color: "#94a3b8" }}>
-                                SỐ DƯ HIỆN TẠI:
-                            </Typography>
-                            <Typography variant="h4" fontWeight="bold" sx={{ color: "#38bdf8", my: 0.5 }}>
-                                {formatCurrency(balance)}
-                            </Typography>
+                            <AccountBalanceWalletIcon sx={{ fontSize: 20 }} />
                         </Box>
-                        <Typography variant="caption" sx={{ color: "#64748b" }}>
-                            Dùng để thanh toán lịch khám, tiền thuốc và xét nghiệm trực tiếp 0 giây.
+                        <Typography variant="h5" fontWeight={800} color="#0F172A" letterSpacing="-0.02em">
+                            Ví Viện Phí & Nạp Tiền Trực Tuyến
                         </Typography>
-                    </Paper>
-                </Grid>
+                    </Box>
+                    <Typography variant="body2" color="#64748B">
+                        Hỗ trợ Cổng PayOS (Chuyển khoản Open Banking / VietQR Napas 247 tức thì) và nộp Tiền mặt tại Quầy Thu ngân Bệnh viện TNT.
+                    </Typography>
+                </Box>
 
-                {/* Top-up Box */}
-                <Grid item xs={12} sm={7}>
-                    <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: "1px solid #e2e8f0", bgcolor: "white" }}>
-                        <Typography variant="subtitle2" fontWeight="bold" color="#0f172a" mb={1.5}>
-                            Chọn phương thức nạp tiền:
-                        </Typography>
+                {walletError && (
+                    <Alert
+                        severity="warning"
+                        sx={{ mb: 3, borderRadius: 2.5 }}
+                        action={
+                            <Button color="inherit" size="small" onClick={loadWalletData}>
+                                Thử lại
+                            </Button>
+                        }
+                    >
+                        {walletError}
+                    </Alert>
+                )}
 
-                        {/* Channel selector tabs: Chỉ PayOS và Tiền mặt */}
-                        <Grid container spacing={1.5} mb={2.5}>
-                            <Grid item xs={6}>
-                                <Button
-                                    fullWidth
-                                    size="small"
-                                    variant={depositChannel === "PAYOS" ? "contained" : "outlined"}
-                                    startIcon={<AccountBalanceIcon />}
-                                    onClick={() => setDepositChannel("PAYOS")}
-                                    sx={{
-                                        py: 1,
-                                        borderRadius: 2,
-                                        textTransform: "none",
-                                        fontWeight: "700",
-                                        fontSize: "0.82rem",
-                                        bgcolor: depositChannel === "PAYOS" ? "#0284c7" : "transparent"
-                                    }}
-                                >
-                                    📱 Cổng PayOS (0% phí)
-                                </Button>
-                            </Grid>
-                            <Grid item xs={6}>
-                                <Button
-                                    fullWidth
-                                    size="small"
-                                    variant={depositChannel === "CASH" ? "contained" : "outlined"}
-                                    startIcon={<PointOfSaleIcon />}
-                                    onClick={() => setDepositChannel("CASH")}
-                                    sx={{
-                                        py: 1,
-                                        borderRadius: 2,
-                                        textTransform: "none",
-                                        fontWeight: "700",
-                                        fontSize: "0.82rem",
-                                        bgcolor: depositChannel === "CASH" ? "#10b981" : "transparent",
-                                        borderColor: "#10b981",
-                                        color: depositChannel === "CASH" ? "#fff" : "#10b981",
-                                        "&:hover": { bgcolor: "#059669", color: "#fff" }
-                                    }}
-                                >
-                                    💵 Tiền mặt tại Quầy
-                                </Button>
-                            </Grid>
-                        </Grid>
+                {/* Top Grid: Balance & Top-up */}
+                <Grid container spacing={3} mb={4}>
+                    {/* Apple-style Balance Card */}
+                    <Grid item xs={12} md={5}>
+                        <Paper
+                            elevation={0}
+                            sx={{
+                                p: 3.5,
+                                borderRadius: 4,
+                                bgcolor: "#0F172A",
+                                color: "#FFFFFF",
+                                height: "100%",
+                                display: "flex",
+                                flexDirection: "column",
+                                justifyContent: "space-between",
+                                position: "relative",
+                                overflow: "hidden",
+                                boxShadow: "0 10px 30px rgba(15, 23, 42, 0.15)",
+                                border: "1px solid rgba(255, 255, 255, 0.08)"
+                            }}
+                        >
+                            {/* Ambient Glow */}
+                            <Box
+                                sx={{
+                                    position: "absolute",
+                                    top: -40,
+                                    right: -40,
+                                    width: 140,
+                                    height: 140,
+                                    borderRadius: 999,
+                                    bgcolor: "rgba(56, 189, 248, 0.15)",
+                                    filter: "blur(40px)",
+                                    pointerEvents: "none"
+                                }}
+                            />
 
-                        {depositChannel === "CASH" ? (
                             <Box>
-                                <Alert severity="info" sx={{ borderRadius: 2, mb: 2 }}>
-                                    <Typography variant="body2" fontWeight="bold" gutterBottom>
-                                        Nộp tiền mặt trực tiếp vào ví viện phí:
+                                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2.5}>
+                                    <Box display="flex" alignItems="center" gap={1.2}>
+                                        <Box
+                                            sx={{
+                                                width: 36,
+                                                height: 36,
+                                                borderRadius: "10px",
+                                                bgcolor: "rgba(56, 189, 248, 0.12)",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                color: "#38BDF8"
+                                            }}
+                                        >
+                                            <CreditCardIcon sx={{ fontSize: 20 }} />
+                                        </Box>
+                                        <Typography variant="caption" sx={{ color: "#94A3B8", fontWeight: 700, letterSpacing: "0.05em" }}>
+                                            VÍ VIỆN PHÍ ĐIỆN TỬ
+                                        </Typography>
+                                    </Box>
+                                    <Chip
+                                        icon={<FlashOnIcon sx={{ fontSize: "14px !important", color: "#10B981 !important" }} />}
+                                        label="Sẵn sàng"
+                                        size="small"
+                                        sx={{
+                                            height: 24,
+                                            fontSize: "0.72rem",
+                                            fontWeight: 700,
+                                            bgcolor: "rgba(16, 185, 129, 0.15)",
+                                            color: "#34D399",
+                                            border: "1px solid rgba(16, 185, 129, 0.3)"
+                                        }}
+                                    />
+                                </Box>
+
+                                <Typography variant="caption" sx={{ color: "#64748B", fontWeight: 600, display: "block", mb: 0.5 }}>
+                                    SỐ DƯ HIỆN KHẢ DỤNG:
+                                </Typography>
+                                <Typography
+                                    variant="h3"
+                                    sx={{
+                                        fontWeight: 900,
+                                        fontFamily: "monospace",
+                                        letterSpacing: "-0.03em",
+                                        color: "#38BDF8",
+                                        mb: 1
+                                    }}
+                                >
+                                    {formatCurrency(balance)}
+                                </Typography>
+                            </Box>
+
+                            <Box mt={3} pt={2} borderTop="1px solid rgba(255, 255, 255, 0.08)">
+                                <Box display="flex" alignItems="center" gap={1} mb={0.5}>
+                                    <SecurityIcon sx={{ color: "#10B981", fontSize: 16 }} />
+                                    <Typography variant="caption" sx={{ color: "#CBD5E1", fontWeight: 600 }}>
+                                        Bảo mật tiêu chuẩn PCI-DSS & Napas 247
                                     </Typography>
-                                    <Typography variant="caption" display="block">
-                                        • Quý khách vui lòng đến trực tiếp <b>Quầy Thu Ngân (Tầng 1)</b> hoặc <b>Bàn Tiếp Đón</b>.
+                                </Box>
+                                <Typography variant="caption" sx={{ color: "#64748B", display: "block" }}>
+                                    Tự động gạch nợ tiền khám, thuốc và xét nghiệm trong 0 giây không cần xếp hàng quầy viện phí.
+                                </Typography>
+                            </Box>
+                        </Paper>
+                    </Grid>
+
+                    {/* Top-up Box */}
+                    <Grid item xs={12} md={7}>
+                        <Paper
+                            elevation={0}
+                            sx={{
+                                p: 3.5,
+                                borderRadius: 4,
+                                bgcolor: "#FFFFFF",
+                                border: "1px solid rgba(15, 23, 42, 0.08)",
+                                boxShadow: "0 4px 20px rgba(15, 23, 42, 0.03)"
+                            }}
+                        >
+                            <Typography variant="subtitle1" fontWeight={800} color="#0F172A" mb={2}>
+                                Chọn phương thức nạp tiền:
+                            </Typography>
+
+                            {/* Channel Selector Buttons */}
+                            <Grid container spacing={2} mb={3}>
+                                <Grid item xs={6}>
+                                    <Button
+                                        fullWidth
+                                        variant={depositChannel === "PAYOS" ? "contained" : "outlined"}
+                                        startIcon={<AccountBalanceIcon />}
+                                        onClick={() => setDepositChannel("PAYOS")}
+                                        sx={{
+                                            py: 1.3,
+                                            borderRadius: 2.5,
+                                            textTransform: "none",
+                                            fontWeight: 800,
+                                            fontSize: "0.85rem",
+                                            bgcolor: depositChannel === "PAYOS" ? "#0088D6" : "transparent",
+                                            color: depositChannel === "PAYOS" ? "white" : "#334155",
+                                            borderColor: depositChannel === "PAYOS" ? "#0088D6" : "rgba(15, 23, 42, 0.15)",
+                                            boxShadow: depositChannel === "PAYOS" ? "0 4px 14px rgba(0, 136, 214, 0.25)" : "none",
+                                            "&:hover": {
+                                                bgcolor: depositChannel === "PAYOS" ? "#0073B7" : "rgba(15, 23, 42, 0.03)"
+                                            }
+                                        }}
+                                    >
+                                        Cổng PayOS (0% phí)
+                                    </Button>
+                                </Grid>
+                                <Grid item xs={6}>
+                                    <Button
+                                        fullWidth
+                                        variant={depositChannel === "CASH" ? "contained" : "outlined"}
+                                        startIcon={<PointOfSaleIcon />}
+                                        onClick={() => setDepositChannel("CASH")}
+                                        sx={{
+                                            py: 1.3,
+                                            borderRadius: 2.5,
+                                            textTransform: "none",
+                                            fontWeight: 800,
+                                            fontSize: "0.85rem",
+                                            bgcolor: depositChannel === "CASH" ? "#10B981" : "transparent",
+                                            color: depositChannel === "CASH" ? "white" : "#059669",
+                                            borderColor: depositChannel === "CASH" ? "#10B981" : "rgba(16, 185, 129, 0.3)",
+                                            boxShadow: depositChannel === "CASH" ? "0 4px 14px rgba(16, 185, 129, 0.25)" : "none",
+                                            "&:hover": {
+                                                bgcolor: depositChannel === "CASH" ? "#059669" : "rgba(16, 185, 129, 0.05)"
+                                            }
+                                        }}
+                                    >
+                                        Tiền mặt tại Quầy
+                                    </Button>
+                                </Grid>
+                            </Grid>
+
+                            {depositChannel === "CASH" ? (
+                                <Alert severity="info" sx={{ borderRadius: 3, border: "1px solid #BAE6FD", bgcolor: "#F0F9FF" }}>
+                                    <Typography variant="subtitle2" fontWeight={800} color="#0369A1" gutterBottom>
+                                        Hướng dẫn nộp tiền mặt vào ví viện phí:
                                     </Typography>
-                                    <Typography variant="caption" display="block">
-                                        • Đọc <b>Số điện thoại</b> hoặc xuất trình <b>Mã Bệnh Nhân</b> cho nhân viên tiếp đón.
-                                    </Typography>
-                                    <Typography variant="caption" display="block">
-                                        • Nộp số tiền mặt mong muốn, nhân viên sẽ gạch nợ và nạp vào ví tức thì.
+                                    <Typography variant="body2" color="#0284C7" component="div">
+                                        • Quý khách vui lòng đến trực tiếp <b>Quầy Thu Ngân (Tầng 1)</b> hoặc <b>Bàn Tiếp Đón</b>.<br />
+                                        • Đọc <b>Số điện thoại</b> hoặc xuất trình <b>Mã Bệnh Nhân</b> cho nhân viên thu ngân.<br />
+                                        • Nộp số tiền mặt mong muốn, nhân viên sẽ gạch nợ và nạp vào ví viện phí tức thì.
                                     </Typography>
                                 </Alert>
-                            </Box>
-                        ) : (
-                            <Box>
-                                {/* Fast Amount Selectors */}
-                                <Grid container spacing={1} mb={2}>
-                                    {[100000, 200000, 500000, 1000000].map((val) => (
-                                        <Grid item xs={6} sm={3} key={val}>
-                                            <Button
-                                                fullWidth
-                                                size="small"
-                                                variant={amount === val ? "contained" : "outlined"}
-                                                onClick={() => setAmount(val)}
-                                                sx={{
-                                                    py: 0.6,
-                                                    borderRadius: 2,
-                                                    textTransform: "none",
-                                                    fontWeight: "600",
-                                                    fontSize: "0.78rem",
-                                                    bgcolor: amount === val ? "#334155" : "transparent",
-                                                    borderColor: "#cbd5e1"
-                                                }}
-                                            >
-                                                {val >= 1000000 ? `${val / 1000000} Triệu` : `${val / 1000}k`}
-                                            </Button>
-                                        </Grid>
-                                    ))}
-                                </Grid>
-
-                                <TextField
-                                    fullWidth
-                                    size="small"
-                                    type="number"
-                                    label="Số tiền nạp (VNĐ)"
-                                    value={amount}
-                                    onChange={(e) => setAmount(Number(e.target.value))}
-                                    sx={{ mb: 2 }}
-                                />
-
-                                <Button
-                                    fullWidth
-                                    variant="contained"
-                                    size="medium"
-                                    startIcon={<QrCodeScannerIcon />}
-                                    disabled={loading}
-                                    onClick={handleDeposit}
-                                    sx={{
-                                        py: 1.1,
-                                        borderRadius: 2,
-                                        fontWeight: "bold",
-                                        textTransform: "none",
-                                        bgcolor: "#0284c7",
-                                        "&:hover": {
-                                            bgcolor: "#0369a1"
-                                        }
-                                    }}
-                                >
-                                    {loading ? (
-                                        <CircularProgress size={20} color="inherit" />
-                                    ) : (
-                                        "Tạo mã PayOS / VietQR Chuyển Khoản"
-                                    )}
-                                </Button>
-                            </Box>
-                        )}
-                    </Paper>
-                </Grid>
-            </Grid>
-
-            {/* History Table */}
-            <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: "1px solid #e2e8f0", bgcolor: "white" }}>
-                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                    <Box display="flex" alignItems="center" gap={1}>
-                        <HistoryIcon fontSize="small" color="action" />
-                        <Typography variant="subtitle1" fontWeight="bold" color="#0f172a">
-                            Lịch Sử Giao Dịch ({transactions.length})
-                        </Typography>
-                    </Box>
-                    <IconButton onClick={loadWalletData} size="small">
-                        <RefreshIcon fontSize="small" />
-                    </IconButton>
-                </Box>
-
-                {loadingHistory ? (
-                    <Box textAlign="center" py={3}>
-                        <CircularProgress size={24} />
-                    </Box>
-                ) : transactions.length === 0 ? (
-                    <Typography variant="body2" color="text.secondary" textAlign="center" py={3}>
-                        Chưa có biến động số dư nào.
-                    </Typography>
-                ) : (
-                    <TableContainer>
-                        <Table size="small">
-                            <TableHead sx={{ bgcolor: "#f8fafc" }}>
-                                <TableRow>
-                                    <TableCell><b>Mã GD</b></TableCell>
-                                    <TableCell><b>Loại giao dịch</b></TableCell>
-                                    <TableCell><b>Phương thức</b></TableCell>
-                                    <TableCell><b>Thời gian</b></TableCell>
-                                    <TableCell align="right"><b>Số tiền</b></TableCell>
-                                    <TableCell align="center"><b>Trạng thái</b></TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {transactions.map((t, idx) => {
-                                    const isDeposit = t.transactionType === "DEPOSIT_WALLET";
-                                    const isSuccess = t.status === "SUCCESS";
-                                    const methodLabel = (t.paymentMethod === "VIETQR" || t.paymentMethod === "PAYOS")
-                                        ? "Cổng PayOS (VietQR)"
-                                        : (t.paymentMethod === "CASH" || t.paymentMethod === "COUNTER_CASH")
-                                        ? "Tiền mặt tại quầy"
-                                        : t.paymentMethod === "INTERNAL_WALLET"
-                                        ? "Ví viện phí"
-                                        : "Tiền mặt";
-
-                                    return (
-                                        <TableRow key={t.transactionId || idx} hover>
-                                            <TableCell>
-                                                <code>{t.vnpayTxnRef || `GD-${idx + 1}`}</code>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Typography variant="body2" fontWeight="600">
-                                                    {isDeposit ? "Nạp tiền ví" : "Thanh toán viện phí"}
-                                                </Typography>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Chip
-                                                    label={methodLabel}
+                            ) : (
+                                <Box>
+                                    {/* Fast Amount Preset Chips */}
+                                    <Typography variant="caption" sx={{ color: "#64748B", fontWeight: 700, display: "block", mb: 1 }}>
+                                        CHỌN NHANH SỐ TIỀN CẦN NẠP:
+                                    </Typography>
+                                    <Grid container spacing={1.5} mb={2.5}>
+                                        {[100000, 200000, 500000, 1000000, 2000000].map((val) => (
+                                            <Grid item xs={6} sm={2.4} key={val}>
+                                                <Button
+                                                    fullWidth
                                                     size="small"
-                                                    variant="outlined"
-                                                    sx={{ fontSize: "0.7rem", height: 22 }}
-                                                />
-                                            </TableCell>
-                                            <TableCell>
-                                                <Typography variant="caption" color="text.secondary">
-                                                    {t.createdAt ? formatDateTime(t.createdAt) : "Vừa xong"}
-                                                </Typography>
-                                            </TableCell>
-                                            <TableCell align="right">
-                                                <Typography
-                                                    variant="body2"
-                                                    fontWeight="bold"
-                                                    color={isSuccess ? (isDeposit ? "success.main" : "primary.main") : "error.main"}
+                                                    variant={amount === val ? "contained" : "outlined"}
+                                                    onClick={() => setAmount(val)}
+                                                    sx={{
+                                                        py: 0.9,
+                                                        borderRadius: 2,
+                                                        textTransform: "none",
+                                                        fontWeight: 800,
+                                                        fontSize: "0.82rem",
+                                                        fontFamily: "monospace",
+                                                        bgcolor: amount === val ? "#0F172A" : "transparent",
+                                                        color: amount === val ? "white" : "#334155",
+                                                        borderColor: amount === val ? "#0F172A" : "rgba(15, 23, 42, 0.12)",
+                                                        "&:hover": {
+                                                            bgcolor: amount === val ? "#1E293B" : "rgba(15, 23, 42, 0.04)"
+                                                        }
+                                                    }}
                                                 >
-                                                    {isDeposit ? "+" : "-"}{formatCurrency(t.amount)}
-                                                </Typography>
-                                            </TableCell>
-                                            <TableCell align="center">
-                                                <Chip
-                                                    label={isSuccess ? "Thành công" : "Thất bại"}
-                                                    color={isSuccess ? "success" : "error"}
-                                                    size="small"
-                                                    sx={{ height: 20, fontSize: "0.7rem", fontWeight: "600" }}
-                                                />
-                                            </TableCell>
-                                        </TableRow>
-                                    );
-                                })}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
-                )}
-            </Paper>
-        </Container>
+                                                    {val >= 1000000 ? `${val / 1000000} Triệu` : `${val / 1000}k`}
+                                                </Button>
+                                            </Grid>
+                                        ))}
+                                    </Grid>
+
+                                    <TextField
+                                        fullWidth
+                                        type="number"
+                                        label="Số tiền nạp tùy chỉnh (VNĐ)"
+                                        value={amount}
+                                        onChange={(e) => setAmount(Number(e.target.value))}
+                                        helperText={`Số tiền quy đổi: ${formatCurrency(amount)}`}
+                                        sx={{
+                                            mb: 2.5,
+                                            "& .MuiOutlinedInput-root": {
+                                                borderRadius: 2.5,
+                                                fontFamily: "monospace",
+                                                fontWeight: 800,
+                                                fontSize: "1.1rem"
+                                            }
+                                        }}
+                                    />
+
+                                    <Button
+                                        fullWidth
+                                        variant="contained"
+                                        size="large"
+                                        startIcon={<QrCodeScannerIcon />}
+                                        disabled={loading}
+                                        onClick={handleDeposit}
+                                        sx={{
+                                            py: 1.4,
+                                            borderRadius: 2.5,
+                                            fontWeight: 800,
+                                            fontSize: "0.95rem",
+                                            textTransform: "none",
+                                            bgcolor: "#0088D6",
+                                            boxShadow: "0 6px 20px rgba(0, 136, 214, 0.3)",
+                                            "&:hover": { bgcolor: "#0073B7" }
+                                        }}
+                                    >
+                                        {loading ? (
+                                            <CircularProgress size={22} color="inherit" />
+                                        ) : (
+                                            "Tạo Mã PayOS / VietQR Chuyển Khoản Tức Thì"
+                                        )}
+                                    </Button>
+                                </Box>
+                            )}
+                        </Paper>
+                    </Grid>
+                </Grid>
+
+                {/* Transaction Ledger Table */}
+                <Paper
+                    elevation={0}
+                    sx={{
+                        p: 3,
+                        borderRadius: 4,
+                        bgcolor: "#FFFFFF",
+                        border: "1px solid rgba(15, 23, 42, 0.08)",
+                        boxShadow: "0 4px 20px rgba(15, 23, 42, 0.03)"
+                    }}
+                >
+                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={2.5}>
+                        <Box display="flex" alignItems="center" gap={1.2}>
+                            <Box
+                                sx={{
+                                    width: 34,
+                                    height: 34,
+                                    borderRadius: "8px",
+                                    bgcolor: "rgba(15, 23, 42, 0.06)",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    color: "#0F172A"
+                                }}
+                            >
+                                <HistoryIcon fontSize="small" />
+                            </Box>
+                            <Box>
+                                <Typography variant="subtitle1" fontWeight={800} color="#0F172A">
+                                    Lịch Sử Biến Động Số Dư
+                                </Typography>
+                                <Typography variant="caption" color="#64748B">
+                                    Tổng số {transactions.length} giao dịch được ghi nhận
+                                </Typography>
+                            </Box>
+                        </Box>
+                        <Tooltip title="Làm mới lịch sử giao dịch">
+                            <IconButton onClick={loadWalletData} size="small" sx={{ border: "1px solid rgba(15, 23, 42, 0.1)" }}>
+                                <RefreshIcon fontSize="small" />
+                            </IconButton>
+                        </Tooltip>
+                    </Box>
+
+                    {loadingHistory ? (
+                        <Box textAlign="center" py={5}>
+                            <CircularProgress size={28} sx={{ color: "#0088D6" }} />
+                            <Typography variant="body2" sx={{ color: "#64748B", mt: 1.5, fontWeight: 600 }}>
+                                Đang đồng bộ sổ cái giao dịch...
+                            </Typography>
+                        </Box>
+                    ) : transactions.length === 0 ? (
+                        <Box textAlign="center" py={5}>
+                            <Typography variant="body2" color="#64748B" fontWeight={600}>
+                                Chưa có biến động số dư nào trong tài khoản của bạn.
+                            </Typography>
+                        </Box>
+                    ) : (
+                        <TableContainer sx={{ borderRadius: 2.5, border: "1px solid rgba(15, 23, 42, 0.06)" }}>
+                            <Table size="small">
+                                <TableHead sx={{ bgcolor: "#F8FAFC" }}>
+                                    <TableRow>
+                                        <TableCell sx={{ fontWeight: 800, color: "#475569", py: 1.4 }}>MÃ GIAO DỊCH</TableCell>
+                                        <TableCell sx={{ fontWeight: 800, color: "#475569" }}>LOẠI BIẾN ĐỘNG</TableCell>
+                                        <TableCell sx={{ fontWeight: 800, color: "#475569" }}>PHƯƠNG THỨC</TableCell>
+                                        <TableCell sx={{ fontWeight: 800, color: "#475569" }}>THỜI GIAN</TableCell>
+                                        <TableCell align="right" sx={{ fontWeight: 800, color: "#475569" }}>SỐ TIỀN</TableCell>
+                                        <TableCell align="center" sx={{ fontWeight: 800, color: "#475569" }}>TRẠNG THÁI</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {transactions.map((t, idx) => {
+                                        const isDeposit = t.transactionType === "DEPOSIT_WALLET";
+                                        const isSuccess = t.status === "SUCCESS";
+                                        const methodLabel = (t.paymentMethod === "VIETQR" || t.paymentMethod === "PAYOS")
+                                            ? "Cổng PayOS (VietQR)"
+                                            : (t.paymentMethod === "CASH" || t.paymentMethod === "COUNTER_CASH")
+                                            ? "Tiền mặt tại quầy"
+                                            : t.paymentMethod === "INTERNAL_WALLET"
+                                            ? "Ví viện phí"
+                                            : "Tiền mặt";
+
+                                        return (
+                                            <TableRow key={t.transactionId || idx} hover sx={{ "&:last-child td": { border: 0 } }}>
+                                                <TableCell>
+                                                    <Typography variant="body2" sx={{ fontFamily: "monospace", fontWeight: 700, color: "#0F172A" }}>
+                                                        {t.vnpayTxnRef || `GD-${idx + 1}`}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Typography variant="body2" fontWeight={700} color={isDeposit ? "#059669" : "#0F172A"}>
+                                                        {isDeposit ? "Nạp tiền ví" : "Thanh toán viện phí"}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Chip
+                                                        label={methodLabel}
+                                                        size="small"
+                                                        sx={{
+                                                            fontSize: "0.72rem",
+                                                            height: 22,
+                                                            fontWeight: 600,
+                                                            bgcolor: "rgba(15, 23, 42, 0.05)"
+                                                        }}
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Typography variant="caption" sx={{ color: "#64748B", fontWeight: 600 }}>
+                                                        {t.createdAt ? formatDateTime(t.createdAt) : "Vừa xong"}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell align="right">
+                                                    <Typography
+                                                        variant="body2"
+                                                        sx={{
+                                                            fontWeight: 800,
+                                                            fontFamily: "monospace",
+                                                            color: isSuccess ? (isDeposit ? "#059669" : "#0088D6") : "#DC2626"
+                                                        }}
+                                                    >
+                                                        {isDeposit ? "+" : "-"}{formatCurrency(t.amount)}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell align="center">
+                                                    <Chip
+                                                        label={isSuccess ? "Thành công" : "Thất bại"}
+                                                        size="small"
+                                                        sx={{
+                                                            height: 22,
+                                                            fontSize: "0.72rem",
+                                                            fontWeight: 800,
+                                                            bgcolor: isSuccess ? "rgba(16, 185, 129, 0.1)" : "rgba(239, 68, 68, 0.1)",
+                                                            color: isSuccess ? "#059669" : "#DC2626"
+                                                        }}
+                                                    />
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    )}
+                </Paper>
+            </Container>
+        </Box>
     );
 }

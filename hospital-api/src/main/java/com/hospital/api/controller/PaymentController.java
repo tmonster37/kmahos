@@ -32,10 +32,11 @@ public class PaymentController {
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @RequestParam BigDecimal amount,
             @RequestParam TransactionType type,
+            @RequestParam(required = false) String bookingCode,
             HttpServletRequest request
     ) {
         String ipAddress = request.getRemoteAddr();
-        String paymentUrl = paymentService.createVNPayUrl(userPrincipal.getId(), amount, type, ipAddress);
+        String paymentUrl = paymentService.createVNPayUrl(userPrincipal.getId(), amount, type, ipAddress, bookingCode);
         return ResponseEntity.ok(ApiResponse.ok(paymentUrl, "Khởi tạo URL VNPay thành công"));
     }
 
@@ -44,10 +45,11 @@ public class PaymentController {
     public ResponseEntity<ApiResponse<PaymentGatewayResponse>> createVietQRPayment(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @RequestParam BigDecimal amount,
-            @RequestParam TransactionType type
+            @RequestParam TransactionType type,
+            @RequestParam(required = false) String bookingCode
     ) {
         UUID accountId = userPrincipal != null ? userPrincipal.getId() : null;
-        PaymentGatewayResponse response = paymentService.createVietQRPayment(accountId, amount, type);
+        PaymentGatewayResponse response = paymentService.createVietQRPayment(accountId, amount, type, bookingCode);
         return ResponseEntity.ok(ApiResponse.ok(response, "Tạo mã thanh toán VietQR thành công"));
     }
 
@@ -56,10 +58,11 @@ public class PaymentController {
     public ResponseEntity<ApiResponse<PaymentGatewayResponse>> createMoMoPayment(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @RequestParam BigDecimal amount,
-            @RequestParam TransactionType type
+            @RequestParam TransactionType type,
+            @RequestParam(required = false) String bookingCode
     ) {
         UUID accountId = userPrincipal != null ? userPrincipal.getId() : null;
-        PaymentGatewayResponse response = paymentService.createMoMoPayment(accountId, amount, type);
+        PaymentGatewayResponse response = paymentService.createMoMoPayment(accountId, amount, type, bookingCode);
         return ResponseEntity.ok(ApiResponse.ok(response, "Tạo mã thanh toán MoMo thành công"));
     }
 

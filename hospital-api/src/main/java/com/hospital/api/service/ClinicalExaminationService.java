@@ -28,6 +28,7 @@ public interface ClinicalExaminationService {
     LabTestDetailResponse getLabTestById(UUID testId);
     LabTestDetailResponse collectSpecimen(UUID testId, CollectSpecimenRequest request);
     LabTestDetailResponse saveDetailedTestResult(UUID testId, SaveDetailedTestResultRequest request);
+    MedicalTestResponse cancelMedicalTest(UUID testId, String reason);
 
     // Quản lý Chỉ số lâm sàng (EHR Observations - OpenMRS/FHIR)
     MedicalRecordResponse recordObservations(UUID recordId, List<ObservationInputRequest> observations);

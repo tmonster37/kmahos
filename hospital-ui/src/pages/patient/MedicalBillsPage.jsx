@@ -89,22 +89,101 @@ export default function MedicalBillsPage() {
     const totalPaid = bookings.reduce((sum, b) => sum + (b.price || 200000), 0);
 
     return (
-        <Container maxWidth="xl" sx={{ py: 4 }}>
-            {/* Header */}
-            <Box mb={4}>
-                <Typography variant="h4" fontWeight="900" color="#002D5A" gutterBottom>
-                    🧾 Hóa Đơn Viện Phí & Lịch Sử Giao Dịch
-                </Typography>
-                <Typography variant="body1" color="textSecondary">
-                    Quản lý toàn bộ chi phí khám chữa bệnh, tiền xét nghiệm cận lâm sàng, tiền thuốc và thanh toán trực tuyến qua Cổng PayOS (VietQR Napas 247).
-                </Typography>
-            </Box>
+        <Container maxWidth="xl" sx={{ py: 3 }}>
+            {/* Header Banner - Apple HIG + Linear Elevated Header */}
+            <Paper
+                elevation={0}
+                sx={{
+                    p: { xs: 2.5, md: 3 },
+                    mb: 3,
+                    borderRadius: 3.5,
+                    bgcolor: "#FFFFFF",
+                    border: "1px solid rgba(15, 23, 42, 0.08)",
+                    boxShadow: "0 2px 10px rgba(0,0,0,0.03)",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    gap: 2
+                }}
+            >
+                <Box display="flex" alignItems="center" gap={2}>
+                    <Box
+                        sx={{
+                            width: 54,
+                            height: 54,
+                            borderRadius: 3,
+                            bgcolor: "rgba(0, 136, 214, 0.1)",
+                            color: "#0088D6",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            border: "1px solid rgba(0, 136, 214, 0.2)"
+                        }}
+                    >
+                        <ReceiptLongIcon sx={{ fontSize: 30 }} />
+                    </Box>
+                    <Box>
+                        <Box display="flex" alignItems="center" gap={1.2} mb={0.5} flexWrap="wrap">
+                            <Chip
+                                label="VIỆN PHÍ & THANH TOÁN • BILLING & STATEMENTS PRO"
+                                size="small"
+                                sx={{
+                                    height: 22,
+                                    fontSize: "0.68rem",
+                                    fontWeight: 700,
+                                    letterSpacing: "0.06em",
+                                    bgcolor: "#EBF5FF",
+                                    color: "#0088D6",
+                                    borderRadius: 1.5,
+                                    border: "1px solid rgba(0, 136, 214, 0.2)"
+                                }}
+                            />
+                            <Chip
+                                label="VIETQR NAPAS 247"
+                                size="small"
+                                sx={{
+                                    height: 22,
+                                    fontSize: "0.68rem",
+                                    fontWeight: 700,
+                                    bgcolor: "rgba(16, 185, 129, 0.1)",
+                                    color: "#059669",
+                                    borderRadius: 1.5
+                                }}
+                            />
+                        </Box>
+                        <Typography variant="h5" fontWeight={800} color="#0F172A" sx={{ letterSpacing: "-0.02em" }}>
+                            Hóa Đơn Viện Phí & Lịch Sử Giao Dịch
+                        </Typography>
+                        <Typography variant="body2" color="#64748B" sx={{ mt: 0.25 }}>
+                            Quản lý toàn bộ chi phí khám chữa bệnh, tiền xét nghiệm cận lâm sàng, tiền thuốc và thanh toán trực tuyến qua Cổng PayOS.
+                        </Typography>
+                    </Box>
+                </Box>
+                <Box display="flex" gap={1.5} alignItems="center">
+                    <Button
+                        variant="outlined"
+                        sx={{
+                            borderRadius: 2.5,
+                            textTransform: "none",
+                            fontWeight: 700,
+                            borderColor: "rgba(15, 23, 42, 0.12)",
+                            color: "#334155",
+                            bgcolor: "#FFFFFF",
+                            "&:hover": { bgcolor: "#F8FAFC", borderColor: "#CBD5E1" }
+                        }}
+                        onClick={loadBills}
+                    >
+                        Làm Mới Danh Sách
+                    </Button>
+                </Box>
+            </Paper>
 
             {/* Error banner */}
             {billsError && (
                 <Alert
                     severity="warning"
-                    sx={{ mb: 3, borderRadius: 2 }}
+                    sx={{ mb: 3, borderRadius: 2.5 }}
                     action={
                         <Button color="inherit" size="small" onClick={loadBills}>
                             Thử lại
@@ -115,100 +194,142 @@ export default function MedicalBillsPage() {
                 </Alert>
             )}
 
-            {/* Quick KPI Cards */}
-            <Grid container spacing={3} mb={4}>
+            {/* Quick Micro-KPI Cards */}
+            <Grid container spacing={2.5} mb={3}>
                 <Grid item xs={12} sm={6} md={3}>
-                    <Card sx={{ borderRadius: 3, border: "1px solid #E2E8F0", bgcolor: "#F0F9FF" }}>
-                        <CardContent>
-                            <Typography variant="caption" color="textSecondary" fontWeight="bold">TỔNG HÓA ĐƠN ĐÃ LẬP</Typography>
-                            <Typography variant="h4" fontWeight="900" color="#0284c7" my={0.5}>
-                                {bookings.length}
-                            </Typography>
-                            <Typography variant="caption" color="textSecondary">Bao gồm khám và dịch vụ</Typography>
-                        </CardContent>
-                    </Card>
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 2.5,
+                            borderRadius: 3,
+                            bgcolor: "#FFFFFF",
+                            border: "1px solid rgba(15, 23, 42, 0.08)",
+                            borderTop: "3px solid #0088D6",
+                            boxShadow: "0 1px 3px rgba(0,0,0,0.02)"
+                        }}
+                    >
+                        <Typography variant="caption" sx={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "#64748B", display: "block" }}>
+                            TỔNG HÓA ĐƠN ĐÃ LẬP
+                        </Typography>
+                        <Typography variant="h4" fontWeight={800} color="#0088D6" my={0.5}>
+                            {bookings.length}
+                        </Typography>
+                        <Typography variant="caption" color="#64748B">Bao gồm khám và dịch vụ</Typography>
+                    </Paper>
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
-                    <Card sx={{ borderRadius: 3, border: "1px solid #E2E8F0", bgcolor: "#ECFDF5" }}>
-                        <CardContent>
-                            <Typography variant="caption" color="textSecondary" fontWeight="bold">TỔNG CHI PHÍ KHÁM</Typography>
-                            <Typography variant="h4" fontWeight="900" color="#10b981" my={0.5}>
-                                {formatCurrency(totalPaid)}
-                            </Typography>
-                            <Typography variant="caption" color="textSecondary">Đã bao gồm thuế & khấu trừ BHYT</Typography>
-                        </CardContent>
-                    </Card>
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 2.5,
+                            borderRadius: 3,
+                            bgcolor: "#FFFFFF",
+                            border: "1px solid rgba(15, 23, 42, 0.08)",
+                            borderTop: "3px solid #10B981",
+                            boxShadow: "0 1px 3px rgba(0,0,0,0.02)"
+                        }}
+                    >
+                        <Typography variant="caption" sx={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "#64748B", display: "block" }}>
+                            TỔNG CHI PHÍ KHÁM
+                        </Typography>
+                        <Typography variant="h4" fontWeight={800} color="#10B981" my={0.5}>
+                            {formatCurrency(totalPaid)}
+                        </Typography>
+                        <Typography variant="caption" color="#64748B">Đã bao gồm thuế & khấu trừ BHYT</Typography>
+                    </Paper>
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
-                    <Card sx={{ borderRadius: 3, border: "1px solid #E2E8F0", bgcolor: "#FEF3C7" }}>
-                        <CardContent>
-                            <Typography variant="caption" color="textSecondary" fontWeight="bold">HỖ TRỢ BẢO HIỂM</Typography>
-                            <Typography variant="h4" fontWeight="900" color="#D97706" my={0.5}>
-                                80% - 100%
-                            </Typography>
-                            <Typography variant="caption" color="textSecondary">Áp dụng đúng tuyến BHYT</Typography>
-                        </CardContent>
-                    </Card>
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 2.5,
+                            borderRadius: 3,
+                            bgcolor: "#FFFFFF",
+                            border: "1px solid rgba(15, 23, 42, 0.08)",
+                            borderTop: "3px solid #F59E0B",
+                            boxShadow: "0 1px 3px rgba(0,0,0,0.02)"
+                        }}
+                    >
+                        <Typography variant="caption" sx={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "#64748B", display: "block" }}>
+                            HỖ TRỢ BẢO HIỂM
+                        </Typography>
+                        <Typography variant="h4" fontWeight={800} color="#D97706" my={0.5}>
+                            80% - 100%
+                        </Typography>
+                        <Typography variant="caption" color="#64748B">Áp dụng đúng tuyến BHYT</Typography>
+                    </Paper>
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
-                    <Card sx={{ borderRadius: 3, border: "1px solid #E2E8F0", bgcolor: "#F8FAFC" }}>
-                        <CardContent>
-                            <Typography variant="caption" color="textSecondary" fontWeight="bold">CỔNG THANH TOÁN</Typography>
-                            <Typography variant="h5" fontWeight="900" color="#005BAA" my={0.5}>
-                                PayOS Open Banking
-                            </Typography>
-                            <Typography variant="caption" color="textSecondary">VietQR Napas 247 • 0% phí GD</Typography>
-                        </CardContent>
-                    </Card>
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 2.5,
+                            borderRadius: 3,
+                            bgcolor: "#FFFFFF",
+                            border: "1px solid rgba(15, 23, 42, 0.08)",
+                            borderTop: "3px solid #8B5CF6",
+                            boxShadow: "0 1px 3px rgba(0,0,0,0.02)"
+                        }}
+                    >
+                        <Typography variant="caption" sx={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "#64748B", display: "block" }}>
+                            CỔNG THANH TOÁN
+                        </Typography>
+                        <Typography variant="h5" fontWeight={800} color="#7C3AED" my={0.75}>
+                            PayOS Open Banking
+                        </Typography>
+                        <Typography variant="caption" color="#64748B">VietQR Napas 247 • 0% phí GD</Typography>
+                    </Paper>
                 </Grid>
             </Grid>
 
             {/* Table Bills */}
-            <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: "1px solid #E2E8F0", bgcolor: "white" }}>
+            <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3.5, border: "1px solid rgba(15, 23, 42, 0.08)", bgcolor: "#FFFFFF", boxShadow: "0 1px 3px rgba(0,0,0,0.02)" }}>
                 <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                    <Typography variant="h6" fontWeight="bold" color="#002D5A">
+                    <Typography variant="h6" fontWeight={800} color="#0F172A">
                         Danh Sách Viện Phí & Phiếu Khám
                     </Typography>
-                    <Button variant="outlined" size="small" onClick={loadBills}>
-                        Làm mới danh sách
-                    </Button>
                 </Box>
 
                 {loading ? (
-                    <Box display="flex" justifyContent="center" py={6}><CircularProgress /></Box>
+                    <Box display="flex" justifyContent="center" py={6}><CircularProgress size={32} /></Box>
                 ) : bookings.length === 0 ? (
-                    <Alert severity="info" sx={{ my: 2 }}>Bạn chưa có hóa đơn hoặc giao dịch viện phí nào.</Alert>
+                    <Alert severity="info" sx={{ my: 2, borderRadius: 2 }}>Bạn chưa có hóa đơn hoặc giao dịch viện phí nào.</Alert>
                 ) : (
                     <TableContainer>
                         <Table>
-                            <TableHead sx={{ bgcolor: "#F8FAFC" }}>
-                                <TableRow>
-                                    <TableCell><b>Mã hóa đơn / Phiếu</b></TableCell>
-                                    <TableCell><b>Bệnh nhân</b></TableCell>
-                                    <TableCell><b>Chuyên khoa & Bác sĩ</b></TableCell>
-                                    <TableCell><b>Ngày khám</b></TableCell>
-                                    <TableCell><b>Số tiền</b></TableCell>
-                                    <TableCell align="center"><b>Trạng thái</b></TableCell>
-                                    <TableCell align="center"><b>Hành động</b></TableCell>
+                            <TableHead>
+                                <TableRow sx={{ bgcolor: "#F8FAFC" }}>
+                                    <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", color: "#475569", py: 1.5 }}>Mã hóa đơn / Phiếu</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", color: "#475569", py: 1.5 }}>Bệnh nhân</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", color: "#475569", py: 1.5 }}>Chuyên khoa & Bác sĩ</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", color: "#475569", py: 1.5 }}>Ngày khám</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", color: "#475569", py: 1.5 }}>Số tiền</TableCell>
+                                    <TableCell align="center" sx={{ fontWeight: 700, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", color: "#475569", py: 1.5 }}>Trạng thái</TableCell>
+                                    <TableCell align="center" sx={{ fontWeight: 700, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", color: "#475569", py: 1.5 }}>Hành động</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
                                 {bookings.map((b) => (
-                                    <TableRow key={b.bookingId} hover>
+                                    <TableRow key={b.bookingId} hover sx={{ "&:hover": { bgcolor: "rgba(0, 136, 214, 0.02)" } }}>
                                         <TableCell>
-                                            <Typography fontWeight="bold" color="#0ea5e9">{b.bookingCode}</Typography>
-                                            <Typography variant="caption" color="textSecondary">Số thứ tự: #{b.queueNumber}</Typography>
+                                            <Typography fontWeight={700} sx={{ fontFamily: "monospace", color: "#0088D6", bgcolor: "rgba(0, 136, 214, 0.08)", px: 1, py: 0.35, borderRadius: 1.5, display: "inline-block" }}>
+                                                {b.bookingCode}
+                                            </Typography>
+                                            <Typography variant="caption" color="textSecondary" display="block" sx={{ mt: 0.5 }}>Số thứ tự: #{b.queueNumber}</Typography>
                                         </TableCell>
                                         <TableCell>
-                                            <Typography fontWeight="bold">{b.patientName}</Typography>
+                                            <Typography fontWeight={700} color="#0F172A">{b.patientName}</Typography>
                                         </TableCell>
                                         <TableCell>
-                                            <Typography>{b.departmentName}</Typography>
+                                            <Typography fontWeight={600} color="#1E293B">{b.departmentName}</Typography>
                                             <Typography variant="caption" color="textSecondary">BS. {b.doctorName || "Đang phân công"}</Typography>
                                         </TableCell>
-                                        <TableCell>{formatDate(b.bookingDate)} ({b.startTime || "N/A"})</TableCell>
+                                        <TableCell sx={{ whiteSpace: "nowrap" }}>
+                                            <Typography variant="body2">{formatDate(b.bookingDate)}</Typography>
+                                            <Typography variant="caption" color="textSecondary">{b.startTime || "N/A"}</Typography>
+                                        </TableCell>
                                         <TableCell>
-                                            <Typography fontWeight="bold" color="success.main">
+                                            <Typography fontWeight={800} color="#10B981">
                                                 {formatCurrency(b.price || 200000)}
                                             </Typography>
                                         </TableCell>
@@ -217,7 +338,7 @@ export default function MedicalBillsPage() {
                                                 label={b.status === "COMPLETED" ? "Đã khám" : b.status === "CONFIRMED" ? "Đã xác nhận" : "Chờ xử lý"}
                                                 color={b.status === "COMPLETED" ? "success" : "primary"}
                                                 size="small"
-                                                sx={{ fontWeight: "bold" }}
+                                                sx={{ fontWeight: 700, borderRadius: 1.5 }}
                                             />
                                         </TableCell>
                                         <TableCell align="center">
@@ -228,7 +349,7 @@ export default function MedicalBillsPage() {
                                                     startIcon={<PaymentIcon />}
                                                     disabled={creatingPayment}
                                                     onClick={() => handleCreatePayOSPayment(b)}
-                                                    sx={{ borderRadius: 2, fontWeight: "bold", bgcolor: "#005BAA", "&:hover": { bgcolor: "#004080" } }}
+                                                    sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none", bgcolor: "#0088D6", "&:hover": { bgcolor: "#0077BE" } }}
                                                 >
                                                     PayOS
                                                 </Button>
@@ -250,7 +371,7 @@ export default function MedicalBillsPage() {
                                                         paidAt: b.bookingDate,
                                                         cashierName: "Hệ thống Quản Trị Viện Phí TNT"
                                                     })}
-                                                    sx={{ borderRadius: 2 }}
+                                                    sx={{ borderRadius: 2, textTransform: "none", fontWeight: 600, borderColor: "rgba(15, 23, 42, 0.15)" }}
                                                 >
                                                     In biên lai
                                                 </Button>

@@ -51,6 +51,8 @@ Hệ thống Quản lý Bệnh viện Thông minh (**Hospital Management System 
                                                       [ Database: PostgreSQL 16 ]
 ```
 
+Sơ đồ UML chi tiết của luồng đặt lịch, tiếp đón QR và cận lâm sàng được lưu trong [docs/diagrams](docs/diagrams/README.md), gồm cả nguồn Mermaid có thể chỉnh sửa.
+
 ### Chi tiết Stack công nghệ đã xác minh:
 
 | Thành phần | Công nghệ | Phiên bản | Ghi chú & Thư viện sử dụng |

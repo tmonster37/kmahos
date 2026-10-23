@@ -1,6 +1,24 @@
 import React, { useState } from "react";
-import { Container, Paper, TextField, Button, Typography, Box, Alert, Grid } from "@mui/material";
+import {
+    Container,
+    Paper,
+    TextField,
+    Button,
+    Typography,
+    Box,
+    Alert,
+    Grid,
+    InputAdornment,
+    Divider
+} from "@mui/material";
 import { Link, useNavigate } from "react-router-dom";
+import LocalHospitalIcon from "@mui/icons-material/LocalHospital";
+import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
+import PhoneIphoneIcon from "@mui/icons-material/PhoneIphone";
+import MailOutlineIcon from "@mui/icons-material/MailOutline";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import { useAuth } from "../../context/AuthContext";
 import axiosInstance from "../../services/AxiosInstance";
 
@@ -67,47 +85,214 @@ export default function RegisterPage() {
     };
 
     return (
-        <Container maxWidth="sm" sx={{ py: 6 }}>
-            <Paper elevation={4} sx={{ p: 4, borderRadius: 3 }}>
-                <Typography variant="h5" fontWeight="bold" color="primary.main" textAlign="center" gutterBottom>
-                    TẠO TÀI KHOẢN TNT HOSPITAL
-                </Typography>
-                <Typography variant="body2" color="textSecondary" textAlign="center" mb={3}>
-                    Đăng ký để đặt lịch khám bệnh và quản lý hồ sơ sức khỏe
-                </Typography>
-
-                {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-
-                <Box component="form" onSubmit={handleRegister}>
-                    <Grid container spacing={2}>
-                        <Grid item xs={12}>
-                            <TextField fullWidth label="Họ và tên" name="fullName" value={formData.fullName} onChange={handleChange} required />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                            <TextField fullWidth label="Số điện thoại" name="phoneNumber" value={formData.phoneNumber} onChange={handleChange} required placeholder="0987654321" />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                            <TextField fullWidth type="email" label="Email (không bắt buộc)" name="email" value={formData.email} onChange={handleChange} />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                            <TextField fullWidth type="password" label="Mật khẩu" name="password" value={formData.password} onChange={handleChange} required />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                            <TextField fullWidth type="password" label="Xác nhận mật khẩu" name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} required />
-                        </Grid>
-                    </Grid>
-
-                    <Button type="submit" fullWidth variant="contained" size="large" sx={{ mt: 3, py: 1.5 }} disabled={loading}>
-                        {loading ? "Đang xử lý..." : "Đăng ký tài khoản"}
-                    </Button>
-
-                    <Box textAlign="center" mt={2}>
-                        <Typography variant="body2">
-                            Đã có tài khoản? <Link to="/login" style={{ color: "#0066CC", fontWeight: "bold", textDecoration: "none" }}>Đăng nhập ngay</Link>
+        <Box
+            sx={{
+                minHeight: "90vh",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                py: { xs: 4, md: 6 },
+                bgcolor: "#F8FAFC",
+                position: "relative"
+            }}
+        >
+            <Container maxWidth="sm">
+                <Paper
+                    elevation={0}
+                    sx={{
+                        p: { xs: 3.5, sm: 5 },
+                        borderRadius: 4,
+                        bgcolor: "#FFFFFF",
+                        border: "1px solid rgba(15, 23, 42, 0.08)",
+                        boxShadow: "0 10px 40px rgba(15, 23, 42, 0.05)"
+                    }}
+                >
+                    {/* Header */}
+                    <Box textAlign="center" mb={3.5}>
+                        <Box display="flex" justifyContent="center" mb={2}>
+                            <Box
+                                sx={{
+                                    width: 52,
+                                    height: 52,
+                                    borderRadius: "15px",
+                                    background: "linear-gradient(135deg, #0088D6 0%, #00C292 100%)",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    color: "white",
+                                    boxShadow: "0 8px 20px rgba(0, 136, 214, 0.28)"
+                                }}
+                            >
+                                <LocalHospitalIcon sx={{ fontSize: 30 }} />
+                            </Box>
+                        </Box>
+                        <Typography variant="h5" fontWeight={900} sx={{ letterSpacing: "-0.03em", color: "#0F172A", mb: 0.5 }}>
+                            Tạo Tài Khoản Khám Bệnh
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: "#64748B" }}>
+                            Đăng ký thành viên để lưu trữ hồ sơ y bạ điện tử và đặt hẹn ưu tiên
                         </Typography>
                     </Box>
-                </Box>
-            </Paper>
-        </Container>
+
+                    {error && (
+                        <Alert severity="error" sx={{ mb: 3, borderRadius: 2.5 }}>
+                            {error}
+                        </Alert>
+                    )}
+
+                    <Box component="form" onSubmit={handleRegister}>
+                        <Grid container spacing={2}>
+                            <Grid item xs={12}>
+                                <TextField
+                                    fullWidth
+                                    label="Họ và tên bệnh nhân"
+                                    name="fullName"
+                                    value={formData.fullName}
+                                    onChange={handleChange}
+                                    required
+                                    placeholder="Ví dụ: Nguyễn Văn An"
+                                    InputProps={{
+                                        startAdornment: (
+                                            <InputAdornment position="start">
+                                                <PersonOutlineIcon sx={{ color: "#94A3B8" }} />
+                                            </InputAdornment>
+                                        ),
+                                        sx: { borderRadius: 2.5 }
+                                    }}
+                                />
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                                <TextField
+                                    fullWidth
+                                    label="Số điện thoại di động"
+                                    name="phoneNumber"
+                                    value={formData.phoneNumber}
+                                    onChange={handleChange}
+                                    required
+                                    placeholder="0987654321"
+                                    InputProps={{
+                                        startAdornment: (
+                                            <InputAdornment position="start">
+                                                <PhoneIphoneIcon sx={{ color: "#94A3B8" }} />
+                                            </InputAdornment>
+                                        ),
+                                        sx: { borderRadius: 2.5, fontFamily: "monospace" }
+                                    }}
+                                />
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                                <TextField
+                                    fullWidth
+                                    type="email"
+                                    label="Địa chỉ Email (không bắt buộc)"
+                                    name="email"
+                                    value={formData.email}
+                                    onChange={handleChange}
+                                    placeholder="email@example.com"
+                                    InputProps={{
+                                        startAdornment: (
+                                            <InputAdornment position="start">
+                                                <MailOutlineIcon sx={{ color: "#94A3B8" }} />
+                                            </InputAdornment>
+                                        ),
+                                        sx: { borderRadius: 2.5 }
+                                    }}
+                                />
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                                <TextField
+                                    fullWidth
+                                    type="password"
+                                    label="Mật khẩu"
+                                    name="password"
+                                    value={formData.password}
+                                    onChange={handleChange}
+                                    required
+                                    placeholder="Ít nhất 6 ký tự"
+                                    InputProps={{
+                                        startAdornment: (
+                                            <InputAdornment position="start">
+                                                <LockOutlinedIcon sx={{ color: "#94A3B8" }} />
+                                            </InputAdornment>
+                                        ),
+                                        sx: { borderRadius: 2.5 }
+                                    }}
+                                />
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                                <TextField
+                                    fullWidth
+                                    type="password"
+                                    label="Xác nhận mật khẩu"
+                                    name="confirmPassword"
+                                    value={formData.confirmPassword}
+                                    onChange={handleChange}
+                                    required
+                                    placeholder="Nhập lại mật khẩu"
+                                    InputProps={{
+                                        startAdornment: (
+                                            <InputAdornment position="start">
+                                                <LockOutlinedIcon sx={{ color: "#94A3B8" }} />
+                                            </InputAdornment>
+                                        ),
+                                        sx: { borderRadius: 2.5 }
+                                    }}
+                                />
+                            </Grid>
+                        </Grid>
+
+                        <Button
+                            type="submit"
+                            fullWidth
+                            variant="contained"
+                            size="large"
+                            disabled={loading}
+                            sx={{
+                                mt: 3.5,
+                                py: 1.4,
+                                borderRadius: 2.5,
+                                fontWeight: 800,
+                                fontSize: "0.95rem",
+                                textTransform: "none",
+                                bgcolor: "#0088D6",
+                                boxShadow: "0 6px 20px rgba(0, 136, 214, 0.3)",
+                                "&:hover": { bgcolor: "#0073B7" }
+                            }}
+                        >
+                            {loading ? "Đang tạo tài khoản..." : "Hoàn Tất Đăng Ký"}
+                        </Button>
+
+                        <Box textAlign="center" mt={3} pt={2} borderTop="1px solid rgba(15, 23, 42, 0.06)">
+                            <Typography variant="body2" sx={{ color: "#64748B", mb: 1 }}>
+                                Đã có tài khoản?{" "}
+                                <Typography
+                                    component={Link}
+                                    to="/login"
+                                    variant="body2"
+                                    sx={{
+                                        color: "#0088D6",
+                                        fontWeight: 800,
+                                        textDecoration: "none",
+                                        "&:hover": { textDecoration: "underline" }
+                                    }}
+                                >
+                                    Đăng nhập ngay
+                                </Typography>
+                            </Typography>
+
+                            <Button
+                                component={Link}
+                                to="/"
+                                size="small"
+                                startIcon={<ArrowBackIcon />}
+                                sx={{ color: "#64748B", fontWeight: 700, textTransform: "none", mt: 0.5 }}
+                            >
+                                Quay về trang chủ
+                            </Button>
+                        </Box>
+                    </Box>
+                </Paper>
+            </Container>
+        </Box>
     );
 }

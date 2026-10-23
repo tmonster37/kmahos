@@ -28,6 +28,7 @@ import ScheduleManagePage from "../pages/admin/ScheduleManagePage";
 import MedicalServiceManagePage from "../pages/admin/MedicalServiceManagePage";
 import AccountManagePage from "../pages/admin/AccountManagePage";
 import TransactionManagePage from "../pages/admin/TransactionManagePage";
+import BookingManagePage from "../pages/admin/BookingManagePage";
 import CashierPage from "../pages/cashier/CashierPage";
 import NurseReceptionPage from "../pages/nurse/NurseReceptionPage";
 import PatientManagePage from "../pages/admin/PatientManagePage";
@@ -141,6 +142,7 @@ export default function AppRoutes() {
                     <Route element={<ProtectedRoute allowedRoles={["ROLE_ADMIN"]} />}>
                         <Route path="/admin/accounts" element={<AccountManagePage />} />
                         <Route path="/admin/transactions" element={<TransactionManagePage />} />
+                        <Route path="/admin/bookings" element={<BookingManagePage />} />
                     </Route>
                 </Route>
             </Route>
