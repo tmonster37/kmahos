@@ -49,7 +49,7 @@ public class CashierServiceImpl implements CashierService {
     private final ObjectMapper objectMapper;
     private final com.hospital.api.service.AuditLogService auditLogService;
 
-    private static final Pattern BOOKING_CODE_PATTERN = Pattern.compile("BK[A-Za-z0-9]+");
+    private static final Pattern BOOKING_CODE_PATTERN = Pattern.compile("(BK|KIOSK)[A-Za-z0-9]+");
     private static final String SNAPSHOT_PREFIX = "[SNAPSHOT:";
     private static final String SNAPSHOT_SUFFIX = "]";
 
@@ -697,14 +697,14 @@ public class CashierServiceImpl implements CashierService {
     }
 
     private String extractBookingCode(String desc, String ref) {
-        if (ref != null && ref.startsWith("RC-BK")) {
+        if (ref != null && (ref.startsWith("RC-BK") || ref.startsWith("RC-KIOSK"))) {
             Matcher matcher = BOOKING_CODE_PATTERN.matcher(ref);
             if (matcher.find()) {
                 return matcher.group();
             }
         }
         if (desc != null) {
-            Matcher matcher = Pattern.compile("(HA-[A-Za-z0-9-]+|ADM-[A-Za-z0-9-]+|BK[A-Za-z0-9]+)").matcher(desc);
+            Matcher matcher = Pattern.compile("(HA-[A-Za-z0-9-]+|ADM-[A-Za-z0-9-]+|BK[A-Za-z0-9]+|KIOSK[A-Za-z0-9]+)").matcher(desc);
             if (matcher.find()) {
                 return matcher.group();
             }

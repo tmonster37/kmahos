@@ -498,8 +498,11 @@ export default function ExaminationPage() {
         }
     };
 
+    const isWaitingPatient = (p) =>
+        (p.status === "CONFIRMED" || p.status === "PENDING_PAYMENT" || p.status === "WAITING") && !p.isReturnAfterResult;
+
     const handleCallNext = async () => {
-        const nextPatient = queue.find((p) => p.status === "CONFIRMED");
+        const nextPatient = queue.find(isWaitingPatient);
         if (!nextPatient) {
             alert("Không còn bệnh nhân nào đang chờ khám trong hàng đợi hôm nay!");
             return;
@@ -529,11 +532,14 @@ export default function ExaminationPage() {
                 initialDiagnosis: initialDiagnosis || "Khám lâm sàng tổng quát ban đầu",
             });
             const data = res?.data || res;
-            setRecord(data);
+            const finalRec = data?.recordId ? data : (data?.data || data);
+            setRecord(finalRec);
             setMessage(`Đã tiếp nhận bệnh nhân STT ${patientItem.queueNumber}: ${patientItem.patientName} vào buồng khám!`);
             fetchDoctorQueue();
         } catch (err) {
-            alert(err?.message || err || "Không thể tiếp nhận bệnh nhân!");
+            console.error("Lỗi tiếp nhận bệnh nhân:", err);
+            const errDetail = err?.response?.data?.message || err?.message || "Không thể tiếp nhận bệnh nhân!";
+            alert(errDetail);
         } finally {
             setStartingExam(false);
         }
@@ -633,7 +639,7 @@ export default function ExaminationPage() {
             const matchesStatus =
                 filterStatus === "ALL" ||
                 (filterStatus === "RETURN_AFTER_RESULT" && p.isReturnAfterResult) ||
-                (filterStatus === "WAITING" && p.status === "CONFIRMED" && !p.isReturnAfterResult) ||
+                (filterStatus === "WAITING" && isWaitingPatient(p)) ||
                 (filterStatus === "IN_PROGRESS" && p.status === "IN_PROGRESS") ||
                 (filterStatus === "COMPLETED" && p.status === "COMPLETED");
 
@@ -650,7 +656,7 @@ export default function ExaminationPage() {
     }, [queue, filterStatus, searchQuery]);
 
     const returnAfterResultCount = queue.filter((p) => p.isReturnAfterResult).length;
-    const waitingCount = queue.filter((p) => p.status === "CONFIRMED" && !p.isReturnAfterResult).length;
+    const waitingCount = queue.filter(isWaitingPatient).length;
     const inProgressCount = queue.filter((p) => p.status === "IN_PROGRESS").length;
     const completedCount = queue.filter((p) => p.status === "COMPLETED").length;
     const priorityCount = queue.filter((p) => p.isPriority && p.status !== "COMPLETED").length;
@@ -1243,6 +1249,14 @@ export default function ExaminationPage() {
                                         statusColor = "#16a34a";
                                         statusBg = "#dcfce7";
                                         statusLabel = "Đã khám xong";
+                                    } else if (item.status === "PENDING_PAYMENT") {
+                                        statusColor = "#d97706";
+                                        statusBg = "#fef3c7";
+                                        statusLabel = "Chờ khám (Thu sau)";
+                                    } else if (item.status === "CONFIRMED" || item.status === "WAITING") {
+                                        statusColor = "#059669";
+                                        statusBg = "#ecfdf5";
+                                        statusLabel = "Chờ khám";
                                     }
 
                                     return (

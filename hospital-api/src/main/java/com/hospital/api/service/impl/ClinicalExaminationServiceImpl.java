@@ -135,6 +135,9 @@ public class ClinicalExaminationServiceImpl implements ClinicalExaminationServic
         if (booking.getStatus() == BookingStatus.IN_PROGRESS || booking.getStatus() == BookingStatus.COMPLETED) {
             return true;
         }
+        if (booking.getStatus() == BookingStatus.CONFIRMED || booking.getCheckedInAt() != null) {
+            return true;
+        }
         String code = booking.getBookingCode();
         return transactionRepository.existsByDescriptionContainingAndStatus(code, "SUCCESS");
     }
@@ -146,11 +149,8 @@ public class ClinicalExaminationServiceImpl implements ClinicalExaminationServic
                 .orElseThrow(() -> new AppException("Không tìm thấy mã đặt khám: " + request.bookingCode(), HttpStatus.NOT_FOUND));
 
         if (!isConsultationFeePaid(booking)) {
-            throw new AppException(
-                    "Lượt khám [" + booking.getBookingCode() + "] chưa hoàn tất thanh toán tiền công khám ban đầu ("
-                    + (booking.getPrice() != null ? booking.getPrice() : BigDecimal.ZERO) + " VNĐ). Vui lòng hướng dẫn bệnh nhân thanh toán tại quầy tiếp đón hoặc qua VietQR trước khi vào khám.",
-                    HttpStatus.PAYMENT_REQUIRED
-            );
+            log.info("Lượt khám [{}] chưa hoàn tất thanh toán trước tiền công khám ({} VNĐ). Ghi nhận hình thức thu viện phí sau tại Quầy Thu Ngân khi xuất viện/kết thúc khám.",
+                    booking.getBookingCode(), booking.getPrice() != null ? booking.getPrice() : BigDecimal.ZERO);
         }
 
         Doctor doctor = doctorRepository.findByAccount_UserId(doctorAccountId)

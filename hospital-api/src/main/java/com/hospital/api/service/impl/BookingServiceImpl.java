@@ -208,9 +208,7 @@ public class BookingServiceImpl implements BookingService {
         }
 
         BigDecimal kioskFee = doctor.getConsultationFee() != null ? doctor.getConsultationFee() : BigDecimal.valueOf(150000);
-        BookingStatus kioskStatus = isPriority || kioskFee.compareTo(BigDecimal.ZERO) <= 0
-                ? BookingStatus.CONFIRMED
-                : BookingStatus.PENDING_PAYMENT;
+        BookingStatus kioskStatus = BookingStatus.CONFIRMED;
 
         Booking booking = Booking.builder()
                 .bookingCode(bookingCode)
@@ -224,6 +222,7 @@ public class BookingServiceImpl implements BookingService {
                 .doctor(doctor)
                 .isPriority(isPriority)
                 .priorityReason(priorityReason)
+                .checkedInAt(LocalDateTime.now(hospitalClock))
                 .build();
 
         return BookingResponse.fromEntity(bookingRepository.save(booking));

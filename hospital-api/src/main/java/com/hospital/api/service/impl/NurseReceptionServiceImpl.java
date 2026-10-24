@@ -197,7 +197,7 @@ public class NurseReceptionServiceImpl implements NurseReceptionService {
         }
 
         return bookings.stream()
-                .filter(b -> b.getStatus() == BookingStatus.CONFIRMED || b.getStatus() == BookingStatus.IN_PROGRESS)
+                .filter(b -> b.getStatus() != BookingStatus.CANCELLED && b.getStatus() != BookingStatus.COMPLETED)
                 .map(NurseQueueResponse::fromEntity)
                 .toList();
     }
