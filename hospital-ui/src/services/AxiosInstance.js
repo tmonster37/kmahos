@@ -7,7 +7,7 @@ const API_BASE_URL =
 
 const axiosInstance = axios.create({
     baseURL: API_BASE_URL,
-    timeout: 15000,
+    timeout: 75000,
     headers: {
         "Content-Type": "application/json",
     },
@@ -61,7 +61,7 @@ axiosInstance.interceptors.response.use(
             } else if (status === 500) {
                 friendlyMessage = "Hệ thống máy chủ bệnh viện đang bận, vui lòng thử lại sau ít phút.";
             } else if (error.code === "ECONNABORTED" || error.message?.includes("timeout")) {
-                friendlyMessage = "Yêu cầu phản hồi quá thời gian cho phép (Timeout). Vui lòng thử lại.";
+                friendlyMessage = "Máy chủ đang khởi động từ chế độ ngủ đông (Cold Start), vui lòng chờ thêm ít giây rồi thử lại...";
             } else if (error.message?.includes("Network Error")) {
                 friendlyMessage = "Không thể kết nối đến máy chủ API Bệnh Viện (Port 8080). Vui lòng kiểm tra lại kết nối mạng.";
             } else {

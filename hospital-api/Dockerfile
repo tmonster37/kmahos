@@ -10,5 +10,5 @@ FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
 
-EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# Tối ưu RAM cho Render Free Tier (512MB): giới hạn Heap max 320MB, SerialGC, Stack 512k
+ENTRYPOINT ["java", "-Xms180m", "-Xmx320m", "-XX:+UseSerialGC", "-Xss512k", "-jar", "app.jar"]

@@ -13,8 +13,11 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD:taizz0537}
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 15
-      minimum-idle: 5
+      maximum-pool-size: 5
+      minimum-idle: 1
+      idle-timeout: 180000
+      max-lifetime: 600000
+      connection-timeout: 30000
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
