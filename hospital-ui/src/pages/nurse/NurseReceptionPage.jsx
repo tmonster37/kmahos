@@ -2183,7 +2183,7 @@ export default function NurseReceptionPage() {
                                     BỆNH VIỆN ĐA KHOA QUỐC TẾ TNT
                                 </Typography>
                                 <Typography variant="caption" color="textSecondary" display="block">
-                                    141 Chiến Thắng, Thanh Liệt, Hà Nội • Hotline: 1900 8888
+                                    Lô đất CC2, Khu đô thị mới Văn Quán, số 114 Nguyễn Khuyến, phường Văn Quán, quận Hà Đông, Hà Nội • Hotline: 1900 8888
                                 </Typography>
                                 <Typography variant="h6" fontWeight="bold" sx={{ mt: 1, textTransform: "uppercase", color: "#1E293B" }}>
                                     HÓA ĐƠN / BIÊN LAI THU VIỆN PHÍ

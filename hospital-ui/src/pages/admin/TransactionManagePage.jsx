@@ -37,7 +37,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import DownloadIcon from "@mui/icons-material/Download";
 import axiosInstance from "../../services/AxiosInstance";
 import { formatCurrency, formatDateTime } from "../../utils/formatters";
-import { printReceipt } from "../../utils/printHelper";
+import { printReceipt, printShiftReconciliation } from "../../utils/printHelper";
 
 export default function TransactionManagePage() {
     const [transactions, setTransactions] = useState([]);
@@ -96,7 +96,7 @@ export default function TransactionManagePage() {
         }
 
         let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
-        csvContent += "DANH SÁCH ĐỐI SOÁT GIAO DỊCH VIỆN PHÍ - YOUMED HMS\n";
+        csvContent += "DANH SÁCH ĐỐI SOÁT GIAO DỊCH VIỆN PHÍ - BỆNH VIỆN ĐA KHOA QUỐC TẾ TNT\n";
         csvContent += `Thời điểm xuất: ${new Date().toLocaleString("vi-VN")} | Tổng số giao dịch: ${filtered.length}\n\n`;
         csvContent += "Mã Giao Dịch,Mã Đối Soát (TxnRef),Người Nộp Tiền,Loại Viện Phí,Kênh Thanh Toán,Số Tiền (VNĐ),Trạng Thái,Thời Gian Giao Dịch\n";
 
@@ -112,6 +112,39 @@ export default function TransactionManagePage() {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+    };
+
+    const handlePrintLedger = () => {
+        if (!filtered || filtered.length === 0) {
+            alert("Không có dữ liệu giao dịch để in sổ!");
+            return;
+        }
+
+        const cashTxns = filtered.filter(t => t.paymentMethod === "CASH");
+        const digitalTxns = filtered.filter(t => t.paymentMethod !== "CASH");
+        const cashTotal = cashTxns.reduce((s, t) => s + (Number(t.amount) || 0), 0);
+        const digitalTotal = digitalTxns.reduce((s, t) => s + (Number(t.amount) || 0), 0);
+        const totalCollected = filtered.filter(t => t.status === "SUCCESS").reduce((s, t) => s + (Number(t.amount) || 0), 0);
+
+        printShiftReconciliation({
+            cashierName: "Bộ phận Thu Ngân Viện Phí",
+            shiftName: `Sổ Thu Viện Phí (${filtered.length} giao dịch)`,
+            totalCollected,
+            cashTotal,
+            cashCount: cashTxns.length,
+            digitalTotal,
+            digitalCount: digitalTxns.length,
+            transactionCount: filtered.length,
+            transactions: filtered.map(t => ({
+                code: t.transactionId || t.vnpayTxnRef || "TXN",
+                time: t.createdAt ? formatDateTime(t.createdAt) : "---",
+                patientName: t.accountName || t.fullName || "Khách hàng",
+                content: t.description || t.transactionType || "Thu viện phí",
+                method: t.paymentMethod === "CASH" ? "Tiền mặt" : "Chuyển khoản / PayOS",
+                amount: Number(t.amount) || 0,
+                status: t.status === "SUCCESS" ? "Thành công" : t.status
+            }))
+        });
     };
 
     return (
@@ -208,7 +241,7 @@ export default function TransactionManagePage() {
                         <Button
                             variant="contained"
                             startIcon={<PrintIcon />}
-                            onClick={() => window.print()}
+                            onClick={handlePrintLedger}
                             sx={{
                                 borderRadius: 2.5,
                                 fontWeight: 700,

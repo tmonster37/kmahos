@@ -45,6 +45,10 @@ export default function ThermalTicketModal({ open, onClose, ticketData, autoRese
     if (!printContent) return;
 
     const printWindow = window.open('', '_blank', 'width=380,height=600');
+    if (!printWindow) {
+      alert("Vui lòng cho phép mở cửa sổ popup để in phiếu!");
+      return;
+    }
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
@@ -142,11 +146,18 @@ export default function ThermalTicketModal({ open, onClose, ticketData, autoRese
               window.print();
               setTimeout(function() { window.close(); }, 500);
             };
+            setTimeout(function() {
+              try { window.print(); } catch (e) {}
+            }, 500);
           </script>
         </body>
       </html>
     `);
     printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      try { printWindow.print(); } catch (e) {}
+    }, 300);
   };
 
   const isPriority = ticketData.isPriority || ticketData.priority;
@@ -171,10 +182,10 @@ export default function ThermalTicketModal({ open, onClose, ticketData, autoRese
         >
           {/* Header Bệnh Viện */}
           <Typography className="hospital-title" sx={{ fontWeight: 800, fontSize: '1.05rem', color: '#0d47a1', textTransform: 'uppercase' }}>
-            BỆNH VIỆN ĐA KHOA QUỐC TẾ
+            BỆNH VIỆN ĐA KHOA QUỐC TẾ TNT
           </Typography>
           <Typography className="hospital-sub" sx={{ fontSize: '0.75rem', color: '#666', mb: 1 }}>
-            Đ/c: 123 Đường Nguyễn Trãi, Quận 1, TP.HCM | Hotline: 1900 6868
+            Đ/c: Lô đất CC2, Khu đô thị mới Văn Quán, số 114 Nguyễn Khuyến, phường Văn Quán, quận Hà Đông, Hà Nội | Hotline: 1900 8888
           </Typography>
 
           <Box className="divider" sx={{ borderTop: '1px dashed #bbb', my: 1 }} />

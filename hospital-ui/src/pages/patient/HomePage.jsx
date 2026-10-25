@@ -2029,7 +2029,7 @@ export default function HomePage() {
                                 <Box display="flex" alignItems="flex-start" gap={1.2}>
                                     <LocationOnIcon sx={{ fontSize: 20, color: "#0D9488", mt: 0.2 }} />
                                     <Typography variant="body2" color="#0F172A">
-                                        <b>Địa chỉ bệnh viện:</b> 141 Chiến Thắng, Tân Triều, Thanh Trì, Hà Nội.
+                                        <b>Địa chỉ bệnh viện:</b> Lô đất CC2, Khu đô thị mới Văn Quán, số 114 Nguyễn Khuyến, phường Văn Quán, quận Hà Đông, Hà Nội.
                                     </Typography>
                                 </Box>
                                 <Box display="flex" alignItems="flex-start" gap={1.2}>

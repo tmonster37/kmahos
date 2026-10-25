@@ -428,6 +428,38 @@ export default function DashboardPage() {
         <Box sx={{ bgcolor: "#F8FAFC", minHeight: "100vh", pb: 6 }}>
             <Container maxWidth="xl" sx={{ pt: 3.5 }}>
 
+                {/* Print-only Hospital Header */}
+                <Box
+                    sx={{
+                        display: "none",
+                        "@media print": {
+                            display: "block !important",
+                            mb: 3,
+                            pb: 2,
+                            borderBottom: "2px solid #002D5A"
+                        }
+                    }}
+                >
+                    <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+                        <Box>
+                            <Typography variant="h6" fontWeight="bold" sx={{ color: "#002D5A", fontSize: "14pt" }}>
+                                BỆNH VIỆN ĐA KHOA QUỐC TẾ TNT
+                            </Typography>
+                            <Typography variant="body2" sx={{ fontSize: "9.5pt" }}>
+                                Địa chỉ: Lô đất CC2, Khu đô thị mới Văn Quán, số 114 Nguyễn Khuyến, phường Văn Quán, quận Hà Đông, Hà Nội • Hotline: 1900 8888
+                            </Typography>
+                        </Box>
+                        <Box textAlign="right">
+                            <Typography variant="caption" fontStyle="italic" sx={{ fontSize: "9pt", display: "block" }}>
+                                Thời điểm in báo cáo: {new Date().toLocaleString("vi-VN")}
+                            </Typography>
+                            <Typography variant="caption" sx={{ fontSize: "8.5pt", color: "#64748B" }}>
+                                Hệ thống Thông tin Bệnh viện EMR - HIS TNT
+                            </Typography>
+                        </Box>
+                    </Box>
+                </Box>
+
                 {/* 1. Header & Unified Time Range Controls */}
                 <Box
                     display="flex"
@@ -471,6 +503,7 @@ export default function DashboardPage() {
 
                     {/* Time Range Selector & Action Buttons */}
                     <Stack
+                        className="no-print"
                         direction={{ xs: "column", sm: "row" }}
                         spacing={1.5}
                         alignItems={{ xs: "stretch", sm: "center" }}

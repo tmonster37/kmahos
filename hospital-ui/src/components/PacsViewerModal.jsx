@@ -201,12 +201,19 @@ export default function PacsViewerModal({
                 </div>
 
                 <script>
-                    window.onload = function() { window.print(); window.onafterprint = function() { window.close(); }; };
+                    window.onload = function() {
+                        setTimeout(function() { window.print(); }, 250);
+                    };
+                    window.onafterprint = function() { window.close(); };
                 </script>
             </body>
             </html>
         `);
         printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => {
+            try { printWindow.print(); } catch (e) {}
+        }, 350);
     };
 
     return (

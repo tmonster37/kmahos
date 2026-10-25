@@ -837,7 +837,7 @@ export default function MedicalHistoryPage() {
                                         variant="contained"
                                         color="error"
                                         startIcon={<PictureAsPdfIcon fontSize="small" />}
-                                        href={`${API_BASE_URL}/api/prescriptions/${selectedBooking.bookingCode}/pdf`}
+                                        href={`${API_BASE_URL}/api/prescriptions/${recordData?.prescription?.prescriptionCode || selectedBooking.bookingCode}/pdf`}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         sx={{ textTransform: "none", fontWeight: "bold" }}

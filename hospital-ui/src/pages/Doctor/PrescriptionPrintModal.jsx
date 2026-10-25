@@ -42,6 +42,10 @@ export default function PrescriptionPrintModal({ open, onClose, record, prescrip
         const tableFontSize = isA5 ? "10pt" : "11.5pt";
 
         const printWindow = window.open("", "_blank");
+        if (!printWindow) {
+            alert("Vui lòng cho phép mở cửa sổ popup để in đơn thuốc!");
+            return;
+        }
         printWindow.document.write(`
             <!DOCTYPE html>
             <html>
@@ -89,11 +93,18 @@ export default function PrescriptionPrintModal({ open, onClose, record, prescrip
                         window.print();
                         window.onafterprint = function() { window.close(); };
                     };
+                    setTimeout(function() {
+                        try { window.print(); } catch (e) {}
+                    }, 500);
                 </script>
             </body>
             </html>
         `);
         printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => {
+            try { printWindow.print(); } catch (e) {}
+        }, 300);
     };
 
     return (
@@ -141,8 +152,8 @@ export default function PrescriptionPrintModal({ open, onClose, record, prescrip
                         <tbody>
                             <tr>
                                 <td style={{ verticalAlign: "top", width: "55%" }}>
-                                    <div style={{ fontWeight: "bold", fontSize: pageSize === "A5" ? "10pt" : "11.5pt" }}>BỆNH VIỆN ĐA KHOA TNT</div>
-                                    <div style={{ fontSize: pageSize === "A5" ? "9pt" : "10pt" }}>Địa chỉ: 141 Chiến Thắng, Thanh Liệt, Hà Nội</div>
+                                    <div style={{ fontWeight: "bold", fontSize: pageSize === "A5" ? "10pt" : "11.5pt" }}>BỆNH VIỆN ĐA KHOA QUỐC TẾ TNT</div>
+                                    <div style={{ fontSize: pageSize === "A5" ? "9pt" : "10pt" }}>Địa chỉ: Lô đất CC2, Khu đô thị mới Văn Quán, số 114 Nguyễn Khuyến, phường Văn Quán, quận Hà Đông, Hà Nội</div>
                                     <div style={{ fontSize: pageSize === "A5" ? "9pt" : "10pt" }}>Hotline: 1900 8888 • Cấp cứu 24/7</div>
                                     <div style={{ fontSize: pageSize === "A5" ? "9pt" : "10pt" }}>Khoa: Khám Bệnh - Nội Tổng Hợp</div>
                                 </td>
@@ -251,7 +262,9 @@ export default function PrescriptionPrintModal({ open, onClose, record, prescrip
                                     <div style={{ fontWeight: "bold", marginTop: 2 }}>BÁC SĨ KHÁM BỆNH</div>
                                     <div style={{ fontStyle: "italic", fontSize: pageSize === "A5" ? "8.5pt" : "9.5pt" }}>(Ký và đóng dấu điện tử)</div>
                                     <div style={{ height: pageSize === "A5" ? 40 : 55, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                        <Chip label="ĐÃ KÝ ĐIỆN TỬ - TNT HOSPITAL" color="primary" size="small" variant="outlined" sx={{ fontWeight: 700 }} />
+                                        <div style={{ display: "inline-block", padding: "2px 10px", border: "1.5px solid #0284c7", color: "#0284c7", borderRadius: "12px", fontWeight: "bold", fontSize: pageSize === "A5" ? "8pt" : "9pt" }}>
+                                            ĐÃ KÝ ĐIỆN TỬ - TNT HOSPITAL
+                                        </div>
                                     </div>
                                     <div style={{ fontWeight: "bold" }}>{doctorName}</div>
                                 </td>

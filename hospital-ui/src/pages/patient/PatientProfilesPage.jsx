@@ -54,9 +54,9 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import CloseIcon from "@mui/icons-material/Close";
 import BookmarkBorderIcon from "@mui/icons-material/BookmarkBorder";
-import DownloadIcon from "@mui/icons-material/Download";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { bookingApi } from "../../services/bookingApi";
+import { printAppointmentTicket, printMedicalRecordSheet } from "../../utils/printHelper";
 import {
     formatDate,
     formatCurrency,
@@ -96,7 +96,7 @@ const DEFAULT_SAMPLE_TICKET = {
     hospitalName: "Bệnh Viện Đa Khoa Quốc Tế TNT",
     hospitalBrand: "TNT HOSPITAL",
     hospitalSlogan: "Hết lòng vì người bệnh - Nâng tầm y tế số",
-    hospitalAddress: "141 Chiến Thắng, Tân Triều, Thanh Trì, Hà Nội",
+    hospitalAddress: "Lô đất CC2, Khu đô thị mới Văn Quán, số 114 Nguyễn Khuyến, phường Văn Quán, quận Hà Đông, Hà Nội",
     hospitalPhone: "1900 8888 - (024) 3888 9999",
     hospitalEmail: "hotro@tnthospital.vn",
     hospitalWebsite: "https://tnthospital.vn",
@@ -374,7 +374,11 @@ export default function PatientProfilesPage() {
 
     // In Phiếu Khám Bệnh & Đơn Thuốc (Hình 3)
     const handlePrintRecordSheet = () => {
-        window.print();
+        if (viewingRecordSheet) {
+            printMedicalRecordSheet(viewingRecordSheet);
+        } else {
+            window.print();
+        }
     };
 
     const currentBooking = bookings[0] || DEFAULT_SAMPLE_TICKET;
@@ -988,7 +992,7 @@ export default function PatientProfilesPage() {
                                     <Button
                                         variant="outlined"
                                         startIcon={<PrintIcon />}
-                                        onClick={() => window.print()}
+                                        onClick={() => printAppointmentTicket(currentBooking)}
                                         sx={{ borderRadius: 2, textTransform: "none", fontWeight: 700 }}
                                     >
                                         In phiếu khám
@@ -1125,7 +1129,7 @@ export default function PatientProfilesPage() {
                                                 <div>Email: <b>{viewingRecordSheet.hospitalEmail || "hotro@tnthospital.vn"}</b></div>
                                                 <div>Số điện thoại: <b>{viewingRecordSheet.hospitalPhone || "1900 8888 - (024) 3888 9999"}</b></div>
                                                 <div>Website: <b>{viewingRecordSheet.hospitalWebsite || "https://tnthospital.vn"}</b></div>
-                                                <div>Địa chỉ: <b>{viewingRecordSheet.hospitalAddress || "141 Chiến Thắng, Tân Triều, Thanh Trì, Hà Nội"}</b></div>
+                                                <div>Địa chỉ: <b>{viewingRecordSheet.hospitalAddress || "Lô đất CC2, Khu đô thị mới Văn Quán, số 114 Nguyễn Khuyến, phường Văn Quán, quận Hà Đông, Hà Nội"}</b></div>
                                             </Box>
                                         </Box>
 

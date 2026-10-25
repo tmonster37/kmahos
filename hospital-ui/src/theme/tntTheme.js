@@ -152,6 +152,31 @@ const tntTheme = createTheme({
                 "button, .MuiChip-root": {
                     whiteSpace: "nowrap",
                 },
+                "@media print": {
+                    ".no-print, .MuiDrawer-root, .MuiAppBar-root, header, nav, footer, button, .MuiButton-root, .MuiButtonGroup-root, .MuiToggleButtonGroup-root": {
+                        display: "none !important",
+                    },
+                    "body, #root": {
+                        backgroundColor: "#FFFFFF !important",
+                        color: "#000000 !important",
+                        margin: "0 !important",
+                        padding: "0 !important",
+                    },
+                    "main, [role='main']": {
+                        margin: "0 !important",
+                        padding: "0 !important",
+                        width: "100% !important",
+                        maxWidth: "100% !important",
+                    },
+                    ".MuiContainer-root": {
+                        maxWidth: "100% !important",
+                        padding: "0 !important",
+                        margin: "0 !important",
+                    },
+                    ".MuiPaper-root": {
+                        boxShadow: "none !important",
+                    },
+                },
             },
         },
         MuiChip: {

@@ -140,7 +140,7 @@ export default function MainLayout() {
                             <Box display="flex" flexDirection="column" gap={0.8} fontSize="0.825rem">
                                 <Box display="flex" alignItems="flex-start" gap={1}>
                                     <LocationOnIcon sx={{ fontSize: 16, color: "#0088D6", mt: 0.3 }} />
-                                    <span>Địa chỉ: 141 Chiến Thắng, Tân Triều, Thanh Trì, Hà Nội</span>
+                                    <span>Địa chỉ: Lô đất CC2, Khu đô thị mới Văn Quán, số 114 Nguyễn Khuyến, phường Văn Quán, quận Hà Đông, Hà Nội</span>
                                 </Box>
                                 <Box display="flex" alignItems="center" gap={1}>
                                     <PhoneInTalkIcon sx={{ fontSize: 16, color: "#00C292" }} />

@@ -70,7 +70,7 @@ export function printReceipt(data) {
                 <tr>
                     <td class="header-left">
                         <div style="font-weight: bold; font-size: 11pt;">BỆNH VIỆN ĐA KHOA QUỐC TẾ TNT</div>
-                        <div style="font-size: 9pt;">Địa chỉ: 141 Chiến Thắng, Thanh Liệt, Hà Nội</div>
+                        <div style="font-size: 9pt;">Địa chỉ: Lô đất CC2, Khu đô thị mới Văn Quán, số 114 Nguyễn Khuyến, phường Văn Quán, quận Hà Đông, Hà Nội</div>
                         <div style="font-size: 9pt;">Hotline: 1900 8888 • MST: 0109988776</div>
                     </td>
                     <td class="header-right">
@@ -148,11 +148,18 @@ export function printReceipt(data) {
                     window.print();
                     window.onafterprint = function() { window.close(); };
                 };
+                setTimeout(function() {
+                    try { window.print(); } catch (e) {}
+                }, 500);
             </script>
         </body>
         </html>
     `);
     printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+        try { printWindow.print(); } catch (e) {}
+    }, 300);
 }
 
 /**
@@ -215,7 +222,7 @@ export function printAppointmentTicket(data) {
                 <tr>
                     <td style="width: 60%; vertical-align: top;">
                         <div style="font-weight: bold; font-size: 11.5pt;">BỆNH VIỆN ĐA KHOA QUỐC TẾ TNT</div>
-                        <div style="font-size: 9pt;">141 Chiến Thắng, Thanh Liệt, Hà Nội • Hotline: 1900 8888</div>
+                        <div style="font-size: 9pt;">Địa chỉ: Lô đất CC2, Khu đô thị mới Văn Quán, số 114 Nguyễn Khuyến, phường Văn Quán, quận Hà Đông, Hà Nội • Hotline: 1900 8888</div>
                     </td>
                     <td style="width: 40%; text-align: right; vertical-align: top;">
                         <div style="font-size: 10pt;">Mã khám: <b>${bookingCode}</b></div>
@@ -276,11 +283,18 @@ export function printAppointmentTicket(data) {
                     window.print();
                     window.onafterprint = function() { window.close(); };
                 };
+                setTimeout(function() {
+                    try { window.print(); } catch (e) {}
+                }, 500);
             </script>
         </body>
         </html>
     `);
     printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+        try { printWindow.print(); } catch (e) {}
+    }, 300);
 }
 
 /**
@@ -342,7 +356,7 @@ export function printThermalTicket(data) {
         </head>
         <body>
             <div class="hospital-name">BỆNH VIỆN ĐA KHOA QUỐC TẾ TNT</div>
-            <div class="hospital-sub">141 Chiến Thắng, Thanh Liệt, Hà Nội • 1900 8888</div>
+            <div class="hospital-sub">Địa chỉ: Lô đất CC2, Khu đô thị mới Văn Quán, số 114 Nguyễn Khuyến, phường Văn Quán, quận Hà Đông, Hà Nội • Hotline: 1900 8888</div>
             <div class="divider"></div>
 
             <div class="title">PHIẾU TIẾP NHẬN KHÁM</div>
@@ -384,11 +398,18 @@ export function printThermalTicket(data) {
                     window.print();
                     window.onafterprint = function() { window.close(); };
                 };
+                setTimeout(function() {
+                    try { window.print(); } catch (e) {}
+                }, 500);
             </script>
         </body>
         </html>
     `);
     printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+        try { printWindow.print(); } catch (e) {}
+    }, 300);
 }
 
 /**
@@ -455,7 +476,7 @@ export function printTreatmentSheet(data) {
             <table class="header-table">
                 <tr>
                     <td style="width: 55%; vertical-align: top;">
-                        <div style="font-size: 10pt;">SỞ Y TẾ TP. HÀ NỘI</div>
+                        <div style="font-size: 10pt;">SỞ Y TẾ THÀNH PHỐ HÀ NỘI</div>
                         <div style="font-weight: bold; font-size: 11pt;">BỆNH VIỆN ĐA KHOA QUỐC TẾ TNT</div>
                         <div style="font-size: 10pt;">Khoa: <b>${departmentName}</b></div>
                         <div style="font-size: 10pt;">Buồng: <b>${roomNumber}</b> &nbsp;&nbsp;|&nbsp;&nbsp; Giường: <b>${bedNumber}</b></div>
@@ -566,11 +587,18 @@ export function printTreatmentSheet(data) {
                     window.print();
                     window.onafterprint = function() { window.close(); };
                 };
+                setTimeout(function() {
+                    try { window.print(); } catch (e) {}
+                }, 500);
             </script>
         </body>
         </html>
     `);
     printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+        try { printWindow.print(); } catch (e) {}
+    }, 300);
 }
 
 /**
@@ -666,11 +694,18 @@ export function printBedsideCard(data) {
                     window.print();
                     window.onafterprint = function() { window.close(); };
                 };
+                setTimeout(function() {
+                    try { window.print(); } catch (e) {}
+                }, 500);
             </script>
         </body>
         </html>
     `);
     printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+        try { printWindow.print(); } catch (e) {}
+    }, 300);
 }
 
 /**
@@ -848,11 +883,18 @@ export function printShiftReconciliation(data) {
                     window.print();
                     window.onafterprint = function() { window.close(); };
                 };
+                setTimeout(function() {
+                    try { window.print(); } catch (e) {}
+                }, 500);
             </script>
         </body>
         </html>
     `);
     printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+        try { printWindow.print(); } catch (e) {}
+    }, 300);
 }
 
 /**
@@ -922,6 +964,7 @@ export function printDispenseSlip(data) {
                     <td class="header-left">
                         <div style="font-weight: bold; font-size: 10.5pt;">BỆNH VIỆN ĐA KHOA QUỐC TẾ TNT</div>
                         <div style="font-size: 8.5pt;">Khoa Dược - ${warehouseName}</div>
+                        <div style="font-size: 8.5pt;">Địa chỉ: Lô đất CC2, Khu đô thị mới Văn Quán, số 114 Nguyễn Khuyến, phường Văn Quán, quận Hà Đông, Hà Nội</div>
                         <div style="font-size: 8.5pt;">Hotline Dược Lâm Sàng: 1900 8888</div>
                     </td>
                     <td class="header-right">
@@ -1004,10 +1047,217 @@ export function printDispenseSlip(data) {
                     window.print();
                     window.onafterprint = function() { window.close(); };
                 };
+                setTimeout(function() {
+                    try { window.print(); } catch (e) {}
+                }, 500);
             </script>
         </body>
         </html>
     `);
     printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+        try { printWindow.print(); } catch (e) {}
+    }, 300);
+}
+
+/**
+ * In Phiếu Khám Bệnh & Đơn Thuốc Ngoại Trú (Khổ A4/A5 Chuẩn EMR)
+ */
+export function printMedicalRecordSheet(data) {
+    if (!data) return;
+
+    const bookingCode = data.bookingCode || "BK-2026-XXXX";
+    const patientName = data.patientName || "Khách hàng";
+    const patientDob = data.patientDob || "---";
+    const patientPhone = data.patientPhone || data.phoneNumber || "---";
+    const patientAddress = data.patientAddress || data.address || "Lô đất CC2, Khu đô thị mới Văn Quán, số 114 Nguyễn Khuyến, phường Văn Quán, quận Hà Đông, Hà Nội";
+    const patientCode = data.patientCode || "BN-2026";
+    const departmentName = data.departmentName || "Khoa Khám Bệnh";
+    const doctorName = data.doctorName || "Bác sĩ điều trị";
+    const bookingDate = data.bookingDate || formatDateTime(new Date().toISOString());
+    const diagnosis = data.diagnosis || data.finalDiagnosis || data.initialDiagnosis || "Khám nội tổng quát";
+    const treatmentPlan = data.treatmentPlan || "Uống thuốc đúng liều lượng theo đơn, tái khám đúng hẹn.";
+    const reExaminationDate = data.reExaminationDate || data.reExamDate || "Không có";
+    const totalAmount = Number(data.totalAmount || data.prescription?.totalAmount || 0);
+
+    const prescriptionItems = Array.isArray(data.prescriptionItems) && data.prescriptionItems.length > 0
+        ? data.prescriptionItems
+        : (data.prescription?.items || data.items || []);
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+        alert("Vui lòng cho phép mở cửa sổ popup để in phiếu khám!");
+        return;
+    }
+
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>Phiếu Khám Bệnh & Đơn Thuốc - ${bookingCode}</title>
+            <style>
+                @page { size: A4 portrait; margin: 12mm; }
+                body {
+                    font-family: 'Times New Roman', Times, serif;
+                    color: #000;
+                    background: #fff;
+                    margin: 0;
+                    padding: 0;
+                    font-size: 11pt;
+                    line-height: 1.4;
+                }
+                .header-table { width: 100%; margin-bottom: 12px; border-collapse: collapse; }
+                .title { text-align: center; font-size: 17pt; font-weight: bold; margin: 12px 0 2px 0; text-transform: uppercase; color: #002D5A; }
+                .subtitle { text-align: center; font-style: italic; font-size: 9.5pt; margin-bottom: 12px; color: #444; }
+                .section-title { font-weight: bold; font-size: 11pt; margin-top: 10px; margin-bottom: 4px; text-transform: uppercase; border-bottom: 1px solid #333; padding-bottom: 2px; }
+                .info-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+                .info-table td { padding: 4px 0; vertical-align: top; font-size: 10.5pt; }
+                .med-table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+                .med-table th, .med-table td { border: 1px solid #333; padding: 5px 6px; font-size: 10pt; }
+                .med-table th { background-color: #f2f2f2; text-align: center; font-weight: bold; }
+                .footer-table { width: 100%; margin-top: 25px; border-collapse: collapse; }
+                .footer-cell { text-align: center; vertical-align: top; width: 50%; font-size: 10.5pt; }
+                .stamp-box {
+                    display: inline-block;
+                    margin-top: 6px;
+                    padding: 3px 12px;
+                    border: 1.5px solid #0284c7;
+                    color: #0284c7;
+                    border-radius: 12px;
+                    font-weight: bold;
+                    font-size: 9pt;
+                    text-transform: uppercase;
+                }
+                @media print {
+                    .no-print { display: none !important; }
+                }
+            </style>
+        </head>
+        <body>
+            <table class="header-table">
+                <tr>
+                    <td style="width: 58%; vertical-align: top;">
+                        <div style="font-weight: bold; font-size: 12pt; color: #002D5A;">BỆNH VIỆN ĐA KHOA QUỐC TẾ TNT</div>
+                        <div style="font-size: 9pt;">Địa chỉ: Lô đất CC2, Khu đô thị mới Văn Quán, số 114 Nguyễn Khuyến, phường Văn Quán, quận Hà Đông, Hà Nội</div>
+                        <div style="font-size: 9pt;">Hotline: 1900 8888 • Email: hotro@tnthospital.vn</div>
+                    </td>
+                    <td style="width: 42%; text-align: right; vertical-align: top;">
+                        <div style="font-size: 9.5pt;">Mã khám: <b>${bookingCode}</b></div>
+                        <div style="font-size: 9.5pt;">Mã BN: <b>${patientCode}</b></div>
+                        <div style="font-size: 8.5pt; color: #555;">Ngày in: ${formatDateTime(new Date().toISOString())}</div>
+                    </td>
+                </tr>
+            </table>
+
+            <div class="title">PHIẾU KHÁM BỆNH & ĐƠN THUỐC</div>
+            <div class="subtitle">(Trích lục Hồ sơ Bệnh án Ngoại trú - Bản thể hiện điện tử EMR)</div>
+
+            <div class="section-title">I. THÔNG TIN BỆNH NHÂN</div>
+            <table class="info-table">
+                <tr>
+                    <td style="width: 50%;">Họ và tên: <b style="text-transform: uppercase; font-size: 11pt;">${patientName}</b></td>
+                    <td style="width: 25%;">Ngày sinh: <b>${patientDob}</b></td>
+                    <td style="width: 25%;">SĐT: <b>${patientPhone}</b></td>
+                </tr>
+                <tr>
+                    <td colspan="3">Địa chỉ: <b>${patientAddress}</b></td>
+                </tr>
+            </table>
+
+            <div class="section-title">II. KẾT QUẢ KHÁM LÂM SÀNG & CHẨN ĐOÁN</div>
+            <table class="info-table">
+                <tr>
+                    <td style="width: 50%;">Chuyên khoa: <b>${departmentName}</b></td>
+                    <td style="width: 50%;">Bác sĩ khám: <b>${doctorName}</b></td>
+                </tr>
+                <tr>
+                    <td>Thời gian khám: <b>${bookingDate}</b></td>
+                    <td>Ngày hẹn tái khám: <b style="color: #0284c7;">${reExaminationDate}</b></td>
+                </tr>
+                <tr>
+                    <td colspan="2">Chẩn đoán xác định: <b style="font-size: 11pt;">${diagnosis}</b></td>
+                </tr>
+                <tr>
+                    <td colspan="2">Hướng điều trị / Lời dặn: <i>${treatmentPlan}</i></td>
+                </tr>
+            </table>
+
+            <div class="section-title">III. ĐƠN THUỐC ĐIỀU TRỊ</div>
+            <table class="med-table">
+                <thead>
+                    <tr>
+                        <th style="width: 35px;">STT</th>
+                        <th style="text-align: left;">Tên thuốc & Hàm lượng</th>
+                        <th style="width: 60px;">SL</th>
+                        <th style="width: 50px;">ĐVT</th>
+                        <th style="text-align: left;">Hướng dẫn liều dùng</th>
+                        ${totalAmount > 0 ? '<th style="width: 80px; text-align: right;">Đơn giá</th>' : ''}
+                    </tr>
+                </thead>
+                <tbody>
+                    ${prescriptionItems.length > 0 ? prescriptionItems.map((item, idx) => `
+                        <tr>
+                            <td style="text-align: center;">${idx + 1}</td>
+                            <td><b>${item.medicineName || item.name || '---'}</b></td>
+                            <td style="text-align: center; font-weight: bold;">${item.quantity || item.qty || 1}</td>
+                            <td style="text-align: center;">${item.unit || 'Viên'}</td>
+                            <td>${item.dosageInstruction || item.usage || item.dosage || 'Theo chỉ định bác sĩ'}</td>
+                            ${totalAmount > 0 ? `<td style="text-align: right;">${formatCurrency(item.price || item.unitPrice || 0)}</td>` : ''}
+                        </tr>
+                    `).join('') : `
+                        <tr>
+                            <td colspan="${totalAmount > 0 ? 6 : 5}" style="text-align: center; padding: 8px; font-style: italic;">
+                                Không có chỉ định kê đơn thuốc trong buổi khám này.
+                            </td>
+                        </tr>
+                    `}
+                </tbody>
+            </table>
+
+            ${totalAmount > 0 ? `
+                <div style="text-align: right; font-weight: bold; font-size: 11pt; margin-top: 6px;">
+                    Tổng tiền thuốc: <span>${formatCurrency(totalAmount)}</span>
+                </div>
+            ` : ''}
+
+            <table class="footer-table">
+                <tr>
+                    <td class="footer-cell">
+                        <b>BỆNH NHÂN / NGƯỜI NHÀ</b><br>
+                        <i style="font-size: 8.5pt;">(Ký, ghi rõ họ tên)</i>
+                        <div style="height: 50px;"></div>
+                        <div>${patientName}</div>
+                    </td>
+                    <td class="footer-cell">
+                        <i style="font-size: 9pt;">Hà Nội, ngày ${new Date().getDate()} tháng ${new Date().getMonth() + 1} năm ${new Date().getFullYear()}</i><br>
+                        <b>BÁC SĨ ĐIỀU TRỊ</b><br>
+                        <i style="font-size: 8.5pt;">(Ký và xác nhận điện tử)</i>
+                        <div style="height: 10px;"></div>
+                        <div class="stamp-box">ĐÃ KÝ ĐIỆN TỬ - TNT HOSPITAL</div>
+                        <div style="height: 15px;"></div>
+                        <div><b>${doctorName}</b></div>
+                    </td>
+                </tr>
+            </table>
+
+            <script>
+                window.onload = function() {
+                    window.print();
+                    window.onafterprint = function() { window.close(); };
+                };
+                setTimeout(function() {
+                    try { window.print(); } catch (e) {}
+                }, 500);
+            </script>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+        try { printWindow.print(); } catch (e) {}
+    }, 300);
 }
 

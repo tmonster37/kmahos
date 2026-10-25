@@ -36,6 +36,11 @@ export default function MedicalRecordPrintModal({ open, onClose, record }) {
         const tableFontSize = isA5 ? "9.5pt" : "11pt";
 
         const printWindow = window.open("", "_blank");
+        if (!printWindow) {
+            alert("Trình duyệt đã chặn cửa sổ bật lên (popup). Vui lòng cho phép popup để in phiếu khám!");
+            return;
+        }
+
         printWindow.document.write(`
             <!DOCTYPE html>
             <html>
@@ -69,14 +74,24 @@ export default function MedicalRecordPrintModal({ open, onClose, record }) {
                 ${printContent.innerHTML}
                 <script>
                     window.onload = function() {
-                        window.print();
-                        window.onafterprint = function() { window.close(); };
+                        setTimeout(function() {
+                            window.print();
+                        }, 250);
                     };
+                    window.onafterprint = function() { window.close(); };
                 </script>
             </body>
             </html>
         `);
         printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => {
+            try {
+                printWindow.print();
+            } catch (e) {
+                console.error("Print fallback triggered:", e);
+            }
+        }, 350);
     };
 
     return (
@@ -123,8 +138,8 @@ export default function MedicalRecordPrintModal({ open, onClose, record }) {
                         <tbody>
                             <tr>
                                 <td style={{ verticalAlign: "top", width: "55%" }}>
-                                    <div style={{ fontWeight: "bold", fontSize: pageSize === "A5" ? "10pt" : "11.5pt" }}>BỆNH VIỆN ĐA KHOA TNT</div>
-                                    <div style={{ fontSize: pageSize === "A5" ? "9pt" : "10pt" }}>Địa chỉ: 141 Chiến Thắng, Thanh Liệt, Hà Nội</div>
+                                    <div style={{ fontWeight: "bold", fontSize: pageSize === "A5" ? "10pt" : "11.5pt" }}>BỆNH VIỆN ĐA KHOA QUỐC TẾ TNT</div>
+                                    <div style={{ fontSize: pageSize === "A5" ? "9pt" : "10pt" }}>Địa chỉ: Lô đất CC2, Khu đô thị mới Văn Quán, số 114 Nguyễn Khuyến, phường Văn Quán, quận Hà Đông, Hà Nội</div>
                                     <div style={{ fontSize: pageSize === "A5" ? "9pt" : "10pt" }}>Hotline: 1900 8888 • Cấp cứu 24/7</div>
                                 </td>
                                 <td style={{ verticalAlign: "top", textAlign: "center", width: "45%" }}>
@@ -248,7 +263,18 @@ export default function MedicalRecordPrintModal({ open, onClose, record }) {
                                     <div style={{ fontWeight: "bold", marginTop: 2 }}>BÁC SĨ KHÁM BỆNH</div>
                                     <div style={{ fontStyle: "italic", fontSize: pageSize === "A5" ? "8.5pt" : "9.5pt" }}>(Ký và đóng dấu điện tử)</div>
                                     <div style={{ height: pageSize === "A5" ? 40 : 55, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                        <Chip label="ĐÃ KÝ ĐIỆN TỬ" color="primary" size="small" variant="outlined" sx={{ fontWeight: 700 }} />
+                                        <div style={{
+                                            display: "inline-block",
+                                            border: "1px solid #1976d2",
+                                            color: "#1976d2",
+                                            borderRadius: "12px",
+                                            padding: "2px 8px",
+                                            fontSize: "8.5pt",
+                                            fontWeight: "bold",
+                                            textTransform: "uppercase"
+                                        }}>
+                                            ĐÃ KÝ ĐIỆN TỬ
+                                        </div>
                                     </div>
                                     <div style={{ fontWeight: "bold" }}>{record.doctorName || "Bác sĩ điều trị"}</div>
                                 </td>

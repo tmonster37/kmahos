@@ -63,11 +63,12 @@ public class PrescriptionPdfService {
     @Transactional(readOnly = true)
     public String getPrescriptionHash(String prescriptionCode) {
         Prescription prescription = prescriptionRepository.findByPrescriptionCode(prescriptionCode)
+                .or(() -> prescriptionRepository.findByMedicalRecordBookingBookingCode(prescriptionCode))
                 .orElseThrow(() -> new AppException("Không tìm thấy đơn thuốc", HttpStatus.NOT_FOUND));
         MedicalExaminationRecord record = prescription.getMedicalRecord();
         Doctor doctor = record != null ? record.getDoctor() : null;
         String doctorIdStr = doctor != null ? doctor.getDoctorId().toString() : "UNKNOWN";
-        return generatePrescriptionHash(prescriptionCode, doctorIdStr, prescription.getCreatedAt());
+        return generatePrescriptionHash(prescription.getPrescriptionCode(), doctorIdStr, prescription.getCreatedAt());
     }
 
     /**
@@ -87,16 +88,18 @@ public class PrescriptionPdfService {
     @Transactional(readOnly = true)
     public byte[] generatePrescriptionPdf(String prescriptionCode) {
         Prescription prescription = prescriptionRepository.findByPrescriptionCode(prescriptionCode)
+                .or(() -> prescriptionRepository.findByMedicalRecordBookingBookingCode(prescriptionCode))
                 .orElseThrow(() -> new AppException("Không tìm thấy đơn thuốc mã: " + prescriptionCode, HttpStatus.NOT_FOUND));
 
         MedicalExaminationRecord record = prescription.getMedicalRecord();
         Doctor doctor = record != null ? record.getDoctor() : null;
         PatientProfile patient = record != null ? record.getPatientProfile() : null;
 
+        String actualCode = prescription.getPrescriptionCode();
         String doctorIdStr = doctor != null ? doctor.getDoctorId().toString() : "UNKNOWN";
         String createdAtStr = prescription.getCreatedAt() != null ? prescription.getCreatedAt().toString() : "";
-        String hash = generatePrescriptionHash(prescriptionCode, doctorIdStr, prescription.getCreatedAt());
-        String verificationUrl = frontendUrl + "/verify-prescription?code=" + prescriptionCode + "&hash=" + hash;
+        String hash = generatePrescriptionHash(actualCode, doctorIdStr, prescription.getCreatedAt());
+        String verificationUrl = frontendUrl + "/verify-prescription?code=" + actualCode + "&hash=" + hash;
 
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
             // Khổ giấy A5 (chuẩn đơn thuốc ngoại trú Việt Nam)
@@ -112,11 +115,11 @@ public class PrescriptionPdfService {
             Font italicFont = FontFactory.getFont(FontFactory.HELVETICA_OBLIQUE, 8, Font.ITALIC);
 
             // 1. HEADER CƠ SỞ Y TẾ
-            Paragraph clinicName = new Paragraph("BENH VIEN DA KHOA QUOC TE YOUMED TNT", subTitleFont);
+            Paragraph clinicName = new Paragraph("BENH VIEN DA KHOA QUOC TE TNT", subTitleFont);
             clinicName.setAlignment(Element.ALIGN_CENTER);
             document.add(clinicName);
 
-            Paragraph clinicInfo = new Paragraph("Dia chi: 123 Duong Nguyen Hue, Quan 1, TP. Ho Chi Minh - Hotline: 1900 6868\nGiay phep hoat dong so: 1234/BYT-GPHD", regularFont);
+            Paragraph clinicInfo = new Paragraph("Dia chi: Lo dat CC2, Khu do thi moi Van Quan, so 114 Nguyen Khuyen, phuong Van Quan, quan Ha Dong, Ha Noi - Hotline: 1900 8888\nGiay phep hoat dong so: 1234/BYT-GPHD", regularFont);
             clinicInfo.setAlignment(Element.ALIGN_CENTER);
             document.add(clinicInfo);
 
@@ -220,12 +223,15 @@ public class PrescriptionPdfService {
             PdfPCell doctorCell = new PdfPCell();
             doctorCell.setBorder(Rectangle.NO_BORDER);
             String docFullName = doctor != null && doctor.getAccount() != null ? doctor.getAccount().getFullName() : "Bac si dieu tri";
+            String licenseNo = (doctor != null && doctor.getDoctorLicense() != null && !doctor.getDoctorLicense().isBlank())
+                    ? doctor.getDoctorLicense()
+                    : "012345/HN-CCHN";
             Paragraph docSign = new Paragraph(
                     "Ngay ke: " + createdAtStr.substring(0, Math.min(10, createdAtStr.length())) + "\n" +
                     "BAC SI KHAM BENH\n" +
                     "(Da ky so dien tu hop le)\n\n\n" +
                     docFullName + "\n" +
-                    "CCHN so: 012345/HCM-CCHN",
+                    "CCHN so: " + licenseNo,
                     boldFont
             );
             docSign.setAlignment(Element.ALIGN_CENTER);
@@ -252,7 +258,9 @@ public class PrescriptionPdfService {
             return new PrescriptionVerificationResponse(false, code, null, null, null, null, "Thông tin xác thực không hợp lệ.");
         }
 
-        Prescription prescription = prescriptionRepository.findByPrescriptionCode(code.trim()).orElse(null);
+        Prescription prescription = prescriptionRepository.findByPrescriptionCode(code.trim())
+                .or(() -> prescriptionRepository.findByMedicalRecordBookingBookingCode(code.trim()))
+                .orElse(null);
         if (prescription == null) {
             return new PrescriptionVerificationResponse(false, code, null, null, null, null, "Không tìm thấy đơn thuốc tương ứng trên hệ thống Bệnh viện.");
         }
