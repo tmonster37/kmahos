@@ -30,9 +30,41 @@ ALTER TABLE patient_profiles ADD COLUMN IF NOT EXISTS medical_history TEXT;
 ALTER TABLE patient_profiles ADD COLUMN IF NOT EXISTS is_linked BOOLEAN DEFAULT FALSE;
 ALTER TABLE patient_profiles ADD COLUMN IF NOT EXISTS relationship VARCHAR(50) DEFAULT 'SELF';
 
--- 4. Bookings: Phân luồng tiếp đón ưu tiên (Priority Patients)
+-- 4. Bookings: Phân luồng tiếp đón ưu tiên (Priority Patients) & Đồng bộ thanh toán
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS is_priority BOOLEAN DEFAULT FALSE;
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS priority_reason VARCHAR(255);
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS checked_in_at TIMESTAMP;
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS dispatched_at TIMESTAMP;
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS is_paid BOOLEAN DEFAULT FALSE;
+
+-- 4b. Transactions: Bổ sung mã đơn hàng PayOS & xác thực Webhook
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS order_code BIGINT;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS webhook_reference VARCHAR(100);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_txn_order_code ON transactions(order_code);
+
+-- 4c. Counter Tickets: Quản lý cấp số & luồng tiếp đón quầy
+CREATE TABLE IF NOT EXISTS counter_tickets (
+    ticket_id BIGSERIAL PRIMARY KEY,
+    ticket_code VARCHAR(30) NOT NULL,
+    idempotency_key VARCHAR(64) UNIQUE,
+    waiting_before INT,
+    queue_number INT NOT NULL,
+    ticket_date DATE NOT NULL,
+    counter_type VARCHAR(30) NOT NULL,
+    counter_id INT,
+    booking_id UUID,
+    patient_name VARCHAR(100) NOT NULL,
+    phone_number VARCHAR(20),
+    is_priority BOOLEAN DEFAULT FALSE,
+    priority_reason VARCHAR(255),
+    status VARCHAR(30) NOT NULL DEFAULT 'WAITING',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    deleted BOOLEAN NOT NULL DEFAULT FALSE
+);
+CREATE INDEX IF NOT EXISTS idx_ticket_counter_date ON counter_tickets(counter_id, ticket_date, status, queue_number);
+CREATE INDEX IF NOT EXISTS idx_ticket_booking ON counter_tickets(booking_id);
 
 -- 5. Prescriptions: Cột trạng thái thanh toán & chống cấp phát trùng
 ALTER TABLE prescriptions ADD COLUMN IF NOT EXISTS is_paid BOOLEAN DEFAULT FALSE;
