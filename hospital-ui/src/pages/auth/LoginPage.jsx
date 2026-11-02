@@ -9,7 +9,6 @@ import {
     Alert,
     IconButton,
     InputAdornment,
-    Chip,
     Stack,
     Dialog,
     DialogTitle,
@@ -36,7 +35,7 @@ import VpnKeyIcon from "@mui/icons-material/VpnKey";
 import { useAuth } from "../../context/AuthContext";
 import axiosInstance from "../../services/AxiosInstance";
 
-const GOOGLE_CLIENT_ID = "1038814592004-8fua2p0vpn2988932qe6jnhef73drop2.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID = (import.meta.env && import.meta.env.VITE_GOOGLE_CLIENT_ID) || "1038814592004-8fua2p0vpn2988932qe6jnhef73drop2.apps.googleusercontent.com";
 
 export default function LoginPage() {
     const [phoneNumber, setPhoneNumber] = useState("");
@@ -204,12 +203,6 @@ export default function LoginPage() {
         }
     };
 
-    const handleQuickFill = (phone, pass) => {
-        setPhoneNumber(phone);
-        setPassword(pass);
-        setError("");
-    };
-
     return (
         <Box
             sx={{
@@ -345,41 +338,6 @@ export default function LoginPage() {
                         >
                             {loading ? "Đang xác thực..." : "Đăng Nhập"}
                         </Button>
-
-                        {/* Quick Demo Role Fillers */}
-                        <Box mt={3} pt={2} borderTop="1px solid rgba(15, 23, 42, 0.08)">
-                            <Typography variant="caption" sx={{ color: "#94A3B8", fontWeight: 700, display: "block", mb: 1 }}>
-                                TÀI KHOẢN MẪU DEMO (CHẠM ĐỂ ĐIỀN):
-                            </Typography>
-                            <Box display="flex" flexWrap="wrap" gap={0.8} justifyContent="center">
-                                {[
-                                    { label: "Admin", phone: "0937050537", pass: "taizz0537", color: "#6366F1" },
-                                    { label: "Trưởng khoa", phone: "0900000002", pass: "taizz0537", color: "#0D9488" },
-                                    { label: "Bác sĩ", phone: "0911000001", pass: "password123", color: "#0088D6" },
-                                    { label: "Điều dưỡng", phone: "0900000004", pass: "password123", color: "#10B981" },
-                                    { label: "Thu ngân", phone: "0900000007", pass: "password123", color: "#F59E0B" },
-                                    { label: "Dược sĩ", phone: "0900000005", pass: "password123", color: "#7C3AED" },
-                                    { label: "Bệnh nhân", phone: "0988889999", pass: "password123", color: "#64748B" }
-                                ].map((item) => (
-                                    <Chip
-                                        key={item.label}
-                                        label={item.label}
-                                        size="small"
-                                        onClick={() => handleQuickFill(item.phone, item.pass)}
-                                        sx={{
-                                            fontWeight: 700,
-                                            fontSize: "0.72rem",
-                                            borderRadius: 1.5,
-                                            bgcolor: "rgba(15, 23, 42, 0.04)",
-                                            color: item.color,
-                                            border: `1px solid ${item.color}33`,
-                                            cursor: "pointer",
-                                            "&:hover": { bgcolor: "rgba(15, 23, 42, 0.08)" }
-                                        }}
-                                    />
-                                ))}
-                            </Box>
-                        </Box>
 
                         <Box display="flex" alignItems="center" my={2.5}>
                             <Box flexGrow={1} height="1px" bgcolor="rgba(15, 23, 42, 0.08)" />
