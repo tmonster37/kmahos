@@ -25,7 +25,7 @@ public class PharmacyInventoryController {
 
     // 1. Quản lý hệ thống Kho Dược
     @PostMapping("/warehouses")
-    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_OF_DEPARTMENT')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<WarehouseResponse>> createWarehouse(
             @Valid @RequestBody CreateWarehouseRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -69,7 +69,7 @@ public class PharmacyInventoryController {
 
     // 3. Điều chuyển kho nội bộ (Kho tổng -> Kho lẻ / Tủ trực)
     @PostMapping("/transfers")
-    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_OF_DEPARTMENT', 'PHARMACIST', 'NURSE')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_OF_DEPARTMENT', 'PHARMACIST')")
     public ResponseEntity<ApiResponse<StockTransferResponse>> createStockTransfer(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @Valid @RequestBody CreateStockTransferRequest request) {
@@ -79,7 +79,7 @@ public class PharmacyInventoryController {
     }
 
     @RequestMapping(value = {"/transfers/{transferId}/approve", "/transfers/{transferId}/send"}, method = {RequestMethod.PUT, RequestMethod.POST})
-    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_OF_DEPARTMENT', 'PHARMACIST', 'NURSE')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_OF_DEPARTMENT', 'PHARMACIST')")
     public ResponseEntity<ApiResponse<StockTransferResponse>> approveAndExecuteTransfer(
             @PathVariable UUID transferId,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
@@ -98,7 +98,7 @@ public class PharmacyInventoryController {
 
     // 4. Cấp phát thuốc theo đơn áp dụng Thuật toán FEFO (First Expired, First Out)
     @PostMapping("/prescriptions/{prescriptionId}/dispense")
-    @PreAuthorize("hasAnyRole('PHARMACIST', 'ADMIN', 'HEAD_OF_DEPARTMENT', 'NURSE')")
+    @PreAuthorize("hasAnyRole('PHARMACIST', 'ADMIN', 'HEAD_OF_DEPARTMENT')")
     public ResponseEntity<ApiResponse<PrescriptionDispenseResponse>> dispensePrescription(
             @PathVariable String prescriptionId,
             @Valid @RequestBody DispensePrescriptionRequest request) {
@@ -133,7 +133,7 @@ public class PharmacyInventoryController {
     }
 
     @GetMapping("/alerts/low-stock")
-    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_OF_DEPARTMENT', 'PHARMACIST', 'NURSE')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_OF_DEPARTMENT', 'PHARMACIST')")
     public ResponseEntity<ApiResponse<List<LowStockAlertResponse>>> getLowStockAlerts(
             @RequestParam(required = false) UUID warehouseId) {
         return ResponseEntity.ok(ApiResponse.ok(inventoryService.getLowStockAlerts(warehouseId), "Lấy danh sách cảnh báo tồn kho tối thiểu thành công"));

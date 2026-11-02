@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useLocation } from "react-router-dom";
 import {
     Container,
@@ -25,7 +25,9 @@ import {
     Tooltip,
     Alert,
     MenuItem,
-    CircularProgress
+    CircularProgress,
+    Grid,
+    InputAdornment
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
@@ -37,6 +39,7 @@ import StarsIcon from "@mui/icons-material/Stars";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import SearchIcon from "@mui/icons-material/Search";
 import axiosInstance from "../../services/AxiosInstance";
 import { useAuth } from "../../context/AuthContext";
 
@@ -65,8 +68,20 @@ export default function DepartmentManagePage() {
 
     const [deptForm, setDeptForm] = useState({ departmentName: "", description: "", headDoctorId: "" });
     const [roomForm, setRoomForm] = useState({ roomName: "", roomType: "EXAMINATION_ROOM", capacity: 1, isActive: true, description: "" });
+    const [roomSearchKeyword, setRoomSearchKeyword] = useState("");
+    const [roomTypeFilter, setRoomTypeFilter] = useState("ALL");
     const [selectedDoctorToAdd, setSelectedDoctorToAdd] = useState("");
     const [feedback, setFeedback] = useState({ type: "", message: "" });
+    const [deptSearchKeyword, setDeptSearchKeyword] = useState("");
+    const [doctorSearchKeyword, setDoctorSearchKeyword] = useState("");
+
+    const extractArray = (res) => {
+        if (!res) return [];
+        if (Array.isArray(res)) return res;
+        if (res.data && Array.isArray(res.data)) return res.data;
+        if (res.data?.data && Array.isArray(res.data.data)) return res.data.data;
+        return [];
+    };
 
     const loadData = async () => {
         setLoading(true);
@@ -76,14 +91,6 @@ export default function DepartmentManagePage() {
                 axiosInstance.get("/api/admin/doctors").catch(() => ({ data: [] })),
                 axiosInstance.get("/api/departments/rooms/all?includeInactive=true").catch(() => ({ data: [] }))
             ]);
-
-            const extractArray = (res) => {
-                if (!res) return [];
-                if (Array.isArray(res)) return res;
-                if (res.data && Array.isArray(res.data)) return res.data;
-                if (res.data?.data && Array.isArray(res.data.data)) return res.data.data;
-                return [];
-            };
 
             const deptList = extractArray(deptRes);
             const formatted = deptList.map(d => ({ ...d, isActive: d.isActive !== undefined ? d.isActive : true }));
@@ -222,11 +229,47 @@ export default function DepartmentManagePage() {
         }
     };
 
-    // 2. Danh sách Bác sĩ thuộc chuyên khoa đang chọn
+    // 1. Danh sách Chuyên khoa đã lọc tìm kiếm
+    const filteredDepartments = useMemo(() => {
+        if (!deptSearchKeyword.trim()) return departments;
+        const kw = deptSearchKeyword.toLowerCase();
+        return departments.filter(d =>
+            (d.departmentName && d.departmentName.toLowerCase().includes(kw)) ||
+            (d.departmentId && String(d.departmentId).includes(kw)) ||
+            (d.description && d.description.toLowerCase().includes(kw))
+        );
+    }, [departments, deptSearchKeyword]);
+
+    // 2. Danh sách Bác sĩ thuộc chuyên khoa đang chọn & đã lọc tìm kiếm
     const deptDoctors = selectedDept ? doctors.filter(d => Number(d.departmentId) === Number(selectedDept.departmentId)) : [];
+    const filteredDoctors = useMemo(() => {
+        if (!doctorSearchKeyword.trim()) return deptDoctors;
+        const kw = doctorSearchKeyword.toLowerCase();
+        return deptDoctors.filter(doc =>
+            (doc.fullName && doc.fullName.toLowerCase().includes(kw)) ||
+            (doc.doctorId && String(doc.doctorId).includes(kw)) ||
+            (doc.phoneNumber && doc.phoneNumber.includes(kw)) ||
+            (doc.specialty && doc.specialty.toLowerCase().includes(kw))
+        );
+    }, [deptDoctors, doctorSearchKeyword]);
 
     // 3. Quản lý Buồng phòng & Lịch trực của phòng
     const currentRooms = selectedDept ? roomsList.filter(r => Number(r.departmentId) === Number(selectedDept.departmentId)) : [];
+    const filteredRooms = useMemo(() => {
+        let list = selectedDept ? roomsList.filter(r => Number(r.departmentId) === Number(selectedDept.departmentId)) : [];
+        if (roomTypeFilter !== "ALL") {
+            list = list.filter(r => r.roomType === roomTypeFilter);
+        }
+        if (roomSearchKeyword.trim()) {
+            const kw = roomSearchKeyword.toLowerCase();
+            list = list.filter(r =>
+                (r.roomName && r.roomName.toLowerCase().includes(kw)) ||
+                (r.roomId && String(r.roomId).includes(kw)) ||
+                (r.description && r.description.toLowerCase().includes(kw))
+            );
+        }
+        return list;
+    }, [selectedDept, roomsList, roomTypeFilter, roomSearchKeyword]);
 
     const handleOpenAddRoom = () => {
         setEditingRoomId(null);
@@ -295,7 +338,7 @@ export default function DepartmentManagePage() {
         try {
             const todayStr = new Date().toISOString().split("T")[0];
             const res = await axiosInstance.get(`/api/schedules/all?date=${todayStr}`).catch(() => null);
-            const allSchedules = (res && Array.isArray(res.data)) ? res.data : [];
+            const allSchedules = extractArray(res);
 
             // Lọc ca trực thuộc khoa hoặc phòng
             const matched = allSchedules.filter(s =>
@@ -432,7 +475,7 @@ export default function DepartmentManagePage() {
                             Thêm Chuyên Khoa Mới
                         </Button>
                     )}
-                    {isHeadOfDept && (
+                    {isHeadOfDept && selectedDept && (
                         <Button
                             variant="contained"
                             startIcon={<AddIcon />}
@@ -456,6 +499,12 @@ export default function DepartmentManagePage() {
             {feedback.message && (
                 <Alert severity={feedback.type || "info"} sx={{ mb: 2.5, borderRadius: 2.5 }} onClose={() => setFeedback({ type: "", message: "" })}>
                     {feedback.message}
+                </Alert>
+            )}
+
+            {isHeadOfDept && !selectedDept && (
+                <Alert severity="warning" sx={{ mb: 2.5, borderRadius: 2.5, fontWeight: 600 }}>
+                    Tài khoản Trưởng khoa chưa được phân công quản lý chuyên khoa nào trong hệ thống. Vui lòng liên hệ Quản trị viên (ADMIN) để được gán chuyên khoa phụ trách.
                 </Alert>
             )}
 
@@ -501,6 +550,24 @@ export default function DepartmentManagePage() {
 
             {/* TAB 0: DANH SÁCH CHUYÊN KHOA */}
             {activeTab === 0 && (
+                <Box>
+                    <Paper elevation={0} sx={{ p: 2, mb: 2, borderRadius: 3, border: "1px solid rgba(15, 23, 42, 0.08)", bgcolor: "#FFFFFF" }}>
+                        <TextField
+                            fullWidth
+                            size="small"
+                            placeholder="Tìm kiếm chuyên khoa theo tên, mã khoa hoặc mô tả..."
+                            value={deptSearchKeyword}
+                            onChange={(e) => setDeptSearchKeyword(e.target.value)}
+                            InputProps={{
+                                startAdornment: (
+                                    <InputAdornment position="start">
+                                        <SearchIcon sx={{ color: "#94A3B8", fontSize: 20 }} />
+                                    </InputAdornment>
+                                ),
+                                sx: { borderRadius: 2 }
+                            }}
+                        />
+                    </Paper>
                 <TableContainer 
                     component={Paper} 
                     elevation={0} 
@@ -529,7 +596,13 @@ export default function DepartmentManagePage() {
                                         <CircularProgress size={32} sx={{ color: "#0088D6" }} />
                                     </TableCell>
                                 </TableRow>
-                            ) : departments.map((dept) => {
+                            ) : filteredDepartments.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={6} align="center" sx={{ py: 6, color: "#94A3B8" }}>
+                                        {departments.length === 0 ? "Chưa có chuyên khoa nào trong hệ thống." : "Không tìm thấy chuyên khoa phù hợp với từ khóa tìm kiếm."}
+                                    </TableCell>
+                                </TableRow>
+                            ) : filteredDepartments.map((dept) => {
                                 const roomsCount = roomsList.filter(r => Number(r.departmentId) === Number(dept.departmentId)).length;
                                 const headDoc = doctors.find(d => Number(d.departmentId) === Number(dept.departmentId) && d.role === "ROLE_HEAD_OF_DEPARTMENT");
                                 return (
@@ -660,6 +733,20 @@ export default function DepartmentManagePage() {
                         </TableBody>
                     </Table>
                 </TableContainer>
+                </Box>
+            )}
+
+                        {/* TAB 1: BÁC SĨ & TRƯỞNG KHOA */}
+            {activeTab === 1 && !selectedDept && (
+                <Paper sx={{ p: 5, textAlign: "center", borderRadius: 3.5, border: "1px solid rgba(15, 23, 42, 0.08)", bgcolor: "#FFFFFF" }}>
+                    {loading ? (
+                        <CircularProgress size={32} sx={{ color: "#0088D6" }} />
+                    ) : (
+                        <Typography variant="body1" color="textSecondary">
+                            Vui lòng chọn một chuyên khoa để xem danh sách bác sĩ và trưởng khoa.
+                        </Typography>
+                    )}
+                </Paper>
             )}
 
             {/* TAB 1: BÁC SĨ & TRƯỞNG KHOA */}
@@ -691,6 +778,25 @@ export default function DepartmentManagePage() {
                         </Button>
                     </Box>
 
+                    {/* Thanh Tìm Kiếm Bác Sĩ Trong Khoa */}
+                    <Paper elevation={0} sx={{ p: 2, mb: 2, borderRadius: 3, border: "1px solid rgba(15, 23, 42, 0.08)", bgcolor: "#FFFFFF" }}>
+                        <TextField
+                            fullWidth
+                            size="small"
+                            placeholder="Tìm kiếm bác sĩ theo tên, học vị hoặc số điện thoại..."
+                            value={doctorSearchKeyword}
+                            onChange={(e) => setDoctorSearchKeyword(e.target.value)}
+                            InputProps={{
+                                startAdornment: (
+                                    <InputAdornment position="start">
+                                        <SearchIcon sx={{ color: "#94A3B8", fontSize: 20 }} />
+                                    </InputAdornment>
+                                ),
+                                sx: { borderRadius: 2 }
+                            }}
+                        />
+                    </Paper>
+
                     <TableContainer 
                         component={Paper} 
                         elevation={0} 
@@ -713,14 +819,14 @@ export default function DepartmentManagePage() {
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {deptDoctors.length === 0 ? (
+                                {filteredDoctors.length === 0 ? (
                                     <TableRow>
                                         <TableCell colSpan={6} align="center" sx={{ py: 5, color: "#94A3B8" }}>
                                             Chưa có bác sĩ nào được phân công vào chuyên khoa này.
                                         </TableCell>
                                     </TableRow>
                                 ) : (
-                                    deptDoctors.map((doc) => {
+                                    filteredDoctors.map((doc) => {
                                         const isHead = doc.role === "ROLE_HEAD_OF_DEPARTMENT";
                                         return (
                                             <TableRow key={doc.doctorId} hover sx={{ "&:hover": { bgcolor: "rgba(0, 136, 214, 0.02) !important" } }}>
@@ -819,6 +925,19 @@ export default function DepartmentManagePage() {
                 </Box>
             )}
 
+                        {/* TAB 2: DANH SÁCH PHÒNG & LỊCH TRỰC */}
+            {activeTab === 2 && !selectedDept && (
+                <Paper sx={{ p: 5, textAlign: "center", borderRadius: 3.5, border: "1px solid rgba(15, 23, 42, 0.08)", bgcolor: "#FFFFFF" }}>
+                    {loading ? (
+                        <CircularProgress size={32} sx={{ color: "#0088D6" }} />
+                    ) : (
+                        <Typography variant="body1" color="textSecondary">
+                            Vui lòng chọn một chuyên khoa để xem sơ đồ buồng phòng và lịch trực.
+                        </Typography>
+                    )}
+                </Paper>
+            )}
+
             {/* TAB 2: DANH SÁCH PHÒNG & LỊCH TRỰC */}
             {activeTab === 2 && selectedDept && (
                 <Box>
@@ -867,6 +986,57 @@ export default function DepartmentManagePage() {
                         </Button>
                     </Box>
 
+                    {/* Thanh Tìm Kiếm & Lọc Loại Buồng Phòng */}
+                    <Paper elevation={0} sx={{ p: 2, mb: 2, borderRadius: 3, border: "1px solid rgba(15, 23, 42, 0.08)", bgcolor: "#FFFFFF" }}>
+                        <Grid container spacing={2} alignItems="center">
+                            <Grid item xs={12} sm={6} md={4}>
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    placeholder="Tìm kiếm buồng/phòng theo tên, mã phòng..."
+                                    value={roomSearchKeyword}
+                                    onChange={(e) => setRoomSearchKeyword(e.target.value)}
+                                    InputProps={{
+                                        startAdornment: (
+                                            <InputAdornment position="start">
+                                                <SearchIcon sx={{ color: "#94A3B8", fontSize: 20 }} />
+                                            </InputAdornment>
+                                        ),
+                                        sx: { borderRadius: 2 }
+                                    }}
+                                />
+                            </Grid>
+                            <Grid item xs={12} sm={6} md={8}>
+                                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                                    {[
+                                        { key: "ALL", label: "Tất cả" },
+                                        { key: "EXAMINATION_ROOM", label: "Phòng khám lâm sàng" },
+                                        { key: "LABORATORY_ROOM", label: "Xét nghiệm / CĐHA" },
+                                        { key: "TREATMENT_ROOM_STANDARD", label: "Nội trú thường" },
+                                        { key: "TREATMENT_ROOM_VIP", label: "Nội trú VIP" },
+                                        { key: "EMERGENCY_ROOM", label: "Cấp cứu" }
+                                    ].map((t) => (
+                                        <Chip
+                                            key={t.key}
+                                            label={t.label}
+                                            size="small"
+                                            clickable
+                                            onClick={() => setRoomTypeFilter(t.key)}
+                                            color={roomTypeFilter === t.key ? "primary" : "default"}
+                                            variant={roomTypeFilter === t.key ? "filled" : "outlined"}
+                                            sx={{
+                                                fontWeight: 700,
+                                                fontSize: "0.75rem",
+                                                borderRadius: 1.8,
+                                                ...(roomTypeFilter === t.key ? { bgcolor: "#0088D6" } : {})
+                                            }}
+                                        />
+                                    ))}
+                                </Stack>
+                            </Grid>
+                        </Grid>
+                    </Paper>
+
                     <TableContainer 
                         component={Paper} 
                         elevation={0} 
@@ -889,14 +1059,14 @@ export default function DepartmentManagePage() {
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {currentRooms.length === 0 ? (
+                                {filteredRooms.length === 0 ? (
                                     <TableRow>
                                         <TableCell colSpan={6} align="center" sx={{ py: 5, color: "#94A3B8" }}>
                                             Chưa cấu hình phòng khám cho chuyên khoa này. Hãy nhấn "Thêm Buồng Phòng Mới"!
                                         </TableCell>
                                     </TableRow>
                                 ) : (
-                                    currentRooms.map((room) => {
+                                    filteredRooms.map((room) => {
                                         const typeConfig = {
                                             EXAMINATION_ROOM: { label: "Phòng khám lâm sàng", color: "#0088D6", bg: "rgba(0, 136, 214, 0.08)" },
                                             LABORATORY_ROOM: { label: "Phòng xét nghiệm / CĐHA", color: "#8B5CF6", bg: "rgba(139, 92, 246, 0.08)" },

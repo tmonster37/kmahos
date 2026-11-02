@@ -109,29 +109,32 @@ public class InpatientController {
     @PostMapping("/beds")
     @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_OF_DEPARTMENT')")
     public ResponseEntity<ApiResponse<com.hospital.api.dto.response.BedResponse>> createBed(
-            @Valid @RequestBody com.hospital.api.dto.request.CreateBedRequest request) {
+            @Valid @RequestBody com.hospital.api.dto.request.CreateBedRequest request,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.ok(inpatientService.createBed(request), "Tạo giường bệnh thành công"));
+                .body(ApiResponse.ok(inpatientService.createBed(request, userPrincipal), "Tạo giường bệnh thành công"));
     }
 
     @PutMapping("/beds/{bedId}/status")
     @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_OF_DEPARTMENT', 'NURSE', 'DOCTOR')")
     public ResponseEntity<ApiResponse<com.hospital.api.dto.response.BedResponse>> updateBedStatus(
             @PathVariable UUID bedId,
-            @RequestParam com.hospital.api.constant.BedStatus status) {
-        return ResponseEntity.ok(ApiResponse.ok(inpatientService.updateBedStatus(bedId, status), "Cập nhật trạng thái giường thành công"));
+            @RequestParam com.hospital.api.constant.BedStatus status,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        return ResponseEntity.ok(ApiResponse.ok(inpatientService.updateBedStatus(bedId, status, userPrincipal), "Cập nhật trạng thái giường thành công"));
     }
 
     @GetMapping("/beds")
     public ResponseEntity<ApiResponse<List<com.hospital.api.dto.response.BedResponse>>> getBedsByRoom(
-            @RequestParam Integer roomId) {
+            @RequestParam(required = false) Integer roomId) {
         return ResponseEntity.ok(ApiResponse.ok(inpatientService.getBedsByRoom(roomId), "Lấy danh sách giường theo buồng thành công"));
     }
 
     @GetMapping("/beds/department/{departmentId}")
     public ResponseEntity<ApiResponse<List<com.hospital.api.dto.response.BedResponse>>> getBedsByDepartment(
-            @PathVariable Integer departmentId) {
-        return ResponseEntity.ok(ApiResponse.ok(inpatientService.getBedsByDepartment(departmentId), "Lấy danh sách giường theo khoa thành công"));
+            @PathVariable Integer departmentId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        return ResponseEntity.ok(ApiResponse.ok(inpatientService.getBedsByDepartment(departmentId, userPrincipal), "Lấy danh sách giường theo khoa thành công"));
     }
 
     @GetMapping("/beds/{bedId}")

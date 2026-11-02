@@ -16,8 +16,16 @@ export const clinicalApi = {
     createPrescription: (recordId, data) =>
         axiosInstance.post(`/api/clinical/records/${recordId}/prescriptions`, data),
 
-    // Lấy chi tiết hồ sơ bệnh án
+    // Lấy chi tiết hồ sơ bệnh án theo recordId
     getRecord: (recordId) => axiosInstance.get(`/api/clinical/records/${recordId}`),
+
+    // Lấy chi tiết hồ sơ bệnh án theo bookingCode
+    getRecordByBookingCode: (bookingCode) =>
+        axiosInstance.get(`/api/clinical/records/by-booking/${bookingCode}`),
+
+    // Lấy toàn bộ bệnh án điện tử của một hồ sơ bệnh nhân
+    getRecordsByPatient: (patientProfileId) =>
+        axiosInstance.get(`/api/clinical/patients/${patientProfileId}/records`),
 
     // Lập Phụ lục Bệnh án (EMR Addendum theo Thông tư 46/2018/TT-BYT)
     createAddendum: (recordId, data) =>

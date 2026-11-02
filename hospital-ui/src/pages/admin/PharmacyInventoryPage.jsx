@@ -664,7 +664,7 @@ export default function PharmacyInventoryPage() {
                                     textTransform: "none",
                                     fontSize: "0.8rem",
                                     ...(rxFilter === "ALL"
-                                        ? { bgcolor: "#0F172A", color: "#FFFFFF" }
+                                        ? { bgcolor: "#0088D6", color: "#FFFFFF" }
                                         : { color: "#475569", borderColor: "rgba(15, 23, 42, 0.2)" })
                                 }}
                             >

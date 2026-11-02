@@ -17,10 +17,11 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/clinical")
+@RequestMapping({"/api/clinical", "/api/clinical-examinations"})
 @RequiredArgsConstructor
 public class ClinicalExaminationController {
 
@@ -51,9 +52,48 @@ public class ClinicalExaminationController {
         ));
     }
 
+    // 2.1 Bác sĩ gọi số mời bệnh nhân vào buồng khám
+    @PostMapping("/call-patient")
+    @PreAuthorize("hasAnyRole('DOCTOR', 'HEAD_OF_DEPARTMENT', 'ADMIN')")
+    public ResponseEntity<ApiResponse<DoctorQueueResponse>> callPatient(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @RequestParam String bookingCode
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                clinicalService.callPatient(userPrincipal.getId(), bookingCode),
+                "Đang gọi bệnh nhân vào buồng khám"
+        ));
+    }
+
+    // 2.2 Bác sĩ báo vắng mặt / bỏ qua lượt tạm thời
+    @PostMapping("/skip-patient")
+    @PreAuthorize("hasAnyRole('DOCTOR', 'HEAD_OF_DEPARTMENT', 'ADMIN')")
+    public ResponseEntity<ApiResponse<DoctorQueueResponse>> skipPatient(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @RequestParam String bookingCode
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                clinicalService.skipPatient(userPrincipal.getId(), bookingCode),
+                "Đã đánh dấu bệnh nhân vắng mặt / bỏ qua lượt"
+        ));
+    }
+
+    // 2.3 Bác sĩ khôi phục gọi lại bệnh nhân vắng mặt
+    @PostMapping("/recall-patient")
+    @PreAuthorize("hasAnyRole('DOCTOR', 'HEAD_OF_DEPARTMENT', 'ADMIN')")
+    public ResponseEntity<ApiResponse<DoctorQueueResponse>> recallPatient(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @RequestParam String bookingCode
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                clinicalService.recallPatient(userPrincipal.getId(), bookingCode),
+                "Đã khôi phục bệnh nhân vào hàng đợi khám"
+        ));
+    }
+
     // 3. Bác sĩ tiếp nhận bệnh nhân & mở phiếu khám
     @PostMapping("/start")
-    @PreAuthorize("hasAnyRole('DOCTOR', 'HEAD_OF_DEPARTMENT', 'ADMIN')")
+    @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<ApiResponse<MedicalRecordResponse>> startExamination(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @Valid @RequestBody StartExaminationRequest request
@@ -64,7 +104,7 @@ public class ClinicalExaminationController {
 
     // 4. Bác sĩ chỉ định các xét nghiệm cận lâm sàng
     @PostMapping("/records/{recordId}/tests")
-    @PreAuthorize("hasAnyRole('DOCTOR', 'HEAD_OF_DEPARTMENT', 'ADMIN')")
+    @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<ApiResponse<List<MedicalTestResponse>>> assignMedicalTests(
             @PathVariable UUID recordId,
             @Valid @RequestBody AssignMedicalTestRequest request
@@ -127,14 +167,17 @@ public class ClinicalExaminationController {
     @PreAuthorize("hasAnyRole('DOCTOR', 'HEAD_OF_DEPARTMENT', 'ADMIN', 'LAB_TECHNICIAN')")
     public ResponseEntity<ApiResponse<MedicalTestResponse>> cancelMedicalTest(
             @PathVariable UUID testId,
-            @RequestParam(required = false) String reason
+            @RequestParam(required = false) String reason,
+            @RequestBody(required = false) CancelMedicalTestRequest body
     ) {
-        return ResponseEntity.ok(ApiResponse.ok(clinicalService.cancelMedicalTest(testId, reason), "Đã hủy chỉ định xét nghiệm thành công"));
+        String effectiveReason = (body != null && body.cancelReason() != null && !body.cancelReason().isBlank())
+                ? body.cancelReason() : reason;
+        return ResponseEntity.ok(ApiResponse.ok(clinicalService.cancelMedicalTest(testId, effectiveReason), "Đã hủy chỉ định xét nghiệm thành công"));
     }
 
     // 7. Bác sĩ kết luận chẩn đoán sau khi có KQ xét nghiệm
     @PutMapping("/records/{recordId}/diagnosis")
-    @PreAuthorize("hasAnyRole('DOCTOR', 'HEAD_OF_DEPARTMENT', 'ADMIN')")
+    @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<ApiResponse<MedicalRecordResponse>> makeDiagnosis(
             @PathVariable UUID recordId,
             @Valid @RequestBody DiagnosisRequest request
@@ -144,7 +187,7 @@ public class ClinicalExaminationController {
 
     // 7.1. Bác sĩ hoàn tất ca khám (cho trường hợp không kê đơn, tư vấn/hướng dẫn hoặc đã có chẩn đoán)
     @PostMapping({"/records/{recordId}/complete", "/records/{recordId}/finish"})
-    @PreAuthorize("hasAnyRole('DOCTOR', 'HEAD_OF_DEPARTMENT', 'ADMIN')")
+    @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<ApiResponse<MedicalRecordResponse>> completeExamination(
             @PathVariable UUID recordId,
             @RequestBody(required = false) com.hospital.api.dto.request.CompleteExaminationRequest request
@@ -152,9 +195,24 @@ public class ClinicalExaminationController {
         return ResponseEntity.ok(ApiResponse.ok(clinicalService.completeExamination(recordId, request), "Hoàn tất ca khám bệnh thành công"));
     }
 
+    // 7.2. Bác sĩ đóng ca khám vắng mặt khi bệnh nhân không quay lại sau khi làm CLS
+    @PostMapping("/records/{recordId}/abandon-after-tests")
+    @PreAuthorize("hasAnyRole('DOCTOR', 'HEAD_OF_DEPARTMENT', 'ADMIN')")
+    public ResponseEntity<ApiResponse<MedicalRecordResponse>> abandonExaminationAfterTests(
+            @PathVariable UUID recordId,
+            @RequestBody(required = false) Map<String, String> body,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        String reason = body != null ? body.get("reason") : null;
+        return ResponseEntity.ok(ApiResponse.ok(
+                clinicalService.abandonExaminationAfterTests(recordId, reason, userPrincipal),
+                "Đã ghi nhận đóng ca khám vắng mặt thành công"
+        ));
+    }
+
     // 8. Bác sĩ kê đơn thuốc (Tự động trừ kho thuốc & hoàn tất buổi khám)
     @PostMapping({"/records/{recordId}/prescriptions", "/records/{recordId}/prescription"})
-    @PreAuthorize("hasAnyRole('DOCTOR', 'HEAD_OF_DEPARTMENT', 'ADMIN')")
+    @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<ApiResponse<PrescriptionResponse>> createPrescription(
             @PathVariable UUID recordId,
             @Valid @RequestBody CreatePrescriptionRequest request
@@ -165,7 +223,7 @@ public class ClinicalExaminationController {
 
     // 8.1. Kiểm tra an toàn dược lý & dị ứng chéo (Clinical Decision Support - CDS)
     @PostMapping({"/records/{recordId}/prescriptions/check-safety", "/records/{recordId}/prescription/check-safety"})
-    @PreAuthorize("hasAnyRole('DOCTOR', 'HEAD_OF_DEPARTMENT', 'ADMIN')")
+    @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<ApiResponse<DrugSafetyCheckResponse>> checkPrescriptionSafety(
             @PathVariable UUID recordId,
             @Valid @RequestBody CheckPrescriptionSafetyRequest request
@@ -202,21 +260,151 @@ public class ClinicalExaminationController {
         ));
     }
 
-    // 10. Lấy danh mục dịch vụ cận lâm sàng cho bác sĩ chọn
-    @GetMapping("/services")
-    public ResponseEntity<ApiResponse<List<MedicalServiceResponse>>> getServices() {
-        return ResponseEntity.ok(ApiResponse.ok(clinicalService.getAllServices(), "Lấy danh mục dịch vụ thành công"));
+    // 9.1. Tra cứu hồ sơ bệnh án điện tử theo mã lịch hẹn / mã khám
+    @GetMapping("/records/by-booking/{bookingCode}")
+    public ResponseEntity<ApiResponse<MedicalRecordResponse>> getRecordByBookingCode(
+            @PathVariable String bookingCode,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        boolean isStaff = checkIsStaff(userPrincipal);
+        UUID currentUserId = userPrincipal != null ? userPrincipal.getId() : null;
+        return ResponseEntity.ok(ApiResponse.ok(
+                clinicalService.getRecordByBookingCode(bookingCode, currentUserId, isStaff),
+                "Lấy thông tin hồ sơ bệnh án theo mã khám thành công"
+        ));
     }
 
-    // 11. Lấy danh mục dược phẩm tồn kho cho bác sĩ kê đơn
+    // 9.2. Tra cứu toàn bộ bệnh án điện tử của một hồ sơ bệnh nhân
+    @GetMapping("/patients/{patientProfileId}/records")
+    public ResponseEntity<ApiResponse<List<MedicalRecordResponse>>> getRecordsByPatientProfile(
+            @PathVariable UUID patientProfileId,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        boolean isStaff = checkIsStaff(userPrincipal);
+        UUID currentUserId = userPrincipal != null ? userPrincipal.getId() : null;
+        return ResponseEntity.ok(ApiResponse.ok(
+                clinicalService.getRecordsByPatientProfile(patientProfileId, currentUserId, isStaff),
+                "Lấy danh sách bệnh án điện tử theo hồ sơ bệnh nhân thành công"
+        ));
+    }
+
+    // 10. Lấy danh mục dịch vụ cận lâm sàng cho bác sĩ chọn hoặc quản lý
+    @GetMapping("/services")
+    public ResponseEntity<ApiResponse<List<MedicalServiceResponse>>> getServices(
+            @RequestParam(name = "includeDeleted", required = false, defaultValue = "false") boolean includeDeleted
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(clinicalService.getAllServices(includeDeleted), "Lấy danh mục dịch vụ thành công"));
+    }
+
+    // 10a. Thêm mới dịch vụ kỹ thuật y tế (2.2.36)
+    @PostMapping("/services")
+    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_OF_DEPARTMENT')")
+    public ResponseEntity<ApiResponse<MedicalServiceResponse>> createService(
+            @Valid @RequestBody MedicalServiceRequest request,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(
+                clinicalService.createMedicalService(request, currentUser),
+                "Thêm mới dịch vụ y tế thành công"
+        ));
+    }
+
+    // 10b. Chỉnh sửa thông tin dịch vụ kỹ thuật y tế (2.2.37)
+    @PutMapping("/services/{serviceId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_OF_DEPARTMENT')")
+    public ResponseEntity<ApiResponse<MedicalServiceResponse>> updateService(
+            @PathVariable Integer serviceId,
+            @Valid @RequestBody MedicalServiceRequest request,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                clinicalService.updateMedicalService(serviceId, request, currentUser),
+                "Cập nhật dịch vụ y tế thành công"
+        ));
+    }
+
+    // 10c. Khóa / Mở khóa dịch vụ kỹ thuật y tế (2.2.38 & 2.2.39)
+    @PutMapping("/services/{serviceId}/toggle-status")
+    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_OF_DEPARTMENT')")
+    public ResponseEntity<ApiResponse<MedicalServiceResponse>> toggleServiceStatus(
+            @PathVariable Integer serviceId,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                clinicalService.toggleMedicalServiceStatus(serviceId, currentUser),
+                "Thay đổi trạng thái dịch vụ y tế thành công"
+        ));
+    }
+
+    // 10d. Ngừng cung cấp dịch vụ y tế (DELETE)
+    @DeleteMapping("/services/{serviceId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_OF_DEPARTMENT')")
+    public ResponseEntity<ApiResponse<Void>> deleteService(
+            @PathVariable Integer serviceId,
+            @AuthenticationPrincipal UserPrincipal currentUser
+    ) {
+        clinicalService.deleteMedicalService(serviceId, currentUser);
+        return ResponseEntity.ok(ApiResponse.ok(null, "Ngừng cung cấp dịch vụ y tế thành công"));
+    }
+
+    // 11. Lấy danh mục dược phẩm tồn kho cho bác sĩ kê đơn hoặc quản trị kho dược
     @GetMapping("/medicines")
-    public ResponseEntity<ApiResponse<List<MedicineResponse>>> getMedicines() {
-        return ResponseEntity.ok(ApiResponse.ok(clinicalService.getAllMedicines(), "Lấy danh mục thuốc thành công"));
+    public ResponseEntity<ApiResponse<List<MedicineResponse>>> getMedicines(
+            @RequestParam(name = "includeDeleted", required = false, defaultValue = "false") boolean includeDeleted
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(clinicalService.getAllMedicines(includeDeleted), "Lấy danh mục thuốc thành công"));
+    }
+
+    // 11a. Thêm mới thuốc vào danh mục kho dược (ADMIN, PHARMACIST)
+    @PostMapping("/medicines")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST')")
+    public ResponseEntity<ApiResponse<MedicineResponse>> createMedicine(
+            @Valid @RequestBody MedicineRequest request
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(
+                clinicalService.createMedicine(request),
+                "Thêm mới thuốc thành công"
+        ));
+    }
+
+    // 11b. Chỉnh sửa thông tin thuốc (ADMIN, PHARMACIST)
+    @PutMapping("/medicines/{medicineId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST')")
+    public ResponseEntity<ApiResponse<MedicineResponse>> updateMedicine(
+            @PathVariable Integer medicineId,
+            @Valid @RequestBody MedicineRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                clinicalService.updateMedicine(medicineId, request),
+                "Cập nhật thông tin thuốc thành công"
+        ));
+    }
+
+    // 11c. Khóa / Mở khóa thuốc (ADMIN, PHARMACIST)
+    @PutMapping("/medicines/{medicineId}/toggle-status")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST')")
+    public ResponseEntity<ApiResponse<MedicineResponse>> toggleMedicineStatus(
+            @PathVariable Integer medicineId
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                clinicalService.toggleMedicineStatus(medicineId),
+                "Thay đổi trạng thái thuốc thành công"
+        ));
+    }
+
+    // 11d. Khóa thuốc (DELETE - ADMIN, PHARMACIST)
+    @DeleteMapping("/medicines/{medicineId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PHARMACIST')")
+    public ResponseEntity<ApiResponse<Void>> deleteMedicine(
+            @PathVariable Integer medicineId
+    ) {
+        clinicalService.toggleMedicineStatus(medicineId);
+        return ResponseEntity.ok(ApiResponse.ok(null, "Thay đổi trạng thái thuốc thành công"));
     }
 
     // 12. Bác sĩ lưu các chỉ số lâm sàng động (Observations - Sản, Mắt, RHM, Nhi, Sinh hiệu)
     @PostMapping("/records/{recordId}/observations")
-    @PreAuthorize("hasAnyRole('DOCTOR', 'HEAD_OF_DEPARTMENT', 'ADMIN')")
+    @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<ApiResponse<MedicalRecordResponse>> recordObservations(
             @PathVariable UUID recordId,
             @Valid @RequestBody SaveObservationsRequest request
@@ -229,7 +417,7 @@ public class ClinicalExaminationController {
 
     // 13. Bác sĩ lưu danh sách chẩn đoán mã ICD-10 (Conditions)
     @PostMapping("/records/{recordId}/conditions")
-    @PreAuthorize("hasAnyRole('DOCTOR', 'HEAD_OF_DEPARTMENT', 'ADMIN')")
+    @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<ApiResponse<MedicalRecordResponse>> recordConditions(
             @PathVariable UUID recordId,
             @Valid @RequestBody SaveConditionsRequest request
@@ -268,7 +456,7 @@ public class ClinicalExaminationController {
 
     // 16. Lập Phụ lục Bệnh án điện tử (EMR Addendum) theo Thông tư 46/2018/TT-BYT khi hồ sơ khóa sau 24h
     @PostMapping("/records/{recordId}/addendums")
-    @PreAuthorize("hasAnyRole('DOCTOR', 'HEAD_OF_DEPARTMENT', 'ADMIN')")
+    @PreAuthorize("hasRole('DOCTOR')")
     public ResponseEntity<ApiResponse<AddendumResponse>> createAddendum(
             @PathVariable UUID recordId,
             @AuthenticationPrincipal UserPrincipal userPrincipal,

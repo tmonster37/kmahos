@@ -17,11 +17,15 @@ public class UserPrincipal implements UserDetails {
     private final Collection<? extends GrantedAuthority> authorities;
 
     public UserPrincipal(Account account) {
+        this(account, List.of(new SimpleGrantedAuthority(account.getRole().name())));
+    }
+
+    public UserPrincipal(Account account, Collection<? extends GrantedAuthority> authorities) {
         this.id = account.getUserId();
-        this.phoneNumber = account.getPhoneNumber();
-        this.password = account.getPassword();
+        this.phoneNumber = account.getPhoneNumber() != null ? account.getPhoneNumber() : account.getEmail();
+        this.password = account.getPassword() != null ? account.getPassword() : "";
         this.isActive = account.isActive() && !account.isDeleted();
-        this.authorities = List.of(new SimpleGrantedAuthority(account.getRole().name()));
+        this.authorities = authorities;
     }
 
     public UUID getId() {
@@ -44,7 +48,7 @@ public class UserPrincipal implements UserDetails {
 
     @Override
     public String getUsername() {
-        return phoneNumber;
+        return phoneNumber != null ? phoneNumber : id.toString();
     }
 
     @Override

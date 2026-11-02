@@ -10,7 +10,8 @@ import java.util.UUID;
 @Entity
 @Table(name = "accounts", indexes = {
     @Index(name = "idx_account_phone", columnList = "phone_number"),
-    @Index(name = "idx_account_email", columnList = "email")
+    @Index(name = "idx_account_email", columnList = "email"),
+    @Index(name = "idx_account_google_sub", columnList = "google_sub")
 })
 public class Account extends BaseEntity {
 
@@ -22,7 +23,7 @@ public class Account extends BaseEntity {
     @Column(name = "full_name", nullable = false, length = 100)
     private String fullName;
 
-    @Column(name = "phone_number", unique = true, nullable = false, length = 20)
+    @Column(name = "phone_number", unique = true, length = 20)
     private String phoneNumber;
 
     @Column(name = "email", unique = true, length = 100)
@@ -33,6 +34,10 @@ public class Account extends BaseEntity {
 
     @Column(name = "avatar")
     private String avatar;
+
+    // Google OpenID Connect Subject Identifier (Định danh duy nhất bất biến)
+    @Column(name = "google_sub", unique = true, length = 100)
+    private String googleSub;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false, length = 30)
@@ -48,13 +53,14 @@ public class Account extends BaseEntity {
     public Account() {
     }
 
-    public Account(UUID userId, String fullName, String phoneNumber, String email, String password, String avatar, Role role, BigDecimal balance, boolean isActive) {
+    public Account(UUID userId, String fullName, String phoneNumber, String email, String password, String avatar, String googleSub, Role role, BigDecimal balance, boolean isActive) {
         this.userId = userId;
         this.fullName = fullName;
         this.phoneNumber = phoneNumber;
         this.email = email;
         this.password = password;
         this.avatar = avatar;
+        this.googleSub = googleSub;
         this.role = role;
         this.balance = balance != null ? balance : BigDecimal.ZERO;
         this.isActive = isActive;
@@ -112,6 +118,14 @@ public class Account extends BaseEntity {
         this.avatar = avatar;
     }
 
+    public String getGoogleSub() {
+        return googleSub;
+    }
+
+    public void setGoogleSub(String googleSub) {
+        this.googleSub = googleSub;
+    }
+
     public Role getRole() {
         return role;
     }
@@ -143,6 +157,7 @@ public class Account extends BaseEntity {
         private String email;
         private String password;
         private String avatar;
+        private String googleSub;
         private Role role;
         private BigDecimal balance = BigDecimal.ZERO;
         private boolean isActive = true;
@@ -177,6 +192,11 @@ public class Account extends BaseEntity {
             return this;
         }
 
+        public AccountBuilder googleSub(String googleSub) {
+            this.googleSub = googleSub;
+            return this;
+        }
+
         public AccountBuilder role(Role role) {
             this.role = role;
             return this;
@@ -193,7 +213,7 @@ public class Account extends BaseEntity {
         }
 
         public Account build() {
-            return new Account(userId, fullName, phoneNumber, email, password, avatar, role, balance, isActive);
+            return new Account(userId, fullName, phoneNumber, email, password, avatar, googleSub, role, balance, isActive);
         }
     }
 }

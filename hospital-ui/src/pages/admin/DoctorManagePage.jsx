@@ -50,6 +50,7 @@ import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 
+import { useAuth } from "../../context/AuthContext";
 import axiosInstance from "../../services/AxiosInstance";
 import { formatCurrency } from "../../utils/formatters";
 
@@ -67,14 +68,16 @@ const defaultForm = {
     fullName: "",
     phoneNumber: "",
     email: "",
-    password: "password123",
-    departmentId: 1,
+    password: "",
+    departmentId: "",
     degree: "BSCKI",
-    consultationFee: 200000,
+    consultationFee: "",
     biography: "",
 };
 
 export default function DoctorManagePage() {
+    const { user } = useAuth();
+    const isAdmin = user?.role === "ROLE_ADMIN";
     const [doctors, setDoctors] = useState([]);
     const [departments, setDepartments] = useState([]);
     const [selectedDeptFilter, setSelectedDeptFilter] = useState("ALL");
@@ -328,7 +331,8 @@ export default function DoctorManagePage() {
                         >
                             Làm mới
                         </Button>
-                        <Button
+                        {isAdmin && (
+<Button
                             variant="contained"
                             startIcon={<AddIcon sx={{ fontSize: 20 }} />}
                             onClick={handleOpenAdd}
@@ -350,6 +354,7 @@ export default function DoctorManagePage() {
                         >
                             Thêm Bác Sĩ Mới
                         </Button>
+)}
                     </Stack>
                 </Box>
 
@@ -669,7 +674,7 @@ export default function DoctorManagePage() {
                                     fontWeight: 600,
                                     fontSize: "0.75rem",
                                     borderRadius: "6px",
-                                    bgcolor: licenseFilter === "ALL" ? "#0F172A" : "#F1F5F9",
+                                    bgcolor: licenseFilter === "ALL" ? "#0088D6" : "#F1F5F9",
                                     color: licenseFilter === "ALL" ? "#FFFFFF" : "#475569"
                                 }}
                             />
@@ -909,7 +914,8 @@ export default function DoctorManagePage() {
                                         {/* Thao tác */}
                                         <TableCell align="right" sx={{ pr: 3 }}>
                                             <Stack direction="row" spacing={1} justifyContent="flex-end">
-                                                <Tooltip title="Cập nhật CCHN Bộ Y Tế">
+                                                {isAdmin && (
+<Tooltip title="Cập nhật CCHN Bộ Y Tế">
                                                     <IconButton
                                                         size="small"
                                                         onClick={() => handleOpenLicense(doc)}
@@ -923,6 +929,8 @@ export default function DoctorManagePage() {
                                                         <BadgeOutlinedIcon fontSize="small" />
                                                     </IconButton>
                                                 </Tooltip>
+)}
+                                                {isAdmin && (
                                                 <Tooltip title="Sửa thông tin hồ sơ">
                                                     <IconButton
                                                         size="small"
@@ -937,6 +945,8 @@ export default function DoctorManagePage() {
                                                         <EditIcon fontSize="small" />
                                                     </IconButton>
                                                 </Tooltip>
+                                                )}
+                                                {isAdmin && (
                                                 <Tooltip title="Vô hiệu hóa hồ sơ">
                                                     <IconButton
                                                         size="small"
@@ -951,6 +961,7 @@ export default function DoctorManagePage() {
                                                         <DeleteOutlineIcon fontSize="small" />
                                                     </IconButton>
                                                 </Tooltip>
+                                                )}
                                             </Stack>
                                         </TableCell>
                                     </TableRow>
@@ -1094,7 +1105,8 @@ export default function DoctorManagePage() {
                                             borderTop: "1px solid rgba(15, 23, 42, 0.06)"
                                         }}
                                     >
-                                        <Tooltip title="Cấp / Sửa CCHN">
+                                        {isAdmin && (
+<Tooltip title="Cấp / Sửa CCHN">
                                             <IconButton
                                                 size="small"
                                                 onClick={() => handleOpenLicense(doc)}
@@ -1103,6 +1115,8 @@ export default function DoctorManagePage() {
                                                 <BadgeOutlinedIcon fontSize="small" />
                                             </IconButton>
                                         </Tooltip>
+)}
+                                        {isAdmin && (
                                         <Tooltip title="Sửa thông tin">
                                             <IconButton
                                                 size="small"
@@ -1112,6 +1126,8 @@ export default function DoctorManagePage() {
                                                 <EditIcon fontSize="small" />
                                             </IconButton>
                                         </Tooltip>
+                                        )}
+                                        {isAdmin && (
                                         <Tooltip title="Vô hiệu hóa">
                                             <IconButton
                                                 size="small"
@@ -1121,6 +1137,7 @@ export default function DoctorManagePage() {
                                                 <DeleteOutlineIcon fontSize="small" />
                                             </IconButton>
                                         </Tooltip>
+                                        )}
                                     </Box>
                                 </Card>
                             </Grid>

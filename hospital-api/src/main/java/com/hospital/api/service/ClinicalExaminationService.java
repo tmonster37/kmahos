@@ -10,14 +10,20 @@ import java.util.UUID;
 
 public interface ClinicalExaminationService {
     MedicalRecordResponse startExamination(UUID doctorAccountId, StartExaminationRequest request);
+    DoctorQueueResponse callPatient(UUID doctorAccountId, String bookingCode);
+    DoctorQueueResponse skipPatient(UUID doctorAccountId, String bookingCode);
+    DoctorQueueResponse recallPatient(UUID doctorAccountId, String bookingCode);
     List<MedicalTestResponse> assignMedicalTests(UUID recordId, AssignMedicalTestRequest request);
     MedicalTestResponse updateTestResult(UUID testId, UpdateTestResultRequest request);
     MedicalRecordResponse makeDiagnosis(UUID recordId, DiagnosisRequest request);
     MedicalRecordResponse completeExamination(UUID recordId, CompleteExaminationRequest request);
+    MedicalRecordResponse abandonExaminationAfterTests(UUID recordId, String reason, com.hospital.api.security.UserPrincipal currentUser);
     PrescriptionResponse createPrescription(UUID recordId, CreatePrescriptionRequest request);
     DrugSafetyCheckResponse checkPrescriptionSafety(UUID recordId, CheckPrescriptionSafetyRequest request);
     MedicalRecordResponse getRecordById(UUID recordId);
     MedicalRecordResponse getRecordById(UUID recordId, UUID currentUserId, boolean isStaff);
+    MedicalRecordResponse getRecordByBookingCode(String bookingCode, UUID currentUserId, boolean isStaff);
+    List<MedicalRecordResponse> getRecordsByPatientProfile(UUID patientProfileId, UUID currentUserId, boolean isStaff);
 
     // Bảng hàng đợi & khám bệnh
     List<DoctorQueueResponse> getDoctorQueue(UUID doctorAccountId, LocalDate date);
@@ -42,11 +48,24 @@ public interface ClinicalExaminationService {
 
     // Danh mục dịch vụ & Dược phẩm
     List<MedicalServiceResponse> getAllServices();
+    List<MedicalServiceResponse> getAllServices(boolean includeDeleted);
+    MedicalServiceResponse createMedicalService(MedicalServiceRequest request);
+    MedicalServiceResponse createMedicalService(MedicalServiceRequest request, com.hospital.api.security.UserPrincipal currentUser);
+    MedicalServiceResponse updateMedicalService(Integer serviceId, MedicalServiceRequest request);
+    MedicalServiceResponse updateMedicalService(Integer serviceId, MedicalServiceRequest request, com.hospital.api.security.UserPrincipal currentUser);
+    MedicalServiceResponse toggleMedicalServiceStatus(Integer serviceId);
+    MedicalServiceResponse toggleMedicalServiceStatus(Integer serviceId, com.hospital.api.security.UserPrincipal currentUser);
+    void deleteMedicalService(Integer serviceId);
+    void deleteMedicalService(Integer serviceId, com.hospital.api.security.UserPrincipal currentUser);
+
     List<MedicineResponse> getAllMedicines();
+    List<MedicineResponse> getAllMedicines(boolean includeDeleted);
+    MedicineResponse createMedicine(MedicineRequest request);
+    MedicineResponse updateMedicine(Integer medicineId, MedicineRequest request);
+    MedicineResponse toggleMedicineStatus(Integer medicineId);
 
     // Quản lý Phụ lục Bệnh án điện tử (EMR Addendum - Thông tư 46/2018/TT-BYT)
     AddendumResponse createAddendum(UUID recordId, UUID doctorAccountId, CreateAddendumRequest request);
     List<AddendumResponse> getAddendums(UUID recordId);
     List<AddendumResponse> getAddendums(UUID recordId, UUID currentUserId, boolean isStaff);
 }
-

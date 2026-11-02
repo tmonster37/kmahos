@@ -40,7 +40,7 @@ public class SlotReservationServiceImpl implements SlotReservationService {
     @Override
     @Transactional
     public ReserveSlotResponse reserveSlot(ReserveSlotRequest request, UUID accountId) {
-        TimeSlot slot = timeSlotRepository.findById(request.timeSlotId())
+        TimeSlot slot = timeSlotRepository.findByIdWithLock(request.timeSlotId())
                 .orElseThrow(() -> new AppException("Không tìm thấy khung giờ khám", HttpStatus.NOT_FOUND));
 
         int effectiveCurrent = slot.getCurrentBookings() != null ? slot.getCurrentBookings() : 0;
@@ -67,6 +67,7 @@ public class SlotReservationServiceImpl implements SlotReservationService {
                 expiresAt
         );
         activeReservations.put(reservationId, entry);
+        onRollback(() -> activeReservations.remove(reservationId, entry));
 
         log.info("Đã giữ chỗ khung giờ {} cho reservationId: {} (hết hạn sau {}s)", slot.getTimeSlotId(), reservationId, RESERVATION_TTL_SECONDS);
 
@@ -82,12 +83,14 @@ public class SlotReservationServiceImpl implements SlotReservationService {
     @Override
     @Transactional
     public void releaseSlot(UUID reservationId) {
-        ReservationEntry entry = activeReservations.remove(reservationId);
+        ReservationEntry entry = activeReservations.get(reservationId);
         if (entry == null) {
             return;
         }
 
-        timeSlotRepository.findById(entry.timeSlotId()).ifPresent(slot -> {
+        timeSlotRepository.findByIdWithLock(entry.timeSlotId()).ifPresent(slot -> {
+            if (!activeReservations.remove(reservationId, entry)) return;
+            onRollback(() -> activeReservations.putIfAbsent(reservationId, entry));
             int currentHolding = slot.getHoldingCount() != null ? slot.getHoldingCount() : 0;
             if (currentHolding > 0) {
                 slot.setHoldingCount(currentHolding - 1);
@@ -105,7 +108,7 @@ public class SlotReservationServiceImpl implements SlotReservationService {
             return;
         }
 
-        timeSlotRepository.findById(entry.timeSlotId()).ifPresent(slot -> {
+        timeSlotRepository.findByIdWithLock(entry.timeSlotId()).ifPresent(slot -> {
             int currentHolding = slot.getHoldingCount() != null ? slot.getHoldingCount() : 0;
             if (currentHolding > 0) {
                 slot.setHoldingCount(currentHolding - 1);
@@ -113,6 +116,41 @@ public class SlotReservationServiceImpl implements SlotReservationService {
                 log.info("Đã xác nhận đặt khám thành công, chuyển slot giữ chỗ thành đặt chính thức cho khung giờ {}", slot.getTimeSlotId());
             }
         });
+    }
+
+    @Override
+    @Transactional
+    public void consumeReservation(UUID reservationId, UUID timeSlotId, UUID accountId, UUID patientProfileId) {
+        ReservationEntry entry = activeReservations.get(reservationId);
+        if (entry == null || !entry.expiresAt().isAfter(Instant.now()) || !entry.timeSlotId().equals(timeSlotId)) {
+            throw new AppException("Phiếu giữ chỗ không hợp lệ hoặc đã hết hạn", HttpStatus.CONFLICT);
+        }
+
+        boolean accountMatches = entry.accountId() == null || accountId == null || entry.accountId().equals(accountId);
+        boolean profileMatches = entry.patientProfileId() == null || patientProfileId == null || entry.patientProfileId().equals(patientProfileId);
+
+        if (!accountMatches || !profileMatches) {
+            throw new AppException("Phiếu giữ chỗ không hợp lệ hoặc thuộc hồ sơ/tài khoản khác", HttpStatus.CONFLICT);
+        }
+        TimeSlot slot = timeSlotRepository.findByIdWithLock(timeSlotId)
+                .orElseThrow(() -> new AppException("Khung giờ không tồn tại", HttpStatus.CONFLICT));
+        if (!activeReservations.remove(reservationId, entry)) throw new AppException("Phiếu giữ chỗ đã sử dụng", HttpStatus.CONFLICT);
+        onRollback(() -> activeReservations.putIfAbsent(reservationId, entry));
+        int holding = slot.getHoldingCount() == null ? 0 : slot.getHoldingCount();
+        if (holding <= 0) throw new AppException("Khung giờ không còn chỗ giữ", HttpStatus.CONFLICT);
+        slot.setHoldingCount(holding - 1);
+        timeSlotRepository.save(slot);
+    }
+
+    private void onRollback(Runnable restore) {
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                    new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override public void afterCompletion(int status) {
+                            if (status != STATUS_COMMITTED) restore.run();
+                        }
+                    });
+        }
     }
 
     @Override

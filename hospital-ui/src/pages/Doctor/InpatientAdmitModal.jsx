@@ -111,14 +111,9 @@ export default function InpatientAdmitModal({ open, onClose, patient, record, on
                 setRooms(mapped);
                 setSelectedRoomId(mapped[0].roomId);
             } else {
-                // Fallback mock rooms nếu phòng chưa được setup trong db
-                const fallbackRooms = [
-                    { roomId: deptId * 100 + 1, roomNumber: `P.${deptId}01`, roomType: "INPATIENT", pricePerDay: 350000, description: "Phòng tiêu chuẩn 4 giường" },
-                    { roomId: deptId * 100 + 2, roomNumber: `P.${deptId}02`, roomType: "INPATIENT", pricePerDay: 500000, description: "Phòng yêu cầu 2 giường" },
-                    { roomId: deptId * 100 + 3, roomNumber: `P.${deptId}03 (VIP)`, roomType: "INPATIENT", pricePerDay: 900000, description: "Phòng VIP đơn lập" }
-                ];
-                setRooms(fallbackRooms);
-                setSelectedRoomId(fallbackRooms[0].roomId);
+                setRooms([]);
+                setSelectedRoomId("");
+                setError("Khoa này hiện chưa có buồng bệnh nội trú được cấu hình trên hệ thống.");
             }
         } catch (err) {
             console.error("Lỗi lấy danh sách phòng:", err);

@@ -1,3 +1,16 @@
+/**
+ * Hàm lọc và mã hóa ký tự HTML phòng chống DOM-based XSS khi in ấn
+ */
+export function escapeHtml(str) {
+    if (str == null) return "";
+    return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
 import { formatCurrency, formatDateTime } from "./formatters";
 import { generateBarcodeSvg } from "./barcodeGenerator";
 
@@ -7,16 +20,16 @@ import { generateBarcodeSvg } from "./barcodeGenerator";
 export function printReceipt(data) {
     if (!data) return;
 
-    const receiptCode = data.receiptCode || data.billId || "RC-" + Math.floor(100000 + Math.random() * 900000);
-    const patientName = data.patientName || "Khách hàng";
-    const phoneNumber = data.phoneNumber || "---";
+    const receiptCode = escapeHtml(data.receiptCode || data.billId || "RC-" + Math.floor(100000 + Math.random() * 900000));
+    const patientName = escapeHtml(data.patientName || "Khách hàng");
+    const phoneNumber = escapeHtml(data.phoneNumber || "---");
     const identityNumber = data.identityNumber || "---";
-    const departmentName = data.departmentName || "Khoa Khám Bệnh";
-    const doctorName = data.doctorName || "Bác sĩ phụ trách";
+    const departmentName = escapeHtml(data.departmentName || "Khoa Khám Bệnh");
+    const doctorName = escapeHtml(data.doctorName || "Bác sĩ phụ trách");
     const paymentMethodText = data.paymentMethod === "CASH" ? "Tiền mặt tại quầy" :
                               data.paymentMethod === "VIETQR" ? "Cổng PayOS (VietQR Napas 247)" :
                               data.paymentMethod === "WALLET" ? "Ví Viện Phí Điện Tử" : "Cổng PayOS (Chuyển khoản)";
-    const cashierName = data.cashierName || "Thu ngân viện phí";
+    const cashierName = escapeHtml(data.cashierName || "Thu ngân viện phí");
     const paidAt = data.paidAt ? formatDateTime(data.paidAt) : formatDateTime(new Date().toISOString());
     const totalAmount = Number(data.totalAmount || data.amount || 0);
     const items = data.items && data.items.length > 0 ? data.items : [
@@ -113,7 +126,7 @@ export function printReceipt(data) {
                     ${items.map((it, idx) => `
                         <tr>
                             <td style="text-align: center;">${idx + 1}</td>
-                            <td>${it.name || it.description}</td>
+                            <td>${escapeHtml(it.name || it.description)}</td>
                             <td style="text-align: center;">${it.qty || 1}</td>
                             <td style="text-align: right;">${formatCurrency(it.price || it.amount)}</td>
                             <td style="text-align: right; font-weight: bold;">${formatCurrency((it.price || it.amount) * (it.qty || 1))}</td>
@@ -168,15 +181,16 @@ export function printReceipt(data) {
 export function printAppointmentTicket(data) {
     if (!data) return;
 
-    const bookingCode = data.bookingCode || "BK-2026-XXXX";
+    const bookingCode = escapeHtml(data.bookingCode || "BK-2026-XXXX");
     const patientName = data.patientName || "Khách hàng";
-    const phoneNumber = data.phoneNumber || "---";
+    const phoneNumber = data.phoneNumber || data.patientPhone || "---";
     const departmentName = data.departmentName || "Khoa Khám Bệnh";
+    const roomName = escapeHtml(data.roomName || "Phòng khám");
     const doctorName = data.doctorName || "Bác sĩ chuyên khoa";
     const bookingDate = data.bookingDate || "---";
-    const timeSlot = data.timeSlot || "Trong giờ hành chính";
-    const queueNumber = data.queueNumber ? `#${data.queueNumber}` : "Đang cấp";
-    const price = Number(data.price || 0);
+    const timeSlot = escapeHtml(data.timeSlot || (data.startTime && data.endTime ? `${data.startTime} - ${data.endTime}` : "Trong giờ hành chính"));
+    const queueNumber = data.queueNumber ? `#${data.queueNumber}` : (data.queueCode || "Đang cấp");
+    const price = Number(data.price || data.totalAmount || 0);
 
     const printWindow = window.open("", "_blank");
     if (!printWindow) {
@@ -250,6 +264,10 @@ export function printAppointmentTicket(data) {
                 <tr>
                     <td>Chuyên khoa khám:</td>
                     <td><b>${departmentName}</b></td>
+                </tr>
+                <tr>
+                    <td>Phòng khám:</td>
+                    <td><b style="color: #0284c7;">${roomName}</b></td>
                 </tr>
                 <tr>
                     <td>Bác sĩ phụ trách:</td>
@@ -1260,4 +1278,176 @@ export function printMedicalRecordSheet(data) {
         try { printWindow.print(); } catch (e) {}
     }, 300);
 }
+
+/**
+ * In Giấy Hẹn Tái Khám / Phiếu Hẹn Tái Khám A5 Chuẩn Bộ Y Tế
+ */
+export function printReExamAppointmentSlip(data) {
+    if (!data) return;
+
+    const patientName = data.patientName || "Bệnh nhân";
+    const patientDob = data.patientDob || data.dateOfBirth || "---";
+    const patientPhone = data.patientPhone || data.phoneNumber || data.phone || "---";
+    const patientAddress = data.patientAddress || data.address || "---";
+    const bookingCode = data.bookingCode || "BK-2026";
+    const departmentName = data.departmentName || "Khoa Khám Bệnh";
+    const roomName = data.roomName || "Phòng khám chuyên khoa";
+    const doctorName = data.doctorName || "Bác sĩ điều trị";
+    const finalDiagnosis = data.finalDiagnosis || data.diagnosis || "Chưa có chẩn đoán";
+    const treatmentPlan = data.treatmentPlan || "Tuân thủ uống thuốc và hướng dẫn điều trị của bác sĩ.";
+    const reExaminationDate = data.reExaminationDate || data.reExamDate || "Theo hẹn bác sĩ";
+    const appointmentCode = "TK-" + (bookingCode.replace(/[^0-9]/g, "").slice(-6) || Math.floor(100000 + Math.random() * 900000));
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+        alert("Vui lòng cho phép mở cửa sổ popup để in giấy hẹn tái khám!");
+        return;
+    }
+
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>Giấy Hẹn Tái Khám - ${patientName}</title>
+            <style>
+                @page { size: A5 portrait; margin: 10mm; }
+                body {
+                    font-family: 'Times New Roman', Times, serif;
+                    color: #000;
+                    background: #fff;
+                    margin: 0;
+                    padding: 0;
+                    font-size: 11pt;
+                    line-height: 1.4;
+                }
+                .header-table { width: 100%; margin-bottom: 12px; border-collapse: collapse; }
+                .title { text-align: center; font-size: 16pt; font-weight: bold; margin: 10px 0 2px 0; text-transform: uppercase; color: #0284c7; }
+                .subtitle { text-align: center; font-style: italic; font-size: 9.5pt; margin-bottom: 12px; color: #444; }
+                .info-box {
+                    border: 1.5px solid #0284c7;
+                    border-radius: 8px;
+                    padding: 10px 14px;
+                    margin: 12px 0;
+                    background-color: #f0f9ff;
+                }
+                .highlight-date {
+                    font-size: 14pt;
+                    font-weight: bold;
+                    color: #0369a1;
+                    text-align: center;
+                    padding: 8px 0;
+                    background: #e0f2fe;
+                    border-radius: 6px;
+                    margin: 8px 0;
+                    border: 1px dashed #0284c7;
+                }
+                .info-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+                .info-table td { padding: 4px 2px; vertical-align: top; font-size: 10.5pt; }
+                .footer-table { width: 100%; margin-top: 20px; border-collapse: collapse; }
+                .footer-cell { text-align: center; vertical-align: top; width: 50%; font-size: 10.5pt; }
+                .note-box {
+                    font-size: 9pt;
+                    font-style: italic;
+                    color: #475569;
+                    margin-top: 10px;
+                    padding: 6px 10px;
+                    background: #f8fafc;
+                    border-left: 3px solid #0284c7;
+                }
+                @media print {
+                    .no-print { display: none !important; }
+                }
+            </style>
+        </head>
+        <body>
+            <table class="header-table">
+                <tr>
+                    <td style="width: 60%; vertical-align: top;">
+                        <div style="font-weight: bold; font-size: 11pt; color: #002D5A;">BỆNH VIỆN ĐA KHOA QUỐC TẾ TNT</div>
+                        <div style="font-size: 8.5pt;">Địa chỉ: Lô CC2, KĐT Văn Quán, Q. Hà Đông, Hà Nội</div>
+                        <div style="font-size: 8.5pt;">Hotline: 1900 8888 • Cấp cứu: 024 3888 9999</div>
+                    </td>
+                    <td style="width: 40%; text-align: right; vertical-align: top;">
+                        <div style="font-size: 9pt;">Mã hẹn: <b style="color: #0284c7;">${appointmentCode}</b></div>
+                        <div style="font-size: 8.5pt;">Mã khám cũ: <b>${bookingCode}</b></div>
+                        <div style="font-size: 8pt; color: #666;">Ngày lập: ${new Date().toLocaleDateString('vi-VN')}</div>
+                    </td>
+                </tr>
+            </table>
+
+            <div class="title">GIẤY HẸN TÁI KHÁM</div>
+            <div class="subtitle">(Dành cho bệnh nhân điều trị ngoại trú tái khám định kỳ)</div>
+
+            <table class="info-table">
+                <tr>
+                    <td style="width: 60%;">Họ và tên người bệnh: <b style="font-size: 11.5pt; text-transform: uppercase;">${patientName}</b></td>
+                    <td style="width: 40%;">Năm sinh/Ngày sinh: <b>${patientDob}</b></td>
+                </tr>
+                <tr>
+                    <td>Số điện thoại: <b>${patientPhone}</b></td>
+                    <td>Khoa khám: <b>${departmentName}</b></td>
+                </tr>
+                <tr>
+                    <td colspan="2">Địa chỉ: ${patientAddress}</td>
+                </tr>
+                <tr>
+                    <td colspan="2">Chẩn đoán xuất viện / ra về: <b style="color: #0f172a;">${finalDiagnosis}</b></td>
+                </tr>
+            </table>
+
+            <div class="info-box">
+                <div style="font-weight: bold; font-size: 10.5pt; color: #0369a1; text-transform: uppercase; margin-bottom: 4px;">
+                    📅 THÔNG TIN LỊCH HẸN TÁI KHÁM:
+                </div>
+                <div class="highlight-date">
+                    NGÀY HẸN TÁI KHÁM: ${reExaminationDate}
+                </div>
+                <div style="font-size: 10pt; margin-top: 4px;">
+                    • <b>Địa điểm khám:</b> ${roomName} - ${departmentName} (Tầng 2 - Khu Khám Bệnh Chuyên Khoa)<br/>
+                    • <b>Bác sĩ hẹn khám:</b> ${doctorName}<br/>
+                    • <b>Lời dặn chuyên môn:</b> ${treatmentPlan}
+                </div>
+            </div>
+
+            <div class="note-box">
+                <b>* Hướng dẫn dành cho người bệnh khi đi tái khám:</b><br/>
+                1. Mang theo Giấy hẹn tái khám này kèm CCCD/BHYT và đơn thuốc / phim chụp cũ.<br/>
+                2. Quét mã QR trên phiếu tại Kiosk tiếp đón tự động hoặc Quầy tiếp đón để được cấp số ưu tiên khám.<br/>
+                3. Nếu cần làm xét nghiệm máu vào ngày tái khám, vui lòng nhịn ăn sáng trước khi đến viện.
+            </div>
+
+            <table class="footer-table">
+                <tr>
+                    <td class="footer-cell">
+                        <b>NGƯỜI BỆNH / THÂN NHÂN</b><br/>
+                        <i style="font-size: 9pt;">(Ký và ghi rõ họ tên)</i>
+                    </td>
+                    <td class="footer-cell">
+                        <b>BÁC SĨ ĐIỀU TRỊ HẸN KHÁM</b><br/>
+                        <i style="font-size: 9pt;">(Ký, ghi rõ họ tên và đóng dấu)</i>
+                        <div style="margin-top: 50px; font-weight: bold; font-size: 11pt;">${doctorName}</div>
+                    </td>
+                </tr>
+            </table>
+
+            <script>
+                window.onload = function() {
+                    window.print();
+                    window.onafterprint = function() { window.close(); };
+                };
+                setTimeout(function() {
+                    try { window.print(); } catch (e) {}
+                }, 500);
+            </script>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+        try { printWindow.print(); } catch (e) {}
+    }, 300);
+}
+
 

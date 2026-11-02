@@ -25,4 +25,19 @@ export const bookingApi = {
 
     // Lấy lịch sử đặt khám
     getMyBookings: () => axiosInstance.get("/api/bookings/my-history"),
+
+    // Hủy lịch khám
+    cancelBooking: (bookingId) => axiosInstance.put(`/api/bookings/${bookingId}/cancel`),
+
+    // Tìm kiếm hồ sơ bệnh nhân cũ theo mã (Hình 2.16)
+    searchProfileByCode: (patientCode) =>
+        axiosInstance.post("/api/patient-profiles/link/search-by-code", { patientCode }),
+
+    // Tìm kiếm hồ sơ bệnh nhân cũ khi quên mã (Hình 2.17)
+    searchProfilesByInfo: (info) =>
+        axiosInstance.post("/api/patient-profiles/link/search-by-info", info),
+
+    // Xác thực số điện thoại & liên kết hồ sơ vào tài khoản
+    verifyAndLinkProfile: (payload) =>
+        axiosInstance.post("/api/patient-profiles/link/verify-and-link", payload),
 };

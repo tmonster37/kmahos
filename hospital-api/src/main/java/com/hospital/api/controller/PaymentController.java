@@ -25,6 +25,7 @@ import java.util.UUID;
 public class PaymentController {
 
     private final PaymentService paymentService;
+    private final com.hospital.api.service.CashierService cashierService;
 
     // 1. Tạo URL thanh toán VNPay
     @PostMapping("/vnpay/create-url")
@@ -53,6 +54,24 @@ public class PaymentController {
         return ResponseEntity.ok(ApiResponse.ok(response, "Tạo mã thanh toán VietQR thành công"));
     }
 
+    // 2.1. Khởi tạo thanh toán VietQR tại Kiosk cho người bệnh đặt lịch
+    @PostMapping("/kiosk/vietqr")
+    public ResponseEntity<ApiResponse<PaymentGatewayResponse>> createKioskVietQRPayment(
+            @RequestParam String bookingCode
+    ) {
+        PaymentGatewayResponse response = paymentService.createKioskPayment(bookingCode);
+        return ResponseEntity.ok(ApiResponse.ok(response, "Khởi tạo mã thanh toán VietQR tại Kiosk thành công"));
+    }
+
+    // 2.2. Đồng bộ thanh toán tại Kiosk theo mã booking
+    @PostMapping("/kiosk/sync/{bookingCode}")
+    public ResponseEntity<ApiResponse<com.hospital.api.dto.response.TransactionResponse>> syncKioskPayment(
+            @PathVariable String bookingCode
+    ) {
+        com.hospital.api.dto.response.TransactionResponse transaction = paymentService.syncKioskPayment(bookingCode);
+        return ResponseEntity.ok(ApiResponse.ok(transaction, "Đồng bộ giao dịch Kiosk thành công"));
+    }
+
     // 3. Khởi tạo thanh toán Ví MoMo (MoMo QR & Deeplink)
     @PostMapping("/momo/create")
     public ResponseEntity<ApiResponse<PaymentGatewayResponse>> createMoMoPayment(
@@ -71,9 +90,10 @@ public class PaymentController {
     public ResponseEntity<ApiResponse<Void>> payWithWallet(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @RequestParam BigDecimal amount,
-            @RequestParam TransactionType type
+            @RequestParam TransactionType type,
+            @RequestParam(required = false) String bookingCode
     ) {
-        paymentService.payWithInternalWallet(userPrincipal.getId(), amount, type);
+        paymentService.payWithInternalWallet(userPrincipal.getId(), amount, type, bookingCode);
         return ResponseEntity.ok(ApiResponse.ok(null, "Thanh toán bằng ví nội bộ thành công"));
     }
 
@@ -95,7 +115,7 @@ public class PaymentController {
     @PreAuthorize("hasAnyRole('ADMIN', 'CASHIER')")
     public ResponseEntity<ApiResponse<com.hospital.api.dto.response.TransactionResponse>> confirmPaymentSuccess(
             @PathVariable String txnRef,
-            @RequestParam(required = false, defaultValue = "VIETQR") PaymentMethod method
+            @RequestParam PaymentMethod method
     ) {
         com.hospital.api.dto.response.TransactionResponse transaction = paymentService.confirmPaymentSuccess(txnRef, method);
         return ResponseEntity.ok(ApiResponse.ok(transaction, "Xác nhận thanh toán thành công"));
@@ -113,9 +133,10 @@ public class PaymentController {
     // 7.1. Đồng bộ trạng thái giao dịch trực tiếp từ cổng PayOS Open Banking
     @PostMapping("/payos/sync/{orderCode}")
     public ResponseEntity<ApiResponse<com.hospital.api.dto.response.TransactionResponse>> syncPayOSPayment(
-            @PathVariable Long orderCode
+            @PathVariable Long orderCode,
+            @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
-        com.hospital.api.dto.response.TransactionResponse transaction = paymentService.syncPayOSPayment(orderCode);
+        com.hospital.api.dto.response.TransactionResponse transaction = paymentService.syncPayOSPayment(orderCode, userPrincipal);
         return ResponseEntity.ok(ApiResponse.ok(transaction, "Đồng bộ giao dịch từ PayOS thành công"));
     }
 
@@ -168,6 +189,15 @@ public class PaymentController {
     ) {
         List<com.hospital.api.dto.response.TransactionResponse> history = paymentService.getTransactionHistory(userPrincipal.getId(), page, size);
         return ResponseEntity.ok(ApiResponse.ok(history, "Lấy lịch sử giao dịch thành công"));
+    }
+
+    // 9.1. Danh sách khoản viện phí cần nộp của bệnh nhân
+    @GetMapping("/my-pending-bills")
+    public ResponseEntity<ApiResponse<List<com.hospital.api.dto.response.CashierPendingBillResponse>>> getMyPendingBills(
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        List<com.hospital.api.dto.response.CashierPendingBillResponse> bills = cashierService.getPendingBillsForPatient(userPrincipal.getId());
+        return ResponseEntity.ok(ApiResponse.ok(bills, "Lấy danh sách khoản viện phí cần nộp thành công"));
     }
 
     // 10. Danh sách toàn bộ giao dịch đối soát dành cho Quản trị viên & Kế toán

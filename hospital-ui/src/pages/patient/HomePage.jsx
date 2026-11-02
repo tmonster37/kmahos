@@ -383,12 +383,12 @@ export default function HomePage() {
                 aria-label="Giới thiệu bệnh viện"
                 sx={{
                     position: "relative",
-                    background: "radial-gradient(ellipse 90% 70% at 50% -10%, #0F766E 0%, #042F2E 60%, #021E1E 100%)",
-                    color: "#FFFFFF",
+                    background: "linear-gradient(180deg, #F0FDFA 0%, #F8FAFC 60%, #FFFFFF 100%)",
+                    color: "#0F172A",
                     pt: { xs: 4, sm: 5, md: 7 },
                     pb: { xs: 9, sm: 10, md: 12 },
                     overflow: "hidden",
-                    borderBottom: "1px solid rgba(255, 255, 255, 0.08)"
+                    borderBottom: "1px solid #E2E8F0"
                 }}
             >
                 {/* Subtle Background Mesh Ornaments (Teal & Heart Red Glow) */}
@@ -399,7 +399,7 @@ export default function HomePage() {
                         left: "30%",
                         width: 700,
                         height: 500,
-                        background: "radial-gradient(circle, rgba(13, 148, 136, 0.28) 0%, rgba(244, 63, 94, 0.08) 50%, rgba(0, 0, 0, 0) 75%)",
+                        background: "radial-gradient(circle, rgba(13, 148, 136, 0.08) 0%, rgba(244, 63, 94, 0.04) 50%, rgba(0, 0, 0, 0) 75%)",
                         pointerEvents: "none",
                         zIndex: 1
                     }}
@@ -415,13 +415,13 @@ export default function HomePage() {
                                 alignItems="center"
                                 gap={1}
                                 sx={{
-                                    bgcolor: "rgba(255, 255, 255, 0.12)",
-                                    backdropFilter: "blur(14px)",
-                                    border: "1px solid rgba(255, 255, 255, 0.25)",
+                                    bgcolor: "#FFFFFF",
+                                    border: "1px solid #99F6E4",
                                     borderRadius: "9999px",
                                     px: 2,
                                     py: 0.6,
-                                    mb: 2.5
+                                    mb: 2.5,
+                                    boxShadow: "0 2px 8px rgba(13, 148, 136, 0.1)"
                                 }}
                             >
                                 <Box
@@ -440,8 +440,8 @@ export default function HomePage() {
                                         width: 8,
                                         height: 8,
                                         borderRadius: "50%",
-                                        bgcolor: "#2DD4BF",
-                                        boxShadow: "0 0 10px #2DD4BF"
+                                        bgcolor: "#0D9488",
+                                        boxShadow: "0 0 10px rgba(13, 148, 136, 0.5)"
                                     }}
                                 />
                                 <Typography
@@ -450,7 +450,7 @@ export default function HomePage() {
                                         fontWeight: 800,
                                         letterSpacing: "0.06em",
                                         textTransform: "uppercase",
-                                        color: "#F0FDFA"
+                                        color: "#0F766E"
                                     }}
                                 >
                                     HỆ THỐNG Y TẾ SỐ YOUMED TNT · ĐA KHOA QUỐC TẾ
@@ -467,7 +467,7 @@ export default function HomePage() {
                                     lineHeight: 1.18,
                                     letterSpacing: "-0.03em",
                                     mb: 2,
-                                    color: "#FFFFFF"
+                                    color: "#0F172A"
                                 }}
                             >
                                 Chăm Sóc Sức Khỏe Toàn Diện{" "}
@@ -475,7 +475,7 @@ export default function HomePage() {
                                     component="span"
                                     sx={{
                                         display: "block",
-                                        background: "linear-gradient(90deg, #2DD4BF 0%, #5EEAD4 50%, #FDA4AF 100%)",
+                                        background: "linear-gradient(90deg, #0D9488 0%, #0F766E 50%, #E11D48 100%)",
                                         WebkitBackgroundClip: "text",
                                         WebkitTextFillColor: "transparent"
                                     }}
@@ -487,11 +487,12 @@ export default function HomePage() {
                             <Typography
                                 variant="body1"
                                 sx={{
-                                    color: "rgba(240, 253, 250, 0.92)",
+                                    color: "#475569",
                                     fontSize: { xs: "0.95rem", sm: "1.05rem", md: "1.12rem" },
                                     lineHeight: 1.65,
                                     maxWidth: 620,
-                                    mb: 3.5
+                                    mb: 3.5,
+                                    fontWeight: 500
                                 }}
                             >
                                 Chủ động chọn chuyên khoa, bác sĩ và khung giờ khám trước. Nhận phiếu số thứ tự điện tử, thủ tục tinh gọn và thanh toán viện phí trực tuyến qua PayOS VietQR.
@@ -511,24 +512,19 @@ export default function HomePage() {
                                     size="large"
                                     startIcon={<CalendarMonthIcon sx={{ fontSize: 20 }} />}
                                     sx={{
-                                        background: "#FFFFFF !important",
-                                        bgcolor: "#FFFFFF !important",
-                                        backgroundImage: "none !important",
-                                        color: "#0D9488 !important",
+                                        bgcolor: "#0D9488 !important",
+                                        color: "#FFFFFF !important",
                                         fontWeight: 800,
                                         fontSize: "0.98rem",
                                         px: 3.6,
                                         py: 1.3,
                                         borderRadius: "12px",
-                                        boxShadow: "0 10px 25px rgba(0, 0, 0, 0.25)",
+                                        boxShadow: "0 8px 20px rgba(13, 148, 136, 0.3)",
                                         transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
                                         "&:hover": {
-                                            background: "#F0FDFA !important",
-                                            bgcolor: "#F0FDFA !important",
-                                            backgroundImage: "none !important",
-                                            color: "#0F766E !important",
+                                            bgcolor: "#0F766E !important",
                                             transform: "translateY(-2px)",
-                                            boxShadow: "0 14px 30px rgba(0, 0, 0, 0.3)"
+                                            boxShadow: "0 12px 28px rgba(13, 148, 136, 0.4)"
                                         }
                                     }}
                                 >
@@ -542,18 +538,18 @@ export default function HomePage() {
                                     size="large"
                                     startIcon={<SearchIcon sx={{ fontSize: 20 }} />}
                                     sx={{
-                                        borderColor: "rgba(255, 255, 255, 0.4)",
-                                        color: "#FFFFFF",
+                                        borderColor: "#CBD5E1",
+                                        color: "#334155",
                                         fontWeight: 700,
                                         fontSize: "0.95rem",
                                         px: 3.2,
                                         py: 1.3,
                                         borderRadius: "12px",
-                                        backdropFilter: "blur(8px)",
                                         transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
                                         "&:hover": {
-                                            borderColor: "#FFFFFF",
-                                            bgcolor: "rgba(255, 255, 255, 0.14)",
+                                            borderColor: "#0D9488",
+                                            color: "#0D9488",
+                                            bgcolor: "#F0FDFA",
                                             transform: "translateY(-2px)"
                                         }
                                     }}
@@ -569,10 +565,9 @@ export default function HomePage() {
                                     p: { xs: 1.8, md: 2.2 },
                                     borderRadius: "18px",
                                     maxWidth: 640,
-                                    bgcolor: "rgba(255, 255, 255, 0.98)",
-                                    backdropFilter: "blur(24px)",
-                                    boxShadow: "0 20px 50px -10px rgba(4, 47, 46, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.3)",
-                                    border: "1px solid rgba(204, 251, 241, 0.8)"
+                                    bgcolor: "#FFFFFF",
+                                    boxShadow: "0 10px 30px rgba(0, 0, 0, 0.06)",
+                                    border: "1px solid #E2E8F0"
                                 }}
                             >
                                 <Box
@@ -606,7 +601,7 @@ export default function HomePage() {
                                         InputProps={{
                                             disableUnderline: true,
                                             startAdornment: (
-                                                <InputAdornment position="start" sx={{ pl: 1, color: "#0D9488" }}>
+                                                 <InputAdornment position="start" sx={{ pl: 1, color: "#0D9488" }}>
                                                     <SearchIcon sx={{ fontSize: 24 }} />
                                                 </InputAdornment>
                                             ),
@@ -706,7 +701,7 @@ export default function HomePage() {
                                         width: { xs: 280, sm: 380, md: 440 },
                                         height: { xs: 280, sm: 380, md: 440 },
                                         borderRadius: "50%",
-                                        background: "radial-gradient(circle, rgba(45, 212, 191, 0.35) 0%, rgba(244, 63, 94, 0.12) 50%, transparent 70%)",
+                                        background: "radial-gradient(circle, rgba(13, 148, 136, 0.15) 0%, rgba(244, 63, 94, 0.05) 50%, transparent 70%)",
                                         filter: "blur(20px)",
                                         zIndex: 1
                                     }}
@@ -721,10 +716,9 @@ export default function HomePage() {
                                         maxWidth: 420,
                                         borderRadius: "28px",
                                         p: { xs: 2, sm: 3 },
-                                        background: "linear-gradient(180deg, rgba(20, 184, 166, 0.18) 0%, rgba(4, 47, 46, 0.55) 100%)",
-                                        backdropFilter: "blur(24px)",
-                                        border: "1px solid rgba(45, 212, 191, 0.35)",
-                                        boxShadow: "0 24px 60px rgba(0, 0, 0, 0.45)"
+                                        background: "linear-gradient(180deg, #F0FDFA 0%, #E6FAF4 100%)",
+                                        border: "1px solid #99F6E4",
+                                        boxShadow: "0 20px 40px rgba(13, 148, 136, 0.12)"
                                     }}
                                 >
                                     {/* Doctor Portrait Image (Ảnh BS Nam Trưởng Khoa đã xóa nền 100%) */}
@@ -737,7 +731,7 @@ export default function HomePage() {
                                             maxHeight: { xs: 320, sm: 400, md: 440 },
                                             objectFit: "contain",
                                             display: "block",
-                                            filter: "drop-shadow(0 14px 28px rgba(0,0,0,0.5))",
+                                            filter: "drop-shadow(0 14px 28px rgba(0,0,0,0.15))",
                                             transition: "transform 0.4s ease",
                                             "&:hover": {
                                                 transform: "scale(1.02)"
@@ -751,13 +745,12 @@ export default function HomePage() {
                                             position: "absolute",
                                             top: 20,
                                             left: -15,
-                                            bgcolor: "rgba(15, 23, 42, 0.75)",
-                                            backdropFilter: "blur(14px)",
-                                            border: "1px solid rgba(255, 255, 255, 0.2)",
+                                            bgcolor: "#FFFFFF",
+                                            border: "1px solid #E2E8F0",
                                             borderRadius: "16px",
                                             px: 1.8,
                                             py: 1,
-                                            boxShadow: "0 10px 25px rgba(0,0,0,0.3)",
+                                            boxShadow: "0 10px 25px rgba(0,0,0,0.08)",
                                             display: { xs: "none", sm: "flex" },
                                             alignItems: "center",
                                             gap: 1.2
@@ -768,21 +761,21 @@ export default function HomePage() {
                                                 width: 36,
                                                 height: 36,
                                                 borderRadius: "10px",
-                                                bgcolor: "rgba(244, 63, 94, 0.18)",
+                                                bgcolor: "#FFF1F2",
                                                 color: "#F43F5E",
                                                 display: "flex",
                                                 alignItems: "center",
                                                 justifyContent: "center",
-                                                border: "1px solid rgba(244, 63, 94, 0.3)"
+                                                border: "1px solid #FECDD3"
                                             }}
                                         >
                                             <MonitorHeartIcon sx={{ fontSize: 20 }} />
                                         </Box>
                                         <Box>
-                                            <Typography sx={{ fontSize: "0.82rem", fontWeight: 800, color: "#FFFFFF", lineHeight: 1.2 }}>
+                                            <Typography sx={{ fontSize: "0.82rem", fontWeight: 800, color: "#0F172A", lineHeight: 1.2 }}>
                                                 ⭐ 4.9/5 Đánh Giá
                                             </Typography>
-                                            <Typography sx={{ fontSize: "0.72rem", color: "#94A3B8", fontWeight: 600 }}>
+                                            <Typography sx={{ fontSize: "0.72rem", color: "#64748B", fontWeight: 600 }}>
                                                 150.000+ Lượt khám an tâm
                                             </Typography>
                                         </Box>
@@ -794,13 +787,12 @@ export default function HomePage() {
                                             position: "absolute",
                                             bottom: 75,
                                             right: -15,
-                                            bgcolor: "rgba(15, 23, 42, 0.75)",
-                                            backdropFilter: "blur(14px)",
-                                            border: "1px solid rgba(255, 255, 255, 0.2)",
+                                            bgcolor: "#FFFFFF",
+                                            border: "1px solid #E2E8F0",
                                             borderRadius: "16px",
                                             px: 1.8,
                                             py: 1,
-                                            boxShadow: "0 10px 25px rgba(0,0,0,0.3)",
+                                            boxShadow: "0 10px 25px rgba(0,0,0,0.08)",
                                             display: { xs: "none", sm: "flex" },
                                             alignItems: "center",
                                             gap: 1.2
@@ -811,21 +803,21 @@ export default function HomePage() {
                                                 width: 36,
                                                 height: 36,
                                                 borderRadius: "10px",
-                                                bgcolor: "rgba(13, 148, 136, 0.2)",
-                                                color: "#2DD4BF",
+                                                bgcolor: "#F0FDFA",
+                                                color: "#0D9488",
                                                 display: "flex",
                                                 alignItems: "center",
                                                 justifyContent: "center",
-                                                border: "1px solid rgba(45, 212, 191, 0.3)"
+                                                border: "1px solid #99F6E4"
                                             }}
                                         >
                                             <VerifiedIcon sx={{ fontSize: 20 }} />
                                         </Box>
                                         <Box>
-                                            <Typography sx={{ fontSize: "0.82rem", fontWeight: 800, color: "#FFFFFF", lineHeight: 1.2 }}>
+                                            <Typography sx={{ fontSize: "0.82rem", fontWeight: 800, color: "#0F172A", lineHeight: 1.2 }}>
                                                 100% Bác Sĩ CCHN
                                             </Typography>
-                                            <Typography sx={{ fontSize: "0.72rem", color: "#94A3B8", fontWeight: 600 }}>
+                                            <Typography sx={{ fontSize: "0.72rem", color: "#64748B", fontWeight: 600 }}>
                                                 Bộ Y Tế cấp phép chính quy
                                             </Typography>
                                         </Box>
@@ -836,34 +828,59 @@ export default function HomePage() {
                                         sx={{
                                             mt: 1.5,
                                             p: 1.5,
-                                            bgcolor: "rgba(255, 255, 255, 0.95)",
-                                            backdropFilter: "blur(10px)",
-                                            borderRadius: "16px",
-                                            color: "#0F172A",
-                                            boxShadow: "0 8px 20px rgba(0,0,0,0.15)",
+                                            bgcolor: "#FFFFFF",
+                                            borderRadius: "18px",
+                                            border: "1px solid #E2E8F0",
+                                            boxShadow: "0 8px 20px rgba(0, 0, 0, 0.05)",
                                             display: "flex",
                                             alignItems: "center",
                                             justifyContent: "space-between"
                                         }}
                                     >
-                                        <Box>
-                                            <Typography sx={{ fontSize: "0.92rem", fontWeight: 900, color: "#0F172A" }}>
-                                                BS.CKII Nguyễn Văn An
-                                            </Typography>
-                                            <Typography sx={{ fontSize: "0.75rem", color: "#0D9488", fontWeight: 700 }}>
-                                                Trưởng Hội Đồng Chẩn Đoán Cấp Cao
-                                            </Typography>
+                                        <Box display="flex" alignItems="center" gap={1.2}>
+                                            <Avatar
+                                                src="/images/logo.png"
+                                                alt="YouMed TNT"
+                                                sx={{
+                                                    width: 40,
+                                                    height: 40,
+                                                    bgcolor: "#F0FDFA",
+                                                    border: "1.5px solid #99F6E4",
+                                                    p: 0.3
+                                                }}
+                                            />
+                                            <Box>
+                                                <Box display="flex" alignItems="center" gap={0.6}>
+                                                    <Typography
+                                                        variant="subtitle2"
+                                                        fontWeight={800}
+                                                        color="#0F172A"
+                                                        sx={{ fontSize: "0.85rem", lineHeight: 1.2 }}
+                                                    >
+                                                        BS.CKII Nguyễn Văn An
+                                                    </Typography>
+                                                    <VerifiedIcon sx={{ fontSize: 15, color: "#0D9488" }} />
+                                                </Box>
+                                                <Typography
+                                                    variant="caption"
+                                                    color="#64748B"
+                                                    sx={{ fontSize: "0.72rem", fontWeight: 600, display: "block" }}
+                                                >
+                                                    Hội Đồng Cố Vấn Chuyên Môn
+                                                </Typography>
+                                            </Box>
                                         </Box>
+
                                         <Chip
-                                            label="25+ năm KN"
+                                            label="Đang trực"
                                             size="small"
                                             sx={{
-                                                bgcolor: "#F0FDFA",
-                                                color: "#0D9488",
+                                                bgcolor: "#DCFCE7",
+                                                color: "#15803D",
                                                 fontWeight: 800,
-                                                fontSize: "0.72rem",
-                                                borderRadius: "8px",
-                                                border: "1px solid #CCFBF1"
+                                                fontSize: "0.7rem",
+                                                height: 22,
+                                                border: "1px solid #86EFAC"
                                             }}
                                         />
                                     </Box>
@@ -871,48 +888,8 @@ export default function HomePage() {
                             </Box>
                         </Grid>
                     </Grid>
-
-                    {/* 4 Micro-Trust Metrics (Hairline Strip) */}
-                    <Box
-                        display="flex"
-                        justifyContent="center"
-                        alignItems="center"
-                        gap={{ xs: 2, md: 5 }}
-                        flexWrap="wrap"
-                        mt={{ xs: 4, md: 5 }}
-                        sx={{
-                            pt: 2,
-                            borderTop: "1px solid rgba(255, 255, 255, 0.12)"
-                        }}
-                    >
-                        <Box display="flex" alignItems="center" gap={1}>
-                            <VerifiedIcon sx={{ color: "#2DD4BF", fontSize: 18 }} />
-                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.92)", fontWeight: 600, fontSize: "0.85rem" }}>
-                                100% Bác sĩ CCHN chuẩn Bộ Y Tế
-                            </Typography>
-                        </Box>
-                        <Box display="flex" alignItems="center" gap={1}>
-                            <AccessTimeIcon sx={{ color: "#5EEAD4", fontSize: 18 }} />
-                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.92)", fontWeight: 600, fontSize: "0.85rem" }}>
-                                Cấp số điện tử tự động, không chờ đợi
-                            </Typography>
-                        </Box>
-                        <Box display="flex" alignItems="center" gap={1}>
-                            <SecurityIcon sx={{ color: "#FDA4AF", fontSize: 18 }} />
-                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.92)", fontWeight: 600, fontSize: "0.85rem" }}>
-                                Bệnh án điện tử bảo mật chuẩn HL7/FHIR
-                            </Typography>
-                        </Box>
-                        <Box display="flex" alignItems="center" gap={1}>
-                            <QrCode2Icon sx={{ color: "#FDE047", fontSize: 18 }} />
-                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.92)", fontWeight: 600, fontSize: "0.85rem" }}>
-                                Thanh toán PayOS VietQR tự động
-                            </Typography>
-                        </Box>
-                    </Box>
                 </Container>
             </Box>
-
             {/* =========================================================================
                 2. DỊCH VỤ CỐT LÕI (Bento Grid 4 Highlights)
             ========================================================================= */}
@@ -2013,7 +1990,7 @@ export default function HomePage() {
                                 </Typography>
                             </Box>
                             <Typography variant="h3" component="h3" fontWeight="900" color="#0F172A" gutterBottom sx={{ fontSize: { xs: "1.45rem", md: "1.85rem" } }}>
-                                Bệnh Viện Đa Khoa Quốc Tế YouMed TNT
+                                TNT HOSPITAL
                             </Typography>
                             <Typography variant="body2" color="#64748B" sx={{ lineHeight: 1.65, mb: 3, fontSize: "0.92rem" }}>
                                 Hoạt động dưới sự quản lý chuyên môn của Bộ Y Tế, cung cấp dịch vụ thăm khám và điều trị chất lượng cao, ứng dụng công nghệ y tế số nhằm mang lại trải nghiệm khám chữa bệnh chu đáo, minh bạch cho mọi người dân.
@@ -2029,7 +2006,7 @@ export default function HomePage() {
                                 <Box display="flex" alignItems="flex-start" gap={1.2}>
                                     <LocationOnIcon sx={{ fontSize: 20, color: "#0D9488", mt: 0.2 }} />
                                     <Typography variant="body2" color="#0F172A">
-                                        <b>Địa chỉ bệnh viện:</b> Lô đất CC2, Khu đô thị mới Văn Quán, số 114 Nguyễn Khuyến, phường Văn Quán, quận Hà Đông, Hà Nội.
+                                        <b>Địa chỉ bệnh viện:</b> số 114 Nguyễn Khuyến, phường Văn Quán, quận Hà Đông, Hà Nội.
                                     </Typography>
                                 </Box>
                                 <Box display="flex" alignItems="flex-start" gap={1.2}>

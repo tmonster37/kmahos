@@ -37,6 +37,10 @@ public class Prescription extends BaseEntity {
     @Column(name = "doctor_notes", columnDefinition = "TEXT")
     private String doctorNotes;
 
+    @Column(name = "is_paid")
+    @Builder.Default
+    private Boolean isPaid = false;
+
     @OneToMany(mappedBy = "prescription", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<PrescriptionItem> prescriptionItems = new ArrayList<>();

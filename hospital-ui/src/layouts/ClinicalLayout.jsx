@@ -132,11 +132,11 @@ export default function ClinicalLayout() {
             });
         }
 
-        // 5. Phân hệ Quầy Thu Ngân (Thu ngân, Admin)
+        // 5. Phân hệ Kế Toán Viện Phí & Kiểm Toán (Kế toán, Thu ngân, Admin)
         if (role === "ROLE_CASHIER" || role === "ROLE_ADMIN") {
             items.push({
-                text: "Thu ngân",
-                fullName: "Quầy Thu Ngân Viện Phí",
+                text: "Kế toán",
+                fullName: "Kế Toán Viện Phí & Kiểm Toán",
                 path: "/cashier",
                 icon: <PointOfSaleIcon sx={{ fontSize: 17 }} />
             });

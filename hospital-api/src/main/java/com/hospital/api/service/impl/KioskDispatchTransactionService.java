@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 
@@ -33,6 +34,7 @@ public class KioskDispatchTransactionService {
     private final CounterTicketRepository counterTicketRepository;
     private final BookingRepository bookingRepository;
     private final BookingService bookingService;
+    private final BookingReceptionTransition reception;
     private final Clock hospitalClock;
 
     @Transactional
@@ -69,7 +71,9 @@ public class KioskDispatchTransactionService {
         }
 
         final CounterType allocationType = targetType;
-        List<Counter> lockedCounters = lockCountersForDispatch(allocationType);
+        Booking existingBooking = request.bookingCode() != null && !request.bookingCode().isBlank()
+                ? bookingRepository.findByBookingCodeForUpdate(request.bookingCode()).orElseThrow(() -> new AppException("Không tìm thấy lịch hẹn", HttpStatus.NOT_FOUND)) : null;
+        List<Counter> lockedCounters = reception.lockCounters();
 
         CounterTicket existing = counterTicketRepository
                 .findByIdempotencyKeyAndDeletedFalse(request.idempotencyKey())
@@ -121,17 +125,40 @@ public class KioskDispatchTransactionService {
 
         Booking linkedBooking;
         if (request.bookingCode() != null && !request.bookingCode().isBlank()) {
-            linkedBooking = bookingRepository.findByBookingCode(request.bookingCode())
-                    .orElseThrow(() -> new AppException("Không tìm thấy lịch hẹn", HttpStatus.NOT_FOUND));
+            linkedBooking = existingBooking;
+            bookingService.checkInKiosk(new com.hospital.api.dto.request.KioskCheckInRequest(request.bookingCode()));
         } else {
             BookingResponse bookingResponse = bookingService.createKioskBooking(new KioskBookingRequest(
                     request.fullName(), request.phoneNumber(), request.departmentId(), request.birthYear(),
                     isPriority, priorityReason,
-                    Boolean.TRUE.equals(request.hasInsurance()) ? "Đăng ký khám BHYT" : "Khám dịch vụ tự động từ Kiosk"
+                    Boolean.TRUE.equals(request.hasInsurance()) ? "Đăng ký khám BHYT" : "Khám dịch vụ tự động từ Kiosk",
+                    Boolean.TRUE.equals(request.payNow())
             ));
             linkedBooking = bookingRepository.findByBookingCode(bookingResponse.bookingCode())
                     .orElseThrow(() -> new IllegalStateException("Kiosk booking was not persisted"));
         }
+
+        if (BookingReceptionTransition.paymentEligible(linkedBooking)) reception.afterVerifiedPayment(linkedBooking);
+        List<CounterTicket> linkedTickets = counterTicketRepository.findAllByBookingForUpdate(linkedBooking.getBookingId());
+        if (!linkedTickets.isEmpty()) {
+            CounterTicket linked = linkedTickets.get(0);
+            if (existingBooking == null) {
+                linked.setIdempotencyKey(request.idempotencyKey());
+                linked.setHasInsurance(Boolean.TRUE.equals(request.hasInsurance()));
+                // Booking creation cannot know the walk-in's insurance choice. Retain
+                // clinically inferred priority, otherwise use this request's allocation.
+                if (!Boolean.TRUE.equals(linkedBooking.getIsPriority())) {
+                    linked.setCounterType(allocationType);
+                    linked.setCounter(selectedCounter);
+                    linked.setQueueNumber(queueNumber);
+                    linked.setTicketCode(ticketCode);
+                    linked.setWaitingBefore(waitingBefore);
+                }
+            }
+            CounterTicket saved = counterTicketRepository.saveAndFlush(linked);
+            return CounterTicketResponse.fromEntity(saved, saved.getWaitingBefore() == null ? 0 : saved.getWaitingBefore());
+        }
+        boolean payNow = BookingReceptionTransition.paymentEligible(linkedBooking) && linkedBooking.getDispatchedAt() != null;
 
         CounterTicket ticket = CounterTicket.builder()
                 .ticketCode(ticketCode)
@@ -147,7 +174,7 @@ public class KioskDispatchTransactionService {
                 .isPriority(isPriority)
                 .priorityReason(priorityReason)
                 .hasInsurance(Boolean.TRUE.equals(request.hasInsurance()))
-                .status(CounterTicketStatus.WAITING)
+                .status(payNow ? CounterTicketStatus.SERVED : CounterTicketStatus.WAITING)
                 .build();
 
         CounterTicket savedTicket = counterTicketRepository.saveAndFlush(ticket);

@@ -13,9 +13,10 @@ import java.util.UUID;
 public interface AccountRepository extends JpaRepository<Account, UUID> {
     Optional<Account> findByPhoneNumber(String phoneNumber);
     Optional<Account> findByEmail(String email);
+    Optional<Account> findByGoogleSub(String googleSub);
     boolean existsByPhoneNumber(String phoneNumber);
     boolean existsByEmail(String email);
+    boolean existsByGoogleSub(String googleSub);
     List<Account> findAllByRoleInAndDeletedFalse(List<Role> roles);
     List<Account> findAllByDeletedFalse();
 }
-

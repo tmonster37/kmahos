@@ -62,6 +62,7 @@ import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 
 import PaymentQRModal from "../../components/payment/PaymentQRModal";
+import AddOrLinkPatientProfileModal from "../../components/common/AddOrLinkPatientProfileModal";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import axiosInstance from "../../services/AxiosInstance";
 import { formatCurrency, formatDate, formatISODate, isValidPhoneNumber, isValidHealthInsurance } from "../../utils/formatters";
@@ -70,17 +71,17 @@ import { useAuth } from "../../context/AuthContext";
 import designTokens from "../../theme/designTokens";
 
 const STEPS = [
-    "Chọn Chuyên Khoa",
-    "Bác Sĩ & Ngày Khám",
-    "Khung Giờ Khám",
-    "Hồ Sơ Bệnh Nhân",
-    "Xác Nhận & Cấp Phiếu"
+    "1. Chọn Chuyên Khoa",
+    "2. Chọn Bác Sĩ & Ngày",
+    "3. Buổi & Khung Giờ",
+    "4. Hồ Sơ Bệnh Nhân",
+    "5. Xác Nhận & Cấp Phiếu"
 ];
 
 export default function BookingPage() {
     const location = useLocation();
     const navigate = useNavigate();
-    const { isAuthenticated } = useAuth();
+    const { user, isAuthenticated } = useAuth();
     const queryParams = new URLSearchParams(location.search);
     const paramDeptId = queryParams.get("departmentId");
     const paramSymptoms = queryParams.get("symptoms");
@@ -114,7 +115,7 @@ export default function BookingPage() {
     const [newProfileData, setNewProfileData] = useState({
         fullName: "",
         relationship: "Bản thân",
-        phoneNumber: "",
+        phoneNumber: user?.phoneNumber || "",
         dateOfBirth: "1990-01-01",
         gender: "MALE",
         address: "Hà Nội",
@@ -289,21 +290,21 @@ export default function BookingPage() {
                 dateOfBirth: formatISODate(newProfileData.dateOfBirth),
             };
             const res = await axiosInstance.post("/api/patient-profiles", payload);
-            const created = res.data;
+            const created = res.data?.data || res.data;
             setProfiles(prev => [created, ...prev]);
             setSelectedProfile(created);
             setOpenNewProfileModal(false);
             setNewProfileData({
                 fullName: "",
                 relationship: "Bản thân",
-                phoneNumber: "",
+                phoneNumber: user?.phoneNumber || "",
                 dateOfBirth: "1990-01-01",
                 gender: "MALE",
                 address: "Hà Nội",
                 healthInsuranceNumber: ""
             });
         } catch (err) {
-            setError(err.message || "Tạo hồ sơ thất bại");
+            setError(err.response?.data?.message || err.message || "Tạo hồ sơ thất bại");
         } finally {
             setCreatingProfile(false);
         }
@@ -330,7 +331,7 @@ export default function BookingPage() {
             const res = await axiosInstance.post("/api/bookings", {
                 patientProfileId: selectedProfile.patientProfileId,
                 timeSlotId: selectedSlot.timeSlotId,
-                symptoms: symptoms || "Khám tổng quát và tư vấn sức khỏe",
+                symptoms: symptoms.trim() || "Khám tổng quát và tư vấn sức khỏe",
                 reservationId: reservationId
             });
             const bookingData = res?.data?.data || res?.data || res;
@@ -340,20 +341,21 @@ export default function BookingPage() {
 
             if (paymentMethod === "VIETQR") {
                 try {
-                    const payRes = await axiosInstance.post(`/api/payment/vietqr/create?amount=${amount}&type=PAY_BOOKING`);
+                    const payRes = await axiosInstance.post(`/api/payment/vietqr/create?amount=${amount}&type=PAY_BOOKING&bookingCode=${encodeURIComponent(bookingData.bookingCode)}`);
                     const payData = payRes?.data?.data || payRes?.data || payRes;
                     setPaymentModalData(payData);
                     setOpenQRModal(true);
                 } catch (e) {
                     console.log("PayOS / VietQR error:", e);
-                    setActiveStep(4);
                 }
+                setActiveStep(4);
             } else if (paymentMethod === "WALLET") {
                 try {
-                    await axiosInstance.post(`/api/payment/wallet/pay?amount=${amount}&type=PAY_BOOKING`);
+                    await axiosInstance.post(`/api/payment/wallet/pay?amount=${amount}&type=PAY_BOOKING&bookingCode=${encodeURIComponent(bookingData.bookingCode)}`);
+                    setBookingResult(prev => ({ ...prev, isPaid: true }));
                     setActiveStep(4);
                 } catch (e) {
-                    alert(e.message || "Số dư ví không đủ, vui lòng nạp thêm tiền hoặc chọn phương thức khác!");
+                    alert(e.response?.data?.message || e.message || "Số dư ví không đủ, vui lòng nạp thêm tiền hoặc chọn phương thức khác!");
                     return;
                 }
             } else {
@@ -361,7 +363,7 @@ export default function BookingPage() {
                 setActiveStep(4);
             }
         } catch (err) {
-            setError(err.message || "Đặt lịch thất bại, vui lòng thử lại!");
+            setError(err.response?.data?.message || err.message || "Đặt lịch thất bại, vui lòng thử lại!");
         } finally {
             setLoadingBooking(false);
         }
@@ -655,7 +657,17 @@ export default function BookingPage() {
                                                             color: "#475569"
                                                         }}
                                                     />
-                                                    <Typography variant="caption" fontWeight="700" color="#0284C7">
+                                                    <Typography
+                                                        variant="caption"
+                                                        fontWeight="700"
+                                                        color="#0284C7"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedDept(dept);
+                                                            setActiveStep(1);
+                                                        }}
+                                                        sx={{ cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
+                                                    >
                                                         Chọn chuyên khoa →
                                                     </Typography>
                                                 </Box>
@@ -921,7 +933,7 @@ export default function BookingPage() {
                                     "&:hover": { bgcolor: "#0369A1" }
                                 }}
                             >
-                                Tiếp tục: Chọn Khung Giờ
+                                Tiếp tục: Chọn Buổi & Khung Giờ
                             </Button>
                         </Box>
                     </Box>
@@ -982,49 +994,75 @@ export default function BookingPage() {
                                 </Box>
                             </Box>
 
-                            <Grid container spacing={2}>
-                                {selectedDoctorSchedule?.timeSlots?.map((slot) => {
-                                    const isSelected = selectedSlot?.timeSlotId === slot.timeSlotId;
-                                    const isFull = slot.isFull || (slot.currentBookings >= slot.maxCapacity);
-                                    const available = Math.max(0, slot.maxCapacity - slot.currentBookings);
+                            {(() => {
+                                const rawSlots = selectedDoctorSchedule?.timeSlots || [];
+                                const displayedSlots = rawSlots.filter(slot => {
+                                    if (activeSession === "ALL") return true;
+                                    const startHour = parseInt(String(slot.startTime).split(":")[0], 10);
+                                    if (isNaN(startHour)) return true;
+                                    if (activeSession === "MORNING") return startHour < 12;
+                                    if (activeSession === "AFTERNOON") return startHour >= 12 && startHour < 17;
+                                    if (activeSession === "EVENING") return startHour >= 17;
+                                    return true;
+                                });
 
+                                if (displayedSlots.length === 0) {
                                     return (
-                                        <Grid item xs={6} sm={4} md={3} key={slot.timeSlotId}>
-                                            <Button
-                                                fullWidth
-                                                disabled={isFull}
-                                                variant={isSelected ? "contained" : "outlined"}
-                                                onClick={() => handleSelectSlot(slot)}
-                                                sx={{
-                                                    py: 1.8,
-                                                    borderRadius: "12px",
-                                                    flexDirection: "column",
-                                                    borderWidth: 1.5,
-                                                    borderColor: isSelected ? "#0284C7" : isFull ? "#E2E8F0" : "#CBD5E1",
-                                                    bgcolor: isSelected ? "#0284C7" : isFull ? "#F8FAFC" : "#FFFFFF",
-                                                    color: isSelected ? "#FFFFFF" : isFull ? "#94A3B8" : "#0F172A",
-                                                    transition: "all 0.2s ease",
-                                                    "&:hover": {
-                                                        borderWidth: 1.5,
-                                                        borderColor: "#0284C7",
-                                                        bgcolor: isSelected ? "#0369A1" : "#E0F2FE"
-                                                    }
-                                                }}
-                                            >
-                                                <Box display="flex" alignItems="center" gap={0.6} mb={0.4}>
-                                                    <AccessTimeIcon sx={{ fontSize: 16 }} />
-                                                    <Typography variant="body2" fontWeight="800" sx={{ fontFamily: "monospace" }}>
-                                                        {slot.startTime} - {slot.endTime}
-                                                    </Typography>
-                                                </Box>
-                                                <Typography variant="caption" sx={{ opacity: isSelected ? 0.95 : 0.75, fontSize: "0.72rem" }}>
-                                                    {isFull ? "Đã hết chỗ" : `Còn ${available}/${slot.maxCapacity} lượt`}
-                                                </Typography>
-                                            </Button>
-                                        </Grid>
+                                        <Box textAlign="center" py={4}>
+                                            <AccessTimeIcon sx={{ fontSize: 44, color: "#94A3B8", mb: 1 }} />
+                                            <Typography color="#64748B" fontWeight={600}>
+                                                Không có khung giờ khám nào phù hợp trong buổi đã chọn. Vui lòng chọn "Tất cả" hoặc ngày khám khác.
+                                            </Typography>
+                                        </Box>
                                     );
-                                })}
-                            </Grid>
+                                }
+
+                                return (
+                                    <Grid container spacing={2}>
+                                        {displayedSlots.map((slot) => {
+                                            const isSelected = selectedSlot?.timeSlotId === slot.timeSlotId;
+                                            const isFull = slot.isFull || (slot.currentBookings >= slot.maxCapacity);
+                                            const available = Math.max(0, slot.maxCapacity - slot.currentBookings);
+
+                                            return (
+                                                <Grid item xs={6} sm={4} md={3} key={slot.timeSlotId}>
+                                                    <Button
+                                                        fullWidth
+                                                        disabled={isFull}
+                                                        variant={isSelected ? "contained" : "outlined"}
+                                                        onClick={() => handleSelectSlot(slot)}
+                                                        sx={{
+                                                            py: 1.8,
+                                                            borderRadius: "12px",
+                                                            flexDirection: "column",
+                                                            borderWidth: 1.5,
+                                                            borderColor: isSelected ? "#0284C7" : isFull ? "#E2E8F0" : "#CBD5E1",
+                                                            bgcolor: isSelected ? "#0284C7" : isFull ? "#F8FAFC" : "#FFFFFF",
+                                                            color: isSelected ? "#FFFFFF" : isFull ? "#94A3B8" : "#0F172A",
+                                                            transition: "all 0.2s ease",
+                                                            "&:hover": {
+                                                                borderWidth: 1.5,
+                                                                borderColor: "#0284C7",
+                                                                bgcolor: isSelected ? "#0369A1" : "#E0F2FE"
+                                                            }
+                                                        }}
+                                                    >
+                                                        <Box display="flex" alignItems="center" gap={0.6} mb={0.4}>
+                                                            <AccessTimeIcon sx={{ fontSize: 16 }} />
+                                                            <Typography variant="body2" fontWeight="800" sx={{ fontFamily: "monospace" }}>
+                                                                {slot.startTime} - {slot.endTime}
+                                                            </Typography>
+                                                        </Box>
+                                                        <Typography variant="caption" sx={{ opacity: isSelected ? 0.95 : 0.75, fontSize: "0.72rem" }}>
+                                                            {isFull ? "Đã hết chỗ" : `Còn ${available}/${slot.maxCapacity} lượt`}
+                                                        </Typography>
+                                                    </Button>
+                                                </Grid>
+                                            );
+                                        })}
+                                    </Grid>
+                                );
+                            })()}
                         </Paper>
 
                         <Box display="flex" justifyContent="space-between" mt={4}>
@@ -1050,7 +1088,7 @@ export default function BookingPage() {
                                     "&:hover": { bgcolor: "#0369A1" }
                                 }}
                             >
-                                Tiếp tục: Chọn Hồ Sơ Khám
+                                Tiếp tục: Chọn Hồ Sơ Bệnh Nhân
                             </Button>
                         </Box>
                     </Box>
@@ -1153,7 +1191,13 @@ export default function BookingPage() {
                                                             >
                                                                 <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
                                                                     <Chip
-                                                                        label={p.relationship || "Bản thân"}
+                                                                        label={
+                                                                            p.relationship === "CHILD" ? "Con cái" :
+                                                                            p.relationship === "SPOUSE" ? "Vợ / Chồng" :
+                                                                            p.relationship === "PARENT" ? "Bố / Mẹ" :
+                                                                            p.relationship === "OTHER" ? "Người thân" :
+                                                                            (p.relationship === "SELF" ? "Bản thân" : (p.relationship || "Bản thân"))
+                                                                        }
                                                                         size="small"
                                                                         sx={{
                                                                             bgcolor: isSelected ? "#0284C7" : "#E2E8F0",
@@ -1502,6 +1546,16 @@ export default function BookingPage() {
                                         {formatCurrency(bookingResult.price || 200000)}
                                     </Typography>
                                 </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <Typography variant="caption" color="#64748B">Trạng thái thanh toán:</Typography>
+                                    <Box mt={0.5}>
+                                        {bookingResult.isPaid ? (
+                                            <Chip label="Đã thanh toán (Ví viện phí)" color="success" size="small" sx={{ fontWeight: 700 }} />
+                                        ) : (
+                                            <Chip label={paymentMethod === "COUNTER" ? "Thanh toán tại quầy" : "Chờ thanh toán"} color="warning" size="small" sx={{ fontWeight: 700 }} />
+                                        )}
+                                    </Box>
+                                </Grid>
                             </Grid>
 
                             {/* Action Buttons */}
@@ -1561,111 +1615,16 @@ export default function BookingPage() {
                     </Box>
                 )}
 
-                {/* Modal Tạo Hồ Sơ Mới */}
-                <Dialog
+                {/* Modal Tạo Hồ Sơ Mới Chuẩn Hóa */}
+                <AddOrLinkPatientProfileModal
                     open={openNewProfileModal}
                     onClose={() => setOpenNewProfileModal(false)}
-                    maxWidth="sm"
-                    fullWidth
-                    PaperProps={{ sx: { borderRadius: "18px" } }}
-                >
-                    <DialogTitle fontWeight="800" color="#0F172A" sx={{ borderBottom: "1px solid #E2E8F0" }}>
-                        ➕ Thêm Hồ Sơ Khám Bệnh Mới
-                    </DialogTitle>
-                    <DialogContent sx={{ pt: 2.5 }}>
-                        <Grid container spacing={2}>
-                            <Grid item xs={12} sm={8}>
-                                <TextField
-                                    fullWidth
-                                    size="small"
-                                    label="Họ và tên đầy đủ"
-                                    value={newProfileData.fullName}
-                                    onChange={(e) => setNewProfileData({ ...newProfileData, fullName: e.target.value })}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={4}>
-                                <FormControl fullWidth size="small">
-                                    <InputLabel>Quan hệ</InputLabel>
-                                    <Select
-                                        value={newProfileData.relationship}
-                                        label="Quan hệ"
-                                        onChange={(e) => setNewProfileData({ ...newProfileData, relationship: e.target.value })}
-                                    >
-                                        <MenuItem value="Bản thân">Bản thân</MenuItem>
-                                        <MenuItem value="Bố">Bố</MenuItem>
-                                        <MenuItem value="Mẹ">Mẹ</MenuItem>
-                                        <MenuItem value="Vợ/Chồng">Vợ/Chồng</MenuItem>
-                                        <MenuItem value="Con">Con</MenuItem>
-                                        <MenuItem value="Người thân khác">Khác</MenuItem>
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <TextField
-                                    fullWidth
-                                    size="small"
-                                    label="Số điện thoại"
-                                    value={newProfileData.phoneNumber}
-                                    onChange={(e) => setNewProfileData({ ...newProfileData, phoneNumber: e.target.value })}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <TextField
-                                    fullWidth
-                                    size="small"
-                                    type="date"
-                                    label="Ngày sinh"
-                                    value={newProfileData.dateOfBirth}
-                                    onChange={(e) => setNewProfileData({ ...newProfileData, dateOfBirth: e.target.value })}
-                                    InputLabelProps={{ shrink: true }}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <FormControl fullWidth size="small">
-                                    <InputLabel>Giới tính</InputLabel>
-                                    <Select
-                                        value={newProfileData.gender}
-                                        label="Giới tính"
-                                        onChange={(e) => setNewProfileData({ ...newProfileData, gender: e.target.value })}
-                                    >
-                                        <MenuItem value="MALE">Nam</MenuItem>
-                                        <MenuItem value="FEMALE">Nữ</MenuItem>
-                                        <MenuItem value="OTHER">Khác</MenuItem>
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <TextField
-                                    fullWidth
-                                    size="small"
-                                    label="Mã thẻ BHYT (nếu có)"
-                                    value={newProfileData.healthInsuranceNumber}
-                                    onChange={(e) => setNewProfileData({ ...newProfileData, healthInsuranceNumber: e.target.value })}
-                                />
-                            </Grid>
-                            <Grid item xs={12}>
-                                <TextField
-                                    fullWidth
-                                    size="small"
-                                    label="Địa chỉ cư trú"
-                                    value={newProfileData.address}
-                                    onChange={(e) => setNewProfileData({ ...newProfileData, address: e.target.value })}
-                                />
-                            </Grid>
-                        </Grid>
-                    </DialogContent>
-                    <DialogActions sx={{ p: 2.5, borderTop: "1px solid #E2E8F0" }}>
-                        <Button onClick={() => setOpenNewProfileModal(false)} sx={{ fontWeight: 600 }}>Hủy</Button>
-                        <Button
-                            variant="contained"
-                            disabled={creatingProfile}
-                            onClick={handleCreateNewProfile}
-                            sx={{ bgcolor: "#0284C7", borderRadius: "10px", fontWeight: 700, "&:hover": { bgcolor: "#0369A1" } }}
-                        >
-                            {creatingProfile ? <CircularProgress size={20} /> : "Lưu hồ sơ"}
-                        </Button>
-                    </DialogActions>
-                </Dialog>
+                    onSuccess={() => {
+                        setOpenNewProfileModal(false);
+                        loadPatientProfiles();
+                    }}
+                    userPhone={user?.phoneNumber || ""}
+                />
 
                 {/* Modal Cổng Thanh Toán PayOS (VietQR) cho Đặt Lịch Khám */}
                 <PaymentQRModal

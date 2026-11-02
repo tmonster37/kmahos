@@ -46,29 +46,35 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**", "/api/payment/vnpay/**", "/api/payment/vnpay-ipn", "/api/payment/payos/**", "/api/payment/status/**", "/api/payment/vietqr/**", "/api/payment/momo/**", "/error").permitAll()
+                .requestMatchers("/api/health", "/health", "/actuator/**").permitAll()
+                .requestMatchers("/api/auth/**", "/api/payment/payos/webhook", "/api/payment/vnpay/callback", "/api/payment/vnpay/ipn", "/api/payment/vnpay-ipn", "/api/payment/kiosk/vietqr", "/api/payment/kiosk/sync/**", "/error").permitAll()
                 .requestMatchers("/api/prescriptions/verify", "/api/prescriptions/*/verify", "/api/prescriptions/*/pdf", "/api/prescriptions/*/hash").permitAll()
                 .requestMatchers("/api/bookings/kiosk", "/api/bookings/kiosk/**", "/api/bookings/code/**", "/api/bookings/reserve-slot", "/api/bookings/release-slot/**", "/api/clinical/queue/public", "/api/patient-profiles/lookup").permitAll()
                 .requestMatchers("/api/counters", "/api/counters/kiosk/**", "/api/counters/*/queue").permitAll()
                 .requestMatchers("/api/ai/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/departments/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/departments", "/api/departments/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/schedules/by-department/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/schedules/doctor/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/admin/doctors", "/api/admin/doctors/**").hasAnyRole("ADMIN", "HEAD_OF_DEPARTMENT")
+                .requestMatchers("/api/admin/doctors", "/api/admin/doctors/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/clinical/services", "/api/clinical/medicines", "/api/clinical/records/**", "/api/clinical/concepts/**", "/api/clinical/patients/**").authenticated()
-                .requestMatchers(HttpMethod.GET, "/api/admin/doctors/**", "/api/doctors/**").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/doctors/**").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/inpatient/patient/**", "/api/inpatient/*/daily-records").authenticated()
-                .requestMatchers("/api/admin/doctors/**").hasAnyRole("ADMIN", "HEAD_OF_DEPARTMENT")
+
+                .requestMatchers("/api/admin/dashboard/kpi-revenue", "/api/admin/dashboard/revenue").hasRole("ADMIN")
                 .requestMatchers("/api/admin/patients/**").hasAnyRole("ADMIN", "HEAD_OF_DEPARTMENT")
                 .requestMatchers("/api/admin/dashboard/**").hasAnyRole("ADMIN", "HEAD_OF_DEPARTMENT")
                 .requestMatchers("/api/admin/ehr/**").hasAnyRole("ADMIN", "HEAD_OF_DEPARTMENT")
+                .requestMatchers("/api/admin/audit-logs/**").hasRole("ADMIN")
                 .requestMatchers("/api/gateway/**").hasAnyRole("LAB_TECHNICIAN", "DOCTOR", "HEAD_OF_DEPARTMENT", "ADMIN")
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/doctor/**").hasAnyRole("DOCTOR", "HEAD_OF_DEPARTMENT", "ADMIN")
                 .requestMatchers("/api/inpatient/**").hasAnyRole("DOCTOR", "HEAD_OF_DEPARTMENT", "NURSE", "ADMIN")
                 .requestMatchers("/api/pharmacy/**").hasAnyRole("PHARMACIST", "DOCTOR", "HEAD_OF_DEPARTMENT", "NURSE", "ADMIN")
                 .requestMatchers("/api/ehr/**").hasAnyRole("ADMIN", "HEAD_OF_DEPARTMENT", "DOCTOR", "NURSE")
-                .requestMatchers("/api/lab/**", "/api/clinical/**").hasAnyRole("LAB_TECHNICIAN", "DOCTOR", "HEAD_OF_DEPARTMENT", "ADMIN")
-                .requestMatchers("/api/cashier/**", "/api/payment/admin/**", "/api/payment/confirm/**").hasAnyRole("CASHIER", "ADMIN")
+                .requestMatchers("/api/clinical/medicines", "/api/clinical/medicines/**", "/api/clinical-examinations/medicines", "/api/clinical-examinations/medicines/**").hasAnyRole("ADMIN", "PHARMACIST", "HEAD_OF_DEPARTMENT")
+                .requestMatchers("/api/lab/**", "/api/clinical/**", "/api/clinical-examinations/**").hasAnyRole("LAB_TECHNICIAN", "DOCTOR", "HEAD_OF_DEPARTMENT", "ADMIN")
+                .requestMatchers("/api/cashier/**", "/api/payment/admin/**", "/api/payment/confirm/**").hasAnyRole("CASHIER", "NURSE", "ADMIN")
                 .requestMatchers("/api/nurse/**").hasAnyRole("NURSE", "ADMIN", "CASHIER")
                 .requestMatchers("/api/patient-profiles/**", "/api/bookings/**", "/api/chat/**", "/api/utilities/**", "/api/payment/**", "/api/schedules/**").authenticated()
                 .anyRequest().authenticated()
@@ -114,7 +120,6 @@ public class SecurityConfig {
                 .collect(Collectors.toList());
 
         config.setAllowedOrigins(origins);
-        config.addAllowedOriginPattern("https://*.vercel.app");
         config.addAllowedOriginPattern("http://localhost:[*]");
         config.addAllowedOriginPattern("http://127.0.0.1:[*]");
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));

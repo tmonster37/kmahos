@@ -54,6 +54,7 @@ import BarChartOutlinedIcon from "@mui/icons-material/BarChartOutlined";
 
 import axiosInstance from "../../services/AxiosInstance";
 import { formatCurrency } from "../../utils/formatters";
+import { useAuth } from "../../context/AuthContext";
 
 // Bảng màu y tế tối ưu chuẩn WCAG AAA
 const COLORS = {
@@ -107,6 +108,8 @@ const CustomChartTooltip = ({ active, payload, label, isCurrency = true }) => {
 };
 
 export default function DashboardPage() {
+    const { user } = useAuth();
+    const isHeadOfDepartment = user?.role === "ROLE_HEAD_OF_DEPARTMENT";
     const [timeRange, setTimeRange] = useState("WEEK"); // TODAY, WEEK, MONTH, YEAR, CUSTOM
     const [customStartDate, setCustomStartDate] = useState(() => {
         const d = new Date();
@@ -127,7 +130,7 @@ export default function DashboardPage() {
     const [auditFilter, setAuditFilter] = useState("ALL");
     const [roomDeptFilter, setRoomDeptFilter] = useState("ALL");
     const [roomLoadFilter, setRoomLoadFilter] = useState("ALL");
-    const [demoMode, setDemoMode] = useState(false);
+    // demoMode đã được loại bỏ để đảm bảo tính trung thực số liệu
 
     // Tính toán tham số ngày
     const getDateRangeParams = () => {
@@ -162,14 +165,25 @@ export default function DashboardPage() {
         const { startDate, endDate } = getDateRangeParams();
 
         try {
-            const [utilRes, kpiRevRes, roomCapRes, auditRes] = await Promise.allSettled([
-                axiosInstance.get("/api/utilities/admin/dashboard"),
-                axiosInstance.get("/api/admin/dashboard/kpi-revenue", {
-                    params: { startDate, endDate }
-                }),
-                axiosInstance.get("/api/admin/dashboard/room-capacity"),
-                axiosInstance.get("/api/admin/audit-logs", { params: { limit: 50 } })
-            ]);
+            const requests = [
+                axiosInstance.get("/api/utilities/admin/dashboard", { params: { startDate, endDate } }),
+                axiosInstance.get("/api/admin/dashboard/room-capacity")
+            ];
+
+            if (!isHeadOfDepartment) {
+                requests.push(
+                    axiosInstance.get("/api/admin/dashboard/kpi-revenue", {
+                        params: { startDate, endDate }
+                    }),
+                    axiosInstance.get("/api/admin/audit-logs", { params: { limit: 50 } })
+                );
+            }
+
+            const results = await Promise.allSettled(requests);
+            const utilRes = results[0];
+            const roomCapRes = results[1];
+            const kpiRevRes = !isHeadOfDepartment ? results[2] : null;
+            const auditRes = !isHeadOfDepartment ? results[3] : null;
 
             const extractData = (resVal) => {
                 if (!resVal) return null;
@@ -185,22 +199,26 @@ export default function DashboardPage() {
                 hasError = true;
             }
 
-            if (kpiRevRes.status === "fulfilled" && kpiRevRes.value) {
+            if (kpiRevRes && kpiRevRes.status === "fulfilled" && kpiRevRes.value) {
                 setKpiRevenue(extractData(kpiRevRes.value));
-            } else {
+            } else if (!isHeadOfDepartment) {
                 hasError = true;
+            } else {
+                setKpiRevenue(null);
             }
 
             if (roomCapRes.status === "fulfilled" && roomCapRes.value) {
                 setRoomCapacity(extractData(roomCapRes.value));
             }
 
-            if (auditRes.status === "fulfilled" && auditRes.value) {
+            if (auditRes && auditRes.status === "fulfilled" && auditRes.value) {
                 const logs = extractData(auditRes.value);
                 setAuditLogs(Array.isArray(logs) ? logs : []);
+            } else {
+                setAuditLogs([]);
             }
 
-            if (hasError && !kpiRevRes.value && !utilRes.value) {
+            if (hasError && !utilRes.value) {
                 setErrorMsg("Không thể đồng bộ một số dữ liệu chỉ số từ máy chủ. Kiểm tra kết nối API.");
             }
         } catch (err) {
@@ -267,19 +285,8 @@ export default function DashboardPage() {
                 };
             });
         }
-        if (demoMode) {
-            return [
-                { date: "12/10", fullDate: "2026-10-12", revenue: 38500000, transactions: 24 },
-                { date: "13/10", fullDate: "2026-10-13", revenue: 42000000, transactions: 28 },
-                { date: "14/10", fullDate: "2026-10-14", revenue: 36000000, transactions: 22 },
-                { date: "15/10", fullDate: "2026-10-15", revenue: 51200000, transactions: 35 },
-                { date: "16/10", fullDate: "2026-10-16", revenue: 48900000, transactions: 31 },
-                { date: "17/10", fullDate: "2026-10-17", revenue: 45000000, transactions: 29 },
-                { date: "18/10", fullDate: "2026-10-18", revenue: 54000000, transactions: 38 }
-            ];
-        }
         return [];
-    }, [kpiRevenue, demoMode]);
+    }, [kpiRevenue]);
 
     // Dữ liệu phân bổ lượt khám theo khoa
     const departmentChartData = useMemo(() => {
@@ -292,18 +299,8 @@ export default function DashboardPage() {
                 }))
                 .sort((a, b) => b.count - a.count);
         }
-        if (demoMode) {
-            return [
-                { department: "Nội Tim Mạch", fullName: "Khoa Nội Tim Mạch", count: 420 },
-                { department: "CĐHA & CLS", fullName: "Khoa Chẩn Đoán Hình Ảnh", count: 380 },
-                { department: "Khám Đa Khoa", fullName: "Khoa Khám Bệnh Đa Khoa", count: 310 },
-                { department: "Nhi & Sơ Sinh", fullName: "Khoa Nhi", count: 260 },
-                { department: "Ngoại Tổng Hợp", fullName: "Khoa Ngoại Tổng Hợp", count: 190 },
-                { department: "Tai Mũi Họng", fullName: "Khoa Tai Mũi Họng", count: 140 }
-            ];
-        }
         return [];
-    }, [utilStats, demoMode]);
+    }, [utilStats]);
 
     // Cơ cấu phương thức thanh toán
     const paymentMethodsData = useMemo(() => {
@@ -325,17 +322,8 @@ export default function DashboardPage() {
             ].filter(i => i.value > 0);
         }
 
-        if (demoMode) {
-            return [
-                { name: "VietQR (Chuyển khoản)", value: 120000000, color: "#0088D6" },
-                { name: "Tiền mặt tại Quầy", value: 65000000, color: "#00A878" },
-                { name: "Cổng VNPAY-QR", value: 45000000, color: "#F59E0B" },
-                { name: "Ví MoMo", value: 32000000, color: "#D81B60" },
-                { name: "Thẻ POS", value: 23400000, color: "#7C3AED" }
-            ];
-        }
         return [];
-    }, [kpiRevenue, demoMode]);
+    }, [kpiRevenue]);
 
     // Lọc Audit Logs
     const filteredAuditLogs = useMemo(() => {
@@ -384,8 +372,45 @@ export default function DashboardPage() {
         document.body.removeChild(link);
     };
 
-    // 4 Thẻ KPI hàng đầu
-    const statCards = [
+    // 4 Thẻ KPI hàng đầu (Phân biệt giữa ADMIN toàn viện và TRƯỞNG KHOA)
+    const statCards = isHeadOfDepartment ? [
+        {
+            title: "Bác Sĩ Thuộc Khoa",
+            value: `${utilStats?.totalDoctors ?? 0} bác sĩ`,
+            subtext: `Nhân sự chuyên môn của khoa`,
+            icon: <PeopleAltOutlinedIcon />,
+            color: COLORS.primary,
+            bgColor: COLORS.primaryLight,
+            trend: "Khoa quản lý"
+        },
+        {
+            title: timeRange === "TODAY" ? "Lượt Khám Khoa (Hôm nay)" : "Lượt Khám Khoa",
+            value: `${utilStats?.totalBookingsToday ?? 0} ca`,
+            subtext: `Hoàn tất: ${utilStats?.totalCompletedExams ?? 0} ca`,
+            icon: <EventAvailableOutlinedIcon />,
+            color: COLORS.success,
+            bgColor: "rgba(0, 168, 120, 0.08)",
+            trend: "Hôm nay"
+        },
+        {
+            title: "Công Suất Buồng Khám Khoa",
+            value: `${roomCapacity?.overallUtilizationRate ?? 0}%`,
+            subtext: `${roomCapacity?.activeRooms ?? 0}/${roomCapacity?.totalRooms ?? roomList.length} buồng đang mở phiên`,
+            icon: <MeetingRoomOutlinedIcon />,
+            color: overloadedRoomsCount > 0 ? COLORS.danger : COLORS.teal,
+            bgColor: overloadedRoomsCount > 0 ? "rgba(239, 68, 68, 0.08)" : "rgba(13, 148, 136, 0.08)",
+            trend: overloadedRoomsCount > 0 ? `${overloadedRoomsCount} buồng quá tải` : "Tải ổn định"
+        },
+        {
+            title: "Bệnh Nhân Chờ Khám Khoa",
+            value: `${totalWaitingBN} người`,
+            subtext: `${totalExaminingBN} bệnh nhân đang ngồi ghế khám`,
+            icon: <PeopleAltOutlinedIcon />,
+            color: totalWaitingBN > 20 ? COLORS.warning : COLORS.purple,
+            bgColor: totalWaitingBN > 20 ? "rgba(245, 158, 11, 0.08)" : "rgba(124, 58, 237, 0.08)",
+            trend: `${utilStats?.totalPatients ?? 0} lượt BN`
+        }
+    ] : [
         {
             title: "Tổng Doanh Thu Quyết Toán",
             value: formatCurrency(kpiRevenue?.totalRevenue ?? utilStats?.totalRevenueThisMonth ?? 0),
@@ -443,10 +468,10 @@ export default function DashboardPage() {
                     <Box display="flex" justifyContent="space-between" alignItems="flex-start">
                         <Box>
                             <Typography variant="h6" fontWeight="bold" sx={{ color: "#002D5A", fontSize: "14pt" }}>
-                                BỆNH VIỆN ĐA KHOA QUỐC TẾ TNT
+                                TNT HOSPITAL
                             </Typography>
                             <Typography variant="body2" sx={{ fontSize: "9.5pt" }}>
-                                Địa chỉ: Lô đất CC2, Khu đô thị mới Văn Quán, số 114 Nguyễn Khuyến, phường Văn Quán, quận Hà Đông, Hà Nội • Hotline: 1900 8888
+                                Địa chỉ: số 114 Nguyễn Khuyến, phường Văn Quán, quận Hà Đông, Hà Nội • Hotline: 1900 8888
                             </Typography>
                         </Box>
                         <Box textAlign="right">
@@ -531,9 +556,9 @@ export default function DashboardPage() {
                                     fontSize: "0.825rem",
                                     color: "#64748B",
                                     "&.Mui-selected": {
-                                        bgcolor: "#0F172A",
+                                        bgcolor: "#0088D6",
                                         color: "#FFFFFF",
-                                        boxShadow: "0 1px 3px rgba(15, 23, 42, 0.12)"
+                                        boxShadow: "0 1px 3px rgba(0, 136, 214, 0.2)"
                                     }
                                 }
                             }}
@@ -637,23 +662,8 @@ export default function DashboardPage() {
                     </Alert>
                 )}
 
-                {/* Demo Mode & Đồng bộ trạng thái */}
-                <Box display="flex" justifyContent="space-between" alignItems="center" px={0.5} mb={2.5}>
-                    <FormControlLabel
-                        control={
-                            <Switch
-                                checked={demoMode}
-                                onChange={(e) => setDemoMode(e.target.checked)}
-                                color="warning"
-                                size="small"
-                            />
-                        }
-                        label={
-                            <Typography variant="caption" fontWeight="600" color="#64748B">
-                                Chế độ số liệu mô phỏng minh họa (Demo Visual Mode)
-                            </Typography>
-                        }
-                    />
+                {/* Thời gian cập nhật */}
+                <Box display="flex" justifyContent="flex-end" alignItems="center" px={0.5} mb={2.5}>
                     <Typography variant="caption" sx={{ color: "#94A3B8" }}>
                         Cập nhật: {new Date().toLocaleTimeString("vi-VN")}
                     </Typography>
@@ -751,8 +761,9 @@ export default function DashboardPage() {
                     ))}
                 </Grid>
 
-                {/* 3. Hàng Biểu Đồ Doanh Thu & Cơ Cấu Kênh Thanh Toán */}
-                <Grid container spacing={2.5} mb={3}>
+                {/* 3. Hàng Biểu Đồ Doanh Thu & Cơ Cấu Kênh Thanh Toán (Chỉ dành cho ADMIN toàn viện) */}
+                {!isHeadOfDepartment && (
+                    <Grid container spacing={2.5} mb={3}>
                     {/* AreaChart Doanh Thu */}
                     <Grid item xs={12} lg={8}>
                         <Paper
@@ -829,9 +840,7 @@ export default function DashboardPage() {
                                     <Typography variant="body2" color="#64748B">
                                         Chưa có dữ liệu giao dịch trong khoảng thời gian này.
                                     </Typography>
-                                    <Button size="small" onClick={() => setDemoMode(true)} sx={{ mt: 1, textTransform: "none", fontWeight: 700 }}>
-                                        Bật chế độ xem mẫu mô phỏng
-                                    </Button>
+
                                 </Box>
                             )}
                         </Paper>
@@ -932,6 +941,7 @@ export default function DashboardPage() {
                         </Paper>
                     </Grid>
                 </Grid>
+                )}
 
                 {/* 4. Hàng Phân Bổ Chuyên Khoa & Giám Sát Buồng Khám */}
                 <Grid container spacing={2.5} mb={3}>
@@ -1148,7 +1158,8 @@ export default function DashboardPage() {
                     </Grid>
                 </Grid>
 
-                {/* 5. Nhật Ký Kiểm Toán Toàn Viện (Immutable Audit Logs - PII Sanitized) */}
+                {/* 5. Nhật Ký Kiểm Toán Toàn Viện (Chỉ dành cho ADMIN hệ thống) */}
+                {!isHeadOfDepartment && (
                 <Paper
                     elevation={0}
                     sx={{
@@ -1264,6 +1275,7 @@ export default function DashboardPage() {
                         </Table>
                     </TableContainer>
                 </Paper>
+                )}
 
             </Container>
         </Box>

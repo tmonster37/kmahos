@@ -19,12 +19,16 @@ public interface PaymentService {
     PaymentGatewayResponse createMoMoPayment(UUID accountId, BigDecimal amount, TransactionType type);
     PaymentGatewayResponse createMoMoPayment(UUID accountId, BigDecimal amount, TransactionType type, String bookingCode);
     void payWithInternalWallet(UUID accountId, BigDecimal amount, TransactionType type);
+    void payWithInternalWallet(UUID accountId, BigDecimal amount, TransactionType type, String bookingCode);
     TransactionResponse processVNPayCallback(Map<String, String> queryParams);
     com.hospital.api.dto.response.VnpayIpnResponse processVNPayIpn(Map<String, String> queryParams);
     TransactionResponse processPayOSWebhook(PayOSWebhookRequest request);
     TransactionResponse checkTransactionStatus(String txnRef, UUID requestingAccountId, boolean isPrivileged);
     TransactionResponse confirmPaymentSuccess(String txnRef, PaymentMethod method);
     TransactionResponse syncPayOSPayment(Long orderCode);
+    TransactionResponse syncPayOSPayment(Long orderCode, com.hospital.api.security.UserPrincipal currentUser);
+    PaymentGatewayResponse createKioskPayment(String bookingCode);
+    TransactionResponse syncKioskPayment(String bookingCode);
     PaymentGatewayResponse createPayOSPaymentLink(UUID accountId, BigDecimal amount, TransactionType type, String description);
     List<TransactionResponse> getTransactionHistory(UUID accountId, Integer page, Integer size);
     List<TransactionResponse> getAllTransactions(Integer page, Integer size);

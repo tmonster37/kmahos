@@ -20,5 +20,18 @@ public record CashierPendingBillResponse(
         List<CashierBillItemDto> items,
         BigDecimal totalAmount,
         String status, // UNPAID
-        LocalDateTime createdAt
-) {}
+        LocalDateTime createdAt,
+        String receptionSource
+) {
+    public CashierPendingBillResponse(
+            String billId, String bookingCode, UUID bookingId, String patientName,
+            String phoneNumber, String identityNumber, String gender, String address,
+            String departmentName, String doctorName, String billType,
+            List<CashierBillItemDto> items, BigDecimal totalAmount, String status,
+            LocalDateTime createdAt
+    ) {
+        this(billId, bookingCode, bookingId, patientName, phoneNumber, identityNumber,
+                gender, address, departmentName, doctorName, billType, items, totalAmount,
+                status, createdAt, "ONLINE_APPOINTMENT");
+    }
+}

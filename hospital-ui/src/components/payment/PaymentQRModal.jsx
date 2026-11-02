@@ -18,49 +18,70 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CloseIcon from "@mui/icons-material/Close";
 import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
-import DoneAllIcon from "@mui/icons-material/DoneAll";
 import DownloadIcon from "@mui/icons-material/Download";
 import SyncIcon from "@mui/icons-material/Sync";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import { QRCodeCanvas } from "qrcode.react";
 import axiosInstance from "../../services/AxiosInstance";
 import { formatCurrency } from "../../utils/formatters";
+import { getVerifiedPayment } from "../../services/bookingPayment";
 
 export default function PaymentQRModal({ open, onClose, paymentData, onSuccess }) {
     const [copiedField, setCopiedField] = useState(null);
     const [status, setStatus] = useState("PENDING");
-    const [confirming, setConfirming] = useState(false);
     const [syncing, setSyncing] = useState(false);
     const [imgError, setImgError] = useState(false);
     const qrCanvasRef = useRef(null);
 
     const txnRef = paymentData?.txnRef;
+    const orderCode = paymentData?.orderCode;
+    const verificationRef = useRef(null);
+    const onSuccessRef = useRef(onSuccess);
+    onSuccessRef.current = onSuccess;
 
     useEffect(() => {
-        if (!open) return;
-        setImgError(false);
-        if (!txnRef) return;
         setStatus("PENDING");
+        setSyncing(false);
+        setImgError(false);
+        if (!open || !orderCode) return;
 
-        // Polling check transaction status every 2.5s
-        const interval = setInterval(async () => {
+        const session = { cancelled: false, checking: false, completed: false, notification: null };
+        let interval;
+        const checkLocalStatus = async () => {
+            if (session.cancelled || session.checking || session.completed) return null;
+            session.checking = true;
             try {
-                const res = await axiosInstance.get(`/api/payment/status/${txnRef}`);
+                const effectiveRef = txnRef || ("TNT" + orderCode);
+                const res = await axiosInstance.get(`/api/payment/status/${effectiveRef}`);
                 const data = res?.data?.data || res?.data || res;
-                if (data && data.status === "SUCCESS") {
+                if (session.cancelled || !data) return null;
+                if (data.status === "SUCCESS") {
+                    session.completed = true;
                     setStatus("SUCCESS");
                     clearInterval(interval);
-                    if (onSuccess) {
-                        setTimeout(() => onSuccess(data), 1200);
-                    }
+                    session.notification = setTimeout(() => {
+                        if (!session.cancelled) onSuccessRef.current?.(data);
+                    }, 800);
+                    return data;
                 }
+                return null;
             } catch (e) {
-                // Keep polling
+                // Polling thầm lặng trạng thái local DB
+                return null;
+            } finally {
+                session.checking = false;
             }
-        }, 2500);
+        };
+        verificationRef.current = checkLocalStatus;
+        interval = setInterval(() => { checkLocalStatus().catch(() => {}); }, 2500);
 
-        return () => clearInterval(interval);
-    }, [open, txnRef, paymentData]);
+        return () => {
+            session.cancelled = true;
+            clearInterval(interval);
+            clearTimeout(session.notification);
+            if (verificationRef.current === checkLocalStatus) verificationRef.current = null;
+        };
+    }, [open, txnRef, orderCode]);
 
     const handleCopy = (text, fieldName) => {
         if (!text) return;
@@ -112,43 +133,24 @@ export default function PaymentQRModal({ open, onClose, paymentData, onSuccess }
         }
     };
 
-    // Đồng bộ trực tiếp từ cổng PayOS
+    // Bấm nút "Đồng bộ ngay": Chủ động gọi API PayOS đối soát đơn hàng
     const handleSyncPayOS = async () => {
-        if (!paymentData?.orderCode) return;
+        if (!orderCode) return;
         setSyncing(true);
         try {
-            const res = await axiosInstance.post(`/api/payment/payos/sync/${paymentData.orderCode}`);
-            const data = res?.data?.data || res?.data || res;
-            if (data && data.status === "SUCCESS") {
+            const data = await getVerifiedPayment(axiosInstance, { orderCode });
+            if (data?.status === "SUCCESS") {
                 setStatus("SUCCESS");
-                if (onSuccess) {
-                    setTimeout(() => onSuccess(data), 800);
-                }
+                setTimeout(() => {
+                    onSuccessRef.current?.(data);
+                }, 600);
             } else {
-                alert("PayOS báo giao dịch chưa hoàn tất hoặc đang chờ ngân hàng ghi có.");
+                alert("PayOS chưa xác nhận thanh toán cho đúng đơn hàng này. Vui lòng chờ ngân hàng ghi có hoặc bấm lại sau vài giây.");
             }
         } catch (err) {
-            alert(err.message || "Lỗi đồng bộ giao dịch từ PayOS");
+            alert(err?.response?.data?.message || err.message || "Lỗi đồng bộ giao dịch từ PayOS");
         } finally {
             setSyncing(false);
-        }
-    };
-
-    // Nút xác nhận thanh toán đã hoàn tất
-    const handleConfirmSimulated = async () => {
-        if (!txnRef) return;
-        setConfirming(true);
-        try {
-            const res = await axiosInstance.post(`/api/payment/confirm/${txnRef}?method=VIETQR`);
-            const data = res?.data?.data || res?.data || res;
-            setStatus("SUCCESS");
-            if (onSuccess) {
-                setTimeout(() => onSuccess(data), 800);
-            }
-        } catch (err) {
-            alert(err.message || "Xác nhận thanh toán thất bại");
-        } finally {
-            setConfirming(false);
         }
     };
 
@@ -172,8 +174,8 @@ export default function PaymentQRModal({ open, onClose, paymentData, onSuccess }
     const effectiveQrValue = emvCoPayload || (isImageUrl ? qrImageUrl : (paymentData.paymentUrl || `PAY:${txnRef}:${paymentData.amount}`));
 
     // Số tài khoản sạch không chứa dấu cách để copy chính xác vào App ngân hàng
-    const displayAccountNo = paymentData.bankAccountNo || "0987654321";
-    const cleanAccountNo = displayAccountNo.replace(/\s+/g, "");
+    const displayAccountNo = paymentData.bankAccountNo || "---";
+    const cleanAccountNo = displayAccountNo !== "---" ? displayAccountNo.replace(/\s+/g, "") : "";
 
     return (
         <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 4, overflow: "hidden" } }}>
@@ -445,17 +447,7 @@ export default function PaymentQRModal({ open, onClose, paymentData, onSuccess }
                                 {syncing ? "Đang đồng bộ..." : "Đồng bộ từ PayOS"}
                             </Button>
                         )}
-                        <Button
-                            variant="outlined"
-                            color="success"
-                            size="small"
-                            disabled={confirming}
-                            startIcon={<DoneAllIcon />}
-                            onClick={handleConfirmSimulated}
-                            sx={{ textTransform: "none", fontWeight: "bold" }}
-                        >
-                            {confirming ? "Đang kiểm tra..." : "Tôi đã chuyển khoản xong"}
-                        </Button>
+
                     </Box>
                 )}
                 <Button variant="contained" color="inherit" onClick={onClose} sx={{ fontWeight: "bold" }}>

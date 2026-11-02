@@ -15,6 +15,12 @@
 *.pfx
 *.cer
 secrets/
+client_secret_*.json
+client_secret.json
+*client_secret*.json
+service-account*.json
+credentials*.json
+*.credential.json
 
 # ------------------------------------------------------------------------------
 # 2. Database Dumps & Backups
@@ -95,6 +101,20 @@ anh/
 # ------------------------------------------------------------------------------
 test_payos_real_integration.js
 *.local.js
+test_department_constraints.js
+test_edit_doctor_schedule.js
+test_link_patient_profile.js
+test_patient_journey_e2e.js
+parse_headings.ps1
+parse_sections.ps1
+print_sec1_10.ps1
+ref_doc_text.txt
+req_doc_text.txt
+sections_full_text.txt
+sections_summary.csv
+temp_doc_extracted.xml
+temp_doc_text.txt
+temp_rels.xml
 
 # ------------------------------------------------------------------------------
 # 10. Visual Test Screenshots
@@ -103,5 +123,3 @@ test_payos_real_integration.js
 *.jpg
 *.jpeg
 !hospital-ui/public/**
-
-

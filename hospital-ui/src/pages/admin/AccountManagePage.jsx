@@ -85,7 +85,7 @@ export default function AccountManagePage() {
         phoneNumber: "",
         email: "",
         role: "ROLE_DOCTOR",
-        password: "password123"
+        password: `Hospital@${Math.floor(1000 + Math.random() * 9000)}`
     });
 
     const [editFormData, setEditFormData] = useState({
@@ -205,7 +205,7 @@ export default function AccountManagePage() {
             setAccounts(prev => [created, ...prev]);
             setFeedback({ type: "success", message: `Đã tạo tài khoản mới [${formData.fullName} - ${formData.phoneNumber}] thành công!` });
             setOpenAddModal(false);
-            setFormData({ fullName: "", phoneNumber: "", email: "", role: "ROLE_DOCTOR", password: "password123" });
+            setFormData({ fullName: "", phoneNumber: "", email: "", role: "ROLE_DOCTOR", password: `Hospital@${Math.floor(1000 + Math.random() * 9000)}` });
         } catch (err) {
             const msg = err.response?.data?.message || err.message || "Lỗi tạo tài khoản mới!";
             setFeedback({ type: "error", message: msg });
@@ -1078,7 +1078,7 @@ export default function AccountManagePage() {
                             value={formData.password}
                             onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                             required
-                            placeholder="Mặc định: password123"
+                            placeholder="Ví dụ: Hospital@8392"
                             InputProps={{
                                 endAdornment: (
                                     <InputAdornment position="end">

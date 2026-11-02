@@ -37,6 +37,7 @@ public class CounterServiceImpl implements CounterService {
     private final RoomRepository roomRepository;
     private final com.hospital.api.service.BookingService bookingService;
     private final KioskDispatchTransactionService kioskDispatchTransactionService;
+    private final BookingReceptionTransition reception;
     private final Clock clock;
 
     @PostConstruct
@@ -258,14 +259,24 @@ public class CounterServiceImpl implements CounterService {
     @Override
     @Transactional
     public CounterTicketResponse completeTicket(Long ticketId, Integer counterId, UUID staffId, CounterActionRequest request) {
-        CounterTicket ticket = counterTicketRepository.findById(ticketId)
+        var initial = counterTicketRepository.findLinkById(ticketId)
                 .orElseThrow(() -> new AppException("Phiếu tiếp đón không tồn tại", HttpStatus.NOT_FOUND));
-
+        if (initial.getBookingId() == null)
+            throw new AppException("Phiếu tiếp đón chưa gắn lượt khám", HttpStatus.CONFLICT);
+        Booking booking = bookingRepository.findByIdWithLock(initial.getBookingId())
+                .orElseThrow(() -> new AppException("Không tìm thấy lượt khám", HttpStatus.NOT_FOUND));
+        reception.lockCounters();
+        CounterTicket ticket = counterTicketRepository.findByIdForUpdate(ticketId)
+                .orElseThrow(() -> new AppException("Phiếu tiếp đón không tồn tại", HttpStatus.NOT_FOUND));
+        if (ticket.getStatus() == CounterTicketStatus.SKIPPED) throw new AppException("Phiếu đã bỏ qua", HttpStatus.CONFLICT);
+        if (ticket.getStatus() == CounterTicketStatus.SERVED) {
+            if (!BookingReceptionTransition.paymentEligible(booking)) throw new AppException("PAYMENT_REQUIRED: Chưa thanh toán", HttpStatus.PAYMENT_REQUIRED);
+            if (!BookingReceptionTransition.doctorEligible(booking)) throw new AppException("Phiếu kết thúc chưa có điều phối hợp lệ", HttpStatus.CONFLICT);
+            return CounterTicketResponse.fromEntity(ticket, 0);
+        }
+        reception.dispatchTo(booking, request == null ? null : request.targetRoomId(), null, null);
         ticket.setStatus(CounterTicketStatus.SERVED);
         ticket.setServedAt(LocalDateTime.now(clock));
-        if (request != null && request.targetRoomId() != null) {
-            ticket.setDispatchedRoomId(request.targetRoomId());
-        }
         CounterTicket saved = counterTicketRepository.save(ticket);
 
         Counter counter = counterRepository.findById(counterId).orElse(null);
@@ -281,9 +292,15 @@ public class CounterServiceImpl implements CounterService {
     @Override
     @Transactional
     public CounterTicketResponse skipTicket(Long ticketId, Integer counterId, UUID staffId) {
-        CounterTicket ticket = counterTicketRepository.findById(ticketId)
+        var link = counterTicketRepository.findLinkById(ticketId)
                 .orElseThrow(() -> new AppException("Phiếu tiếp đón không tồn tại", HttpStatus.NOT_FOUND));
-
+        if (link.getBookingId() != null) bookingRepository.findByIdWithLock(link.getBookingId())
+                .orElseThrow(() -> new AppException("Lượt khám không tồn tại", HttpStatus.CONFLICT));
+        reception.lockCounters();
+        CounterTicket ticket = counterTicketRepository.findByIdForUpdate(ticketId)
+                .orElseThrow(() -> new AppException("Phiếu tiếp đón không tồn tại", HttpStatus.NOT_FOUND));
+        if (ticket.getStatus() == CounterTicketStatus.SERVED) throw new AppException("Phiếu đã phục vụ", HttpStatus.CONFLICT);
+        if (ticket.getStatus() == CounterTicketStatus.SKIPPED) return CounterTicketResponse.fromEntity(ticket, 0);
         ticket.setStatus(CounterTicketStatus.SKIPPED);
         CounterTicket saved = counterTicketRepository.save(ticket);
 

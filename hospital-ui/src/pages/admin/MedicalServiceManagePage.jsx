@@ -37,26 +37,38 @@ import SearchIcon from "@mui/icons-material/Search";
 import ScienceIcon from "@mui/icons-material/Science";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import MonetizationOnOutlinedIcon from "@mui/icons-material/MonetizationOnOutlined";
+import LockIcon from "@mui/icons-material/Lock";
+import LockOpenIcon from "@mui/icons-material/LockOpen";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import BlockIcon from "@mui/icons-material/Block";
+import { useAuth } from "../../context/AuthContext";
 import axiosInstance from "../../services/AxiosInstance";
 import { formatCurrency } from "../../utils/formatters";
 
 export default function MedicalServiceManagePage() {
+    const { user } = useAuth();
+    const isAdmin = user?.role === "ROLE_ADMIN";
+    const isHeadOfDept = user?.role === "ROLE_HEAD_OF_DEPARTMENT";
+    const [hodDeptId, setHodDeptId] = useState(null);
+
     const [services, setServices] = useState([]);
     const [departments, setDepartments] = useState([]);
     const [searchKeyword, setSearchKeyword] = useState("");
+    const [selectedDeptFilter, setSelectedDeptFilter] = useState("ALL");
+    const [statusFilter, setStatusFilter] = useState("ALL"); // ALL, ACTIVE, LOCKED
     const [openModal, setOpenModal] = useState(false);
     const [editingServiceId, setEditingServiceId] = useState(null);
     const [formData, setFormData] = useState({
         serviceName: "",
-        price: 150000,
-        departmentId: 1,
-        description: "Thực hiện theo chỉ định lâm sàng của Bác sĩ"
+        price: "",
+        departmentId: "",
+        description: ""
     });
     const [loading, setLoading] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
     const [feedback, setFeedback] = useState({ type: "", message: "" });
-
-    const [selectedDeptFilter, setSelectedDeptFilter] = useState("ALL");
     const [deleteConfirm, setDeleteConfirm] = useState({ open: false, service: null });
+    const [unlockConfirm, setUnlockConfirm] = useState({ open: false, service: null });
 
     useEffect(() => {
         loadData();
@@ -65,27 +77,27 @@ export default function MedicalServiceManagePage() {
     const loadData = async () => {
         setLoading(true);
         try {
-            const [servRes, deptRes] = await Promise.all([
-                axiosInstance.get("/api/clinical/services").catch(() => ({ data: [] })),
-                axiosInstance.get("/api/departments").catch(() => ({ data: [] }))
+            const [servRes, deptRes, docRes] = await Promise.all([
+                axiosInstance.get("/api/clinical/services?includeDeleted=true").catch(() => ({ data: [] })),
+                axiosInstance.get("/api/departments").catch(() => ({ data: [] })),
+                axiosInstance.get("/api/admin/doctors").catch(() => ({ data: [] }))
             ]);
 
             const depts = (deptRes?.data && Array.isArray(deptRes.data)) ? deptRes.data : (Array.isArray(deptRes) ? deptRes : []);
             if (depts.length > 0) setDepartments(depts);
+            const docs = (docRes?.data && Array.isArray(docRes.data)) ? docRes.data : [];
+            if (isHeadOfDept && docs.length > 0) {
+                const myDoc = docs.find(d => (user?.userId && (d.userId === user.userId || d.accountId === user.userId)) || (user?.phoneNumber && (d.phoneNumber === user.phoneNumber || d.phone === user.phoneNumber)) || (user?.fullName && d.fullName === user.fullName)) || docs[0];
+                if (myDoc && myDoc.departmentId) {
+                    setHodDeptId(myDoc.departmentId);
+                }
+            }
 
             const list = (servRes?.data && Array.isArray(servRes.data)) ? servRes.data : (Array.isArray(servRes) ? servRes : []);
             if (list.length > 0) {
                 setServices(list);
             } else {
-                // Mock danh mục chuẩn y khoa nếu API trả rỗng
-                setServices([
-                    { serviceId: 1, serviceName: "Tổng phân tích tế bào máu ngoại vi bằng máy tự động (CBC)", price: 120000, departmentName: "Khoa Xét Nghiệm Huyết Học", description: "Đánh giá số lượng hồng cầu, bạch cầu, tiểu cầu" },
-                    { serviceId: 2, serviceName: "Chụp X-Quang ngực thẳng kỹ thuật số (DR)", price: 180000, departmentName: "Khoa Chẩn Đoán Hình Ảnh", description: "Khảo sát nhu mô phổi, bóng tim, lồng ngực" },
-                    { serviceId: 3, serviceName: "Siêu âm Doppler màu tim mạch chuyên sâu", price: 350000, departmentName: "Khoa Nội Tim Mạch", description: "Đánh giá hình thái, chức năng co bóp cơ tim, van tim" },
-                    { serviceId: 4, serviceName: "Nội soi dạ dày - tá tràng không đau (Tiền mê)", price: 850000, departmentName: "Khoa Tiêu Hóa & Nội Soi", description: "Chẩn đoán viêm loét, polyp, vi khuẩn HP dạ dày" },
-                    { serviceId: 5, serviceName: "Chụp cắt lớp vi tính lồng ngực 128 lát cắt (CT-Scanner)", price: 1450000, departmentName: "Khoa Chẩn Đoán Hình Ảnh", description: "Tầm soát nốt mờ phổi và tổn thương vi thể" },
-                    { serviceId: 6, serviceName: "Chụp cộng hưởng từ sọ não (MRI 1.5 Tesla)", price: 2200000, departmentName: "Khoa Chẩn Đoán Hình Ảnh", description: "Khảo sát nhu mô não, mạch máu não chi tiết cao" }
-                ]);
+                setServices([]);
             }
         } catch (err) {
             console.error("Lỗi tải danh mục dịch vụ:", err);
@@ -99,9 +111,9 @@ export default function MedicalServiceManagePage() {
         setEditingServiceId(null);
         setFormData({
             serviceName: "",
-            price: 150000,
-            departmentId: departments[0]?.departmentId || 1,
-            description: "Thực hiện theo chỉ định lâm sàng của Bác sĩ"
+            price: "",
+            departmentId: isHeadOfDept && hodDeptId ? hodDeptId : (departments[0]?.departmentId || ""),
+            description: ""
         });
         setOpenModal(true);
     };
@@ -110,21 +122,50 @@ export default function MedicalServiceManagePage() {
         setEditingServiceId(item.serviceId);
         setFormData({
             serviceName: item.serviceName || "",
-            price: item.price || 150000,
-            departmentId: item.departmentId || departments[0]?.departmentId || 1,
+            price: item.price != null ? item.price : "",
+            departmentId: item.departmentId || (isHeadOfDept && hodDeptId ? hodDeptId : (departments[0]?.departmentId || "")),
             description: item.description || ""
         });
         setOpenModal(true);
     };
 
-    const handleConfirmDelete = () => {
+    // 2.2.38: Khóa dịch vụ y tế
+    const handleConfirmLock = async () => {
         const item = deleteConfirm.service;
         if (!item) return;
-        setServices(prev => prev.filter(s => s.serviceId !== item.serviceId));
-        setFeedback({ type: "success", message: `Đã ngừng cung cấp dịch vụ [${item.serviceName}] thành công!` });
-        setDeleteConfirm({ open: false, service: null });
+        setSubmitting(true);
+        try {
+            await axiosInstance.put(`/api/clinical/services/${item.serviceId}/toggle-status`);
+            setFeedback({ type: "success", message: `Đã khóa (ngừng cung cấp) dịch vụ [${item.serviceName}] thành công!` });
+            setDeleteConfirm({ open: false, service: null });
+            await loadData();
+        } catch (err) {
+            console.error("Lỗi khóa dịch vụ:", err);
+            setFeedback({ type: "error", message: err.response?.data?.message || err.message || "Lỗi khi khóa dịch vụ." });
+        } finally {
+            setSubmitting(false);
+        }
     };
 
+    // 2.2.39: Mở khóa dịch vụ y tế
+    const handleConfirmUnlock = async () => {
+        const item = unlockConfirm.service;
+        if (!item) return;
+        setSubmitting(true);
+        try {
+            await axiosInstance.put(`/api/clinical/services/${item.serviceId}/toggle-status`);
+            setFeedback({ type: "success", message: `Đã mở khóa và kích hoạt lại dịch vụ [${item.serviceName}] thành công!` });
+            setUnlockConfirm({ open: false, service: null });
+            await loadData();
+        } catch (err) {
+            console.error("Lỗi mở khóa dịch vụ:", err);
+            setFeedback({ type: "error", message: err.response?.data?.message || err.message || "Lỗi khi mở khóa dịch vụ." });
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    // 2.2.36 & 2.2.37: Thêm mới & Chỉnh sửa dịch vụ y tế
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!formData.serviceName.trim()) {
@@ -132,18 +173,35 @@ export default function MedicalServiceManagePage() {
             return;
         }
 
-        const dept = departments.find(d => Number(d.departmentId) === Number(formData.departmentId));
-        const deptName = dept ? dept.departmentName : "Khoa Cận Lâm Sàng";
-
-        if (editingServiceId) {
-            setServices(prev => prev.map(s => s.serviceId === editingServiceId ? { ...s, ...formData, departmentName: deptName } : s));
-            setFeedback({ type: "success", message: `Đã cập nhật dịch vụ [${formData.serviceName}] thành công!` });
-        } else {
-            const newId = services.length > 0 ? Math.max(...services.map(s => s.serviceId || 0)) + 1 : 1;
-            setServices(prev => [{ serviceId: newId, ...formData, departmentName: deptName }, ...prev]);
-            setFeedback({ type: "success", message: `Đã thêm dịch vụ y tế [${formData.serviceName}] vào danh mục!` });
+        setSubmitting(true);
+        try {
+            if (editingServiceId) {
+                // 2.2.37: PUT /api/clinical/services/{id}
+                await axiosInstance.put(`/api/clinical/services/${editingServiceId}`, {
+                    serviceName: formData.serviceName.trim(),
+                    price: Number(formData.price),
+                    departmentId: Number(formData.departmentId),
+                    description: formData.description
+                });
+                setFeedback({ type: "success", message: `Đã cập nhật dịch vụ [${formData.serviceName}] thành công!` });
+            } else {
+                // 2.2.36: POST /api/clinical/services
+                await axiosInstance.post("/api/clinical/services", {
+                    serviceName: formData.serviceName.trim(),
+                    price: Number(formData.price),
+                    departmentId: Number(formData.departmentId),
+                    description: formData.description
+                });
+                setFeedback({ type: "success", message: `Đã thêm dịch vụ y tế [${formData.serviceName}] vào danh mục CSDL!` });
+            }
+            setOpenModal(false);
+            await loadData();
+        } catch (err) {
+            console.error("Lỗi lưu dịch vụ:", err);
+            setFeedback({ type: "error", message: err.response?.data?.message || err.message || "Lỗi khi lưu dịch vụ y tế." });
+        } finally {
+            setSubmitting(false);
         }
-        setOpenModal(false);
     };
 
     const filteredServices = services.filter(s => {
@@ -154,16 +212,23 @@ export default function MedicalServiceManagePage() {
             s.description?.toLowerCase().includes(kw);
 
         const matchesDept = selectedDeptFilter === "ALL" || s.departmentName === selectedDeptFilter;
-        return matchesKw && matchesDept;
+        
+        let matchesStatus = true;
+        if (statusFilter === "ACTIVE") matchesStatus = !s.deleted;
+        if (statusFilter === "LOCKED") matchesStatus = Boolean(s.deleted);
+
+        return matchesKw && matchesDept && matchesStatus;
     });
 
     const totalServices = services.length;
+    const activeServicesCount = services.filter(s => !s.deleted).length;
+    const lockedServicesCount = services.filter(s => s.deleted).length;
     const uniqueDepts = Array.from(new Set(services.map(s => s.departmentName).filter(Boolean)));
     const avgPrice = totalServices > 0 ? Math.round(services.reduce((sum, s) => sum + (Number(s.price) || 0), 0) / totalServices) : 0;
 
     return (
         <Container maxWidth="xl" sx={{ py: 3 }}>
-            {/* 1. Header Banner (Apple HIG Paper) */}
+            {/* 1. Header Banner */}
             <Paper
                 elevation={0}
                 sx={{
@@ -292,6 +357,9 @@ export default function MedicalServiceManagePage() {
                                 <Typography variant="h4" fontWeight={800} color="#0F172A" sx={{ letterSpacing: "-0.03em" }}>
                                     {totalServices}
                                 </Typography>
+                                <Typography variant="caption" sx={{ color: "#64748B" }}>
+                                    <b style={{ color: "#10B981" }}>{activeServicesCount}</b> đang dùng • <b style={{ color: "#EF4444" }}>{lockedServicesCount}</b> đã khóa
+                                </Typography>
                             </Box>
                         </CardContent>
                     </Card>
@@ -330,6 +398,7 @@ export default function MedicalServiceManagePage() {
                                 <Typography variant="h4" fontWeight={800} color="#0F172A" sx={{ letterSpacing: "-0.03em" }}>
                                     {uniqueDepts.length}
                                 </Typography>
+                                <Typography variant="caption" sx={{ color: "#64748B" }}>Khoa xét nghiệm & CĐHA</Typography>
                             </Box>
                         </CardContent>
                     </Card>
@@ -368,6 +437,7 @@ export default function MedicalServiceManagePage() {
                                 <Typography variant="h4" fontWeight={800} color="#0F172A" sx={{ letterSpacing: "-0.03em" }}>
                                     {formatCurrency(avgPrice)}
                                 </Typography>
+                                <Typography variant="caption" sx={{ color: "#64748B" }}>Giá niêm yết theo danh mục</Typography>
                             </Box>
                         </CardContent>
                     </Card>
@@ -399,7 +469,7 @@ export default function MedicalServiceManagePage() {
                             placeholder="Tìm theo tên dịch vụ, chuyên khoa hoặc chỉ định..."
                             value={searchKeyword}
                             onChange={(e) => setSearchKeyword(e.target.value)}
-                            sx={{ minWidth: { xs: "100%", sm: 320 }, maxWidth: 440 }}
+                            sx={{ minWidth: { xs: "100%", sm: 300 }, maxWidth: 400 }}
                             InputProps={{
                                 startAdornment: (
                                     <InputAdornment position="start">
@@ -421,7 +491,7 @@ export default function MedicalServiceManagePage() {
                             size="small"
                             value={selectedDeptFilter}
                             onChange={(e) => setSelectedDeptFilter(e.target.value)}
-                            sx={{ minWidth: 220 }}
+                            sx={{ minWidth: 200 }}
                             InputProps={{
                                 sx: {
                                     borderRadius: 2.5,
@@ -437,6 +507,27 @@ export default function MedicalServiceManagePage() {
                                 <MenuItem key={d} value={d}>{d}</MenuItem>
                             ))}
                         </TextField>
+
+                        <TextField
+                            select
+                            size="small"
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                            sx={{ minWidth: 170 }}
+                            InputProps={{
+                                sx: {
+                                    borderRadius: 2.5,
+                                    bgcolor: "#F8FAFC",
+                                    "& fieldset": { borderColor: "rgba(15, 23, 42, 0.1)" },
+                                    "&:hover fieldset": { borderColor: "#0088D6" },
+                                    "&.Mui-focused fieldset": { borderColor: "#0088D6" }
+                                }
+                            }}
+                        >
+                            <MenuItem value="ALL">Tất cả trạng thái</MenuItem>
+                            <MenuItem value="ACTIVE">Đang hoạt động ({activeServicesCount})</MenuItem>
+                            <MenuItem value="LOCKED">Đã khóa ({lockedServicesCount})</MenuItem>
+                        </TextField>
                     </Box>
 
                     <Typography variant="body2" sx={{ color: "#64748B", fontWeight: 600 }}>
@@ -445,7 +536,7 @@ export default function MedicalServiceManagePage() {
                 </Box>
             </Paper>
 
-            {/* 4. Bảng Dịch Vụ (Apple HIG Table) */}
+            {/* 4. Bảng Dịch Vụ */}
             <TableContainer
                 component={Paper}
                 elevation={0}
@@ -460,25 +551,26 @@ export default function MedicalServiceManagePage() {
                 <Table>
                     <TableHead sx={{ bgcolor: "#F8FAFC" }}>
                         <TableRow>
-                            <TableCell width={60} sx={{ fontWeight: 800, color: "#475569", py: 1.8, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", borderBottom: "1px solid rgba(15, 23, 42, 0.08)" }}>STT</TableCell>
-                            <TableCell width={360} sx={{ fontWeight: 800, color: "#475569", py: 1.8, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", borderBottom: "1px solid rgba(15, 23, 42, 0.08)" }}>Tên Dịch Vụ Kỹ Thuật</TableCell>
-                            <TableCell width={240} sx={{ fontWeight: 800, color: "#475569", py: 1.8, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", borderBottom: "1px solid rgba(15, 23, 42, 0.08)" }}>Chuyên Khoa Thực Hiện</TableCell>
-                            <TableCell width={160} align="right" sx={{ fontWeight: 800, color: "#475569", py: 1.8, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", borderBottom: "1px solid rgba(15, 23, 42, 0.08)" }}>Đơn Giá Niêm Yết</TableCell>
+                            <TableCell width={50} sx={{ fontWeight: 800, color: "#475569", py: 1.8, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", borderBottom: "1px solid rgba(15, 23, 42, 0.08)" }}>STT</TableCell>
+                            <TableCell width={320} sx={{ fontWeight: 800, color: "#475569", py: 1.8, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", borderBottom: "1px solid rgba(15, 23, 42, 0.08)" }}>Tên Dịch Vụ Kỹ Thuật</TableCell>
+                            <TableCell width={220} sx={{ fontWeight: 800, color: "#475569", py: 1.8, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", borderBottom: "1px solid rgba(15, 23, 42, 0.08)" }}>Chuyên Khoa Thực Hiện</TableCell>
+                            <TableCell width={150} align="right" sx={{ fontWeight: 800, color: "#475569", py: 1.8, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", borderBottom: "1px solid rgba(15, 23, 42, 0.08)" }}>Đơn Giá Niêm Yết</TableCell>
+                            <TableCell width={140} align="center" sx={{ fontWeight: 800, color: "#475569", py: 1.8, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", borderBottom: "1px solid rgba(15, 23, 42, 0.08)" }}>Trạng Thái</TableCell>
                             <TableCell sx={{ fontWeight: 800, color: "#475569", py: 1.8, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", borderBottom: "1px solid rgba(15, 23, 42, 0.08)" }}>Mô Tả / Chỉ Định Y Khoa</TableCell>
-                            <TableCell width={120} align="center" sx={{ fontWeight: 800, color: "#475569", py: 1.8, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", borderBottom: "1px solid rgba(15, 23, 42, 0.08)" }}>Thao Tác</TableCell>
+                            <TableCell width={140} align="center" sx={{ fontWeight: 800, color: "#475569", py: 1.8, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", borderBottom: "1px solid rgba(15, 23, 42, 0.08)" }}>Thao Tác</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
                         {loading ? (
                             <TableRow>
-                                <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
+                                <TableCell colSpan={7} align="center" sx={{ py: 8 }}>
                                     <CircularProgress size={34} sx={{ color: "#0088D6" }} />
                                     <Typography variant="body2" sx={{ color: "#64748B", mt: 1.5, fontWeight: 600 }}>Đang tải danh mục dịch vụ...</Typography>
                                 </TableCell>
                             </TableRow>
                         ) : filteredServices.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
+                                <TableCell colSpan={7} align="center" sx={{ py: 8 }}>
                                     <Box
                                         sx={{
                                             width: 56,
@@ -501,11 +593,11 @@ export default function MedicalServiceManagePage() {
                                     <Typography variant="body2" sx={{ color: "#64748B", mb: 2 }}>
                                         Hãy kiểm tra lại từ khóa tìm kiếm hoặc chọn chuyên khoa khác
                                     </Typography>
-                                    {(searchKeyword || selectedDeptFilter !== "ALL") && (
+                                    {(searchKeyword || selectedDeptFilter !== "ALL" || statusFilter !== "ALL") && (
                                         <Button
                                             size="small"
                                             variant="outlined"
-                                            onClick={() => { setSearchKeyword(""); setSelectedDeptFilter("ALL"); }}
+                                            onClick={() => { setSearchKeyword(""); setSelectedDeptFilter("ALL"); setStatusFilter("ALL"); }}
                                             sx={{ borderRadius: 2.2, textTransform: "none", fontWeight: 700 }}
                                         >
                                             Đặt lại bộ lọc
@@ -514,86 +606,142 @@ export default function MedicalServiceManagePage() {
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            filteredServices.map((item, idx) => (
-                                <TableRow
-                                    key={item.serviceId || idx}
-                                    hover
-                                    sx={{
-                                        "&:hover": { bgcolor: "rgba(248, 250, 252, 0.8)" },
-                                        transition: "background-color 0.15s ease"
-                                    }}
-                                >
-                                    <TableCell sx={{ py: 2, borderBottom: "1px solid rgba(15, 23, 42, 0.06)", fontWeight: 700, color: "#64748B", fontFamily: "monospace" }}>{idx + 1}</TableCell>
-                                    <TableCell sx={{ py: 2, borderBottom: "1px solid rgba(15, 23, 42, 0.06)" }}>
-                                        <Typography variant="body2" fontWeight={700} color="#0F172A">
-                                            {item.serviceName}
-                                        </Typography>
-                                    </TableCell>
-                                    <TableCell sx={{ py: 2, borderBottom: "1px solid rgba(15, 23, 42, 0.06)" }}>
-                                        <Chip
-                                            icon={<ScienceIcon style={{ fontSize: 16 }} />}
-                                            label={item.departmentName || "Khoa Cận Lâm Sàng"}
-                                            size="small"
-                                            sx={{
-                                                fontWeight: 700,
-                                                fontSize: "0.72rem",
-                                                bgcolor: "rgba(0, 136, 214, 0.08)",
-                                                color: "#0088D6",
-                                                border: "1px solid rgba(0, 136, 214, 0.2)",
-                                                borderRadius: 1.5,
-                                                height: 24
-                                            }}
-                                        />
-                                    </TableCell>
-                                    <TableCell align="right" sx={{ py: 2, borderBottom: "1px solid rgba(15, 23, 42, 0.06)" }}>
-                                        <Typography variant="body2" fontWeight={800} color="#10B981" sx={{ fontFamily: "monospace" }}>
-                                            {formatCurrency(item.price)}
-                                        </Typography>
-                                    </TableCell>
-                                    <TableCell sx={{ py: 2, borderBottom: "1px solid rgba(15, 23, 42, 0.06)" }}>
-                                        <Typography variant="caption" sx={{ color: "#64748B" }}>
-                                            {item.description || "Thực hiện theo chỉ định của Bác sĩ"}
-                                        </Typography>
-                                    </TableCell>
-                                    <TableCell align="center" sx={{ py: 2, borderBottom: "1px solid rgba(15, 23, 42, 0.06)" }}>
-                                        <Tooltip title="Chỉnh sửa dịch vụ">
-                                            <IconButton
+                            filteredServices.map((item, idx) => {
+                                const isLocked = Boolean(item.deleted);
+                                return (
+                                    <TableRow
+                                        key={item.serviceId || idx}
+                                        hover
+                                        sx={{
+                                            bgcolor: isLocked ? "rgba(241, 245, 249, 0.6)" : "inherit",
+                                            "&:hover": { bgcolor: isLocked ? "rgba(241, 245, 249, 0.9)" : "rgba(248, 250, 252, 0.8)" },
+                                            transition: "background-color 0.15s ease",
+                                            opacity: isLocked ? 0.8 : 1
+                                        }}
+                                    >
+                                        <TableCell sx={{ py: 2, borderBottom: "1px solid rgba(15, 23, 42, 0.06)", fontWeight: 700, color: "#64748B", fontFamily: "monospace" }}>{idx + 1}</TableCell>
+                                        <TableCell sx={{ py: 2, borderBottom: "1px solid rgba(15, 23, 42, 0.06)" }}>
+                                            <Typography variant="body2" fontWeight={700} color={isLocked ? "#64748B" : "#0F172A"} sx={{ textDecoration: isLocked ? "line-through" : "none" }}>
+                                                {item.serviceName}
+                                            </Typography>
+                                        </TableCell>
+                                        <TableCell sx={{ py: 2, borderBottom: "1px solid rgba(15, 23, 42, 0.06)" }}>
+                                            <Chip
+                                                icon={<ScienceIcon style={{ fontSize: 16 }} />}
+                                                label={item.departmentName || "Khoa Cận Lâm Sàng"}
                                                 size="small"
-                                                onClick={() => handleOpenEdit(item)}
                                                 sx={{
-                                                    bgcolor: "rgba(0, 136, 214, 0.08)",
-                                                    color: "#0088D6",
-                                                    borderRadius: 2,
-                                                    mr: 0.8,
-                                                    "&:hover": { bgcolor: "rgba(0, 136, 214, 0.16)" }
+                                                    fontWeight: 700,
+                                                    fontSize: "0.72rem",
+                                                    bgcolor: isLocked ? "rgba(100, 116, 139, 0.08)" : "rgba(0, 136, 214, 0.08)",
+                                                    color: isLocked ? "#64748B" : "#0088D6",
+                                                    border: isLocked ? "1px solid rgba(100, 116, 139, 0.2)" : "1px solid rgba(0, 136, 214, 0.2)",
+                                                    borderRadius: 1.5,
+                                                    height: 24
                                                 }}
-                                            >
-                                                <EditIcon fontSize="small" />
-                                            </IconButton>
-                                        </Tooltip>
-                                        <Tooltip title="Ngừng cung cấp dịch vụ">
-                                            <IconButton
-                                                size="small"
-                                                onClick={() => setDeleteConfirm({ open: true, service: item })}
-                                                sx={{
-                                                    bgcolor: "rgba(239, 68, 68, 0.08)",
-                                                    color: "#EF4444",
-                                                    borderRadius: 2,
-                                                    "&:hover": { bgcolor: "rgba(239, 68, 68, 0.16)" }
-                                                }}
-                                            >
-                                                <DeleteIcon fontSize="small" />
-                                            </IconButton>
-                                        </Tooltip>
-                                    </TableCell>
-                                </TableRow>
-                            ))
+                                            />
+                                        </TableCell>
+                                        <TableCell align="right" sx={{ py: 2, borderBottom: "1px solid rgba(15, 23, 42, 0.06)" }}>
+                                            <Typography variant="body2" fontWeight={800} color={isLocked ? "#64748B" : "#10B981"} sx={{ fontFamily: "monospace" }}>
+                                                {formatCurrency(item.price)}
+                                            </Typography>
+                                        </TableCell>
+                                        <TableCell align="center" sx={{ py: 2, borderBottom: "1px solid rgba(15, 23, 42, 0.06)" }}>
+                                            {isLocked ? (
+                                                <Chip
+                                                    icon={<LockIcon style={{ fontSize: 13 }} />}
+                                                    label="ĐÃ KHÓA"
+                                                    size="small"
+                                                    sx={{
+                                                        fontWeight: 800,
+                                                        fontSize: "0.68rem",
+                                                        bgcolor: "rgba(239, 68, 68, 0.1)",
+                                                        color: "#DC2626",
+                                                        border: "1px solid rgba(239, 68, 68, 0.3)",
+                                                        borderRadius: 1.5,
+                                                        height: 22
+                                                    }}
+                                                />
+                                            ) : (
+                                                <Chip
+                                                    icon={<CheckCircleOutlineIcon style={{ fontSize: 13 }} />}
+                                                    label="HOẠT ĐỘNG"
+                                                    size="small"
+                                                    sx={{
+                                                        fontWeight: 800,
+                                                        fontSize: "0.68rem",
+                                                        bgcolor: "rgba(16, 185, 129, 0.1)",
+                                                        color: "#059669",
+                                                        border: "1px solid rgba(16, 185, 129, 0.3)",
+                                                        borderRadius: 1.5,
+                                                        height: 22
+                                                    }}
+                                                />
+                                            )}
+                                        </TableCell>
+                                        <TableCell sx={{ py: 2, borderBottom: "1px solid rgba(15, 23, 42, 0.06)" }}>
+                                            <Typography variant="caption" sx={{ color: "#64748B" }}>
+                                                {item.description || "Thực hiện theo chỉ định của Bác sĩ"}
+                                            </Typography>
+                                        </TableCell>
+                                        <TableCell align="center" sx={{ py: 2, borderBottom: "1px solid rgba(15, 23, 42, 0.06)" }}>
+                                            <Tooltip title="Chỉnh sửa dịch vụ (2.2.37)">
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={() => handleOpenEdit(item)}
+                                                    sx={{
+                                                        bgcolor: "rgba(0, 136, 214, 0.08)",
+                                                        color: "#0088D6",
+                                                        borderRadius: 2,
+                                                        mr: 0.8,
+                                                        "&:hover": { bgcolor: "rgba(0, 136, 214, 0.16)" }
+                                                    }}
+                                                >
+                                                    <EditIcon fontSize="small" />
+                                                </IconButton>
+                                            </Tooltip>
+
+                                            {isLocked ? (
+                                                <Tooltip title="Mở khóa dịch vụ (2.2.39)">
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() => setUnlockConfirm({ open: true, service: item })}
+                                                        sx={{
+                                                            bgcolor: "rgba(16, 185, 129, 0.08)",
+                                                            color: "#10B981",
+                                                            borderRadius: 2,
+                                                            "&:hover": { bgcolor: "rgba(16, 185, 129, 0.18)" }
+                                                        }}
+                                                    >
+                                                        <LockOpenIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            ) : (
+                                                <Tooltip title="Khóa dịch vụ (2.2.38)">
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() => setDeleteConfirm({ open: true, service: item })}
+                                                        sx={{
+                                                            bgcolor: "rgba(239, 68, 68, 0.08)",
+                                                            color: "#EF4444",
+                                                            borderRadius: 2,
+                                                            "&:hover": { bgcolor: "rgba(239, 68, 68, 0.16)" }
+                                                        }}
+                                                    >
+                                                        <BlockIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            )}
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })
                         )}
                     </TableBody>
                 </Table>
             </TableContainer>
 
-            {/* Dialog xác nhận xóa dịch vụ */}
+            {/* Dialog xác nhận KHÓA dịch vụ (2.2.38) */}
             <Dialog
                 open={deleteConfirm.open}
                 onClose={() => setDeleteConfirm({ open: false, service: null })}
@@ -607,34 +755,79 @@ export default function MedicalServiceManagePage() {
             >
                 <DialogTitle sx={{ fontWeight: 800, color: "#DC2626", display: "flex", alignItems: "center", gap: 1.2, pb: 1 }}>
                     <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: "rgba(239, 68, 68, 0.1)", color: "#EF4444", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <DeleteIcon sx={{ fontSize: 20 }} />
+                        <BlockIcon sx={{ fontSize: 20 }} />
                     </Box>
-                    Xác Nhận Ngừng Cung Cấp Dịch Vụ
+                    Xác Nhận Khóa Dịch Vụ Y Tế
                 </DialogTitle>
                 <DialogContent dividers sx={{ borderColor: "rgba(15, 23, 42, 0.08)" }}>
                     <Typography variant="body2" color="#0F172A">
-                        Bạn có chắc chắn muốn ngừng cung cấp dịch vụ <b>[{deleteConfirm.service?.serviceName}]</b> khỏi danh mục hoạt động không?
+                        Bạn có chắc chắn muốn khóa dịch vụ <b>[{deleteConfirm.service?.serviceName}]</b>? Dịch vụ bị khóa sẽ không thể chỉ định trong khám bệnh lâm sàng.
                     </Typography>
                 </DialogContent>
                 <DialogActions sx={{ p: 2.5 }}>
-                    <Button onClick={() => setDeleteConfirm({ open: false, service: null })} sx={{ textTransform: "none", borderRadius: 2, fontWeight: 600 }}>
+                    <Button onClick={() => setDeleteConfirm({ open: false, service: null })} disabled={submitting} sx={{ textTransform: "none", borderRadius: 2, fontWeight: 600 }}>
                         Hủy Bỏ
                     </Button>
                     <Button
-                        onClick={handleConfirmDelete}
+                        onClick={handleConfirmLock}
+                        disabled={submitting}
                         variant="contained"
                         color="error"
                         sx={{ textTransform: "none", borderRadius: 2.2, fontWeight: 700 }}
                     >
-                        Ngừng Cung Cấp
+                        {submitting ? "Đang xử lý..." : "Khóa Dịch Vụ"}
                     </Button>
                 </DialogActions>
             </Dialog>
 
-            {/* Modal Thêm/Sửa Dịch Vụ */}
+            {/* Dialog xác nhận MỞ KHÓA dịch vụ (2.2.39) */}
+            <Dialog
+                open={unlockConfirm.open}
+                onClose={() => setUnlockConfirm({ open: false, service: null })}
+                PaperProps={{
+                    sx: {
+                        borderRadius: 4,
+                        border: "1px solid rgba(15, 23, 42, 0.08)",
+                        boxShadow: "0 20px 40px rgba(15, 23, 42, 0.15)"
+                    }
+                }}
+            >
+                <DialogTitle sx={{ fontWeight: 800, color: "#059669", display: "flex", alignItems: "center", gap: 1.2, pb: 1 }}>
+                    <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: "rgba(16, 185, 129, 0.1)", color: "#10B981", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <LockOpenIcon sx={{ fontSize: 20 }} />
+                    </Box>
+                    Xác Nhận Mở Khóa Dịch Vụ Y Tế
+                </DialogTitle>
+                <DialogContent dividers sx={{ borderColor: "rgba(15, 23, 42, 0.08)" }}>
+                    <Typography variant="body2" color="#0F172A">
+                        Bạn có chắc chắn muốn mở khóa và kích hoạt lại dịch vụ <b>[{unlockConfirm.service?.serviceName}]</b>? Dịch vụ sẽ sẵn sàng để Bác sĩ chỉ định trở lại.
+                    </Typography>
+                </DialogContent>
+                <DialogActions sx={{ p: 2.5 }}>
+                    <Button onClick={() => setUnlockConfirm({ open: false, service: null })} disabled={submitting} sx={{ textTransform: "none", borderRadius: 2, fontWeight: 600 }}>
+                        Hủy Bỏ
+                    </Button>
+                    <Button
+                        onClick={handleConfirmUnlock}
+                        disabled={submitting}
+                        variant="contained"
+                        sx={{
+                            textTransform: "none",
+                            borderRadius: 2.2,
+                            fontWeight: 700,
+                            bgcolor: "#10B981",
+                            "&:hover": { bgcolor: "#059669" }
+                        }}
+                    >
+                        {submitting ? "Đang xử lý..." : "Mở Khóa Dịch Vụ"}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Modal Thêm (2.2.36) / Sửa (2.2.37) Dịch Vụ */}
             <Dialog
                 open={openModal}
-                onClose={() => setOpenModal(false)}
+                onClose={() => !submitting && setOpenModal(false)}
                 maxWidth="sm"
                 fullWidth
                 PaperProps={{
@@ -710,9 +903,10 @@ export default function MedicalServiceManagePage() {
                         </Grid>
                     </DialogContent>
                     <DialogActions sx={{ p: 2.5 }}>
-                        <Button onClick={() => setOpenModal(false)} sx={{ borderRadius: 2, textTransform: "none", fontWeight: 600 }}>Hủy</Button>
+                        <Button onClick={() => setOpenModal(false)} disabled={submitting} sx={{ borderRadius: 2, textTransform: "none", fontWeight: 600 }}>Hủy</Button>
                         <Button
                             type="submit"
+                            disabled={submitting}
                             variant="contained"
                             sx={{
                                 borderRadius: 2.2,
@@ -722,7 +916,7 @@ export default function MedicalServiceManagePage() {
                                 "&:hover": { bgcolor: "#0073B7" }
                             }}
                         >
-                            {editingServiceId ? "Cập Nhật" : "Lưu Dịch Vụ"}
+                            {submitting ? "Đang lưu..." : (editingServiceId ? "Cập Nhật CSDL" : "Lưu CSDL")}
                         </Button>
                     </DialogActions>
                 </Box>

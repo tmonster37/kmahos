@@ -34,22 +34,26 @@ public class AuditLogController {
     }
 
     /**
-     * Ghi nhận chủ động một sự kiện audit từ giao diện Admin
+     * Ghi nhận chủ động một sự kiện audit từ giao diện Quản trị / Kế toán
      */
     @PostMapping
     public ResponseEntity<ApiResponse<Void>> recordCustomAuditLog(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @RequestBody Map<String, String> payload
     ) {
-        String action = payload.getOrDefault("action", "ADMIN_CUSTOM_EVENT");
-        String entityType = payload.getOrDefault("entityType", "SYSTEM");
+        String action = payload.getOrDefault("action", "ACCOUNTANT_AUDIT_EVENT");
+        String entityType = payload.getOrDefault("entityType", "FINANCE");
         String entityId = payload.getOrDefault("entityId", "");
         String details = payload.getOrDefault("details", "");
 
+        String role = (userPrincipal != null && userPrincipal.getAuthorities() != null && !userPrincipal.getAuthorities().isEmpty())
+                ? userPrincipal.getAuthorities().iterator().next().getAuthority()
+                : "ROLE_ADMIN";
+
         auditLogService.log(
-                userPrincipal.getId(),
-                userPrincipal.getUsername(),
-                "ROLE_ADMIN",
+                userPrincipal != null ? userPrincipal.getId() : null,
+                userPrincipal != null ? userPrincipal.getUsername() : "ADMIN",
+                role,
                 action,
                 entityType,
                 entityId,

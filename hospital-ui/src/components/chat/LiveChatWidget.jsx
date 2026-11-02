@@ -84,7 +84,10 @@ export default function LiveChatWidget() {
     useEffect(() => {
         if (isAuthenticated) {
             fetchConsultants();
-            const interval = setInterval(fetchConsultants, 12000);
+            const interval = setInterval(() => {
+                if (typeof document !== "undefined" && document.hidden) return;
+                fetchConsultants();
+            }, 12000);
             return () => clearInterval(interval);
         }
     }, [isAuthenticated]);
@@ -93,7 +96,10 @@ export default function LiveChatWidget() {
     useEffect(() => {
         if (open && activePartner && isAuthenticated && tabIndex === 1) {
             fetchDoctorMessages();
-            const interval = setInterval(fetchDoctorMessages, 4000);
+            const interval = setInterval(() => {
+                if (typeof document !== "undefined" && document.hidden) return;
+                fetchDoctorMessages();
+            }, 4000);
             return () => clearInterval(interval);
         }
     }, [open, activePartner, isAuthenticated, tabIndex]);
@@ -227,7 +233,7 @@ export default function LiveChatWidget() {
     };
 
     return (
-        <Box sx={{ position: "fixed", bottom: 24, right: 24, zIndex: 1300 }}>
+        <Box sx={{ position: "fixed", bottom: { xs: 76, md: 24 }, right: { xs: 16, md: 24 }, zIndex: 1300 }}>
             {/* Floating FAB button */}
             {!open && (
                 <Badge badgeContent={totalUnread} color="error" max={99}>

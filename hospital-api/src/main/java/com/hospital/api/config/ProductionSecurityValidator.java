@@ -25,14 +25,28 @@ public class ProductionSecurityValidator {
     @Value("${vnpay.hash-secret:}")
     private String vnpayHashSecret;
 
+    @Value("${payos.client-id:}")
+    private String payosClientId;
+
+    @Value("${payos.api-key:}")
+    private String payosApiKey;
+
     @Value("${payos.checksum-key:}")
     private String payosChecksumKey;
+
+    @Value("${payos.return-url:}")
+    private String payosReturnUrl;
+
+    @Value("${payos.cancel-url:}")
+    private String payosCancelUrl;
 
     @Value("${spring.datasource.password:}")
     private String dbPassword;
 
     private static final String DEFAULT_DEV_JWT = "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970";
     private static final String DEFAULT_DEV_VNPAY = "BRYEEDJIJFAGUSDLEPIOPDMDYEMLDCAX";
+    private static final String DEFAULT_DEV_PAYOS_CLIENT = "demo-client-id";
+    private static final String DEFAULT_DEV_PAYOS_API_KEY = "demo-api-key";
     private static final String DEFAULT_DEV_PAYOS = "demo-checksum-key";
 
     public ProductionSecurityValidator(Environment environment) {
@@ -42,7 +56,9 @@ public class ProductionSecurityValidator {
     @PostConstruct
     public void validateProductionSecurity() {
         boolean isProduction = Arrays.asList(environment.getActiveProfiles()).contains("prod")
-                || Arrays.asList(environment.getActiveProfiles()).contains("production");
+                || Arrays.asList(environment.getActiveProfiles()).contains("production")
+                || "production".equalsIgnoreCase(environment.getProperty("ENVIRONMENT"))
+                || "prod".equalsIgnoreCase(environment.getProperty("ENVIRONMENT"));
 
         if (!isProduction) {
             log.info("Khởi động ứng dụng với profile không phải production ({}). Đang sử dụng cấu hình phát triển cục bộ.",
@@ -53,7 +69,11 @@ public class ProductionSecurityValidator {
         log.info("Đang kiểm tra an toàn cấu hình cho môi trường Production...");
 
         // 1. Kiểm tra JWT Secret
-        if (jwtSecret == null || jwtSecret.isBlank() || DEFAULT_DEV_JWT.equalsIgnoreCase(jwtSecret.trim())) {
+        if (jwtSecret == null || jwtSecret.isBlank() 
+                || "${JWT_SECRET}".equals(jwtSecret.trim())
+                || "null".equalsIgnoreCase(jwtSecret.trim())
+                || "undefined".equalsIgnoreCase(jwtSecret.trim())
+                || DEFAULT_DEV_JWT.equalsIgnoreCase(jwtSecret.trim())) {
             throw new IllegalStateException(
                     "CRITICAL SECURITY CONFIGURATION ERROR: Ứng dụng không thể khởi động trên Production với JWT_SECRET mặc định hoặc rỗng! " +
                     "Vui lòng cấu hình biến môi trường JWT_SECRET với khóa an toàn tối thiểu 256 bits.");
@@ -70,10 +90,26 @@ public class ProductionSecurityValidator {
                     "CRITICAL SECURITY CONFIGURATION ERROR: VNPAY_HASH_SECRET trên Production không được sử dụng khóa sandbox mặc định.");
         }
 
-        // 3. Kiểm tra PayOS Checksum Key
-        if (payosChecksumKey != null && DEFAULT_DEV_PAYOS.equalsIgnoreCase(payosChecksumKey.trim())) {
+        // 3. Kiểm tra PayOS Configuration
+        if (payosClientId == null || payosClientId.isBlank() || DEFAULT_DEV_PAYOS_CLIENT.equalsIgnoreCase(payosClientId.trim())) {
             throw new IllegalStateException(
-                    "CRITICAL SECURITY CONFIGURATION ERROR: PAYOS_CHECKSUM_KEY trên Production không được sử dụng khóa demo mặc định.");
+                    "CRITICAL SECURITY CONFIGURATION ERROR: PAYOS_CLIENT_ID trên Production không được để trống hoặc dùng mã demo.");
+        }
+        if (payosApiKey == null || payosApiKey.isBlank() || DEFAULT_DEV_PAYOS_API_KEY.equalsIgnoreCase(payosApiKey.trim())) {
+            throw new IllegalStateException(
+                    "CRITICAL SECURITY CONFIGURATION ERROR: PAYOS_API_KEY trên Production không được để trống hoặc dùng mã demo.");
+        }
+        if (payosChecksumKey == null || payosChecksumKey.isBlank() || DEFAULT_DEV_PAYOS.equalsIgnoreCase(payosChecksumKey.trim())) {
+            throw new IllegalStateException(
+                    "CRITICAL SECURITY CONFIGURATION ERROR: PAYOS_CHECKSUM_KEY trên Production không được để trống hoặc dùng khóa demo mặc định.");
+        }
+        if (payosReturnUrl != null && (payosReturnUrl.contains("localhost") || payosReturnUrl.contains("127.0.0.1"))) {
+            throw new IllegalStateException(
+                    "CRITICAL SECURITY CONFIGURATION ERROR: PAYOS_RETURN_URL trên Production không được trỏ về localhost / 127.0.0.1.");
+        }
+        if (payosCancelUrl != null && (payosCancelUrl.contains("localhost") || payosCancelUrl.contains("127.0.0.1"))) {
+            throw new IllegalStateException(
+                    "CRITICAL SECURITY CONFIGURATION ERROR: PAYOS_CANCEL_URL trên Production không được trỏ về localhost / 127.0.0.1.");
         }
 
         // 4. Kiểm tra Database Password

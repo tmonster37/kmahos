@@ -3,8 +3,14 @@ package com.hospital.api.controller;
 import com.hospital.api.common.ApiResponse;
 import com.hospital.api.constant.Role;
 import com.hospital.api.entity.Account;
+import com.hospital.api.entity.PatientProfile;
 import com.hospital.api.exception.AppException;
 import com.hospital.api.repository.AccountRepository;
+import com.hospital.api.repository.DoctorRepository;
+import com.hospital.api.repository.PatientProfileRepository;
+import com.hospital.api.security.UserPrincipal;
+import com.hospital.api.service.AuditLogService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Builder;
@@ -12,15 +18,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
-import com.hospital.api.repository.DoctorRepository;
-import com.hospital.api.repository.PatientProfileRepository;
-
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -33,6 +36,7 @@ public class AccountAdminController {
     private final DoctorRepository doctorRepository;
     private final PatientProfileRepository patientProfileRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AuditLogService auditLogService;
 
     // DTO Response
     @Builder
@@ -116,7 +120,11 @@ public class AccountAdminController {
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     @Transactional
-    public ResponseEntity<ApiResponse<AccountResponse>> createAccount(@Valid @RequestBody CreateAccountRequest request) {
+    public ResponseEntity<ApiResponse<AccountResponse>> createAccount(
+            @Valid @RequestBody CreateAccountRequest request,
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            HttpServletRequest servletRequest
+    ) {
         String phone = request.phoneNumber().trim();
         if (accountRepository.existsByPhoneNumber(phone)) {
             throw new AppException("Số điện thoại này đã được sử dụng!", HttpStatus.BAD_REQUEST);
@@ -137,23 +145,37 @@ public class AccountAdminController {
                 .build();
 
         account = accountRepository.save(account);
+
+        if (currentUser != null) {
+            auditLogService.log(currentUser.getId(), currentUser.getUsername(), "ROLE_ADMIN", "CREATE_ACCOUNT",
+                    "ACCOUNT", account.getUserId().toString(),
+                    "Tạo tài khoản: " + account.getPhoneNumber() + " (" + account.getRole() + ")",
+                    servletRequest != null ? servletRequest.getRemoteAddr() : "127.0.0.1");
+        }
+
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.ok(AccountResponse.fromEntity(account), "Tạo tài khoản thành công"));
     }
 
-    // 3. Cập nhật thông tin tài khoản
+    // 3. Cập nhật thông tin tài khoản (và đồng bộ 2 chiều sang PatientProfile / Doctor)
     @PutMapping("/{userId}")
     @PreAuthorize("hasRole('ADMIN')")
     @Transactional
     public ResponseEntity<ApiResponse<AccountResponse>> updateAccount(
             @PathVariable UUID userId,
-            @Valid @RequestBody UpdateAccountRequest request
+            @Valid @RequestBody UpdateAccountRequest request,
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            HttpServletRequest servletRequest
     ) {
         Account account = accountRepository.findById(userId)
                 .orElseThrow(() -> new AppException("Tài khoản không tồn tại!", HttpStatus.NOT_FOUND));
 
-        String phone = request.phoneNumber().trim();
-        if (!phone.equals(account.getPhoneNumber()) && accountRepository.existsByPhoneNumber(phone)) {
+        String oldPhone = account.getPhoneNumber();
+        String oldName = account.getFullName();
+        String newPhone = request.phoneNumber().trim();
+        String newName = request.fullName().trim();
+
+        if (!newPhone.equals(oldPhone) && accountRepository.existsByPhoneNumber(newPhone)) {
             throw new AppException("Số điện thoại này đã được sử dụng bởi tài khoản khác!", HttpStatus.BAD_REQUEST);
         }
 
@@ -164,13 +186,33 @@ public class AccountAdminController {
             account.setEmail(request.email().trim());
         }
 
-        account.setFullName(request.fullName().trim());
-        account.setPhoneNumber(phone);
+        account.setFullName(newName);
+        account.setPhoneNumber(newPhone);
         if (request.role() != null) {
             account.setRole(request.role());
         }
 
         account = accountRepository.save(account);
+
+        // Đồng bộ sang các PatientProfile liên kết
+        List<PatientProfile> linkedProfiles = patientProfileRepository.findAllByAccount_UserIdAndDeletedFalse(userId);
+        for (PatientProfile p : linkedProfiles) {
+            if (p.getPhoneNumber() == null || p.getPhoneNumber().isBlank() || p.getPhoneNumber().equals(oldPhone)) {
+                p.setPhoneNumber(newPhone);
+            }
+            if (linkedProfiles.size() == 1 && (p.getFullName() == null || p.getFullName().equals(oldName))) {
+                p.setFullName(newName);
+            }
+            patientProfileRepository.save(p);
+        }
+
+        if (currentUser != null) {
+            auditLogService.log(currentUser.getId(), currentUser.getUsername(), "ROLE_ADMIN", "UPDATE_ACCOUNT",
+                    "ACCOUNT", account.getUserId().toString(),
+                    "Cập nhật tài khoản: " + account.getPhoneNumber(),
+                    servletRequest != null ? servletRequest.getRemoteAddr() : "127.0.0.1");
+        }
+
         return ResponseEntity.ok(ApiResponse.ok(AccountResponse.fromEntity(account), "Cập nhật tài khoản thành công"));
     }
 
@@ -178,7 +220,11 @@ public class AccountAdminController {
     @PutMapping("/{userId}/toggle-status")
     @PreAuthorize("hasRole('ADMIN')")
     @Transactional
-    public ResponseEntity<ApiResponse<AccountResponse>> toggleStatus(@PathVariable UUID userId) {
+    public ResponseEntity<ApiResponse<AccountResponse>> toggleStatus(
+            @PathVariable UUID userId,
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            HttpServletRequest servletRequest
+    ) {
         Account account = accountRepository.findById(userId)
                 .orElseThrow(() -> new AppException("Tài khoản không tồn tại!", HttpStatus.NOT_FOUND));
 
@@ -186,6 +232,14 @@ public class AccountAdminController {
         account = accountRepository.save(account);
 
         String msg = account.isActive() ? "Đã mở khóa tài khoản thành công" : "Đã khóa tài khoản thành công";
+
+        if (currentUser != null) {
+            auditLogService.log(currentUser.getId(), currentUser.getUsername(), "ROLE_ADMIN", "TOGGLE_ACCOUNT_STATUS",
+                    "ACCOUNT", account.getUserId().toString(),
+                    msg + " cho: " + account.getPhoneNumber(),
+                    servletRequest != null ? servletRequest.getRemoteAddr() : "127.0.0.1");
+        }
+
         return ResponseEntity.ok(ApiResponse.ok(AccountResponse.fromEntity(account), msg));
     }
 
@@ -195,13 +249,22 @@ public class AccountAdminController {
     @Transactional
     public ResponseEntity<ApiResponse<Void>> resetPassword(
             @PathVariable UUID userId,
-            @Valid @RequestBody ResetPasswordRequest request
+            @Valid @RequestBody ResetPasswordRequest request,
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            HttpServletRequest servletRequest
     ) {
         Account account = accountRepository.findById(userId)
                 .orElseThrow(() -> new AppException("Tài khoản không tồn tại!", HttpStatus.NOT_FOUND));
 
         account.setPassword(passwordEncoder.encode(request.newPassword()));
         accountRepository.save(account);
+
+        if (currentUser != null) {
+            auditLogService.log(currentUser.getId(), currentUser.getUsername(), "ROLE_ADMIN", "RESET_PASSWORD",
+                    "ACCOUNT", account.getUserId().toString(),
+                    "Đặt lại mật khẩu cho tài khoản: " + account.getPhoneNumber(),
+                    servletRequest != null ? servletRequest.getRemoteAddr() : "127.0.0.1");
+        }
 
         return ResponseEntity.ok(ApiResponse.ok(null, "Đặt lại mật khẩu cho tài khoản [" + account.getFullName() + "] thành công"));
     }
@@ -210,18 +273,30 @@ public class AccountAdminController {
     @RequestMapping(value = "/{userId}", method = RequestMethod.DELETE)
     @PreAuthorize("hasRole('ADMIN')")
     @Transactional
-    public ResponseEntity<ApiResponse<Void>> deleteAccount(@PathVariable UUID userId) {
-        return performDeleteAccount(userId);
+    public ResponseEntity<ApiResponse<Void>> deleteAccount(
+            @PathVariable UUID userId,
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            HttpServletRequest servletRequest
+    ) {
+        return performDeleteAccount(userId, currentUser, servletRequest);
     }
 
     @PostMapping("/{userId}/delete")
     @PreAuthorize("hasRole('ADMIN')")
     @Transactional
-    public ResponseEntity<ApiResponse<Void>> deleteAccountViaPost(@PathVariable UUID userId) {
-        return performDeleteAccount(userId);
+    public ResponseEntity<ApiResponse<Void>> deleteAccountViaPost(
+            @PathVariable UUID userId,
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            HttpServletRequest servletRequest
+    ) {
+        return performDeleteAccount(userId, currentUser, servletRequest);
     }
 
-    private ResponseEntity<ApiResponse<Void>> performDeleteAccount(UUID userId) {
+    private ResponseEntity<ApiResponse<Void>> performDeleteAccount(
+            UUID userId,
+            UserPrincipal currentUser,
+            HttpServletRequest servletRequest
+    ) {
         Account account = accountRepository.findById(userId)
                 .orElseThrow(() -> new AppException("Tài khoản không tồn tại!", HttpStatus.NOT_FOUND));
 
@@ -250,6 +325,13 @@ public class AccountAdminController {
             profile.setDeleted(true);
             patientProfileRepository.save(profile);
         });
+
+        if (currentUser != null) {
+            auditLogService.log(currentUser.getId(), currentUser.getUsername(), "ROLE_ADMIN", "DELETE_ACCOUNT",
+                    "ACCOUNT", account.getUserId().toString(),
+                    "Xóa mềm tài khoản: " + account.getPhoneNumber(),
+                    servletRequest != null ? servletRequest.getRemoteAddr() : "127.0.0.1");
+        }
 
         return ResponseEntity.ok(ApiResponse.ok(null, "Xóa tài khoản [" + account.getFullName() + "] thành công"));
     }

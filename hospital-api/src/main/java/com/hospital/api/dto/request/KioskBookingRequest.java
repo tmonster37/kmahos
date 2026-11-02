@@ -19,5 +19,11 @@ public record KioskBookingRequest(
 
         String priorityReason,
 
-        String symptoms
-) {}
+        String symptoms,
+
+        Boolean payNow
+) {
+    public KioskBookingRequest(String fullName, String phoneNumber, Integer departmentId, Integer birthYear, Boolean isPriority, String priorityReason, String symptoms) {
+        this(fullName, phoneNumber, departmentId, birthYear, isPriority, priorityReason, symptoms, false);
+    }
+}

@@ -6,7 +6,7 @@ const tntTheme = createTheme({
         primary: {
             main: designTokens.brand.primary,      // YouMed medical blue (#0088D6)
             light: designTokens.brand.primaryLight, // #EBF6FE
-            dark: designTokens.brand.primaryDark,   // #0062A3
+            dark: designTokens.brand.primaryDark,   // #CFFBF1
             contrastText: "#FFFFFF",
         },
         secondary: {
@@ -16,7 +16,7 @@ const tntTheme = createTheme({
             contrastText: "#FFFFFF",
         },
         info: {
-            main: designTokens.status.info.main,    // #0284C7
+            main: designTokens.status.info.main,    // #02adc7ff
             light: designTokens.status.info.bg,     // #E0F2FE
             dark: "#0369A1",
             contrastText: "#FFFFFF",

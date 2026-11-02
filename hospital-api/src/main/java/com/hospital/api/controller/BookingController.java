@@ -79,16 +79,27 @@ public class BookingController {
         return ResponseEntity.ok(ApiResponse.ok(bookingService.checkInKiosk(request), "Check-in Kiosk thành công"));
     }
 
-    // Bệnh nhân hủy lịch khám đã đặt
+    // Bệnh nhân thanh toán trực tiếp tại cây Kiosk qua mã QR VietQR (để vào thẳng buồng khám)
+    @PostMapping("/kiosk/pay")
+    public ResponseEntity<ApiResponse<com.hospital.api.dto.response.KioskCheckInResponse>> payKioskBooking(@Valid @RequestBody com.hospital.api.dto.request.KioskPayRequest request) {
+        return ResponseEntity.ok(ApiResponse.ok(bookingService.payKioskBooking(request), "Thanh toán viện phí tại Kiosk thành công"));
+    }
+
+    // Bệnh nhân hoặc nhân viên hủy lịch khám đã đặt
     @PutMapping("/{bookingId}/cancel")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> cancelBooking(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable UUID bookingId,
             HttpServletRequest servletRequest
     ) {
-        bookingService.adminCancelBooking(bookingId);
-        auditLogService.log(userPrincipal.getId(), userPrincipal.getPhoneNumber(), "ROLE_ADMIN", "BOOKING_CANCEL",
+        boolean isStaff = userPrincipal.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().contains("ADMIN") || a.getAuthority().contains("STAFF"));
+        bookingService.cancelBooking(userPrincipal.getId(), bookingId, isStaff);
+        String roleStr = userPrincipal.getAuthorities().stream()
+                .map(org.springframework.security.core.GrantedAuthority::getAuthority)
+                .findFirst().orElse("ROLE_PATIENT");
+        auditLogService.log(userPrincipal.getId(), userPrincipal.getPhoneNumber(), roleStr, "BOOKING_CANCEL",
                 "BOOKING", bookingId.toString(), "Cancelled booking", servletRequest.getRemoteAddr());
         return ResponseEntity.ok(ApiResponse.ok(null, "Đã hủy lịch khám thành công"));
     }

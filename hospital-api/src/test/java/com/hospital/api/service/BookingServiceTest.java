@@ -69,6 +69,7 @@ class BookingServiceTest {
     @Mock
     private SlotReservationService slotReservationService;
 
+    @Mock private com.hospital.api.service.impl.BookingReceptionTransition reception;
     private Clock hospitalClock;
     private BookingServiceImpl bookingService;
 
@@ -86,7 +87,8 @@ class BookingServiceTest {
         hospitalClock = Clock.fixed(Instant.parse("2026-10-23T02:00:00Z"), ZoneId.of("Asia/Ho_Chi_Minh"));
         bookingService = new BookingServiceImpl(bookingRepository, timeSlotRepository, patientProfileRepository,
                 accountRepository, doctorRepository, scheduleRepository, mock(RoomRepository.class),
-                slotReservationService, hospitalClock);
+                mock(com.hospital.api.repository.TransactionRepository.class),
+                slotReservationService, reception, hospitalClock);
         accountId = UUID.randomUUID();
         patientProfileId = UUID.randomUUID();
         timeSlotId = UUID.randomUUID();
@@ -157,8 +159,8 @@ class BookingServiceTest {
                 .thenReturn(Optional.of(testProfile));
         when(timeSlotRepository.findByIdWithLock(timeSlotId))
                 .thenReturn(Optional.of(testSlot));
-        when(bookingRepository.countBookingsByDoctorAndDate(doctorId, testSchedule.getScheduleDate()))
-                .thenReturn(5); // Đã có 5 người đặt trước -> STT tiếp theo là 6
+        when(reception.nextQueueNumber(testDoctor, testSchedule.getScheduleDate()))
+                .thenReturn(6); // Đã có 5 người đặt trước -> STT tiếp theo là 6
         when(bookingRepository.save(any(Booking.class))).thenAnswer(inv -> {
             Booking b = inv.getArgument(0);
             b.setBookingId(UUID.randomUUID());
@@ -198,7 +200,7 @@ class BookingServiceTest {
         AppException ex = assertThrows(AppException.class, () -> bookingService.createBooking(accountId, request));
 
         assertEquals("Khung giờ khám này đã kín chỗ hoặc đang có người giữ chỗ, vui lòng chọn khung giờ khác", ex.getMessage());
-        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
         verify(bookingRepository, never()).save(any(Booking.class));
     }
 
@@ -287,8 +289,8 @@ class BookingServiceTest {
         Booking booking = checkedInBooking(checkedInAt);
         when(bookingRepository.findByBookingCodeForUpdate("0987654321"))
                 .thenReturn(Optional.empty());
-        when(bookingRepository.findAllByPatientProfile_PhoneNumberAndBookingDateAndDeletedFalse(
-                "0987654321", LocalDate.of(2026, 10, 23))).thenReturn(List.of(booking));
+        when(bookingRepository.findActiveBookingCodesByPhoneAndDate(
+                "0987654321", LocalDate.of(2026, 10, 23), List.of(BookingStatus.CANCELLED, BookingStatus.COMPLETED))).thenReturn(List.of(booking.getBookingCode()));
         when(bookingRepository.findByBookingCodeForUpdate("BK-CHECKED"))
                 .thenReturn(Optional.of(booking));
         when(bookingRepository.save(booking)).thenReturn(booking);
@@ -298,6 +300,15 @@ class BookingServiceTest {
         assertEquals(4, response.queueNumber());
         assertEquals(checkedInAt, response.checkedInAt());
         verify(bookingRepository, never()).countBookingsByDoctorAndDate(any(), any());
+    }
+
+    @Test void phoneCheckInRequiresExactCodeWhenSeveralAppointmentsMatch() {
+        when(bookingRepository.findActiveBookingCodesByPhoneAndDate("0987654321", LocalDate.of(2026,10,23),
+                List.of(BookingStatus.CANCELLED, BookingStatus.COMPLETED))).thenReturn(List.of("BK20261023ABC123", "BK20261023DEF456"));
+        AppException error = assertThrows(AppException.class, () -> bookingService.checkInKiosk(new KioskCheckInRequest("0987654321")));
+        assertEquals(HttpStatus.CONFLICT, error.getStatus());
+        verify(reception, never()).checkIn(any(), any(), anyBoolean());
+        verify(bookingRepository, never()).save(any());
     }
 
     @Test
@@ -319,6 +330,7 @@ class BookingServiceTest {
         fullTarget.setMaxCapacity(5);
         when(bookingRepository.findByIdWithLock(any())).thenReturn(Optional.of(booking));
         when(timeSlotRepository.findByIdWithLock(fullTarget.getTimeSlotId())).thenReturn(Optional.of(fullTarget));
+        when(timeSlotRepository.findByIdWithLock(testSlot.getTimeSlotId())).thenReturn(Optional.of(testSlot));
 
         AppException ex = assertThrows(AppException.class, () -> bookingService.rescheduleBooking(
                 UUID.randomUUID(), new AdminBookingRescheduleRequest(fullTarget.getTimeSlotId())));
@@ -353,18 +365,128 @@ class BookingServiceTest {
     }
 
     @Test
-    @DisplayName("Booking administration and legacy cancellation require the ADMIN role")
-    void bookingAdministrationRequiresAdmin() throws NoSuchMethodException {
+    @DisplayName("AdminBookingController requires ADMIN role; BookingController cancellation endpoint requires authentication with ownership checks")
+    void bookingCancellationAuthorizationContracts() throws NoSuchMethodException {
         assertEquals("hasRole('ADMIN')", AdminBookingController.class.getAnnotation(PreAuthorize.class).value());
         PreAuthorize cancelAuthorization = BookingController.class
                 .getMethod("cancelBooking", com.hospital.api.security.UserPrincipal.class, UUID.class,
                         jakarta.servlet.http.HttpServletRequest.class)
                 .getAnnotation(PreAuthorize.class);
         assertNotNull(cancelAuthorization);
-        assertEquals("hasRole('ADMIN')", cancelAuthorization.value());
+        assertEquals("isAuthenticated()", cancelAuthorization.value());
+    }
+
+    @Test
+    @DisplayName("cancelBooking rejects cancellation when non-staff user is not the booking owner")
+    void cancelBooking_rejectsNonOwner_withForbidden() {
+        UUID bookingId = UUID.randomUUID();
+        UUID attackerAccountId = UUID.randomUUID();
+
+        Booking booking = Booking.builder()
+                .bookingId(bookingId)
+                .status(BookingStatus.CONFIRMED)
+                .patientProfile(testProfile)
+                .timeSlot(testSlot)
+                .doctor(testDoctor)
+                .build();
+
+        when(bookingRepository.findByIdWithLock(bookingId)).thenReturn(Optional.of(booking));
+
+        AppException ex = assertThrows(AppException.class, () ->
+                bookingService.cancelBooking(attackerAccountId, bookingId, false));
+
+        assertEquals(HttpStatus.FORBIDDEN, ex.getStatus());
+        assertTrue(ex.getMessage().contains("không có quyền hủy"));
+        verify(bookingRepository, never()).save(any(Booking.class));
+    }
+
+    @Test
+    @DisplayName("cancelBooking allows cancellation when user is the booking owner")
+    void cancelBooking_allowsOwner_andCancels() {
+        UUID bookingId = UUID.randomUUID();
+
+        Booking booking = Booking.builder()
+                .bookingId(bookingId)
+                .status(BookingStatus.CONFIRMED)
+                .patientProfile(testProfile)
+                .timeSlot(testSlot)
+                .doctor(testDoctor)
+                .build();
+
+        when(bookingRepository.findByIdWithLock(bookingId)).thenReturn(Optional.of(booking));
+        when(timeSlotRepository.findByIdWithLock(testSlot.getTimeSlotId())).thenReturn(Optional.of(testSlot));
+
+        bookingService.cancelBooking(accountId, bookingId, false);
+
+        assertEquals(BookingStatus.CANCELLED, booking.getStatus());
+        verify(bookingRepository).save(booking);
+        verify(timeSlotRepository).save(testSlot);
     }
 
     private BookingResponse createKioskBookingForBirthYear(int birthYear) {
+        return createKioskBookingForBirthYear(birthYear, false);
+    }
+
+    @Test void freeWebBookingDoesNotBecomePaid() {
+        testDoctor.setConsultationFee(BigDecimal.ZERO);
+        when(patientProfileRepository.findByPatientProfileIdAndAccount_UserIdAndDeletedFalse(patientProfileId, accountId)).thenReturn(Optional.of(testProfile));
+        when(timeSlotRepository.findByIdWithLock(timeSlotId)).thenReturn(Optional.of(testSlot));
+        when(reception.nextQueueNumber(testDoctor, testSchedule.getScheduleDate())).thenReturn(1);
+        when(bookingRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        bookingService.createBooking(accountId, new BookingCreateRequest(patientProfileId, timeSlotId, "Free"));
+        var saved = org.mockito.ArgumentCaptor.forClass(Booking.class);
+        verify(bookingRepository).save(saved.capture());
+        assertFalse(saved.getValue().getIsPaid()); assertNull(saved.getValue().getDispatchedAt());
+    }
+
+    @Test void reservationIdentifierDoesNotBypassCapacityAfterConsumption() {
+        testSlot.setCurrentBookings(5); testSlot.setHoldingCount(0); testSlot.setMaxCapacity(5);
+        when(patientProfileRepository.findByPatientProfileIdAndAccount_UserIdAndDeletedFalse(patientProfileId, accountId)).thenReturn(Optional.of(testProfile));
+        when(timeSlotRepository.findByIdWithLock(timeSlotId)).thenReturn(Optional.of(testSlot));
+        UUID reservation = UUID.randomUUID();
+        assertThrows(AppException.class, () -> bookingService.createBooking(accountId,
+                new BookingCreateRequest(patientProfileId, timeSlotId, "Full", reservation)));
+        verify(slotReservationService).consumeReservation(reservation, timeSlotId, accountId, patientProfileId);
+        verify(bookingRepository, never()).save(any());
+    }
+
+    @Test void kioskStopsAfterAllocatingFirstAvailableSchedule() {
+        prepareKioskPatient();
+        DoctorSchedule first = kioskSchedule(), second = kioskSchedule();
+        TimeSlot slot = kioskSlot(first);
+        when(scheduleRepository.findAllByDoctor_Department_DepartmentIdAndScheduleDateAndDeletedFalse(1, LocalDate.of(2026,10,23))).thenReturn(List.of(first, second));
+        when(timeSlotRepository.findAllByDoctorSchedule_DoctorScheduleIdAndDeletedFalseOrderByStartTimeAsc(first.getDoctorScheduleId())).thenReturn(List.of(slot));
+        when(timeSlotRepository.findByIdWithLock(slot.getTimeSlotId())).thenReturn(Optional.of(slot));
+        when(reception.nextQueueNumber(testDoctor, LocalDate.of(2026,10,23))).thenReturn(1);
+        when(bookingRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        bookingService.createKioskBooking(new com.hospital.api.dto.request.KioskBookingRequest("Patient", "0987654321", 1, 1980, false, null, null));
+        verify(timeSlotRepository, never()).findAllByDoctorSchedule_DoctorScheduleIdAndDeletedFalseOrderByStartTimeAsc(second.getDoctorScheduleId());
+        verify(timeSlotRepository).save(slot);
+    }
+
+    @Test
+    void kioskPayNowDoesNotVerifyPaymentOrDispatch() {
+        createKioskBookingForBirthYear(1980, true);
+        var saved = org.mockito.ArgumentCaptor.forClass(Booking.class);
+        verify(bookingRepository).save(saved.capture());
+        assertFalse(saved.getValue().getIsPaid());
+        assertNull(saved.getValue().getDispatchedAt());
+    }
+
+    @Test
+    void kioskPayRequestCannotCreateVerifiedPayment() {
+        Booking booking = Booking.builder().bookingCode("BK20261031ABC123").price(new BigDecimal("150000"))
+                .isPaid(false).status(BookingStatus.CONFIRMED).queueNumber(1).build();
+        when(bookingRepository.findByBookingCodeForUpdate(booking.getBookingCode())).thenReturn(Optional.of(booking));
+        assertThrows(AppException.class, () -> bookingService.payKioskBooking(
+                new com.hospital.api.dto.request.KioskPayRequest(booking.getBookingCode(), "VIETQR")));
+        assertFalse(booking.getIsPaid());
+        assertNull(booking.getCheckedInAt());
+        assertNull(booking.getDispatchedAt());
+        verify(bookingRepository, never()).save(any());
+    }
+
+    private BookingResponse createKioskBookingForBirthYear(int birthYear, boolean payNow) {
         prepareKioskPatient();
         DoctorSchedule schedule = kioskSchedule();
         TimeSlot slot = kioskSlot(schedule);
@@ -373,11 +495,11 @@ class BookingServiceTest {
         when(timeSlotRepository.findAllByDoctorSchedule_DoctorScheduleIdAndDeletedFalseOrderByStartTimeAsc(
                 schedule.getDoctorScheduleId())).thenReturn(List.of(slot));
         when(timeSlotRepository.findByIdWithLock(slot.getTimeSlotId())).thenReturn(Optional.of(slot));
-        when(bookingRepository.countBookingsByDoctorAndDate(doctorId, LocalDate.of(2026, 10, 23))).thenReturn(0);
+        when(reception.nextQueueNumber(testDoctor, LocalDate.of(2026, 10, 23))).thenReturn(1);
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         return bookingService.createKioskBooking(new com.hospital.api.dto.request.KioskBookingRequest(
-                "Patient", "0987654321", 1, birthYear, false, null, null));
+                "Patient", "0987654321", 1, birthYear, false, null, null, payNow));
     }
 
     private void prepareKioskPatient() {

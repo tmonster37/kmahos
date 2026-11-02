@@ -3,7 +3,7 @@
 
 let cachedVoices = [];
 
-const initVoices = () => {
+export const initVoices = () => {
   if (typeof window !== "undefined" && "speechSynthesis" in window) {
     cachedVoices = window.speechSynthesis.getVoices() || [];
     if (window.speechSynthesis.onvoiceschanged !== undefined) {
@@ -18,12 +18,11 @@ if (typeof window !== "undefined") {
   initVoices();
 }
 
-const getVietnameseVoice = () => {
+export const getVietnameseVoice = () => {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return null;
-  if (!cachedVoices || cachedVoices.length === 0) {
-    cachedVoices = window.speechSynthesis.getVoices() || [];
-  }
-  return cachedVoices.find(v => v.lang && (v.lang.toLowerCase().includes("vi") || v.lang.toLowerCase().includes("vn"))) || null;
+  const currentVoices = window.speechSynthesis.getVoices() || [];
+  const list = currentVoices.length > 0 ? currentVoices : cachedVoices;
+  return list.find(v => v.lang && (v.lang.toLowerCase().includes("vi") || v.lang.toLowerCase().includes("vn") || (v.name && (v.name.toLowerCase().includes("vietnam") || v.name.toLowerCase().includes("vietnamese"))))) || null;
 };
 
 export const playChime = () => {
@@ -32,6 +31,9 @@ export const playChime = () => {
     if (!AudioContext) return Promise.resolve();
 
     const ctx = new AudioContext();
+    if (ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
     const now = ctx.currentTime;
 
     // First tone (Ding - high pitch 587.33 Hz - D5)
@@ -74,6 +76,9 @@ export const speakPatientCall = async ({ queueCode, queueNumber, patientName, ro
   }
 
   try {
+    if (window.speechSynthesis.paused) {
+      window.speechSynthesis.resume();
+    }
     window.speechSynthesis.cancel(); // Dừng câu đang đọc dở nếu có
 
     const isKQ = isReturnAfterResult || (queueCode && queueCode.toUpperCase().startsWith("KQ"));
@@ -100,21 +105,27 @@ export const speakPatientCall = async ({ queueCode, queueNumber, patientName, ro
       text += `, để khám bệnh.`;
     }
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'vi-VN';
-    utterance.rate = 0.95; // Tốc độ đĩnh đạc, rõ ràng chuẩn y tế
-    utterance.pitch = 1.05; // Cao độ nhẹ nhàng, lịch sự
+    setTimeout(() => {
+      try {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'vi-VN';
+        utterance.rate = 0.95; // Tốc độ đĩnh đạc, rõ ràng chuẩn y tế
+        utterance.pitch = 1.05; // Cao độ nhẹ nhàng, lịch sự
 
-    const viVoice = getVietnameseVoice();
-    if (viVoice) {
-      utterance.voice = viVoice;
-    }
+        const viVoice = getVietnameseVoice();
+        if (viVoice) {
+          utterance.voice = viVoice;
+        }
 
-    utterance.onerror = (e) => {
-      console.warn("Speech synthesis error:", e);
-    };
+        utterance.onerror = (e) => {
+          console.warn("Speech synthesis error:", e);
+        };
 
-    window.speechSynthesis.speak(utterance);
+        window.speechSynthesis.speak(utterance);
+      } catch (err) {
+        console.warn("Speech speak error:", err);
+      }
+    }, 60);
   } catch (err) {
     console.warn("Không thể phát giọng đọc bệnh nhân:", err);
   }
@@ -128,28 +139,76 @@ export const speakCounterCall = async ({ ticketCode, patientName, counterName, i
   }
 
   try {
+    if (window.speechSynthesis.paused) {
+      window.speechSynthesis.resume();
+    }
     window.speechSynthesis.cancel();
 
     let text = `Xin mời bệnh nhân ${isPriority ? "ưu tiên" : ""} ${patientName || ""}, số thứ tự ${ticketCode || ""}, đến ${counterName || "Quầy tiếp đón"}, để làm thủ tục.`;
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'vi-VN';
-    utterance.rate = 0.95;
-    utterance.pitch = 1.05;
+    setTimeout(() => {
+      try {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'vi-VN';
+        utterance.rate = 0.95;
+        utterance.pitch = 1.05;
 
-    const viVoice = getVietnameseVoice();
-    if (viVoice) {
-      utterance.voice = viVoice;
-    }
+        const viVoice = getVietnameseVoice();
+        if (viVoice) {
+          utterance.voice = viVoice;
+        }
 
-    utterance.onerror = (e) => {
-      console.warn("Speech synthesis error:", e);
-    };
+        utterance.onerror = (e) => {
+          console.warn("Speech synthesis error:", e);
+        };
 
-    window.speechSynthesis.speak(utterance);
+        window.speechSynthesis.speak(utterance);
+      } catch (err) {
+        console.warn("Speech speak error:", err);
+      }
+    }, 60);
   } catch (err) {
     console.warn("Không thể phát giọng đọc quầy:", err);
   }
 };
 
+export const speakCashierCall = async ({ ticketCode, patientName, counterName, isPriority }) => {
+  await playChime();
 
+  if (typeof window === "undefined" || !('speechSynthesis' in window)) {
+    return;
+  }
+
+  try {
+    if (window.speechSynthesis.paused) {
+      window.speechSynthesis.resume();
+    }
+    window.speechSynthesis.cancel();
+
+    let text = `Xin mời bệnh nhân ${isPriority ? "ưu tiên" : ""} ${patientName || ""}, số phiếu ${ticketCode || ""}, đến ${counterName || "Quầy tiếp đón"}, để nộp tiền và làm thủ tục.`;
+
+    setTimeout(() => {
+      try {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'vi-VN';
+        utterance.rate = 0.95;
+        utterance.pitch = 1.05;
+
+        const viVoice = getVietnameseVoice();
+        if (viVoice) {
+          utterance.voice = viVoice;
+        }
+
+        utterance.onerror = (e) => {
+          console.warn("Speech synthesis error:", e);
+        };
+
+        window.speechSynthesis.speak(utterance);
+      } catch (err) {
+        console.warn("Speech speak error:", err);
+      }
+    }, 60);
+  } catch (err) {
+    console.warn("Không thể phát giọng đọc thu ngân viện phí:", err);
+  }
+};

@@ -73,7 +73,10 @@ export default function ChatConsultationPage() {
     useEffect(() => {
         if (activePartner) {
             fetchMessages();
-            const interval = setInterval(fetchMessages, 3000);
+            const interval = setInterval(() => {
+                if (typeof document !== "undefined" && document.hidden) return;
+                fetchMessages();
+            }, 3000);
             return () => clearInterval(interval);
         }
     }, [activePartner]);

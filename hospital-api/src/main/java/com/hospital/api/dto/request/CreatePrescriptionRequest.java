@@ -15,6 +15,9 @@ public record CreatePrescriptionRequest(
         List<PrescriptionItemRequest> items,
 
         @JsonAlias({"overrideAllergy", "forcePrescribe"})
-        Boolean overrideAllergyWarning
+        Boolean overrideAllergyWarning,
+
+        @JsonAlias({"overrideReason", "clinicalJustification", "justification"})
+        String overrideReason
 ) {}
 

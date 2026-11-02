@@ -54,7 +54,8 @@ export default function NotificationMenu() {
         try {
             const res = await axiosInstance.get("/api/utilities/notifications");
             serverNotifs = res.data && Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []);
-        } catch {
+        } catch (err) {
+            console.warn("Không thể tải thông báo từ máy chủ:", err);
             serverNotifs = [];
         }
 

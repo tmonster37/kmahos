@@ -68,6 +68,13 @@ public class Booking extends BaseEntity {
 
     @Column(name = "checked_in_at")
     private LocalDateTime checkedInAt;
+
+    @Column(name = "dispatched_at")
+    private LocalDateTime dispatchedAt;
+
+    @Column(name = "is_paid", nullable = false)
+    @Builder.Default
+    private Boolean isPaid = false;
 }
 
 

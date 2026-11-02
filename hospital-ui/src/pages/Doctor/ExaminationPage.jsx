@@ -59,9 +59,11 @@ import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import HealingIcon from "@mui/icons-material/Healing";
 import MonitorWeightIcon from "@mui/icons-material/MonitorWeight";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import CancelIcon from "@mui/icons-material/Cancel";
 import CameraAltIcon from "@mui/icons-material/CameraAlt";
 import LockIcon from "@mui/icons-material/Lock";
 import HistoryEduIcon from "@mui/icons-material/HistoryEdu";
+import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 
 import AssignTestsModal from "./AssignTestsModal";
 import PrescriptionModal from "./PrescriptionModal";
@@ -70,6 +72,10 @@ import MedicalRecordPrintModal from "./MedicalRecordPrintModal";
 import InpatientAdmitModal from "./InpatientAdmitModal";
 import AddendumModal from "./AddendumModal";
 import PacsViewerModal from "../../components/PacsViewerModal";
+import EditVitalsModal from "./EditVitalsModal";
+import DoctorScheduleModal from "./DoctorScheduleModal";
+import { useAuth } from "../../context/AuthContext";
+import designTokens from "../../theme/designTokens";
 import axiosInstance from "../../services/AxiosInstance";
 import { formatCurrency, formatDate } from "../../utils/formatters";
 import { speakPatientCall } from "../../services/voiceService";
@@ -231,6 +237,8 @@ function CockpitLiveClock() {
 
 export default function ExaminationPage() {
     const navigate = useNavigate();
+    const { user } = useAuth();
+    const isHeadOfDepartment = user?.role === "ROLE_HEAD_OF_DEPARTMENT" || user?.role === "ROLE_ADMIN";
     const [queue, setQueue] = useState([]);
     const [filterStatus, setFilterStatus] = useState("ALL");
     const [searchQuery, setSearchQuery] = useState("");
@@ -251,6 +259,39 @@ export default function ExaminationPage() {
 
     // Modals
     const [openTestModal, setOpenTestModal] = useState(false);
+    const [cancelTestTarget, setCancelTestTarget] = useState(null);
+    const [cancelReasonText, setCancelReasonText] = useState("");
+    const [cancellingTest, setCancellingTest] = useState(false);
+
+    const handleOpenCancelDialog = (test) => {
+        setCancelTestTarget(test);
+        setCancelReasonText("");
+    };
+
+    const handleConfirmCancelTest = async () => {
+        if (!cancelTestTarget || !cancelReasonText.trim()) return;
+        setCancellingTest(true);
+        try {
+            await axiosInstance.post(`/api/clinical/tests/${cancelTestTarget.testId}/cancel`, {
+                cancelReason: cancelReasonText.trim()
+            });
+            setMessage(`Đã hủy chỉ định ${cancelTestTarget.serviceName} thành công.`);
+            setCancelTestTarget(null);
+            setCancelReasonText("");
+            if (record?.recordId) {
+                const res = await axiosInstance.get(`/api/clinical/records/${record.recordId}`);
+                if (res.data) {
+                    setRecord(res.data);
+                }
+            }
+            fetchDoctorQueue();
+        } catch (err) {
+            console.error("Lỗi hủy chỉ định xét nghiệm:", err);
+            setErrorMessage(err.response?.data?.message || err.message || "Hủy chỉ định thất bại");
+        } finally {
+            setCancellingTest(false);
+        }
+    };
     const [openRxModal, setOpenRxModal] = useState(false);
     const [openRxPrintModal, setOpenRxPrintModal] = useState(false);
     const [openRecordPrintModal, setOpenRecordPrintModal] = useState(false);
@@ -264,6 +305,7 @@ export default function ExaminationPage() {
     const [pacsTarget, setPacsTarget] = useState(null);
     const [activeTab, setActiveTab] = useState(0);
     const [message, setMessage] = useState("");
+    const [errorMessage, setErrorMessage] = useState("");
     const [isRefreshingTests, setIsRefreshingTests] = useState(false);
 
     // Helper: Detect abnormal indicator in test result string
@@ -282,14 +324,14 @@ export default function ExaminationPage() {
 
     useEffect(() => {
         fetchDoctorQueue();
-        const interval = setInterval(fetchDoctorQueue, 15000);
+        const interval = setInterval(fetchDoctorQueue, 5000);
         return () => clearInterval(interval);
     }, []);
 
     // Auto-sync lab test results periodically when pending
     useEffect(() => {
         if (!record || !record.recordId) return;
-        const hasPendingTests = record.tests && record.tests.some((t) => t.state !== "COMPLETED");
+        const hasPendingTests = record.tests && record.tests.some((t) => t.state !== "COMPLETED" && t.state !== "CANCELLED");
         if (!hasPendingTests) return;
 
         const testSyncInterval = setInterval(async () => {
@@ -326,7 +368,7 @@ export default function ExaminationPage() {
         try {
             setLoadingQueue(true);
             const res = await axiosInstance.get("/api/clinical/doctor/queue");
-            const list = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+            const list = Array.isArray(res?.data?.data) ? res.data.data : (Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []));
             setQueue(list);
         } catch (err) {
             console.error("Lỗi lấy danh sách hàng đợi:", err);
@@ -499,27 +541,61 @@ export default function ExaminationPage() {
     };
 
     const isWaitingPatient = (p) =>
-        (p.status === "CONFIRMED" || p.status === "PENDING_PAYMENT" || p.status === "WAITING") && !p.isReturnAfterResult;
+        (p.status === "CONFIRMED" || p.status === "PENDING_PAYMENT" || p.status === "WAITING") && !p.isReturnAfterResult && p.recordState !== "SKIPPED";
 
     const handleCallNext = async () => {
-        const nextPatient = queue.find(isWaitingPatient);
+        const nextPatient = queue.find(p => p.recordState === "CALLING") || queue.find(isWaitingPatient);
         if (!nextPatient) {
             alert("Không còn bệnh nhân nào đang chờ khám trong hàng đợi hôm nay!");
             return;
         }
+        await handleCallPatient(nextPatient);
+    };
 
-        playCallChime();
-        speakPatientCall({
-            queueCode: nextPatient.queueCode,
-            queueNumber: nextPatient.queueNumber,
-            patientName: nextPatient.patientName,
-            roomName: "Khám Bệnh",
-            departmentName: nextPatient.departmentName,
-            isPriority: nextPatient.isPriority
-        });
+    const handleCallPatient = async (patientItem) => {
+        if (!patientItem) return;
+        try {
+            await axiosInstance.post(`/api/clinical/call-patient?bookingCode=${patientItem.bookingCode}`);
+            playCallChime();
+            speakPatientCall({
+                queueCode: patientItem.queueCode,
+                queueNumber: patientItem.queueNumber,
+                patientName: patientItem.patientName,
+                roomName: "Khám Bệnh",
+                departmentName: patientItem.departmentName,
+                isPriority: patientItem.isPriority
+            });
+            notifyUpcomingPatients(queue, patientItem, "Bàn Khám Bác Sĩ");
+            setMessage(`🔔 Đang gọi bệnh nhân STT ${patientItem.queueNumber}: ${patientItem.patientName} vào buồng khám!`);
+            fetchDoctorQueue();
+        } catch (err) {
+            console.error("Lỗi gọi bệnh nhân:", err);
+            alert(err?.response?.data?.message || err?.message || "Không thể gọi bệnh nhân!");
+        }
+    };
 
-        notifyUpcomingPatients(queue, nextPatient, "Bàn Khám Bác Sĩ");
-        await handleStartExam(nextPatient);
+    const handleSkipPatient = async (patientItem) => {
+        if (!patientItem) return;
+        try {
+            await axiosInstance.post(`/api/clinical/skip-patient?bookingCode=${patientItem.bookingCode}`);
+            setMessage(`Đã đánh dấu vắng mặt bệnh nhân STT ${patientItem.queueNumber}: ${patientItem.patientName}.`);
+            fetchDoctorQueue();
+        } catch (err) {
+            console.error("Lỗi bỏ qua lượt:", err);
+            alert(err?.response?.data?.message || err?.message || "Không thể bỏ qua lượt!");
+        }
+    };
+
+    const handleRecallPatient = async (patientItem) => {
+        if (!patientItem) return;
+        try {
+            await axiosInstance.post(`/api/clinical/recall-patient?bookingCode=${patientItem.bookingCode}`);
+            setMessage(`Đã khôi phục bệnh nhân STT ${patientItem.queueNumber}: ${patientItem.patientName} vào danh sách chờ.`);
+            fetchDoctorQueue();
+        } catch (err) {
+            console.error("Lỗi gọi lại bệnh nhân:", err);
+            alert(err?.response?.data?.message || err?.message || "Không thể khôi phục bệnh nhân!");
+        }
     };
 
     const handleStartExam = async (patientItem) => {
@@ -583,8 +659,47 @@ export default function ExaminationPage() {
 
     const [completingExam, setCompletingExam] = useState(false);
 
+    const [openAbandonModal, setOpenAbandonModal] = useState(false);
+    const [abandonReason, setAbandonReason] = useState("");
+    const [abandoning, setAbandoning] = useState(false);
+
+    const handleAbandonAfterTests = async () => {
+        if (!record?.recordId) return;
+        setAbandoning(true);
+        try {
+            const res = await axiosInstance.post(`/api/clinical/records/${record.recordId}/abandon-after-tests`, {
+                reason: abandonReason.trim() || "Bệnh nhân không quay lại buồng khám sau khi làm chỉ định cận lâm sàng"
+            });
+            const data = res?.data?.data || res?.data || res;
+            setRecord(data);
+            setOpenAbandonModal(false);
+            setAbandonReason("");
+            setMessage("Đã ghi nhận đóng ca khám vắng mặt cho bệnh nhân thành công.");
+            fetchDoctorQueue();
+        } catch (err) {
+            console.error("Lỗi đóng ca khám vắng mặt:", err);
+            alert(err?.response?.data?.message || err?.message || "Lỗi đóng ca khám vắng mặt!");
+        } finally {
+            setAbandoning(false);
+        }
+    };
+
     const handleCompleteExamWithoutPrescription = async () => {
         if (!record) return;
+
+        if (!finalDiagnosis?.trim()) {
+            alert("Bác sĩ phải nhập kết luận chẩn đoán lâm sàng xác định trước khi hoàn tất ca khám!");
+            return;
+        }
+
+        const unfinishedTests = (record?.medicalTests || record?.tests || []).filter(
+            t => t.state !== "COMPLETED" && t.state !== "CANCELLED"
+        );
+        if (unfinishedTests.length > 0) {
+            alert(`Không thể hoàn tất ca khám do bệnh nhân vẫn còn ${unfinishedTests.length} chỉ định cận lâm sàng chưa hoàn thành hoặc chưa được hủy!\n\nVui lòng chờ phòng xét nghiệm trả kết quả hoặc bấm hủy chỉ định nếu bệnh nhân không thực hiện.`);
+            return;
+        }
+
         const confirmDone = window.confirm(
             `Xác nhận hoàn tất ca khám cho bệnh nhân ${selectedPatient?.patientName || ""} (Không kê đơn thuốc)?\n\nHệ thống sẽ chuyển trạng thái ca khám sang HOÀN THÀNH (DONE) và đóng hồ sơ.`
         );
@@ -598,15 +713,15 @@ export default function ExaminationPage() {
                 const startRes = await axiosInstance.post("/api/clinical/start", {
                     bookingCode: selectedPatient?.bookingCode,
                     symptoms: selectedPatient?.symptoms,
-                    initialDiagnosis: initialDiagnosis || finalDiagnosis || "Khám nội tổng quát",
+                    initialDiagnosis: initialDiagnosis || finalDiagnosis,
                 });
                 const startData = startRes?.data || startRes;
                 targetRecordId = startData?.recordId || startData?.data?.recordId;
             }
 
             const res = await axiosInstance.post(`/api/clinical/records/${targetRecordId}/complete`, {
-                finalDiagnosis: finalDiagnosis || "Khám nội tổng quát - Không phát hiện bất thường cần can thiệp thuốc",
-                treatmentPlan: treatmentPlan || "Theo dõi sức khỏe định kỳ, điều chỉnh chế độ ăn uống sinh hoạt",
+                finalDiagnosis: finalDiagnosis.trim(),
+                treatmentPlan: treatmentPlan?.trim() || "Theo dõi sức khỏe định kỳ, tái khám khi có dấu hiệu bất thường",
                 reExaminationDate: cleanDate,
             });
             const data = res?.data?.data || res?.data || res;
@@ -938,28 +1053,14 @@ export default function ExaminationPage() {
                     p: { xs: 2, md: 2.5 },
                     mb: 3,
                     borderRadius: 3.5,
-                    background: "linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0369a1 100%)",
-                    color: "#ffffff",
-                    border: "1px solid #334155",
-                    boxShadow: "0 10px 25px -5px rgba(15, 23, 42, 0.3), 0 8px 10px -6px rgba(15, 23, 42, 0.3)",
+                    bgcolor: "#FFFFFF",
+                    color: "#0F172A",
+                    border: "1px solid #E2E8F0",
+                    boxShadow: "0 2px 12px rgba(0, 0, 0, 0.03)",
                     position: "relative",
                     overflow: "hidden"
                 }}
             >
-                {/* Background Accent Glow */}
-                <Box
-                    sx={{
-                        position: "absolute",
-                        top: -40,
-                        right: -40,
-                        width: 180,
-                        height: 180,
-                        borderRadius: "50%",
-                        background: "radial-gradient(circle, rgba(56,189,248,0.25) 0%, rgba(56,189,248,0) 70%)",
-                        pointerEvents: "none"
-                    }}
-                />
-
                 <Box
                     sx={{
                         display: "flex",
@@ -976,35 +1077,37 @@ export default function ExaminationPage() {
                                 width: 44,
                                 height: 44,
                                 borderRadius: 2.5,
-                                bgcolor: "rgba(56, 189, 248, 0.15)",
-                                border: "1px solid rgba(56, 189, 248, 0.3)",
+                                bgcolor: "#F0FDFA",
+                                border: "1px solid #99F6E4",
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
-                                color: "#38bdf8",
-                                flexShrink: 0
+                                color: "#0D9488",
+                                flexShrink: 0,
+                                boxShadow: "0 2px 8px rgba(13, 148, 136, 0.15)"
                             }}
                         >
                             <LocalHospitalIcon sx={{ fontSize: 24 }} />
                         </Box>
                         <Box sx={{ minWidth: 0 }}>
                             <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
-                                <Typography variant="h6" fontWeight={800} sx={{ letterSpacing: "-0.3px", fontSize: "1.15rem", whiteSpace: "nowrap", color: "#ffffff !important" }}>
+                                <Typography variant="h6" fontWeight={800} sx={{ letterSpacing: "-0.3px", fontSize: "1.15rem", whiteSpace: "nowrap", color: "#0F172A" }}>
                                     Bàn Khám Bác Sĩ & Lâm Sàng
                                 </Typography>
                                 <Chip
                                     label="Live Cockpit"
                                     size="small"
                                     sx={{
-                                        bgcolor: "#0284c7",
-                                        color: "#ffffff",
-                                        fontWeight: 700,
-                                        fontSize: "0.65rem",
-                                        height: 18
+                                        bgcolor: "#E0F2FE",
+                                        color: "#0284C7",
+                                        fontWeight: 800,
+                                        fontSize: "0.68rem",
+                                        height: 20,
+                                        border: "1px solid #BAE6FD"
                                     }}
                                 />
                             </Box>
-                            <Typography variant="caption" sx={{ color: "rgba(226, 232, 240, 0.9)", display: "block", mt: 0.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            <Typography variant="caption" sx={{ color: "#64748B", display: "block", mt: 0.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontWeight: 500 }}>
                                 BV Đa khoa TNT • Khoa Khám Bệnh • Ca: <CockpitLiveClock />
                             </Typography>
                         </Box>
@@ -1018,22 +1121,22 @@ export default function ExaminationPage() {
                         justifyContent={{ xs: "flex-start", sm: "center" }}
                         sx={{ flexShrink: 0, my: { xs: 0.5, lg: 0 } }}
                     >
-                        <Box sx={{ px: 1.4, py: 0.6, borderRadius: 2, bgcolor: "rgba(245, 158, 11, 0.15)", border: "1px solid rgba(245, 158, 11, 0.3)", textAlign: "center", minWidth: 68 }}>
-                            <Typography variant="caption" sx={{ color: "#fbbf24", fontWeight: 700, display: "block", fontSize: "0.65rem", whiteSpace: "nowrap" }}>CHỜ KHÁM</Typography>
-                            <Typography variant="subtitle1" fontWeight={800} sx={{ color: "#fef08a", lineHeight: 1.1, fontSize: "1.1rem" }}>{waitingCount}</Typography>
+                        <Box sx={{ px: 1.4, py: 0.6, borderRadius: 2, bgcolor: "#FEF3C7", border: "1px solid #FDE68A", textAlign: "center", minWidth: 68 }}>
+                            <Typography variant="caption" sx={{ color: "#B45309", fontWeight: 800, display: "block", fontSize: "0.65rem", whiteSpace: "nowrap" }}>CHỜ KHÁM</Typography>
+                            <Typography variant="subtitle1" fontWeight={900} sx={{ color: "#92400E", lineHeight: 1.1, fontSize: "1.15rem" }}>{waitingCount}</Typography>
                         </Box>
-                        <Box sx={{ px: 1.4, py: 0.6, borderRadius: 2, bgcolor: "rgba(56, 189, 248, 0.15)", border: "1px solid rgba(56, 189, 248, 0.3)", textAlign: "center", minWidth: 68 }}>
-                            <Typography variant="caption" sx={{ color: "#38bdf8", fontWeight: 700, display: "block", fontSize: "0.65rem", whiteSpace: "nowrap" }}>ĐANG KHÁM</Typography>
-                            <Typography variant="subtitle1" fontWeight={800} sx={{ color: "#e0f2fe", lineHeight: 1.1, fontSize: "1.1rem" }}>{inProgressCount}</Typography>
+                        <Box sx={{ px: 1.4, py: 0.6, borderRadius: 2, bgcolor: "#E0F2FE", border: "1px solid #BAE6FD", textAlign: "center", minWidth: 68 }}>
+                            <Typography variant="caption" sx={{ color: "#0284C7", fontWeight: 800, display: "block", fontSize: "0.65rem", whiteSpace: "nowrap" }}>ĐANG KHÁM</Typography>
+                            <Typography variant="subtitle1" fontWeight={900} sx={{ color: "#0369A1", lineHeight: 1.1, fontSize: "1.15rem" }}>{inProgressCount}</Typography>
                         </Box>
-                        <Box sx={{ px: 1.4, py: 0.6, borderRadius: 2, bgcolor: "rgba(34, 197, 94, 0.15)", border: "1px solid rgba(34, 197, 94, 0.3)", textAlign: "center", minWidth: 68 }}>
-                            <Typography variant="caption" sx={{ color: "#4ade80", fontWeight: 700, display: "block", fontSize: "0.65rem", whiteSpace: "nowrap" }}>ĐÃ KHÁM</Typography>
-                            <Typography variant="subtitle1" fontWeight={800} sx={{ color: "#bbf7d0", lineHeight: 1.1, fontSize: "1.1rem" }}>{completedCount}</Typography>
+                        <Box sx={{ px: 1.4, py: 0.6, borderRadius: 2, bgcolor: "#DCFCE7", border: "1px solid #BBF7D0", textAlign: "center", minWidth: 68 }}>
+                            <Typography variant="caption" sx={{ color: "#15803D", fontWeight: 800, display: "block", fontSize: "0.65rem", whiteSpace: "nowrap" }}>ĐÃ KHÁM</Typography>
+                            <Typography variant="subtitle1" fontWeight={900} sx={{ color: "#166534", lineHeight: 1.1, fontSize: "1.15rem" }}>{completedCount}</Typography>
                         </Box>
                         {priorityCount > 0 && (
-                            <Box sx={{ px: 1.4, py: 0.6, borderRadius: 2, bgcolor: "rgba(239, 68, 68, 0.2)", border: "1px solid rgba(239, 68, 68, 0.4)", textAlign: "center", minWidth: 68 }}>
-                                <Typography variant="caption" sx={{ color: "#fca5a5", fontWeight: 800, display: "block", fontSize: "0.65rem", whiteSpace: "nowrap" }}>ƯU TIÊN</Typography>
-                                <Typography variant="subtitle1" fontWeight={800} sx={{ color: "#fee2e2", lineHeight: 1.1, fontSize: "1.1rem" }}>{priorityCount}</Typography>
+                            <Box sx={{ px: 1.4, py: 0.6, borderRadius: 2, bgcolor: "#FEE2E2", border: "1px solid #FECACA", textAlign: "center", minWidth: 68 }}>
+                                <Typography variant="caption" sx={{ color: "#DC2626", fontWeight: 800, display: "block", fontSize: "0.65rem", whiteSpace: "nowrap" }}>ƯU TIÊN</Typography>
+                                <Typography variant="subtitle1" fontWeight={900} sx={{ color: "#B91C1C", lineHeight: 1.1, fontSize: "1.15rem" }}>{priorityCount}</Typography>
                             </Box>
                         )}
                     </Stack>
@@ -1041,71 +1144,94 @@ export default function ExaminationPage() {
                     {/* Right: Actions */}
                     <Stack
                         direction="row"
-                        spacing={1.2}
+                        spacing={1}
                         alignItems="center"
-                        justifyContent={{ xs: "flex-start", lg: "flex-end" }}
+                        flexWrap="wrap"
                         sx={{ flexShrink: 0 }}
                     >
-                        <Tooltip title="Xem lịch phân công trực">
+                        {/* Nút xem lịch trực cá nhân của Bác sĩ */}
+                        <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={<CalendarMonthIcon sx={{ fontSize: 16 }} />}
+                            onClick={() => setOpenScheduleModal(true)}
+                            sx={{
+                                color: "#334155",
+                                borderColor: "#CBD5E1",
+                                "&:hover": {
+                                    borderColor: "#0D9488",
+                                    color: "#0D9488",
+                                    bgcolor: "#F0FDFA"
+                                },
+                                fontWeight: 700,
+                                fontSize: "0.8rem",
+                                borderRadius: 2,
+                                py: 0.8,
+                                px: 1.5,
+                                textTransform: "none"
+                            }}
+                        >
+                            Lịch Trực
+                        </Button>
+
+                        {/* Nút Tác Nghiệp Đặc Quyền Trưởng Khoa (Nếu là ROLE_HEAD_OF_DEPARTMENT) */}
+                        {isHeadOfDepartment && (
                             <Button
-                                variant="outlined"
+                                variant="contained"
                                 size="small"
-                                onClick={handleOpenMySchedule}
+                                startIcon={<AdminPanelSettingsIcon sx={{ fontSize: 16 }} />}
+                                onClick={() => navigate("/admin/schedules")}
                                 sx={{
-                                    color: "#e2e8f0",
-                                    borderColor: "#475569",
-                                    bgcolor: "rgba(15, 23, 42, 0.6)",
+                                    bgcolor: "#F59E0B",
+                                    color: "#0F172A",
+                                    "&:hover": { bgcolor: "#D97706" },
+                                    fontWeight: 700,
+                                    fontSize: "0.8rem",
                                     borderRadius: 2,
-                                    fontWeight: 600,
-                                    textTransform: "none",
-                                    whiteSpace: "nowrap",
-                                    height: "36px",
+                                    py: 0.8,
                                     px: 1.5,
-                                    "&:hover": { borderColor: "#94a3b8", bgcolor: "rgba(30, 41, 59, 0.8)" }
+                                    textTransform: "none",
+                                    boxShadow: "0 2px 8px rgba(245, 158, 11, 0.35)"
                                 }}
-                                startIcon={<CalendarMonthIcon fontSize="small" />}
                             >
-                                Lịch Trực
+                                Phân Lịch Trực Khoa
                             </Button>
-                        </Tooltip>
+                        )}
 
                         <Button
                             variant="contained"
-                            size="medium"
-                            startIcon={<VolumeUpIcon />}
+                            size="small"
+                            startIcon={<VolumeUpIcon sx={{ fontSize: 18 }} />}
                             onClick={handleCallNext}
+                            disabled={waitingCount === 0}
                             sx={{
-                                background: "linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important",
-                                bgcolor: "#0284c7 !important",
-                                backgroundImage: "none !important",
-                                color: "#ffffff !important",
-                                fontWeight: 800,
+                                bgcolor: "#0D9488",
+                                "&:hover": { bgcolor: "#0F766E" },
+                                color: "#ffffff",
+                                fontWeight: 700,
+                                fontSize: "0.825rem",
                                 borderRadius: 2,
-                                height: "36px",
-                                px: 2.2,
-                                whiteSpace: "nowrap",
-                                boxShadow: "0 4px 15px rgba(2, 132, 199, 0.4)",
+                                py: 0.8,
+                                px: 1.8,
                                 textTransform: "none",
-                                "&:hover": {
-                                    background: "linear-gradient(135deg, #0369a1 0%, #075985 100%) !important",
-                                    boxShadow: "0 6px 20px rgba(2, 132, 199, 0.5)"
+                                boxShadow: "0 4px 12px rgba(13, 148, 136, 0.25)",
+                                "&.Mui-disabled": {
+                                    bgcolor: "#E2E8F0",
+                                    color: "#94A3B8"
                                 }
                             }}
                         >
                             Gọi Số Tiếp ({waitingCount})
                         </Button>
-
-                        <Tooltip title="Làm mới hàng đợi">
+                        <Tooltip title="Làm mới hàng đợi và đồng bộ ca khám">
                             <IconButton
-                                onClick={fetchDoctorQueue}
                                 size="small"
+                                onClick={fetchDoctorQueue}
                                 sx={{
-                                    color: "#e2e8f0",
-                                    bgcolor: "rgba(255,255,255,0.1)",
-                                    width: 36,
-                                    height: 36,
-                                    borderRadius: 2,
-                                    "&:hover": { bgcolor: "rgba(255,255,255,0.2)" }
+                                    color: "#475569",
+                                    bgcolor: "#F8FAFC",
+                                    "&:hover": { bgcolor: "#F1F5F9", color: "#0D9488" },
+                                    border: "1px solid #CBD5E1"
                                 }}
                             >
                                 <RefreshIcon fontSize="small" />
@@ -1122,6 +1248,16 @@ export default function ExaminationPage() {
                     onClose={() => setMessage("")}
                 >
                     {message}
+                </Alert>
+            )}
+
+            {errorMessage && (
+                <Alert
+                    severity="error"
+                    sx={{ mb: 3, borderRadius: 2.5, boxShadow: "0 2px 8px rgba(239,68,68,0.15)" }}
+                    onClose={() => setErrorMessage("")}
+                >
+                    {errorMessage}
                 </Alert>
             )}
 
@@ -1237,7 +1373,15 @@ export default function ExaminationPage() {
                                     let statusBg = "#f1f5f9";
                                     let statusLabel = "Chờ khám";
 
-                                    if (item.isReturnAfterResult) {
+                                    if (item.recordState === "CALLING") {
+                                        statusColor = "#ea580c";
+                                        statusBg = "#ffedd5";
+                                        statusLabel = "Đang gọi vào";
+                                    } else if (item.recordState === "SKIPPED") {
+                                        statusColor = "#64748b";
+                                        statusBg = "#f1f5f9";
+                                        statusLabel = "Vắng mặt (Bỏ qua)";
+                                    } else if (item.isReturnAfterResult) {
                                         statusColor = "#7c3aed";
                                         statusBg = "#f5f3ff";
                                         statusLabel = "Đã có KQ CLS";
@@ -1520,27 +1664,64 @@ export default function ExaminationPage() {
                                             </>
                                         )}
 
-                                        {!record ? (
-                                            <Button
-                                                variant="contained"
-                                                size="small"
-                                                onClick={() => handleStartExam(selectedPatient)}
-                                                disabled={startingExam}
-                                                sx={{
-                                                    bgcolor: "#0284c7",
-                                                    fontWeight: 800,
-                                                    px: 2.2,
-                                                    py: 0.7,
-                                                    fontSize: "0.82rem",
-                                                    whiteSpace: "nowrap",
-                                                    borderRadius: 2,
-                                                    textTransform: "none",
-                                                    boxShadow: "0 2px 8px rgba(2, 132, 199, 0.25)",
-                                                    "&:hover": { bgcolor: "#0369a1" }
-                                                }}
-                                            >
-                                                {startingExam ? "Đang mở hồ sơ..." : "Tiếp Nhận & Bắt Đầu Khám"}
-                                            </Button>
+                                        {(!record || record.state === "WAITING" || record.state === "CALLING" || record.state === "SKIPPED") ? (
+                                            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                                                <Button
+                                                    variant="outlined"
+                                                    color="warning"
+                                                    size="small"
+                                                    startIcon={<VolumeUpIcon sx={{ fontSize: 16 }} />}
+                                                    onClick={() => handleCallPatient(selectedPatient)}
+                                                    sx={{ borderRadius: 2, fontWeight: 800, textTransform: "none", fontSize: "0.8rem", py: 0.6, px: 1.5, whiteSpace: "nowrap" }}
+                                                >
+                                                    {selectedPatient?.recordState === "CALLING" ? "Mời Lại Loa" : "Gọi Vào Phòng"}
+                                                </Button>
+
+                                                {selectedPatient?.recordState === "CALLING" && (
+                                                    <Button
+                                                        variant="outlined"
+                                                        color="inherit"
+                                                        size="small"
+                                                        onClick={() => handleSkipPatient(selectedPatient)}
+                                                        sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none", fontSize: "0.8rem", py: 0.6, px: 1.2, color: "#64748b", borderColor: "#cbd5e1", whiteSpace: "nowrap" }}
+                                                    >
+                                                        Báo Vắng Mặt
+                                                    </Button>
+                                                )}
+
+                                                {selectedPatient?.recordState === "SKIPPED" && (
+                                                    <Button
+                                                        variant="outlined"
+                                                        color="info"
+                                                        size="small"
+                                                        onClick={() => handleRecallPatient(selectedPatient)}
+                                                        sx={{ borderRadius: 2, fontWeight: 800, textTransform: "none", fontSize: "0.8rem", py: 0.6, px: 1.2, whiteSpace: "nowrap" }}
+                                                    >
+                                                        Khôi Phục Khám
+                                                    </Button>
+                                                )}
+
+                                                <Button
+                                                    variant="contained"
+                                                    size="small"
+                                                    onClick={() => handleStartExam(selectedPatient)}
+                                                    disabled={startingExam}
+                                                    sx={{
+                                                        bgcolor: "#0284c7",
+                                                        fontWeight: 800,
+                                                        px: 2.2,
+                                                        py: 0.7,
+                                                        fontSize: "0.82rem",
+                                                        whiteSpace: "nowrap",
+                                                        borderRadius: 2,
+                                                        textTransform: "none",
+                                                        boxShadow: "0 2px 8px rgba(2, 132, 199, 0.25)",
+                                                        "&:hover": { bgcolor: "#0369a1" }
+                                                    }}
+                                                >
+                                                    {startingExam ? "Đang mở hồ sơ..." : "Bắt Đầu Khám"}
+                                                </Button>
+                                            </Stack>
                                         ) : (
                                             <Chip
                                                 label={`Hồ sơ: ${record.state || "IN_PROGRESS"}`}
@@ -2024,249 +2205,14 @@ export default function ExaminationPage() {
                                             }
                                         }}
                                     >
-                                        <Tab label="1. Cận Lâm Sàng & Xét Nghiệm" icon={<ScienceIcon sx={{ fontSize: 18 }} />} iconPosition="start" />
-                                        <Tab label="2. Chẩn Đoán ICD-10 & Phác Đồ" icon={<AssignmentTurnedInIcon sx={{ fontSize: 18 }} />} iconPosition="start" />
+                                        <Tab label="1. Khám Lâm Sàng & Chẩn Đoán Sơ Bộ" icon={<AssignmentTurnedInIcon sx={{ fontSize: 18 }} />} iconPosition="start" />
+                                        <Tab label="2. Chỉ Định Cận Lâm Sàng & Kết Quả" icon={<ScienceIcon sx={{ fontSize: 18 }} />} iconPosition="start" />
                                         <Tab label="3. Kê Đơn Thuốc & Kết Thúc" icon={<MedicationIcon sx={{ fontSize: 18 }} />} iconPosition="start" />
                                     </Tabs>
 
                                     <Box sx={{ p: 3 }}>
-                                        {/* TAB 1: CẬN LÂM SÀNG & XÉT NGHIỆM */}
+                                        {/* TAB 1: KHÁM LÂM SÀNG & CHẨN ĐOÁN SƠ BỘ */}
                                         {activeTab === 0 && (
-                                            <Box>
-                                                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2.5} flexWrap="wrap" gap={1.5}>
-                                                    <Box>
-                                                        <Typography variant="h6" fontWeight={800} sx={{ color: "#0f172a" }}>
-                                                            🔬 Chỉ Định Cận Lâm Sàng & Chẩn Đoán Hình Ảnh
-                                                        </Typography>
-                                                        <Typography variant="body2" sx={{ color: "#64748b" }}>
-                                                            Đồng bộ trực tiếp kết quả xét nghiệm, siêu âm, X-quang từ Kỹ thuật viên phòng Lab
-                                                        </Typography>
-                                                    </Box>
-                                                    <Stack direction="row" spacing={1.5}>
-                                                        <Button
-                                                            variant="outlined"
-                                                            size="small"
-                                                            startIcon={isRefreshingTests ? <CircularProgress size={16} /> : <RefreshIcon />}
-                                                            onClick={handleManualSyncTests}
-                                                            disabled={isRefreshingTests}
-                                                            sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none" }}
-                                                        >
-                                                            {isRefreshingTests ? "Đang đồng bộ..." : "Đồng Bộ Kết Quả"}
-                                                        </Button>
-                                                        <Button
-                                                            variant="contained"
-                                                            size="medium"
-                                                            startIcon={<ScienceIcon />}
-                                                            onClick={() => setOpenTestModal(true)}
-                                                            sx={{
-                                                                bgcolor: "#0284c7",
-                                                                borderRadius: 2,
-                                                                fontWeight: 700,
-                                                                textTransform: "none",
-                                                                boxShadow: "0 4px 10px rgba(2, 132, 199, 0.25)",
-                                                                "&:hover": { bgcolor: "#0369a1" }
-                                                            }}
-                                                        >
-                                                            + Chỉ Định Xét Nghiệm Mới
-                                                        </Button>
-                                                    </Stack>
-                                                </Box>
-
-                                                {/* CẢNH BÁO BẤT THƯỜNG XÉT NGHIỆM CHO BÁC SĨ */}
-                                                {record.tests && record.tests.some(t => t.state === "COMPLETED" && hasAbnormalIndicator(t.testResult)) && (
-                                                    <Alert
-                                                        severity="error"
-                                                        icon={<WarningAmberIcon sx={{ fontSize: 26 }} />}
-                                                        sx={{
-                                                            mb: 2.5,
-                                                            borderRadius: 2.5,
-                                                            bgcolor: "#FEF2F2",
-                                                            border: "1.5px solid #FCA5A5",
-                                                            "& .MuiAlert-message": { width: "100%" }
-                                                        }}
-                                                    >
-                                                        <Typography variant="subtitle2" fontWeight={800} color="#991B1B">
-                                                            ⚠️ CẢNH BÁO LÂM SÀNG: Phát hiện chỉ số xét nghiệm vượt ngưỡng sinh lý bất thường!
-                                                        </Typography>
-                                                        <Typography variant="caption" color="#B91C1C">
-                                                            Vui lòng đối chiếu các giá trị [⬆️ CAO] hoặc [⬇️ THẤP] và xem phim X-Quang / Siêu âm trực tiếp trên PACS Web Viewer trước khi chỉ định phác đồ điều trị.
-                                                        </Typography>
-                                                    </Alert>
-                                                )}
-
-                                                {(!record.tests || record.tests.length === 0) ? (
-                                                    <Paper
-                                                        elevation={0}
-                                                        sx={{
-                                                            p: 5,
-                                                            textAlign: "center",
-                                                            borderRadius: 3,
-                                                            bgcolor: "#f8fafc",
-                                                            border: "1px dashed #cbd5e1"
-                                                        }}
-                                                    >
-                                                        <ScienceIcon sx={{ fontSize: 52, color: "#94a3b8", mb: 1 }} />
-                                                        <Typography variant="subtitle1" fontWeight={700} sx={{ color: "#334155" }}>
-                                                            Chưa có chỉ định cận lâm sàng nào
-                                                        </Typography>
-                                                        <Typography variant="body2" sx={{ color: "#64748b", mb: 2 }}>
-                                                            Bác sĩ có thể chỉ định xét nghiệm máu, nước tiểu, X-quang, Siêu âm hoặc chuyển thẳng sang bước chẩn đoán.
-                                                        </Typography>
-                                                        <Button
-                                                            variant="outlined"
-                                                            startIcon={<ScienceIcon />}
-                                                            onClick={() => setOpenTestModal(true)}
-                                                            sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none" }}
-                                                        >
-                                                            Chỉ định cận lâm sàng ngay
-                                                        </Button>
-                                                    </Paper>
-                                                ) : (
-                                                    <TableContainer component={Paper} elevation={0} sx={{ border: "1px solid #e2e8f0", borderRadius: 2.5 }}>
-                                                        <Table size="medium">
-                                                            <TableHead sx={{ bgcolor: "#f8fafc" }}>
-                                                                <TableRow>
-                                                                    <TableCell sx={{ fontWeight: 800, color: "#475569" }}>MÃ CHỈ ĐỊNH</TableCell>
-                                                                    <TableCell sx={{ fontWeight: 800, color: "#475569" }}>TÊN DỊCH VỤ CẬN LÂM SÀNG</TableCell>
-                                                                    <TableCell sx={{ fontWeight: 800, color: "#475569" }}>ĐƠN GIÁ</TableCell>
-                                                                    <TableCell sx={{ fontWeight: 800, color: "#475569" }}>TRẠNG THÁI</TableCell>
-                                                                    <TableCell sx={{ fontWeight: 800, color: "#475569" }}>KẾT QUẢ / HÌNH ẢNH</TableCell>
-                                                                </TableRow>
-                                                            </TableHead>
-                                                            <TableBody>
-                                                                {record.tests.map((t) => (
-                                                                    <TableRow key={t.testId} hover>
-                                                                        <TableCell sx={{ fontWeight: 700, color: "#0f172a" }}>{t.testCode}</TableCell>
-                                                                        <TableCell sx={{ fontWeight: 600 }}>{t.serviceName}</TableCell>
-                                                                        <TableCell sx={{ fontWeight: 700, color: "#0284c7" }}>{formatCurrency(t.price)}</TableCell>
-                                                                        <TableCell>
-                                                                            <Chip
-                                                                                label={t.state === "COMPLETED" ? "ĐÃ CÓ KẾT QUẢ" : "ĐANG CHỜ KẾT QUẢ"}
-                                                                                sx={{
-                                                                                    fontWeight: 800,
-                                                                                    fontSize: "0.7rem",
-                                                                                    bgcolor: t.state === "COMPLETED" ? "#dcfce7" : "#fef3c7",
-                                                                                    color: t.state === "COMPLETED" ? "#15803d" : "#b45309"
-                                                                                }}
-                                                                            />
-                                                                        </TableCell>
-                                                                        <TableCell sx={{ minWidth: 280 }}>
-                                                                            {t.testResult ? (
-                                                                                <Box>
-                                                                                    {hasAbnormalIndicator(t.testResult) && (
-                                                                                        <Chip
-                                                                                            icon={<WarningAmberIcon sx={{ fontSize: "14px !important" }} />}
-                                                                                            label="⚠️ CÓ CHỈ SỐ BẤT THƯỜNG"
-                                                                                            size="small"
-                                                                                            color="error"
-                                                                                            sx={{ height: 22, fontSize: "0.7rem", fontWeight: 800, mb: 0.8 }}
-                                                                                        />
-                                                                                    )}
-                                                                                    <Typography
-                                                                                        variant="body2"
-                                                                                        sx={{
-                                                                                            fontWeight: 500,
-                                                                                            color: hasAbnormalIndicator(t.testResult) ? "#991B1B" : "#0f172a",
-                                                                                            bgcolor: hasAbnormalIndicator(t.testResult) ? "#FEF2F2" : "#F8FAFC",
-                                                                                            p: 1.2,
-                                                                                            borderRadius: 1.5,
-                                                                                            border: hasAbnormalIndicator(t.testResult) ? "1px solid #FECACA" : "1px solid #E2E8F0",
-                                                                                            whiteSpace: "pre-line",
-                                                                                            fontSize: "0.825rem",
-                                                                                            lineHeight: 1.5
-                                                                                        }}
-                                                                                    >
-                                                                                        {t.testResult}
-                                                                                    </Typography>
-                                                                                    {t.resultFileUrl && (
-                                                                                        <Button
-                                                                                            size="small"
-                                                                                            variant="contained"
-                                                                                            startIcon={<CameraAltIcon />}
-                                                                                            onClick={() => {
-                                                                                                const isXray = (t.serviceName || "").toLowerCase().includes("x-quang") || (t.serviceName || "").toLowerCase().includes("phổi");
-                                                                                                const isAbnormal = hasAbnormalIndicator(t.testResult);
-                                                                                                setPacsTarget({
-                                                                                                    imageSrc: t.resultFileUrl,
-                                                                                                    patientName: selectedPatient?.patientName || "Bệnh nhân",
-                                                                                                    patientCode: selectedPatient?.queueCode || t.testCode,
-                                                                                                    patientAge: selectedPatient?.patientAge || "35",
-                                                                                                    patientGender: selectedPatient?.patientGender === "FEMALE" ? "Nữ" : "Nam",
-                                                                                                    serviceName: t.serviceName,
-                                                                                                    studyDate: t.createdAt,
-                                                                                                    doctorName: t.doctorName || "BS. Điều trị",
-                                                                                                    diagnosisSummary: t.testResult,
-                                                                                                    aiFindings: (isXray && isAbnormal) ? {
-                                                                                                        summary: "Phát hiện vùng mờ bất thường tại thùy dưới phổi phải. Xác suất tổn thương đông đặc 74.5%.",
-                                                                                                        confidence: 74.5,
-                                                                                                        suspectedCondition: "Nghi ngờ Viêm phổi thùy (Lobar Pneumonia)"
-                                                                                                    } : null
-                                                                                                });
-                                                                                            }}
-                                                                                            sx={{
-                                                                                                mt: 1,
-                                                                                                fontWeight: 700,
-                                                                                                textTransform: "none",
-                                                                                                borderRadius: 2,
-                                                                                                bgcolor: "#0284C7",
-                                                                                                fontSize: "0.78rem",
-                                                                                                "&:hover": { bgcolor: "#0369A1" }
-                                                                                            }}
-                                                                                        >
-                                                                                            🩻 Xem Ảnh PACS / DICOM Chuyên Dụng
-                                                                                        </Button>
-                                                                                    )}
-                                                                                </Box>
-                                                                            ) : (
-                                                                                <Typography variant="caption" sx={{ color: "#94a3b8", fontStyle: "italic" }}>
-                                                                                    KTV phòng Lab đang thực hiện...
-                                                                                </Typography>
-                                                                            )}
-                                                                        </TableCell>
-                                                                    </TableRow>
-                                                                ))}
-                                                            </TableBody>
-                                                        </Table>
-                                                    </TableContainer>
-                                                )}
-
-                                                <Box mt={3} display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1.5}>
-                                                    <Button
-                                                        variant="outlined"
-                                                        color="error"
-                                                        startIcon={<HotelIcon />}
-                                                        onClick={() => {
-                                                            if (!finalDiagnosis) {
-                                                                setFinalDiagnosis("Cần theo dõi và điều trị nội trú chuyên khoa");
-                                                            }
-                                                            setActiveTab(1);
-                                                            setOpenAdmitModal(true);
-                                                        }}
-                                                        sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none" }}
-                                                    >
-                                                        Chỉ Định Nhập Viện Cấp Cứu / Nội Trú (Hướng 2)
-                                                    </Button>
-                                                    <Button
-                                                        variant="contained"
-                                                        size="medium"
-                                                        endIcon={<ArrowForwardIcon />}
-                                                        onClick={() => setActiveTab(1)}
-                                                        sx={{
-                                                            bgcolor: "#0284c7",
-                                                            borderRadius: 2,
-                                                            fontWeight: 700,
-                                                            textTransform: "none",
-                                                            "&:hover": { bgcolor: "#0369a1" }
-                                                        }}
-                                                    >
-                                                        Tiếp tục: Chẩn đoán bệnh & Ra quyết định điều trị
-                                                    </Button>
-                                                </Box>
-                                            </Box>
-                                        )}
-
-                                        {/* TAB 2: CHẨN ĐOÁN ICD-10 & PHÁC ĐỒ */}
-                                        {activeTab === 1 && (
                                             <Box>
                                                 <Box mb={2.5}>
                                                     <Typography variant="h6" fontWeight={800} sx={{ color: "#0f172a" }}>
@@ -2681,6 +2627,18 @@ export default function ExaminationPage() {
                                                                 >
                                                                     {record?.state === "DONE" ? "Ca Khám Đã Hoàn Tất" : (completingExam ? "Đang xử lý..." : "Hoàn Tất Ca Khám (Không Dùng Thuốc)")}
                                                                 </Button>
+                                                                {record && record.state !== "DONE" && (record.medicalTests?.length > 0 || record.tests?.length > 0) && (
+                                                                    <Button
+                                                                        fullWidth
+                                                                        variant="outlined"
+                                                                        color="warning"
+                                                                        size="small"
+                                                                        sx={{ mt: 1, borderRadius: 2, textTransform: "none", fontWeight: 700 }}
+                                                                        onClick={() => setOpenAbandonModal(true)}
+                                                                    >
+                                                                        Bệnh nhân không quay lại sau CLS
+                                                                    </Button>
+                                                                )}
                                                             </Card>
                                                         </Grid>
                                                     </Grid>
@@ -2689,10 +2647,273 @@ export default function ExaminationPage() {
                                                 <Box display="flex" justifyContent="space-between" mt={3}>
                                                     <Button
                                                         variant="outlined"
+                                                        onClick={() => setActiveTab(1)}
+                                                        sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none" }}
+                                                    >
+                                                        Chuyển sang: Cận lâm sàng & Xét nghiệm (Bước 2)
+                                                    </Button>
+                                                </Box>
+                                            </Box>
+                                        )}
+
+                                        {/* TAB 2: CẬN LÂM SÀNG & XÉT NGHIỆM */}
+                                        {activeTab === 1 && (
+                                            <Box>
+                                                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2.5} flexWrap="wrap" gap={1.5}>
+                                                    <Box>
+                                                        <Typography variant="h6" fontWeight={800} sx={{ color: "#0f172a" }}>
+                                                            🔬 Chỉ Định Cận Lâm Sàng & Chẩn Đoán Hình Ảnh
+                                                        </Typography>
+                                                        <Typography variant="body2" sx={{ color: "#64748b" }}>
+                                                            Đồng bộ trực tiếp kết quả xét nghiệm, siêu âm, X-quang từ Kỹ thuật viên phòng Lab
+                                                        </Typography>
+                                                    </Box>
+                                                    <Stack direction="row" spacing={1.5}>
+                                                        <Button
+                                                            variant="outlined"
+                                                            size="small"
+                                                            startIcon={isRefreshingTests ? <CircularProgress size={16} /> : <RefreshIcon />}
+                                                            onClick={handleManualSyncTests}
+                                                            disabled={isRefreshingTests}
+                                                            sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none" }}
+                                                        >
+                                                            {isRefreshingTests ? "Đang đồng bộ..." : "Đồng Bộ Kết Quả"}
+                                                        </Button>
+                                                        <Button
+                                                            variant="contained"
+                                                            size="medium"
+                                                            startIcon={<ScienceIcon />}
+                                                            onClick={() => setOpenTestModal(true)}
+                                                            sx={{
+                                                                bgcolor: "#0284c7",
+                                                                borderRadius: 2,
+                                                                fontWeight: 700,
+                                                                textTransform: "none",
+                                                                boxShadow: "0 4px 10px rgba(2, 132, 199, 0.25)",
+                                                                "&:hover": { bgcolor: "#0369a1" }
+                                                            }}
+                                                        >
+                                                            + Chỉ Định Xét Nghiệm Mới
+                                                        </Button>
+                                                    </Stack>
+                                                </Box>
+
+                                                {/* CẢNH BÁO BẤT THƯỜNG XÉT NGHIỆM CHO BÁC SĨ */}
+                                                {record.tests && record.tests.some(t => t.state === "COMPLETED" && hasAbnormalIndicator(t.testResult)) && (
+                                                    <Alert
+                                                        severity="error"
+                                                        icon={<WarningAmberIcon sx={{ fontSize: 26 }} />}
+                                                        sx={{
+                                                            mb: 2.5,
+                                                            borderRadius: 2.5,
+                                                            bgcolor: "#FEF2F2",
+                                                            border: "1.5px solid #FCA5A5",
+                                                            "& .MuiAlert-message": { width: "100%" }
+                                                        }}
+                                                    >
+                                                        <Typography variant="subtitle2" fontWeight={800} color="#991B1B">
+                                                            ⚠️ CẢNH BÁO LÂM SÀNG: Phát hiện chỉ số xét nghiệm vượt ngưỡng sinh lý bất thường!
+                                                        </Typography>
+                                                        <Typography variant="caption" color="#B91C1C">
+                                                            Vui lòng đối chiếu các giá trị [⬆️ CAO] hoặc [⬇️ THẤP] và xem phim X-Quang / Siêu âm trực tiếp trên PACS Web Viewer trước khi chỉ định phác đồ điều trị.
+                                                        </Typography>
+                                                    </Alert>
+                                                )}
+
+                                                {(!record.tests || record.tests.length === 0) ? (
+                                                    <Paper
+                                                        elevation={0}
+                                                        sx={{
+                                                            p: 5,
+                                                            textAlign: "center",
+                                                            borderRadius: 3,
+                                                            bgcolor: "#f8fafc",
+                                                            border: "1px dashed #cbd5e1"
+                                                        }}
+                                                    >
+                                                        <ScienceIcon sx={{ fontSize: 52, color: "#94a3b8", mb: 1 }} />
+                                                        <Typography variant="subtitle1" fontWeight={700} sx={{ color: "#334155" }}>
+                                                            Chưa có chỉ định cận lâm sàng nào
+                                                        </Typography>
+                                                        <Typography variant="body2" sx={{ color: "#64748b", mb: 2 }}>
+                                                            Bác sĩ có thể chỉ định xét nghiệm máu, nước tiểu, X-quang, Siêu âm hoặc chuyển thẳng sang bước chẩn đoán.
+                                                        </Typography>
+                                                        <Button
+                                                            variant="outlined"
+                                                            startIcon={<ScienceIcon />}
+                                                            onClick={() => setOpenTestModal(true)}
+                                                            sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none" }}
+                                                        >
+                                                            Chỉ định cận lâm sàng ngay
+                                                        </Button>
+                                                    </Paper>
+                                                ) : (
+                                                    <TableContainer component={Paper} elevation={0} sx={{ border: "1px solid #e2e8f0", borderRadius: 2.5 }}>
+                                                        <Table size="medium">
+                                                            <TableHead sx={{ bgcolor: "#f8fafc" }}>
+                                                                <TableRow>
+                                                                    <TableCell sx={{ fontWeight: 800, color: "#475569" }}>MÃ CHỈ ĐỊNH</TableCell>
+                                                                    <TableCell sx={{ fontWeight: 800, color: "#475569" }}>TÊN DỊCH VỤ CẬN LÂM SÀNG</TableCell>
+                                                                    <TableCell sx={{ fontWeight: 800, color: "#475569" }}>ĐƠN GIÁ</TableCell>
+                                                                    <TableCell sx={{ fontWeight: 800, color: "#475569" }}>TRẠNG THÁI</TableCell>
+                                                                    <TableCell sx={{ fontWeight: 800, color: "#475569" }}>KẾT QUẢ / HÌNH ẢNH</TableCell>
+                                                                    <TableCell sx={{ fontWeight: 800, color: "#475569", textAlign: "center" }}>THAO TÁC</TableCell>
+                                                                </TableRow>
+                                                            </TableHead>
+                                                            <TableBody>
+                                                                {record.tests.map((t) => (
+                                                                    <TableRow key={t.testId} hover>
+                                                                        <TableCell sx={{ fontWeight: 700, color: "#0f172a" }}>{t.testCode}</TableCell>
+                                                                        <TableCell sx={{ fontWeight: 600 }}>{t.serviceName}</TableCell>
+                                                                        <TableCell sx={{ fontWeight: 700, color: "#0284c7" }}>{formatCurrency(t.price)}</TableCell>
+                                                                        <TableCell>
+                                                                            <Chip
+                                                                                label={t.state === "COMPLETED" ? "ĐÃ CÓ KẾT QUẢ" : (t.state === "CANCELLED" ? "ĐÃ HỦY CHỈ ĐỊNH" : "ĐANG CHỜ KẾT QUẢ")}
+                                                                                sx={{
+                                                                                    fontWeight: 800,
+                                                                                    fontSize: "0.7rem",
+                                                                                    bgcolor: t.state === "COMPLETED" ? "#dcfce7" : (t.state === "CANCELLED" ? "#f1f5f9" : "#fef3c7"),
+                                                                                    color: t.state === "COMPLETED" ? "#15803d" : (t.state === "CANCELLED" ? "#64748b" : "#b45309")
+                                                                                }}
+                                                                            />
+                                                                        </TableCell>
+                                                                        <TableCell sx={{ minWidth: 280 }}>
+                                                                            {t.testResult ? (
+                                                                                <Box>
+                                                                                    {hasAbnormalIndicator(t.testResult) && (
+                                                                                        <Chip
+                                                                                            icon={<WarningAmberIcon sx={{ fontSize: "14px !important" }} />}
+                                                                                            label="⚠️ CÓ CHỈ SỐ BẤT THƯỜNG"
+                                                                                            size="small"
+                                                                                            color="error"
+                                                                                            sx={{ height: 22, fontSize: "0.7rem", fontWeight: 800, mb: 0.8 }}
+                                                                                        />
+                                                                                    )}
+                                                                                    <Typography
+                                                                                        variant="body2"
+                                                                                        sx={{
+                                                                                            fontWeight: 500,
+                                                                                            color: hasAbnormalIndicator(t.testResult) ? "#991B1B" : "#0f172a",
+                                                                                            bgcolor: hasAbnormalIndicator(t.testResult) ? "#FEF2F2" : "#F8FAFC",
+                                                                                            p: 1.2,
+                                                                                            borderRadius: 1.5,
+                                                                                            border: hasAbnormalIndicator(t.testResult) ? "1px solid #FECACA" : "1px solid #E2E8F0",
+                                                                                            whiteSpace: "pre-line",
+                                                                                            fontSize: "0.825rem",
+                                                                                            lineHeight: 1.5
+                                                                                        }}
+                                                                                    >
+                                                                                        {t.testResult}
+                                                                                    </Typography>
+                                                                                    {t.resultFileUrl && (
+                                                                                        <Button
+                                                                                            size="small"
+                                                                                            variant="contained"
+                                                                                            startIcon={<CameraAltIcon />}
+                                                                                            onClick={() => {
+                                                                                                const isXray = (t.serviceName || "").toLowerCase().includes("x-quang") || (t.serviceName || "").toLowerCase().includes("phổi");
+                                                                                                const isAbnormal = hasAbnormalIndicator(t.testResult);
+                                                                                                setPacsTarget({
+                                                                                                    imageSrc: t.resultFileUrl,
+                                                                                                    patientName: selectedPatient?.patientName || "Bệnh nhân",
+                                                                                                    patientCode: selectedPatient?.queueCode || t.testCode,
+                                                                                                    patientAge: selectedPatient?.patientAge || "35",
+                                                                                                    patientGender: selectedPatient?.patientGender === "FEMALE" ? "Nữ" : "Nam",
+                                                                                                    serviceName: t.serviceName,
+                                                                                                    studyDate: t.createdAt,
+                                                                                                    doctorName: t.doctorName || "BS. Điều trị",
+                                                                                                    diagnosisSummary: t.testResult,
+                                                                                                    aiFindings: (isXray && isAbnormal) ? {
+                                                                                                        summary: "Phát hiện vùng mờ bất thường tại thùy dưới phổi phải. Xác suất tổn thương đông đặc 74.5%.",
+                                                                                                        confidence: 74.5,
+                                                                                                        suspectedCondition: "Nghi ngờ Viêm phổi thùy (Lobar Pneumonia)"
+                                                                                                    } : null
+                                                                                                });
+                                                                                            }}
+                                                                                            sx={{
+                                                                                                mt: 1,
+                                                                                                fontWeight: 700,
+                                                                                                textTransform: "none",
+                                                                                                borderRadius: 2,
+                                                                                                bgcolor: "#0284C7",
+                                                                                                fontSize: "0.78rem",
+                                                                                                "&:hover": { bgcolor: "#0369A1" }
+                                                                                            }}
+                                                                                        >
+                                                                                            🩻 Xem Ảnh PACS / DICOM Chuyên Dụng
+                                                                                        </Button>
+                                                                                    )}
+                                                                                </Box>
+                                                                            ) : (
+                                                                                <Typography variant="caption" sx={{ color: "#94a3b8", fontStyle: "italic" }}>
+                                                                                    KTV phòng Lab đang thực hiện...
+                                                                                </Typography>
+                                                                            )}
+                                                                        </TableCell>
+                                                                        <TableCell align="center">
+                                                                        {t.state !== "COMPLETED" && t.state !== "CANCELLED" ? (
+                                                                            <Tooltip title="Hủy chỉ định nếu bệnh nhân từ chối hoặc đổi hướng điều trị">
+                                                                                <Button
+                                                                                    size="small"
+                                                                                    variant="outlined"
+                                                                                    color="error"
+                                                                                    startIcon={<CancelIcon sx={{ fontSize: 16 }} />}
+                                                                                    onClick={() => handleOpenCancelDialog(t)}
+                                                                                    sx={{ borderRadius: 1.5, fontWeight: 700, fontSize: "0.75rem", textTransform: "none" }}
+                                                                                >
+                                                                                    Hủy Chỉ Định
+                                                                                </Button>
+                                                                            </Tooltip>
+                                                                        ) : (
+                                                                            <Typography variant="caption" color="textSecondary" sx={{ fontStyle: "italic" }}>
+                                                                                {t.state === "CANCELLED" ? "Đã hủy" : "Hoàn tất"}
+                                                                            </Typography>
+                                                                        )}
+                                                                    </TableCell>
+                                                                </TableRow>
+                                                                ))}
+                                                            </TableBody>
+                                                        </Table>
+                                                    </TableContainer>
+                                                )}
+
+                                                <Box mt={3} display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1.5}>
+                                                    <Button
+                                                        variant="outlined"
                                                         onClick={() => setActiveTab(0)}
                                                         sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none" }}
                                                     >
-                                                        Quay lại: Cận lâm sàng
+                                                        Quay lại: Khám lâm sàng (Bước 1)
+                                                    </Button>
+                                                    <Button
+                                                        variant="outlined"
+                                                        color="error"
+                                                        startIcon={<HotelIcon />}
+                                                        onClick={() => {
+                                                            if (!finalDiagnosis) {
+                                                                setFinalDiagnosis("Cần theo dõi và điều trị nội trú chuyên khoa");
+                                                            }
+                                                            setActiveTab(1);
+                                                            setOpenAdmitModal(true);
+                                                        }}
+                                                        sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none" }}
+                                                    >
+                                                        Chỉ Định Nhập Viện Cấp Cứu / Nội Trú (Hướng 2)
+                                                    </Button>
+                                                    <Button
+                                                        variant="contained"
+                                                        size="medium"
+                                                        endIcon={<ArrowForwardIcon />}
+                                                        onClick={() => setActiveTab(2)}
+                                                        sx={{
+                                                            bgcolor: "#0284c7",
+                                                            borderRadius: 2,
+                                                            fontWeight: 700,
+                                                            textTransform: "none",
+                                                            "&:hover": { bgcolor: "#0369a1" }
+                                                        }}
+                                                    >
+                                                        Tiếp tục: Kê đơn thuốc (Bước 3)
                                                     </Button>
                                                 </Box>
                                             </Box>
@@ -2956,323 +3177,17 @@ export default function ExaminationPage() {
                             )}
 
                             {/* DIALOG CHỈNH SỬA / CẬP NHẬT SINH HIỆU & TIỀN SỬ */}
-                            <Dialog
+                            <EditVitalsModal
                                 open={openEditVitalsModal}
                                 onClose={() => setOpenEditVitalsModal(false)}
-                                maxWidth="md"
-                                fullWidth
-                                PaperProps={{ sx: { borderRadius: 3 } }}
-                            >
-                                <DialogTitle sx={{ pb: 1, borderBottom: "1px solid #E2E8F0" }}>
-                                    <Box display="flex" alignItems="center" gap={1.5}>
-                                        <Box
-                                            sx={{
-                                                width: 42,
-                                                height: 42,
-                                                borderRadius: 2.5,
-                                                bgcolor: "primary.light",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "center",
-                                                color: "primary.dark",
-                                            }}
-                                        >
-                                            <MonitorWeightIcon />
-                                        </Box>
-                                        <Box>
-                                            <Typography variant="h6" fontWeight="bold" color="primary.dark">
-                                                Cập Nhật Sinh Hiệu, Chỉ Số BMI & Tiền Sử Dị Ứng
-                                            </Typography>
-                                            <Typography variant="caption" color="text.secondary">
-                                                Hệ thống tự động tính BMI và phân loại thể trạng theo chuẩn WHO Tây Thái Bình Dương (WPRO)
-                                            </Typography>
-                                        </Box>
-                                    </Box>
-                                </DialogTitle>
-
-                                <DialogContent sx={{ pt: 2.5 }}>
-                                    {/* Real-time BMI Display Box */}
-                                    {(() => {
-                                        const previewBMI = calculateBMI(editingVitals.weight, editingVitals.height);
-                                        return (
-                                            <Paper
-                                                elevation={0}
-                                                sx={{
-                                                    p: 2,
-                                                    mb: 2.5,
-                                                    borderRadius: 2.5,
-                                                    bgcolor: previewBMI.badgeBg,
-                                                    border: `1.5px solid ${previewBMI.badgeColor}`,
-                                                    display: "flex",
-                                                    alignItems: "center",
-                                                    justifyContent: "space-between",
-                                                    flexWrap: "wrap",
-                                                    gap: 2
-                                                }}
-                                            >
-                                                <Box display="flex" alignItems="center" gap={1.5}>
-                                                    <Box
-                                                        sx={{
-                                                            width: 50,
-                                                            height: 50,
-                                                            borderRadius: "50%",
-                                                            bgcolor: "#ffffff",
-                                                            color: previewBMI.badgeColor,
-                                                            display: "flex",
-                                                            alignItems: "center",
-                                                            justifyContent: "center",
-                                                            fontSize: "1.3rem",
-                                                            fontWeight: 900,
-                                                            boxShadow: "0 2px 8px rgba(0,0,0,0.08)"
-                                                        }}
-                                                    >
-                                                        {previewBMI.bmi}
-                                                    </Box>
-                                                    <Box>
-                                                        <Box display="flex" alignItems="center" gap={1}>
-                                                            <Typography variant="subtitle1" fontWeight={900} sx={{ color: previewBMI.badgeColor }}>
-                                                                Thể trạng: {previewBMI.classification}
-                                                            </Typography>
-                                                            <Chip
-                                                                label={`BMI: ${previewBMI.bmi} kg/m²`}
-                                                                size="small"
-                                                                sx={{ bgcolor: "#ffffff", color: previewBMI.badgeColor, fontWeight: 800, height: 22 }}
-                                                            />
-                                                        </Box>
-                                                        <Typography variant="caption" sx={{ color: previewBMI.badgeColor, fontWeight: 600, display: "block", mt: 0.3 }}>
-                                                            💡 Lời khuyên lâm sàng: {previewBMI.advice}
-                                                        </Typography>
-                                                    </Box>
-                                                </Box>
-                                                <Box textAlign="right">
-                                                    <Typography variant="caption" sx={{ color: "#64748b", display: "block" }}>
-                                                        Tiêu chuẩn: <b>WHO WPRO (Châu Á)</b>
-                                                    </Typography>
-                                                    <Typography variant="caption" sx={{ color: "#64748b", display: "block" }}>
-                                                        Cân đối: 18.5 - 22.9 | Thừa cân: 23 - 24.9 | Béo phì: ≥ 25
-                                                    </Typography>
-                                                </Box>
-                                            </Paper>
-                                        );
-                                    })()}
-
-                                    {/* Quick Presets for Demo / Testing */}
-                                    <Box mb={2.5}>
-                                        <Typography variant="caption" fontWeight={700} sx={{ color: "#475569", display: "block", mb: 0.8 }}>
-                                            ⚡ Gán Nhanh Dữ Liệu Mẫu (Quick Presets):
-                                        </Typography>
-                                        <Box display="flex" flexWrap="wrap" gap={0.8}>
-                                            {[
-                                                { label: "Chuẩn (62kg / 168cm)", data: { weight: 62, height: 168, bloodPressure: "120/80", heartRate: 75, temperature: 36.8, spO2: 98 } },
-                                                { label: "Gầy thiếu cân (44kg / 165cm)", data: { weight: 44, height: 165, bloodPressure: "105/70", heartRate: 80, temperature: 36.6, spO2: 99 } },
-                                                { label: "Thừa cân (72kg / 165cm)", data: { weight: 72, height: 165, bloodPressure: "135/85", heartRate: 82, temperature: 37.0, spO2: 97 } },
-                                                { label: "Béo phì Độ I (82kg / 165cm)", data: { weight: 82, height: 165, bloodPressure: "140/90", heartRate: 86, temperature: 36.9, spO2: 96 } },
-                                                { label: "Béo phì Độ II (95kg / 165cm)", data: { weight: 95, height: 165, bloodPressure: "155/95", heartRate: 90, temperature: 37.1, spO2: 95 } },
-                                                { label: "Tăng huyết áp (160/100 mmHg)", data: { bloodPressure: "160/100", heartRate: 95, medicalHistory: "Tăng huyết áp nguyên phát độ 2 (5 năm), Rối loạn mỡ máu" } },
-                                                { label: "Sốt cao (39.2°C)", data: { temperature: 39.2, heartRate: 104, spO2: 97 } },
-                                                { label: "Dị ứng Penicillin & Amoxicillin", data: { allergies: "Dị ứng Penicillin, Amoxicillin (Sốc phản vệ độ 1, mề đay)" } },
-                                                { label: "Dị ứng Aspirin & NSAID", data: { allergies: "Dị ứng Aspirin, Ibuprofen, NSAID (Khó thở dạng hen)" } }
-                                            ].map((preset, idx) => (
-                                                <Chip
-                                                    key={idx}
-                                                    label={preset.label}
-                                                    size="small"
-                                                    clickable
-                                                    onClick={() => setEditingVitals(prev => ({ ...prev, ...preset.data }))}
-                                                    sx={{
-                                                        fontWeight: 600,
-                                                        fontSize: "0.72rem",
-                                                        borderRadius: 1.5,
-                                                        bgcolor: "#f1f5f9",
-                                                        "&:hover": { bgcolor: "#e2e8f0" }
-                                                    }}
-                                                />
-                                            ))}
-                                        </Box>
-                                    </Box>
-
-                                    {/* Inputs Grid */}
-                                    <Grid container spacing={2}>
-                                        <Grid item xs={6} sm={3}>
-                                            <TextField
-                                                label="Chiều cao (cm)"
-                                                type="number"
-                                                size="small"
-                                                fullWidth
-                                                value={editingVitals.height}
-                                                onChange={(e) => setEditingVitals({ ...editingVitals, height: e.target.value })}
-                                                InputProps={{ endAdornment: <InputAdornment position="end">cm</InputAdornment> }}
-                                            />
-                                        </Grid>
-                                        <Grid item xs={6} sm={3}>
-                                            <TextField
-                                                label="Cân nặng (kg)"
-                                                type="number"
-                                                size="small"
-                                                fullWidth
-                                                value={editingVitals.weight}
-                                                onChange={(e) => setEditingVitals({ ...editingVitals, weight: e.target.value })}
-                                                InputProps={{ endAdornment: <InputAdornment position="end">kg</InputAdornment> }}
-                                            />
-                                        </Grid>
-                                        <Grid item xs={6} sm={3}>
-                                            <TextField
-                                                label="Huyết áp (mmHg)"
-                                                size="small"
-                                                fullWidth
-                                                placeholder="120/80"
-                                                value={editingVitals.bloodPressure}
-                                                onChange={(e) => setEditingVitals({ ...editingVitals, bloodPressure: e.target.value })}
-                                            />
-                                        </Grid>
-                                        <Grid item xs={6} sm={3}>
-                                            <TextField
-                                                label="Nhịp tim (bpm)"
-                                                type="number"
-                                                size="small"
-                                                fullWidth
-                                                value={editingVitals.heartRate}
-                                                onChange={(e) => setEditingVitals({ ...editingVitals, heartRate: e.target.value })}
-                                                InputProps={{ endAdornment: <InputAdornment position="end">bpm</InputAdornment> }}
-                                            />
-                                        </Grid>
-
-                                        <Grid item xs={6} sm={3}>
-                                            <TextField
-                                                label="Thân nhiệt (°C)"
-                                                type="number"
-                                                size="small"
-                                                fullWidth
-                                                value={editingVitals.temperature}
-                                                onChange={(e) => setEditingVitals({ ...editingVitals, temperature: e.target.value })}
-                                                InputProps={{ endAdornment: <InputAdornment position="end">°C</InputAdornment> }}
-                                            />
-                                        </Grid>
-                                        <Grid item xs={6} sm={3}>
-                                            <TextField
-                                                label="SpO2 (%)"
-                                                type="number"
-                                                size="small"
-                                                fullWidth
-                                                value={editingVitals.spO2}
-                                                onChange={(e) => setEditingVitals({ ...editingVitals, spO2: e.target.value })}
-                                                InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
-                                            />
-                                        </Grid>
-                                        <Grid item xs={12} sm={6}>
-                                            <TextField
-                                                label="Nhóm máu"
-                                                size="small"
-                                                fullWidth
-                                                value={editingVitals.bloodType || "O+"}
-                                                onChange={(e) => setEditingVitals({ ...editingVitals, bloodType: e.target.value })}
-                                                placeholder="O+, A+, B+, AB+..."
-                                            />
-                                        </Grid>
-
-                                        <Grid item xs={12}>
-                                            <Divider sx={{ my: 1 }} />
-                                        </Grid>
-
-                                        {/* Tiền sử Dị ứng */}
-                                        <Grid item xs={12}>
-                                            <Box mb={0.8} display="flex" justifyContent="space-between" alignItems="center">
-                                                <Typography variant="subtitle2" fontWeight={800} color="#b91c1c">
-                                                    🚨 Tiền Sử Dị Ứng Thuốc / Thức Ăn:
-                                                </Typography>
-                                                <Box display="flex" gap={0.5}>
-                                                    <Chip
-                                                        label="Dị ứng Penicillin"
-                                                        size="small"
-                                                        color="error"
-                                                        variant="outlined"
-                                                        onClick={() => setEditingVitals(p => ({ ...p, allergies: "Dị ứng Penicillin, Amoxicillin (Sốc phản vệ)" }))}
-                                                        sx={{ fontSize: "0.68rem", height: 20 }}
-                                                    />
-                                                    <Chip
-                                                        label="Dị ứng Aspirin/NSAID"
-                                                        size="small"
-                                                        color="error"
-                                                        variant="outlined"
-                                                        onClick={() => setEditingVitals(p => ({ ...p, allergies: "Dị ứng Aspirin, NSAID, Ibuprofen" }))}
-                                                        sx={{ fontSize: "0.68rem", height: 20 }}
-                                                    />
-                                                    <Chip
-                                                        label="Chưa ghi nhận"
-                                                        size="small"
-                                                        onClick={() => setEditingVitals(p => ({ ...p, allergies: "Chưa ghi nhận dị ứng thuốc" }))}
-                                                        sx={{ fontSize: "0.68rem", height: 20 }}
-                                                    />
-                                                </Box>
-                                            </Box>
-                                            <TextField
-                                                fullWidth
-                                                size="small"
-                                                value={editingVitals.allergies}
-                                                onChange={(e) => setEditingVitals({ ...editingVitals, allergies: e.target.value })}
-                                                placeholder="VD: Dị ứng Penicillin, Amoxicillin, Paracetamol, Hải sản..."
-                                                sx={{
-                                                    "& .MuiOutlinedInput-root": {
-                                                        bgcolor: editingVitals.allergies && !editingVitals.allergies.includes("Chưa ghi nhận") ? "#fef2f2" : "#ffffff",
-                                                        borderColor: editingVitals.allergies && !editingVitals.allergies.includes("Chưa ghi nhận") ? "#ef4444" : undefined
-                                                    }
-                                                }}
-                                            />
-                                        </Grid>
-
-                                        {/* Tiền sử Bệnh mạn tính */}
-                                        <Grid item xs={12}>
-                                            <Box mb={0.8} display="flex" justifyContent="space-between" alignItems="center">
-                                                <Typography variant="subtitle2" fontWeight={800} color="#0369a1">
-                                                    🩺 Tiền Sử Bệnh Lý Mạn Tính & Bệnh Kèm Theo:
-                                                </Typography>
-                                                <Box display="flex" gap={0.5} flexWrap="wrap">
-                                                    {["Tăng huyết áp", "Đái tháo đường T2", "Hen phế quản", "Viêm loét dạ dày"].map((cond, i) => (
-                                                        <Chip
-                                                            key={i}
-                                                            label={cond}
-                                                            size="small"
-                                                            color="primary"
-                                                            variant="outlined"
-                                                            onClick={() => {
-                                                                const current = editingVitals.medicalHistory.includes("Chưa ghi nhận") ? "" : editingVitals.medicalHistory;
-                                                                const updated = current ? `${current}, ${cond}` : cond;
-                                                                setEditingVitals(p => ({ ...p, medicalHistory: updated }));
-                                                            }}
-                                                            sx={{ fontSize: "0.68rem", height: 20 }}
-                                                        />
-                                                    ))}
-                                                </Box>
-                                            </Box>
-                                            <TextField
-                                                fullWidth
-                                                size="small"
-                                                value={editingVitals.medicalHistory}
-                                                onChange={(e) => setEditingVitals({ ...editingVitals, medicalHistory: e.target.value })}
-                                                placeholder="VD: Tăng huyết áp 5 năm, Đái tháo đường Tuýp 2, Hen phế quản..."
-                                            />
-                                        </Grid>
-                                    </Grid>
-                                </DialogContent>
-
-                                <DialogActions sx={{ px: 3, py: 2, borderTop: "1px solid #E2E8F0" }}>
-                                    <Button onClick={() => setOpenEditVitalsModal(false)} variant="outlined" color="inherit" sx={{ borderRadius: 2 }}>
-                                        Hủy Bỏ
-                                    </Button>
-                                    <Button
-                                        onClick={() => {
-                                            setPatientVitals(editingVitals);
-                                            setOpenEditVitalsModal(false);
-                                            setMessage("Đã cập nhật sinh hiệu, chỉ số BMI và tiền sử dị ứng của bệnh nhân!");
-                                        }}
-                                        variant="contained"
-                                        color="primary"
-                                        sx={{ borderRadius: 2, fontWeight: 700, px: 3 }}
-                                    >
-                                        Lưu & Áp Dụng Chỉ Số
-                                    </Button>
-                                </DialogActions>
-                            </Dialog>
+                                editingVitals={editingVitals}
+                                setEditingVitals={setEditingVitals}
+                                onSave={(updatedVitals) => {
+                                    setPatientVitals(updatedVitals);
+                                    setMessage("Đã cập nhật sinh hiệu, chỉ số BMI và tiền sử dị ứng của bệnh nhân!");
+                                }}
+                                calculateBMI={calculateBMI}
+                            />
                         </Box>
                     ) : (
                         /* EMPTY STATE WHEN NO PATIENT IS SELECTED */
@@ -3354,64 +3269,13 @@ export default function ExaminationPage() {
             />
 
             {/* DOCTOR MY SCHEDULE MODAL */}
-            <Dialog open={openScheduleModal} onClose={() => setOpenScheduleModal(false)} maxWidth="md" fullWidth>
-                <DialogTitle sx={{ fontWeight: 800, color: "#0284c7", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span>📅 Lịch Trực Phân Công Của Bác Sĩ (14 Ngày Tới)</span>
-                    <Chip label="Ca Khám Tiêu Chuẩn" color="primary" size="small" sx={{ fontWeight: 700 }} />
-                </DialogTitle>
-                <DialogContent dividers sx={{ p: 2 }}>
-                    {loadingSchedules ? (
-                        <Box textAlign="center" py={4}><CircularProgress /></Box>
-                    ) : (
-                        <TableContainer component={Paper} elevation={0} sx={{ border: "1px solid #e2e8f0", borderRadius: 2 }}>
-                            <Table size="small">
-                                <TableHead sx={{ bgcolor: "#f8fafc" }}>
-                                    <TableRow>
-                                        <TableCell sx={{ fontWeight: 800 }}>NGÀY TRỰC</TableCell>
-                                        <TableCell sx={{ fontWeight: 800 }}>CA TRỰC</TableCell>
-                                        <TableCell sx={{ fontWeight: 800 }}>KHUNG GIỜ</TableCell>
-                                        <TableCell sx={{ fontWeight: 800 }}>PHÒNG KHÁM</TableCell>
-                                        <TableCell align="center" sx={{ fontWeight: 800 }}>SỐ LƯỢNG CHỜ</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {mySchedules.length > 0 ? (
-                                        mySchedules.slice(0, 15).map((sch, idx) => (
-                                            <TableRow key={idx} hover>
-                                                <TableCell sx={{ fontWeight: 700 }}>{sch.date || sch.workDate || formatDate(new Date())}</TableCell>
-                                                <TableCell>
-                                                    <Chip
-                                                        label={sch.shiftType === "MORNING" ? "Ca Sáng" : sch.shiftType === "AFTERNOON" ? "Ca Chiều" : "Ca Tối"}
-                                                        size="small"
-                                                        color={sch.shiftType === "MORNING" ? "info" : sch.shiftType === "AFTERNOON" ? "warning" : "secondary"}
-                                                        sx={{ fontWeight: 700 }}
-                                                    />
-                                                </TableCell>
-                                                <TableCell>{sch.startTime || "07:30"} - {sch.endTime || "11:30"}</TableCell>
-                                                <TableCell>{sch.roomName || "Phòng Khám Lâm Sàng"}</TableCell>
-                                                <TableCell align="center">
-                                                    <Chip label={`${sch.bookedCount || 0} bệnh nhân`} size="small" variant="outlined" sx={{ fontWeight: 700 }} />
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
-                                    ) : (
-                                        <TableRow>
-                                            <TableCell colSpan={5} align="center" sx={{ py: 3, color: "#64748b" }}>
-                                                Hiện chưa có ca trực nào được phân bổ trong tuần này.
-                                            </TableCell>
-                                        </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-                    )}
-                </DialogContent>
-                <DialogActions sx={{ p: 2 }}>
-                    <Button variant="contained" onClick={() => setOpenScheduleModal(false)} sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none" }}>
-                        Đóng Lại
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <DoctorScheduleModal
+                open={openScheduleModal}
+                onClose={() => setOpenScheduleModal(false)}
+                loadingSchedules={loadingSchedules}
+                mySchedules={mySchedules}
+                formatDate={formatDate}
+            />
         </Container>
     );
 }

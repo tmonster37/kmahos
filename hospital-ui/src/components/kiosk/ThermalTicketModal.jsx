@@ -182,10 +182,10 @@ export default function ThermalTicketModal({ open, onClose, ticketData, autoRese
         >
           {/* Header Bệnh Viện */}
           <Typography className="hospital-title" sx={{ fontWeight: 800, fontSize: '1.05rem', color: '#0d47a1', textTransform: 'uppercase' }}>
-            BỆNH VIỆN ĐA KHOA QUỐC TẾ TNT
+            TNT HOSPITAL
           </Typography>
           <Typography className="hospital-sub" sx={{ fontSize: '0.75rem', color: '#666', mb: 1 }}>
-            Đ/c: Lô đất CC2, Khu đô thị mới Văn Quán, số 114 Nguyễn Khuyến, phường Văn Quán, quận Hà Đông, Hà Nội | Hotline: 1900 8888
+            Đ/c: số 114 Nguyễn Khuyến, phường Văn Quán, quận Hà Đông, Hà Nội | Hotline: 1900 8888
           </Typography>
 
           <Box className="divider" sx={{ borderTop: '1px dashed #bbb', my: 1 }} />
@@ -193,6 +193,29 @@ export default function ThermalTicketModal({ open, onClose, ticketData, autoRese
           <Typography className="ticket-title" sx={{ fontWeight: 700, fontSize: '0.9rem', letterSpacing: 0.5, textTransform: 'uppercase' }}>
             PHIẾU KHÁM BỆNH TỰ ĐỘNG
           </Typography>
+
+          {/* Banner Đã Thanh Toán hoặc Ưu Tiên */}
+          {ticketData.isPaid && (
+            <Box
+              className="paid-banner"
+              sx={{
+                bgcolor: '#059669',
+                color: '#fff',
+                fontWeight: 800,
+                py: 0.6,
+                px: 1.2,
+                borderRadius: 1,
+                my: 0.8,
+                fontSize: '0.82rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 0.6
+              }}
+            >
+              <CheckCircleIcon fontSize="small" />
+              ĐÃ NỘP VIỆN PHÍ - VÀO THẲNG BUỒNG KHÁM
+            </Box>
+          )}
 
           {/* Banner Ưu Tiên nếu có */}
           {isPriority && (
@@ -205,8 +228,8 @@ export default function ThermalTicketModal({ open, onClose, ticketData, autoRese
                 py: 0.6,
                 px: 1,
                 borderRadius: 1,
-                my: 1,
-                fontSize: '0.85rem',
+                my: 0.8,
+                fontSize: '0.82rem',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 0.5
@@ -253,15 +276,22 @@ export default function ThermalTicketModal({ open, onClose, ticketData, autoRese
                   {ticketData.patientPhone || ticketData.phoneNumber || '---'}
                 </td>
               </tr>
-              {ticketData.counterName && (
+              {ticketData.isPaid ? (
+                <tr style={{ backgroundColor: '#ecfdf5' }}>
+                  <td className="info-label" style={{ color: '#065f46', padding: '4px 2px', fontWeight: 700, width: '38%' }}>Trạng thái:</td>
+                  <td className="info-value" style={{ fontWeight: 800, color: '#047857', padding: '4px 2px', fontSize: '0.92rem' }}>
+                    ĐÃ THANH TOÁN - VÀO THẲNG PHÒNG
+                  </td>
+                </tr>
+              ) : ticketData.counterName ? (
                 <tr style={{ backgroundColor: '#f0f7ff' }}>
                   <td className="info-label" style={{ color: '#0d47a1', padding: '4px 2px', fontWeight: 700, width: '38%' }}>Quầy tiếp đón:</td>
                   <td className="info-value" style={{ fontWeight: 800, color: '#0d47a1', padding: '4px 2px', fontSize: '0.92rem' }}>
                     {ticketData.counterName} {ticketData.counterLocation ? `(${ticketData.counterLocation})` : ''}
                   </td>
                 </tr>
-              )}
-              {ticketData.waitingBefore !== undefined && ticketData.waitingBefore !== null && (
+              ) : null}
+              {(!ticketData.isPaid && ticketData.waitingBefore !== undefined && ticketData.waitingBefore !== null) && (
                 <tr>
                   <td className="info-label" style={{ color: '#666', padding: '3px 0' }}>Đang chờ trước:</td>
                   <td className="info-value" style={{ fontWeight: 700, color: '#e65100' }}>

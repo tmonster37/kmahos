@@ -60,4 +60,61 @@ public record DoctorQueueResponse(
                 isReturnAfterResult
         );
     }
+
+    /**
+     * Phương thức bảo vệ quyền riêng tư bệnh nhân cho màn hình TV công khai ngoài sảnh chờ
+     */
+    public static DoctorQueueResponse toPublicEntity(Booking b, MedicalExaminationRecord record) {
+        DoctorQueueResponse full = fromEntity(b, record);
+        String maskedName = maskName(full.patientName());
+        String maskedPhone = maskPhone(full.patientPhone());
+
+        return new DoctorQueueResponse(
+                null, // Ẩn bookingId
+                full.bookingCode(),
+                full.queueNumber(),
+                full.queueCode(),
+                full.isPriority(),
+                null, // Ẩn lý do ưu tiên
+                full.bookingDate(),
+                full.timeSlotRange(),
+                null, // Ẩn ID hồ sơ bệnh nhân
+                maskedName,
+                maskedPhone,
+                full.patientGender(),
+                null, // Ẩn ngày sinh chi tiết
+                null, // Ẩn triệu chứng bệnh lý
+                full.status(),
+                null, // Ẩn recordId
+                full.recordState(),
+                full.totalTests(),
+                full.completedTests(),
+                full.isReturnAfterResult()
+        );
+    }
+
+    private static String maskName(String name) {
+        if (name == null || name.isBlank() || "N/A".equals(name)) return "Bệnh nhân";
+        String[] parts = name.trim().split("\\s+");
+        if (parts.length == 1) {
+            String p = parts[0];
+            return p.length() <= 2 ? p : p.charAt(0) + "***" + p.charAt(p.length() - 1);
+        }
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < parts.length; i++) {
+            if (i == 0 || i == parts.length - 1) {
+                sb.append(parts[i]);
+            } else {
+                sb.append("***");
+            }
+            if (i < parts.length - 1) sb.append(" ");
+        }
+        return sb.toString();
+    }
+
+    private static String maskPhone(String phone) {
+        if (phone == null || phone.isBlank()) return "";
+        if (phone.length() < 7) return "***";
+        return phone.substring(0, 3) + "****" + phone.substring(phone.length() - 3);
+    }
 }

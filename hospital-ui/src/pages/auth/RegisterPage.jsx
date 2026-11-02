@@ -9,7 +9,8 @@ import {
     Alert,
     Grid,
     InputAdornment,
-    Divider
+    Divider,
+    CircularProgress
 } from "@mui/material";
 import { Link, useNavigate } from "react-router-dom";
 import LocalHospitalIcon from "@mui/icons-material/LocalHospital";
@@ -18,7 +19,6 @@ import PhoneIphoneIcon from "@mui/icons-material/PhoneIphone";
 import MailOutlineIcon from "@mui/icons-material/MailOutline";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import { useAuth } from "../../context/AuthContext";
 import axiosInstance from "../../services/AxiosInstance";
 
@@ -30,49 +30,76 @@ export default function RegisterPage() {
         password: "",
         confirmPassword: "",
     });
+
+    const [fieldErrors, setFieldErrors] = useState({});
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const { login } = useAuth();
     const navigate = useNavigate();
 
     const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+        if (fieldErrors[name]) {
+            setFieldErrors(prev => ({ ...prev, [name]: "" }));
+        }
     };
 
     const handleRegister = async (e) => {
         e.preventDefault();
         setError("");
-
-        const phoneRegex = /(84|0[3|5|7|8|9])+([0-9]{8})$/;
-        if (!phoneRegex.test(formData.phoneNumber.trim())) {
-            setError("Số điện thoại không hợp lệ! Vui lòng nhập 10 chữ số đúng định dạng (ví dụ: 0987654321).");
-            return;
+        
+        const errors = {};
+        const cleanName = formData.fullName.trim();
+        if (!cleanName || cleanName.length < 2) {
+            errors.fullName = "Họ và tên bệnh nhân phải có ít nhất 2 ký tự!";
+        } else if (cleanName.length > 100) {
+            errors.fullName = "Họ và tên bệnh nhân không vượt quá 100 ký tự!";
         }
 
-        if (formData.password.length < 6) {
-            setError("Mật khẩu phải có độ dài từ 6 ký tự trở lên!");
-            return;
+        const phoneRegex = /(84|0[3|5|7|8|9])+([0-9]{8})$/;
+        const cleanPhone = formData.phoneNumber.trim();
+        if (!phoneRegex.test(cleanPhone)) {
+            errors.phoneNumber = "Số điện thoại không hợp lệ! Vui lòng nhập 10 chữ số (ví dụ: 0987654321).";
+        }
+
+        const cleanEmail = formData.email.trim();
+        if (cleanEmail) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(cleanEmail)) {
+                errors.email = "Định dạng email không hợp lệ (ví dụ: hotro@example.com)!";
+            }
+        }
+
+        if (!formData.password || formData.password.length < 6) {
+            errors.password = "Mật khẩu phải có độ dài từ 6 ký tự trở lên!";
         }
 
         if (formData.password !== formData.confirmPassword) {
-            setError("Mật khẩu xác nhận không khớp!");
+            errors.confirmPassword = "Mật khẩu xác nhận không khớp!";
+        }
+
+        if (Object.keys(errors).length > 0) {
+            setFieldErrors(errors);
+            setError("Vui lòng kiểm tra và sửa các thông tin chưa chính xác bên dưới!");
             return;
         }
 
+        setFieldErrors({});
         setLoading(true);
         try {
+            // Tự đăng ký chỉ tạo tài khoản bệnh nhân (ROLE_PATIENT được gán cố định tại backend)
             const res = await axiosInstance.post("/api/auth/register", {
-                fullName: formData.fullName.trim(),
-                phoneNumber: formData.phoneNumber.trim(),
-                email: formData.email.trim() || null,
-                password: formData.password,
-                role: "ROLE_PATIENT",
+                fullName: cleanName,
+                phoneNumber: cleanPhone,
+                email: cleanEmail || null,
+                password: formData.password
             });
 
             const authData = res?.data || res;
             if (authData?.accessToken) {
-                login(authData); // Tự động đăng nhập
-                navigate("/profiles"); // Chuyển tới tạo hồ sơ y tế
+                login(authData);
+                navigate("/profiles");
             } else {
                 navigate("/login");
             }
@@ -127,10 +154,13 @@ export default function RegisterPage() {
                             </Box>
                         </Box>
                         <Typography variant="h5" fontWeight={900} sx={{ letterSpacing: "-0.03em", color: "#0F172A", mb: 0.5 }}>
-                            Tạo Tài Khoản Khám Bệnh
+                            Đăng Ký Tài Khoản Bệnh Nhân
                         </Typography>
-                        <Typography variant="body2" sx={{ color: "#64748B" }}>
-                            Đăng ký thành viên để lưu trữ hồ sơ y bạ điện tử và đặt hẹn ưu tiên
+                        <Typography variant="body2" sx={{ color: "#64748B", fontWeight: 600 }}>
+                            TNT HOSPITAL
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "#94A3B8", display: "block", mt: 0.5 }}>
+                            Tạo tài khoản thành viên để đặt lịch hẹn và theo dõi hồ sơ y tế
                         </Typography>
                     </Box>
 
@@ -150,7 +180,9 @@ export default function RegisterPage() {
                                     value={formData.fullName}
                                     onChange={handleChange}
                                     required
-                                    placeholder="Ví dụ: Nguyễn Văn An"
+                                    placeholder="Ví dụ: NGUYỄN VĂN AN"
+                                    error={Boolean(fieldErrors.fullName)}
+                                    helperText={fieldErrors.fullName || "Nhập đầy đủ họ và tên theo CCCD/BHYT"}
                                     InputProps={{
                                         startAdornment: (
                                             <InputAdornment position="start">
@@ -161,6 +193,7 @@ export default function RegisterPage() {
                                     }}
                                 />
                             </Grid>
+
                             <Grid item xs={12} sm={6}>
                                 <TextField
                                     fullWidth
@@ -170,25 +203,30 @@ export default function RegisterPage() {
                                     onChange={handleChange}
                                     required
                                     placeholder="0987654321"
+                                    error={Boolean(fieldErrors.phoneNumber)}
+                                    helperText={fieldErrors.phoneNumber || "10 chữ số dùng đăng nhập & nhận OTP"}
                                     InputProps={{
                                         startAdornment: (
                                             <InputAdornment position="start">
                                                 <PhoneIphoneIcon sx={{ color: "#94A3B8" }} />
                                             </InputAdornment>
                                         ),
-                                        sx: { borderRadius: 2.5, fontFamily: "monospace" }
+                                        sx: { borderRadius: 2.5, fontFamily: "monospace", fontWeight: 700 }
                                     }}
                                 />
                             </Grid>
+
                             <Grid item xs={12} sm={6}>
                                 <TextField
                                     fullWidth
                                     type="email"
-                                    label="Địa chỉ Email (không bắt buộc)"
+                                    label="Địa chỉ Email (Nhận thông báo)"
                                     name="email"
                                     value={formData.email}
                                     onChange={handleChange}
                                     placeholder="email@example.com"
+                                    error={Boolean(fieldErrors.email)}
+                                    helperText={fieldErrors.email || "Không bắt buộc, dùng để nhận phiếu khám"}
                                     InputProps={{
                                         startAdornment: (
                                             <InputAdornment position="start">
@@ -199,6 +237,7 @@ export default function RegisterPage() {
                                     }}
                                 />
                             </Grid>
+
                             <Grid item xs={12} sm={6}>
                                 <TextField
                                     fullWidth
@@ -209,6 +248,8 @@ export default function RegisterPage() {
                                     onChange={handleChange}
                                     required
                                     placeholder="Ít nhất 6 ký tự"
+                                    error={Boolean(fieldErrors.password)}
+                                    helperText={fieldErrors.password || "Tối thiểu 6 ký tự bảo mật"}
                                     InputProps={{
                                         startAdornment: (
                                             <InputAdornment position="start">
@@ -219,6 +260,7 @@ export default function RegisterPage() {
                                     }}
                                 />
                             </Grid>
+
                             <Grid item xs={12} sm={6}>
                                 <TextField
                                     fullWidth
@@ -229,6 +271,8 @@ export default function RegisterPage() {
                                     onChange={handleChange}
                                     required
                                     placeholder="Nhập lại mật khẩu"
+                                    error={Boolean(fieldErrors.confirmPassword)}
+                                    helperText={fieldErrors.confirmPassword || "Nhập lại chính xác mật khẩu"}
                                     InputProps={{
                                         startAdornment: (
                                             <InputAdornment position="start">
@@ -259,12 +303,12 @@ export default function RegisterPage() {
                                 "&:hover": { bgcolor: "#0073B7" }
                             }}
                         >
-                            {loading ? "Đang tạo tài khoản..." : "Hoàn Tất Đăng Ký"}
+                            {loading ? <CircularProgress size={24} color="inherit" /> : "Đăng Ký Thành Viên"}
                         </Button>
 
-                        <Box textAlign="center" mt={3} pt={2} borderTop="1px solid rgba(15, 23, 42, 0.06)">
-                            <Typography variant="body2" sx={{ color: "#64748B", mb: 1 }}>
-                                Đã có tài khoản?{" "}
+                        <Box textAlign="center" mt={3}>
+                            <Typography variant="body2" sx={{ color: "#64748B", mb: 1.5 }}>
+                                Đã có tài khoản y tế?{" "}
                                 <Typography
                                     component={Link}
                                     to="/login"
@@ -285,9 +329,9 @@ export default function RegisterPage() {
                                 to="/"
                                 size="small"
                                 startIcon={<ArrowBackIcon />}
-                                sx={{ color: "#64748B", fontWeight: 700, textTransform: "none", mt: 0.5 }}
+                                sx={{ color: "#64748B", fontWeight: 700, textTransform: "none" }}
                             >
-                                Quay về trang chủ
+                                Quay lại Trang Chủ
                             </Button>
                         </Box>
                     </Box>

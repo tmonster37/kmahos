@@ -238,8 +238,8 @@ export default function PacsViewerModal({
             <DialogTitle
                 sx={{
                     p: 1.5,
-                    bgcolor: "#111827",
-                    borderBottom: "1px solid #1F2937",
+                    background: "linear-gradient(135deg, #004B87 0%, #002D54 100%)",
+                    borderBottom: "1px solid #005A9E",
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center"
@@ -285,8 +285,8 @@ export default function PacsViewerModal({
                 sx={{
                     px: 2,
                     py: 1,
-                    bgcolor: "#1E293B",
-                    borderBottom: "1px solid #334155",
+                    bgcolor: "#002244",
+                    borderBottom: "1px solid #003B6D",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
@@ -555,8 +555,8 @@ export default function PacsViewerModal({
                 sx={{
                     px: 3,
                     py: 1.5,
-                    bgcolor: "#111827",
-                    borderTop: "1px solid #1F2937",
+                    bgcolor: "#002244",
+                    borderTop: "1px solid #003B6D",
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",

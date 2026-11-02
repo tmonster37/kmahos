@@ -48,8 +48,17 @@ public class CashierServiceImpl implements CashierService {
     private final com.hospital.api.repository.HospitalAdmissionRepository admissionRepository;
     private final ObjectMapper objectMapper;
     private final com.hospital.api.service.AuditLogService auditLogService;
+    private final BookingReceptionTransition reception;
 
     private static final Pattern BOOKING_CODE_PATTERN = Pattern.compile("(BK|KIOSK)[A-Za-z0-9]+");
+    private boolean exactBookingReference(String description, String bookingCode) {
+        if (description == null) return false;
+        java.util.regex.Matcher matcher = BOOKING_CODE_PATTERN.matcher(description);
+        java.util.Set<String> codes = new java.util.HashSet<>();
+        while (matcher.find()) codes.add(matcher.group());
+        return codes.size() == 1 && codes.contains(bookingCode);
+    }
+
     private static final String SNAPSHOT_PREFIX = "[SNAPSHOT:";
     private static final String SNAPSHOT_SUFFIX = "]";
 
@@ -61,11 +70,17 @@ public class CashierServiceImpl implements CashierService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<CashierPendingBillResponse> getPendingBills(Integer page, Integer size) {
-        List<Booking> allBookings = bookingRepository.findAllByDeletedFalseOrderByCreatedAtDesc();
-        List<CashierPendingBillResponse> pendingBills = new ArrayList<>();
+    public List<CashierPendingBillResponse> getPendingBillsForPatient(UUID accountId) {
+        if (accountId == null) return Collections.emptyList();
+        List<Booking> patientBookings = bookingRepository.findAllByPatientProfile_Account_UserIdAndDeletedFalseOrderByCreatedAtDesc(accountId);
+        return buildBillsFromBookings(patientBookings);
+    }
 
-        for (Booking booking : allBookings) {
+    private List<CashierPendingBillResponse> buildBillsFromBookings(List<Booking> bookings) {
+        List<CashierPendingBillResponse> pendingBills = new ArrayList<>();
+        if (bookings == null) return pendingBills;
+
+        for (Booking booking : bookings) {
             if (booking.getStatus() == BookingStatus.CANCELLED) {
                 continue;
             }
@@ -163,6 +178,14 @@ public class CashierServiceImpl implements CashierService {
                 }
             }
         }
+        return pendingBills;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CashierPendingBillResponse> getPendingBills(Integer page, Integer size) {
+        List<Booking> allBookings = bookingRepository.findAllByDeletedFalseOrderByCreatedAtDesc();
+        List<CashierPendingBillResponse> pendingBills = buildBillsFromBookings(allBookings);
 
         // 3. Thêm hóa đơn viện phí xuất viện nội trú (Inpatient Discharge Bills)
         List<Discharge> discharges = dischargeRepository.findAll();
@@ -239,6 +262,75 @@ public class CashierServiceImpl implements CashierService {
             ));
         }
 
+        // 4. Thêm bệnh nhân đang điều trị nội trú (Active Inpatient Admissions) cần tạm ứng / viện phí
+        List<HospitalAdmission> activeAdmissions = admissionRepository.findAllByState(com.hospital.api.constant.HospitalAdmissionState.ADMITTED);
+        for (HospitalAdmission adm : activeAdmissions) {
+            boolean alreadyAdded = pendingBills.stream().anyMatch(b -> b.bookingId() != null && b.bookingId().equals(adm.getAdmissionId()));
+            if (alreadyAdded) continue;
+
+            String inpatientBillCode = "BILL-INPATIENT-" + adm.getAdmissionId();
+            String admissionCode = adm.getAdmissionCode() != null ? adm.getAdmissionCode() : ("ADM-" + adm.getAdmissionId().toString().substring(0, 8));
+
+            List<Transaction> txns = transactionRepository.findAllByDescriptionContainingAndStatus(inpatientBillCode, "SUCCESS");
+            if (txns.isEmpty() && adm.getAdmissionCode() != null) {
+                txns = transactionRepository.findAllByDescriptionContainingAndStatus(adm.getAdmissionCode(), "SUCCESS");
+            }
+            BigDecimal totalPaid = txns.stream()
+                    .map(Transaction::getAmount)
+                    .filter(java.util.Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            long daysStayed = Math.max(1, java.time.Duration.between(adm.getAdmissionDate(), java.time.Instant.now()).toDays());
+            BigDecimal dailyFee = adm.getDailyRoomFee() != null ? adm.getDailyRoomFee() : BigDecimal.valueOf(300000);
+            BigDecimal currentCost = dailyFee.multiply(BigDecimal.valueOf(daysStayed));
+            BigDecimal advanceTarget = currentCost.max(BigDecimal.valueOf(1000000));
+
+            if (totalPaid.compareTo(advanceTarget) >= 0) {
+                continue;
+            }
+
+            BigDecimal remaining = advanceTarget.subtract(totalPaid);
+            PatientProfile p = adm.getPatientProfile();
+            Doctor doc = adm.getTreatingDoctor();
+            String deptName = (adm.getRoom() != null && adm.getRoom().getDepartment() != null)
+                    ? adm.getRoom().getDepartment().getDepartmentName()
+                    : (doc != null && doc.getDepartment() != null ? doc.getDepartment().getDepartmentName() : "Khoa Điều Trị Nội Trú");
+            String doctorName = (doc != null && doc.getAccount() != null && doc.getAccount().getFullName() != null)
+                    ? doc.getAccount().getFullName()
+                    : "Bác sĩ điều trị";
+
+            List<CashierBillItemDto> inpatientItems = List.of(
+                    new CashierBillItemDto(
+                            "INPATIENT-ADV-" + adm.getAdmissionId(),
+                            "Tạm ứng viện phí điều trị nội trú (" + (adm.getRoom() != null ? adm.getRoom().getRoomName() : "Phòng nội trú") + ")",
+                            1,
+                            remaining,
+                            remaining,
+                            "INPATIENT"
+                    )
+            );
+
+            LocalDateTime admTime = LocalDateTime.ofInstant(adm.getAdmissionDate(), ZoneId.systemDefault());
+
+            pendingBills.add(new CashierPendingBillResponse(
+                    inpatientBillCode,
+                    admissionCode,
+                    adm.getAdmissionId(),
+                    p != null ? p.getFullName() : "Bệnh nhân nội trú",
+                    p != null ? p.getPhoneNumber() : "",
+                    p != null && p.getIdentityNumber() != null ? p.getIdentityNumber() : "",
+                    p != null && p.getGender() != null ? p.getGender().name() : "",
+                    p != null && p.getStreetAddress() != null ? p.getStreetAddress() : "",
+                    deptName,
+                    doctorName,
+                    "INPATIENT",
+                    inpatientItems,
+                    remaining,
+                    "UNPAID",
+                    admTime
+            ));
+        }
+
         if (page != null && size != null && size > 0 && page >= 0) {
             int fromIndex = page * size;
             if (fromIndex >= pendingBills.size()) {
@@ -297,7 +389,10 @@ public class CashierServiceImpl implements CashierService {
         }
 
         // 3. Tính toán tổng viện phí và số tiền đã thanh toán trước đó
-        List<Transaction> txns = transactionRepository.findAllByDescriptionContainingAndStatus(bookingCode, "SUCCESS");
+        List<Transaction> txns = transactionRepository.findAllByDescriptionContainingAndStatus(bookingCode, "SUCCESS").stream()
+                .filter(t -> t.getTransactionType() == TransactionType.PAY_BOOKING)
+                .filter(t -> Boolean.TRUE.equals(t.getIsVerified()) || t.getPaymentMethod() == PaymentMethod.CASH || t.getPaymentMethod() == PaymentMethod.COUNTER_CASH || t.getPaymentMethod() == PaymentMethod.POS)
+                .filter(t -> exactBookingReference(t.getDescription(), bookingCode)).toList();
         BigDecimal totalPaid = txns.stream()
                 .map(Transaction::getAmount)
                 .filter(java.util.Objects::nonNull)
@@ -327,9 +422,6 @@ public class CashierServiceImpl implements CashierService {
             billId = "BILL-" + bookingCode + "-EXAM";
             invoiceTitle = "công khám ban đầu";
             if (totalPaid.compareTo(examPrice) >= 0) {
-                if (!isDigitalQr) {
-                    throw new AppException("Hóa đơn công khám [BILL-" + bookingCode + "-EXAM] đã được thanh toán trước đó!", HttpStatus.CONFLICT);
-                }
                 return buildExistingReceipt(booking, cashierUsername, billId, bookingCode, examPrice, method, itemsToBill, request.notes(), txns);
             }
             billAmount = examPrice.subtract(totalPaid);
@@ -344,9 +436,6 @@ public class CashierServiceImpl implements CashierService {
                     ? treatmentPrice
                     : totalBill.subtract(totalPaid);
             if (remainingTreatment.compareTo(BigDecimal.ZERO) <= 0) {
-                if (!isDigitalQr) {
-                    throw new AppException("Hóa đơn cận lâm sàng & đơn thuốc [BILL-" + bookingCode + "-TREATMENT] đã được thanh toán trước đó!", HttpStatus.CONFLICT);
-                }
                 return buildExistingReceipt(booking, cashierUsername, billId, bookingCode, treatmentPrice, method, itemsToBill, request.notes(), txns);
             }
             billAmount = remainingTreatment;
@@ -354,9 +443,6 @@ public class CashierServiceImpl implements CashierService {
             // ALL or AUTO
             BigDecimal remaining = totalBill.subtract(totalPaid);
             if (remaining.compareTo(BigDecimal.ZERO) <= 0) {
-                if (!isDigitalQr) {
-                    throw new AppException("Toàn bộ viện phí cho ca khám [" + bookingCode + "] đã được thanh toán đầy đủ!", HttpStatus.CONFLICT);
-                }
                 itemsToBill = new ArrayList<>(examItems);
                 itemsToBill.addAll(treatmentItems);
                 billId = "BILL-" + bookingCode + "-ALL";
@@ -400,6 +486,10 @@ public class CashierServiceImpl implements CashierService {
             amountChange = BigDecimal.ZERO;
         }
 
+        if (isDigitalQr) {
+            throw new AppException("Chưa có xác nhận thanh toán điện tử cho hóa đơn", HttpStatus.PAYMENT_REQUIRED);
+        }
+
         String receiptCode = "RC-" + bookingCode + "-" + ("EXAM".equalsIgnoreCase(invoiceTarget) ? "EXAM-" : ("TREATMENT".equalsIgnoreCase(invoiceTarget) ? "CLS-" : "")) + (System.currentTimeMillis() % 1000000L);
         String cashierName = (cashierUsername != null && !cashierUsername.isBlank()) ? cashierUsername : "Thu ngân quầy";
 
@@ -425,6 +515,7 @@ public class CashierServiceImpl implements CashierService {
                 .paymentMethod(method)
                 .status("SUCCESS")
                 .vnpayTxnRef(receiptCode)
+                .isVerified(true)
                 .description(description)
                 .build();
 
@@ -442,11 +533,8 @@ public class CashierServiceImpl implements CashierService {
                 null
         );
 
-        // 5. Cập nhật trạng thái Booking nếu đang ở trạng thái chờ thanh toán
-        if (booking.getStatus() == BookingStatus.PENDING_PAYMENT) {
-            booking.setStatus(BookingStatus.CONFIRMED);
-            bookingRepository.save(booking);
-        }
+        if (!billId.endsWith("-TREATMENT") && booking.getPrice() != null && booking.getPrice().signum() > 0) booking.setIsPaid(true);
+        reception.checkIn(booking, com.hospital.api.constant.CounterType.APPOINTMENT, false);
 
         // 6. Gửi thông báo đến bệnh nhân nếu có tài khoản
         try {
@@ -517,7 +605,8 @@ public class CashierServiceImpl implements CashierService {
 
             boolean isCashierTxn = rawDesc.contains("Thu ngân viện phí")
                     || ref.startsWith("RC-")
-                    || txn.getTransactionType() == TransactionType.PAY_BOOKING;
+                    || txn.getTransactionType() == TransactionType.PAY_BOOKING
+                    || txn.getTransactionType() == TransactionType.PAY_INPATIENT_FEE;
 
             if (!isCashierTxn || !"SUCCESS".equalsIgnoreCase(txn.getStatus())) {
                 continue;
@@ -720,19 +809,27 @@ public class CashierServiceImpl implements CashierService {
         } catch (Exception ignored) {}
 
         Discharge discharge = null;
+        HospitalAdmission admission = null;
         if (admissionId != null) {
             discharge = dischargeRepository.findByHospitalAdmission_AdmissionId(admissionId).orElse(null);
+            if (discharge != null) {
+                admission = discharge.getHospitalAdmission();
+            } else {
+                admission = admissionRepository.findById(admissionId).orElse(null);
+            }
         }
-        if (discharge == null) {
-            discharge = admissionRepository.findByAdmissionCode(key)
-                    .flatMap(adm -> dischargeRepository.findByHospitalAdmission_AdmissionId(adm.getAdmissionId()))
-                    .orElse(null);
+        if (discharge == null && admission == null) {
+            admission = admissionRepository.findByAdmissionCode(key).orElse(null);
+            if (admission != null) {
+                discharge = dischargeRepository.findByHospitalAdmission_AdmissionId(admission.getAdmissionId()).orElse(null);
+            }
         }
-        if (discharge == null) {
+        if (discharge == null && admission == null) {
             throw new AppException("Không tìm thấy thông tin xuất viện / viện phí nội trú tương ứng với mã: " + input, HttpStatus.NOT_FOUND);
         }
-
-        HospitalAdmission admission = discharge.getHospitalAdmission();
+        if (admission == null && discharge != null) {
+            admission = discharge.getHospitalAdmission();
+        }
 
         PaymentMethod method = request.paymentMethod();
         if (method != PaymentMethod.CASH && method != PaymentMethod.COUNTER_CASH
@@ -740,7 +837,22 @@ public class CashierServiceImpl implements CashierService {
             throw new AppException("Phương thức thanh toán " + method + " không được hỗ trợ tại quầy thu ngân!", HttpStatus.BAD_REQUEST);
         }
 
-        BigDecimal totalCost = discharge.getTotalInpatientCost() != null ? discharge.getTotalInpatientCost() : BigDecimal.ZERO;
+        BigDecimal dailyFee = admission.getDailyRoomFee() != null ? admission.getDailyRoomFee() : BigDecimal.valueOf(300000);
+        int days;
+        BigDecimal totalCost;
+        String itemTitle;
+
+        if (discharge != null) {
+            days = discharge.getTotalDays() != null && discharge.getTotalDays() > 0 ? discharge.getTotalDays() : 1;
+            totalCost = discharge.getTotalInpatientCost() != null ? discharge.getTotalInpatientCost() : dailyFee.multiply(BigDecimal.valueOf(days));
+            itemTitle = "Viện phí điều trị nội trú - Tiền giường (" + days + " ngày)";
+        } else {
+            long daysStayed = Math.max(1, java.time.Duration.between(admission.getAdmissionDate(), java.time.Instant.now()).toDays());
+            days = (int) daysStayed;
+            totalCost = dailyFee.multiply(BigDecimal.valueOf(days)).max(BigDecimal.valueOf(1000000));
+            itemTitle = "Tạm ứng viện phí điều trị nội trú (" + (admission.getRoom() != null ? admission.getRoom().getRoomName() : "Nội trú") + " - " + days + " ngày)";
+        }
+
         String billId = "BILL-INPATIENT-" + admission.getAdmissionId();
         String admissionCode = admission.getAdmissionCode() != null ? admission.getAdmissionCode() : ("ADM-" + admission.getAdmissionId().toString().substring(0, 8));
 
@@ -753,11 +865,19 @@ public class CashierServiceImpl implements CashierService {
                 .filter(java.util.Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        if (totalPaid.compareTo(totalCost) >= 0) {
+        if (totalPaid.compareTo(totalCost) >= 0 && discharge != null) {
             throw new AppException("Hóa đơn viện phí nội trú [" + billId + "] đã được thanh toán đầy đủ trước đó!", HttpStatus.CONFLICT);
         }
 
-        BigDecimal billAmount = totalCost.subtract(totalPaid);
+        BigDecimal billAmount;
+        if (discharge != null) {
+            billAmount = totalCost.subtract(totalPaid);
+        } else {
+            billAmount = (request.amountGiven() != null && request.amountGiven().compareTo(BigDecimal.ZERO) > 0)
+                    ? request.amountGiven()
+                    : totalCost.subtract(totalPaid).max(BigDecimal.valueOf(1000000));
+        }
+
         if (billAmount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new AppException("Số tiền viện phí nội trú cần thanh toán không hợp lệ hoặc bằng 0!", HttpStatus.BAD_REQUEST);
         }
@@ -779,14 +899,13 @@ public class CashierServiceImpl implements CashierService {
         String cashierName = (cashierUsername != null && !cashierUsername.isBlank()) ? cashierUsername : "Thu ngân quầy";
         Account account = (admission.getPatientProfile() != null) ? admission.getPatientProfile().getAccount() : null;
 
-        BigDecimal dailyFee = admission.getDailyRoomFee() != null ? admission.getDailyRoomFee() : BigDecimal.valueOf(300000);
         List<CashierBillItemDto> itemsToBill = List.of(
                 new CashierBillItemDto(
                         "INPATIENT-" + admission.getAdmissionId(),
-                        "Viện phí điều trị nội trú - Tiền giường (" + discharge.getTotalDays() + " ngày)",
-                        discharge.getTotalDays(),
+                        itemTitle,
+                        days,
                         dailyFee,
-                        totalCost,
+                        billAmount,
                         "INPATIENT"
                 )
         );
@@ -798,7 +917,7 @@ public class CashierServiceImpl implements CashierService {
             log.warn("Không thể serialize danh sách dịch vụ nội trú cho biên lai {}: {}", receiptCode, ex.getMessage());
         }
 
-        String description = "Thu ngân viện phí xuất viện nội trú [" + billId + "] cho hồ sơ [" + admissionCode + "] bởi thu ngân " + cashierName;
+        String description = "Thu ngân viện phí nội trú [" + billId + "] cho hồ sơ [" + admissionCode + "] bởi thu ngân " + cashierName;
         if (itemsSnapshotJson != null) {
             description += "\n" + SNAPSHOT_PREFIX + itemsSnapshotJson + SNAPSHOT_SUFFIX;
         }
@@ -806,7 +925,7 @@ public class CashierServiceImpl implements CashierService {
         Transaction transaction = Transaction.builder()
                 .account(account)
                 .amount(billAmount)
-                .transactionType(TransactionType.PAY_BOOKING)
+                .transactionType(TransactionType.PAY_INPATIENT_FEE)
                 .paymentMethod(method)
                 .status("SUCCESS")
                 .vnpayTxnRef(receiptCode)
@@ -899,11 +1018,10 @@ public class CashierServiceImpl implements CashierService {
                 ? doc.getDepartment().getDepartmentName()
                 : "Khoa Khám Bệnh";
 
-        // Cập nhật trạng thái Booking nếu đang ở trạng thái chờ thanh toán
-        if (booking.getStatus() == BookingStatus.PENDING_PAYMENT) {
-            booking.setStatus(BookingStatus.CONFIRMED);
-            bookingRepository.save(booking);
-        }
+        BigDecimal consultationPaid = txns.stream().filter(t -> t.getDescription() != null && !t.getDescription().contains("-TREATMENT") && !t.getDescription().contains("-CLS"))
+                .map(Transaction::getAmount).filter(java.util.Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (booking.getPrice() != null && booking.getPrice().signum() > 0 && consultationPaid.compareTo(booking.getPrice()) >= 0) booking.setIsPaid(true);
+        reception.checkIn(booking, com.hospital.api.constant.CounterType.APPOINTMENT, false);
 
         return new CashierReceiptResponse(
                 receiptCode,

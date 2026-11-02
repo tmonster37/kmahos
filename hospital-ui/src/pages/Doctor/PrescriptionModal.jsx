@@ -37,24 +37,6 @@ import LocalHospitalIcon from "@mui/icons-material/LocalHospital";
 import axiosInstance from "../../services/AxiosInstance";
 import { formatCurrency } from "../../utils/formatters";
 
-// Danh mục dược phẩm chuẩn bệnh viện (hỗ trợ offline/fallback)
-export const FALLBACK_MEDICINES = [
-    { medicineId: 1, medicineName: "Paracetamol 500mg", activeIngredient: "Paracetamol", unit: "Viên", price: 1500, stockQuantity: 500 },
-    { medicineId: 2, medicineName: "Amoxicillin 500mg (Kháng sinh Penicillin)", activeIngredient: "Amoxicillin", unit: "Viên", price: 3500, stockQuantity: 300 },
-    { medicineId: 3, medicineName: "Decolgen Forte (Cảm cúm)", activeIngredient: "Paracetamol + Phenylephrine", unit: "Viên", price: 2500, stockQuantity: 200 },
-    { medicineId: 4, medicineName: "Berberin 100mg (Tiêu hóa)", activeIngredient: "Berberin", unit: "Viên", price: 1000, stockQuantity: 400 },
-    { medicineId: 5, medicineName: "Gói bù nước Oresol 27.9g", activeIngredient: "Glucose + Điện giải", unit: "Gói", price: 6000, stockQuantity: 150 },
-    { medicineId: 6, medicineName: "Vitamin C 500mg (Tăng đề kháng)", activeIngredient: "Ascorbic acid", unit: "Viên", price: 2000, stockQuantity: 300 },
-    { medicineId: 7, medicineName: "Omeprazol 20mg (Dạ dày)", activeIngredient: "Omeprazol", unit: "Viên", price: 4000, stockQuantity: 250 },
-    { medicineId: 8, medicineName: "Phosphalugel (Gel chữ P dạ dày)", activeIngredient: "Aluminium phosphate", unit: "Gói", price: 5500, stockQuantity: 200 },
-    { medicineId: 9, medicineName: "Alpha Choay (Kháng viêm phù nề)", activeIngredient: "Chymotrypsin", unit: "Viên", price: 3000, stockQuantity: 350 },
-    { medicineId: 10, medicineName: "Amlodipin 5mg (Hạ huyết áp)", activeIngredient: "Amlodipin", unit: "Viên", price: 2500, stockQuantity: 400 },
-    { medicineId: 11, medicineName: "Vitamin 3B (B1+B6+B12)", activeIngredient: "Thiamin + Pyridoxin + Cyanocobalamin", unit: "Viên", price: 2200, stockQuantity: 300 },
-    { medicineId: 12, medicineName: "Azithromycin 500mg (Kháng sinh Macrolid)", activeIngredient: "Azithromycin", unit: "Viên", price: 12000, stockQuantity: 180 },
-    { medicineId: 13, medicineName: "Cefuroxim 500mg (Kháng sinh Cephalosporin)", activeIngredient: "Cefuroxim", unit: "Viên", price: 8500, stockQuantity: 220 },
-    { medicineId: 14, medicineName: "Men vi sinh Enterogermina", activeIngredient: "Bacillus clausii", unit: "Ống", price: 9000, stockQuantity: 160 }
-];
-
 // Danh mục Đơn thuốc mẫu chuẩn lâm sàng (Prescription Templates)
 export const PRESCRIPTION_TEMPLATES = [
     {
@@ -297,14 +279,10 @@ export default function PrescriptionModal({ open, onClose, recordId, onPrescribe
         try {
             const res = await axiosInstance.get("/api/clinical/medicines");
             const data = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
-            if (data && data.length > 0) {
-                setMedicines(data);
-            } else {
-                setMedicines(FALLBACK_MEDICINES);
-            }
+            setMedicines(data || []);
         } catch (err) {
             console.error("Lỗi lấy danh mục thuốc:", err);
-            setMedicines(FALLBACK_MEDICINES);
+            setMedicines([]);
         }
     };
 
@@ -315,6 +293,7 @@ export default function PrescriptionModal({ open, onClose, recordId, onPrescribe
 
         const newItems = [];
         const allergyWarnings = [];
+        const missingMedicines = [];
 
         template.items.forEach((tItem) => {
             // Tìm thuốc trong kho phù hợp nhất
@@ -340,10 +319,6 @@ export default function PrescriptionModal({ open, onClose, recordId, onPrescribe
                 }
             }
 
-            if (!matchedMed && medicines.length > 0) {
-                matchedMed = medicines[0];
-            }
-
             if (matchedMed) {
                 newItems.push({
                     medicineId: matchedMed.medicineId,
@@ -354,6 +329,8 @@ export default function PrescriptionModal({ open, onClose, recordId, onPrescribe
                     eveningAmount: tItem.eveningAmount,
                     dosageInstruction: tItem.dosageInstruction,
                 });
+            } else {
+                missingMedicines.push(tItem.query);
             }
         });
 
@@ -361,11 +338,20 @@ export default function PrescriptionModal({ open, onClose, recordId, onPrescribe
             setItems(newItems);
             setDoctorNotes(template.doctorNotes);
 
+            const notices = [];
             if (allergyWarnings.length > 0) {
-                setTemplateNotice(`⚠️ Đã nạp toa mẫu "${template.name}". LƯU Ý: ${allergyWarnings.join("; ")}! Hệ thống đã cảnh báo đỏ để Bác sĩ xem xét.`);
+                notices.push(`LƯU Ý DỊ ỨNG: ${allergyWarnings.join("; ")}!`);
+            }
+            if (missingMedicines.length > 0) {
+                notices.push(`Kho dược thiếu: [${missingMedicines.join(", ")}]`);
+            }
+            if (notices.length > 0) {
+                setTemplateNotice(`⚠️ Đã nạp toa mẫu "${template.name}". ${notices.join(" | ")}`);
             } else {
                 setTemplateNotice(`✨ Đã nạp thành công đơn thuốc mẫu: "${template.name}"`);
             }
+        } else {
+            setTemplateNotice(`❌ Không tìm thấy thuốc trong kho dược phù hợp với toa mẫu "${template.name}".`);
         }
     };
 
@@ -441,6 +427,7 @@ export default function PrescriptionModal({ open, onClose, recordId, onPrescribe
             await axiosInstance.post(`/api/clinical/records/${recordId}/prescriptions`, {
                 doctorNotes,
                 overrideAllergyWarning: allergyAlerts.length > 0,
+                overrideReason: overrideReason || null,
                 items: items.map((it) => ({
                     medicineId: Number(it.medicineId),
                     quantity: Number(it.quantity),

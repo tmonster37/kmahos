@@ -41,7 +41,7 @@ public class AccountService {
                 .phoneNumber(phoneNumber)
                 .email(request.email())
                 .password(passwordEncoder.encode(request.password()))
-                .role(request.role() != null ? request.role() : Role.ROLE_PATIENT)
+                .role(Role.ROLE_PATIENT)
                 .isActive(true)
                 .build();
         return accountRepository.save(account);

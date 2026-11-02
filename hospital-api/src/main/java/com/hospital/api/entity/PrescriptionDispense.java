@@ -12,9 +12,11 @@ import java.util.List;
 import java.util.UUID;
 
 @Entity
-@Table(name = "prescription_dispenses", indexes = {
+@Table(name = "prescription_dispenses", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_dispense_prescription", columnNames = {"prescription_id"})
+}, indexes = {
         @Index(name = "idx_dispense_code", columnList = "dispense_code", unique = true),
-        @Index(name = "idx_dispense_presc", columnList = "prescription_id")
+        @Index(name = "idx_dispense_presc", columnList = "prescription_id", unique = true)
 })
 @Getter
 @Setter

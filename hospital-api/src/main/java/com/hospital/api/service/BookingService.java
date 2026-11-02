@@ -17,10 +17,12 @@ public interface BookingService {
     BookingResponse createBooking(UUID accountId, BookingCreateRequest request);
     BookingResponse createKioskBooking(KioskBookingRequest request);
     KioskCheckInResponse checkInKiosk(KioskCheckInRequest request);
+    KioskCheckInResponse payKioskBooking(com.hospital.api.dto.request.KioskPayRequest request);
     List<BookingResponse> getMyBookings(UUID accountId);
     BookingResponse getBookingByCode(String bookingCode);
     List<AdminBookingResponse> getAdminBookings(LocalDate fromDate, LocalDate toDate);
     List<AdminBookingSlotResponse> getAdminBookingSlots(LocalDate date, Integer departmentId);
     AdminBookingResponse rescheduleBooking(UUID bookingId, AdminBookingRescheduleRequest request);
     void adminCancelBooking(UUID bookingId);
+    void cancelBooking(UUID accountId, UUID bookingId, boolean isStaff);
 }

@@ -50,8 +50,11 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import MaleIcon from "@mui/icons-material/Male";
 import FemaleIcon from "@mui/icons-material/Female";
+import { useAuth } from "../../context/AuthContext";
 import axiosInstance from "../../services/AxiosInstance";
 import { formatDate, formatDateTime, formatCurrency, isValidPhoneNumber, isValidIdentityNumber, isValidHealthInsurance } from "../../utils/formatters";
+import PatientProfileDetailModal from "../../components/common/PatientProfileDetailModal";
+import ElectronicMedicalRecordModal from "../../components/common/ElectronicMedicalRecordModal";
 
 const defaultFormData = {
     fullName: "",
@@ -59,15 +62,17 @@ const defaultFormData = {
     identityNumber: "",
     healthInsuranceNumber: "",
     gender: "MALE",
-    dateOfBirth: "1990-01-01",
+    dateOfBirth: "",
     streetAddress: "",
-    province: "Thành phố Hà Nội",
-    district: "Thanh Trì",
-    ward: "Tân Triều",
+    province: "",
+    district: "",
+    ward: "",
     email: ""
 };
 
 export default function PatientManagePage() {
+    const { user } = useAuth();
+    const isHeadOfDept = user?.role === "ROLE_HEAD_OF_DEPARTMENT";
     const [patients, setPatients] = useState([]);
     const [loading, setLoading] = useState(false);
     const [errorMsg, setErrorMsg] = useState("");
@@ -81,6 +86,7 @@ export default function PatientManagePage() {
     // Modals
     const [selectedPatient, setSelectedPatient] = useState(null);
     const [openDetailModal, setOpenDetailModal] = useState(false);
+    const [selectedBookingForEhr, setSelectedBookingForEhr] = useState(null);
 
     const [openFormModal, setOpenFormModal] = useState(false);
     const [editingPatient, setEditingPatient] = useState(null);
@@ -131,9 +137,9 @@ export default function PatientManagePage() {
             identityNumber: p.identityNumber && p.identityNumber !== "Chưa cập nhật" ? p.identityNumber : "",
             healthInsuranceNumber: p.healthInsuranceNumber || "",
             gender: p.gender || "MALE",
-            dateOfBirth: p.dateOfBirth ? p.dateOfBirth.substring(0, 10) : "1990-01-01",
+            dateOfBirth: p.dateOfBirth ? p.dateOfBirth.substring(0, 10) : "",
             streetAddress: p.streetAddress || "",
-            province: p.province || "Thành phố Hà Nội",
+            province: p.province || "",
             district: p.district || "",
             ward: p.ward || "",
             email: p.email || ""
@@ -331,10 +337,11 @@ export default function PatientManagePage() {
                         >
                             {loading ? "Đang tải..." : "Làm mới"}
                         </Button>
-                        <Button
-                            variant="contained"
-                            startIcon={<PersonAddIcon />}
-                            onClick={handleOpenAdd}
+                        {!isHeadOfDept && (
+                            <Button
+                                variant="contained"
+                                startIcon={<PersonAddIcon />}
+                                onClick={handleOpenAdd}
                             sx={{
                                 borderRadius: 2.5,
                                 fontWeight: 700,
@@ -346,7 +353,8 @@ export default function PatientManagePage() {
                             }}
                         >
                             Thêm Bệnh Nhân Mới
-                        </Button>
+                            </Button>
+                        )}
                     </Stack>
                 </Box>
             </Paper>
@@ -636,7 +644,7 @@ export default function PatientManagePage() {
                                                         display: "inline-block"
                                                     }}
                                                 >
-                                                    {p.patientCode || "BN-" + p.patientProfileId.substring(0, 6).toUpperCase()}
+                                                    {p.patientCode || (p.patientProfileId ? "BN-" + String(p.patientProfileId).substring(0, 6).toUpperCase() : "BN-NEW")}
                                                 </Box>
                                             </TableCell>
                                             <TableCell>
@@ -742,7 +750,8 @@ export default function PatientManagePage() {
                                                             <VisibilityIcon fontSize="small" />
                                                         </IconButton>
                                                     </Tooltip>
-                                                    <Tooltip title="Chỉnh sửa thông tin">
+                                                    {!isHeadOfDept && (
+                                                        <Tooltip title="Chỉnh sửa thông tin">
                                                         <IconButton
                                                             size="small"
                                                             onClick={() => handleOpenEdit(p)}
@@ -756,7 +765,9 @@ export default function PatientManagePage() {
                                                             <EditIcon fontSize="small" />
                                                         </IconButton>
                                                     </Tooltip>
-                                                    <Tooltip title="Xóa hồ sơ">
+                                                    )}
+                                                    {!isHeadOfDept && (
+                                                        <Tooltip title="Xóa hồ sơ">
                                                         <IconButton
                                                             size="small"
                                                             onClick={() => handleOpenDelete(p)}
@@ -769,7 +780,8 @@ export default function PatientManagePage() {
                                                         >
                                                             <DeleteIcon fontSize="small" />
                                                         </IconButton>
-                                                    </Tooltip>
+                                                        </Tooltip>
+                                                    )}
                                                 </Stack>
                                             </TableCell>
                                         </TableRow>
@@ -781,210 +793,22 @@ export default function PatientManagePage() {
                 </TableContainer>
             </Paper>
 
-            {/* 4. Modal Chi Tiết Hồ Sơ Bệnh Nhân (Apple HIG Bento Grid) */}
-            <Dialog
+            {/* 4. Modal Chi Tiết Hồ Sơ Bệnh Nhân (Master Patient Index - Dossier Nhân Khẩu) */}
+            <PatientProfileDetailModal
                 open={openDetailModal}
                 onClose={() => setOpenDetailModal(false)}
-                maxWidth="md"
-                fullWidth
-                PaperProps={{
-                    sx: {
-                        borderRadius: 4,
-                        border: "1px solid rgba(15, 23, 42, 0.08)",
-                        boxShadow: "0 20px 40px rgba(0, 0, 0, 0.12)",
-                        overflow: "hidden"
-                    }
-                }}
-            >
-                <DialogTitle
-                    sx={{
-                        fontWeight: 800,
-                        borderBottom: "1px solid rgba(15, 23, 42, 0.08)",
-                        color: "#0F172A",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 1.5,
-                        py: 2,
-                        bgcolor: "#F8FAFC"
-                    }}
-                >
-                    <Box
-                        sx={{
-                            width: 36,
-                            height: 36,
-                            borderRadius: 2,
-                            bgcolor: "rgba(0, 136, 214, 0.1)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center"
-                        }}
-                    >
-                        <PeopleAltIcon sx={{ color: "#0088D6", fontSize: 20 }} />
-                    </Box>
-                    <Box>
-                        <Typography variant="subtitle1" fontWeight={800} color="#0F172A">
-                            Chi Tiết Hồ Sơ Bệnh Nhân: {selectedPatient?.fullName}
-                        </Typography>
-                        <Typography variant="caption" color="#64748B">
-                            Mã định danh: {selectedPatient?.patientCode || "BN-HỒ SƠ"} • Cơ sở dữ liệu y tế quốc gia
-                        </Typography>
-                    </Box>
-                </DialogTitle>
-                <DialogContent sx={{ p: 3, bgcolor: "#FFFFFF" }}>
-                    {selectedPatient && (
-                        <Grid container spacing={3} mt={0.5}>
-                            {/* Cột trái: Thông tin hành chính & liên hệ */}
-                            <Grid item xs={12} md={5}>
-                                <Paper elevation={0} sx={{ p: 2.5, bgcolor: "#F8FAFC", borderRadius: 3, border: "1px solid rgba(15, 23, 42, 0.08)" }}>
-                                    <Box textAlign="center" mb={2}>
-                                        <Avatar
-                                            sx={{
-                                                width: 64,
-                                                height: 64,
-                                                mx: "auto",
-                                                bgcolor: selectedPatient.gender === "FEMALE" ? "rgba(236, 72, 153, 0.12)" : "rgba(0, 136, 214, 0.12)",
-                                                color: selectedPatient.gender === "FEMALE" ? "#DB2777" : "#0088D6",
-                                                fontSize: "1.5rem",
-                                                fontWeight: 800,
-                                                border: "2px solid #FFFFFF",
-                                                boxShadow: "0 2px 8px rgba(0,0,0,0.06)"
-                                            }}
-                                        >
-                                            {selectedPatient.fullName?.charAt(0) || "B"}
-                                        </Avatar>
-                                        <Typography variant="h6" fontWeight="800" color="#0F172A" mt={1}>
-                                            {selectedPatient.fullName}
-                                        </Typography>
-                                        <Box
-                                            component="span"
-                                            sx={{
-                                                fontFamily: "monospace",
-                                                fontWeight: 700,
-                                                fontSize: "0.78rem",
-                                                bgcolor: "rgba(0, 136, 214, 0.08)",
-                                                color: "#0088D6",
-                                                px: 1.2,
-                                                py: 0.3,
-                                                borderRadius: 1.5,
-                                                display: "inline-block",
-                                                mt: 0.5
-                                            }}
-                                        >
-                                            {selectedPatient.patientCode || "BN-HỒ SƠ"}
-                                        </Box>
-                                    </Box>
-                                    <Divider sx={{ my: 1.5 }} />
-                                    <Typography variant="body2" sx={{ mb: 1.2, display: "flex", alignItems: "center", gap: 1 }}>
-                                        <PhoneIcon fontSize="small" sx={{ color: "#64748B" }} /> <b>SĐT:</b>{" "}
-                                        <span style={{ fontFamily: "monospace" }}>{selectedPatient.phoneNumber}</span>
-                                    </Typography>
-                                    {selectedPatient.email && (
-                                        <Typography variant="body2" sx={{ mb: 1.2, display: "flex", alignItems: "center", gap: 1 }}>
-                                            <EmailIcon fontSize="small" sx={{ color: "#64748B" }} /> <b>Email:</b>{" "}
-                                            {selectedPatient.email}
-                                        </Typography>
-                                    )}
-                                    <Typography variant="body2" sx={{ mb: 1.2, display: "flex", alignItems: "center", gap: 1 }}>
-                                        <BadgeIcon fontSize="small" sx={{ color: "#64748B" }} /> <b>CCCD:</b>{" "}
-                                        <span style={{ fontFamily: "monospace" }}>{selectedPatient.identityNumber || "Chưa cập nhật"}</span>
-                                    </Typography>
-                                    <Typography variant="body2" sx={{ mb: 1.2, display: "flex", alignItems: "center", gap: 1 }}>
-                                        <ReceiptIcon fontSize="small" sx={{ color: "#64748B" }} /> <b>BHYT:</b>{" "}
-                                        {selectedPatient.healthInsuranceNumber ? (
-                                            <Chip label={selectedPatient.healthInsuranceNumber} color="info" size="small" sx={{ fontWeight: "bold", height: 20 }} />
-                                        ) : (
-                                            "Chưa đăng ký"
-                                        )}
-                                    </Typography>
-                                    <Typography variant="body2" sx={{ mb: 1.2, display: "flex", alignItems: "center", gap: 1 }}>
-                                        <AccountBalanceWalletIcon fontSize="small" sx={{ color: "#D97706" }} /> <b>Ví viện phí:</b>{" "}
-                                        <b style={{ color: "#059669", fontFamily: "monospace" }}>{formatCurrency(selectedPatient.balance || 0)}</b>
-                                    </Typography>
-                                    <Typography variant="body2" sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
-                                        <LocationOnIcon fontSize="small" sx={{ color: "#64748B", mt: 0.2 }} /> <b>Địa chỉ:</b>{" "}
-                                        {selectedPatient.fullAddress || [selectedPatient.streetAddress, selectedPatient.ward, selectedPatient.district, selectedPatient.province].filter(Boolean).join(", ") || "Chưa cập nhật"}
-                                    </Typography>
-                                </Paper>
-                            </Grid>
+                patient={selectedPatient}
+                profile={selectedPatient}
+                onViewMedicalRecord={(booking) => setSelectedBookingForEhr(booking)}
+                onOpenEhr={(booking) => setSelectedBookingForEhr(booking)}
+            />
 
-                            {/* Cột phải: Lịch sử khám bệnh thực tế */}
-                            <Grid item xs={12} md={7}>
-                                <Typography
-                                    variant="subtitle1"
-                                    fontWeight={800}
-                                    color="#0F172A"
-                                    sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}
-                                >
-                                    <HistoryIcon sx={{ color: "#0088D6" }} />
-                                    Lịch Sử Khám Bệnh & Chỉ Định Cận Lâm Sàng
-                                </Typography>
-                                {selectedPatient.history && selectedPatient.history.length > 0 ? (
-                                    <TableContainer component={Paper} elevation={0} sx={{ border: "1px solid rgba(15, 23, 42, 0.08)", borderRadius: 2.5 }}>
-                                        <Table size="small">
-                                            <TableHead sx={{ bgcolor: "#F8FAFC" }}>
-                                                <TableRow>
-                                                    <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", textTransform: "uppercase", color: "#475569" }}>Ngày</TableCell>
-                                                    <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", textTransform: "uppercase", color: "#475569" }}>Khoa & Bác Sĩ</TableCell>
-                                                    <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", textTransform: "uppercase", color: "#475569" }}>Chẩn Đoán</TableCell>
-                                                    <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", textTransform: "uppercase", color: "#475569", textAlign: "right" }}>Viện Phí</TableCell>
-                                                </TableRow>
-                                            </TableHead>
-                                            <TableBody>
-                                                {selectedPatient.history.map((h, idx) => (
-                                                    <TableRow key={idx}>
-                                                        <TableCell sx={{ fontWeight: 600, fontSize: "0.82rem" }}>{h.visitDate}</TableCell>
-                                                        <TableCell>
-                                                            <Typography variant="body2" fontWeight={700} color="#0F172A">
-                                                                {h.departmentName}
-                                                            </Typography>
-                                                            <Typography variant="caption" color="text.secondary">
-                                                                {h.doctorName}
-                                                            </Typography>
-                                                        </TableCell>
-                                                        <TableCell sx={{ color: "#0088D6", fontWeight: 600, fontSize: "0.82rem" }}>
-                                                            {h.diagnosis}
-                                                        </TableCell>
-                                                        <TableCell align="right" sx={{ fontWeight: 700, color: "#059669", fontFamily: "monospace" }}>
-                                                            {formatCurrency(h.cost)}
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))}
-                                            </TableBody>
-                                        </Table>
-                                    </TableContainer>
-                                ) : (
-                                    <Box
-                                        sx={{
-                                            p: 4,
-                                            border: "1px dashed rgba(15, 23, 42, 0.15)",
-                                            borderRadius: 3,
-                                            textAlign: "center",
-                                            bgcolor: "#F8FAFC"
-                                        }}
-                                    >
-                                        <HistoryIcon sx={{ fontSize: 40, color: "#94A3B8", mb: 1 }} />
-                                        <Typography variant="body2" fontWeight={700} color="#475569">
-                                            Chưa ghi nhận ca khám lâm sàng hoàn tất
-                                        </Typography>
-                                        <Typography variant="caption" color="text.secondary">
-                                            Bệnh nhân đã có hồ sơ đăng ký tại viện nhưng chưa phát sinh hồ sơ khám bệnh hoặc chưa xuất viện
-                                        </Typography>
-                                    </Box>
-                                )}
-                            </Grid>
-                        </Grid>
-                    )}
-                </DialogContent>
-                <DialogActions sx={{ p: 2, px: 3, borderTop: "1px solid rgba(15, 23, 42, 0.08)", bgcolor: "#F8FAFC" }}>
-                    <Button
-                        onClick={() => setOpenDetailModal(false)}
-                        variant="contained"
-                        sx={{ borderRadius: 2.5, textTransform: "none", fontWeight: 700, px: 3, bgcolor: "#0088D6" }}
-                    >
-                        Đóng cửa sổ
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            {/* Modal Bệnh Án Điện Tử (EMR) chuẩn Bộ Y Tế TT 46/2018/TT-BYT */}
+            <ElectronicMedicalRecordModal
+                open={Boolean(selectedBookingForEhr)}
+                onClose={() => setSelectedBookingForEhr(null)}
+                booking={selectedBookingForEhr}
+            />
 
             {/* 5. Modal Thêm / Chỉnh Sửa Hồ Sơ Bệnh Nhân Apple HIG */}
             <Dialog

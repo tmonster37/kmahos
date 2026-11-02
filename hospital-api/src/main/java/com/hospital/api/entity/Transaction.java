@@ -13,7 +13,7 @@ import java.util.UUID;
 @Table(name = "transactions", indexes = {
         @Index(name = "idx_txn_account", columnList = "account_id"),
         @Index(name = "idx_txn_vnpay_ref", columnList = "vnpay_txn_ref"),
-        @Index(name = "idx_txn_order_code", columnList = "order_code")
+        @Index(name = "idx_txn_order_code", columnList = "order_code", unique = true)
 })
 @Getter
 @Setter
@@ -49,7 +49,7 @@ public class Transaction extends BaseEntity {
     @Column(name = "vnpay_txn_ref", length = 50)
     private String vnpayTxnRef; // Mã tham chiếu VNPay
 
-    @Column(name = "order_code")
+    @Column(name = "order_code", unique = true)
     private Long orderCode; // Mã đơn hàng số cho PayOS / Open Banking
 
     @Column(name = "is_verified", nullable = false)

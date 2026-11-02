@@ -23,6 +23,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import SecurityIcon from "@mui/icons-material/Security";
 import LocalHospitalIcon from "@mui/icons-material/LocalHospital";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import BadgeIcon from "@mui/icons-material/Badge";
 import axiosInstance, { API_BASE_URL } from "../../services/AxiosInstance";
 
 export default function VerifyPrescriptionPage() {

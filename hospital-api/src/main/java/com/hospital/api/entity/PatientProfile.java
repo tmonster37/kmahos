@@ -56,9 +56,24 @@ public class PatientProfile extends BaseEntity {
     @Column(name = "ward", length = 100)
     private String ward;
 
+    @Column(name = "allergies", columnDefinition = "TEXT")
+    private String allergies; // Tiền sử dị ứng thuốc, thức ăn...
+
+    @Column(name = "medical_history", columnDefinition = "TEXT")
+    private String medicalHistory; // Tiền sử bệnh bản thân / gia đình
+
     // Tài khoản người nhà/bệnh nhân quản lý hồ sơ này
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "account_id", nullable = false)
+    @JoinColumn(name = "account_id", nullable = true)
     private Account account;
-}
 
+    // Đánh dấu hồ sơ đã được liên kết chính thức vào tài khoản ứng dụng
+    @Builder.Default
+    @Column(name = "is_linked", nullable = false, columnDefinition = "boolean default false")
+    private boolean isLinked = false;
+
+    // Mối quan hệ với chủ tài khoản: SELF, SPOUSE, CHILD, PARENT, OTHER
+    @Builder.Default
+    @Column(name = "relationship", length = 50)
+    private String relationship = "SELF";
+}

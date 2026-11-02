@@ -9,7 +9,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 
 @Component
-public class PayOSConfig {
+public class  PayOSConfig {
 
     @Value("${payos.client-id:demo-client-id}")
     public String clientId;
@@ -60,6 +60,23 @@ public class PayOSConfig {
                 returnUrlStr != null ? returnUrlStr : ""
         );
         return hmacSHA256(checksumKey, data);
+    }
+
+    /** Lossless ASCII mapping for our generated order codes (less than 10^13).
+     * PayOS supports only nine description characters for some bank accounts. */
+    /**
+     * Sinh ma orderCode an toan cho PayOS (duong, nho hon 10^13 de khop tham chieu 9 ky tu base-36)
+     */
+    public static long generateOrderCode() {
+        return (System.currentTimeMillis() % 10000000000L) * 1000L + java.util.concurrent.ThreadLocalRandom.current().nextInt(100, 999);
+    }
+
+    public static String paymentReference(long orderCode) {
+        String reference = Long.toString(orderCode, 36).toUpperCase(java.util.Locale.ROOT);
+        if (orderCode <= 0 || reference.length() > 9) {
+            throw new IllegalArgumentException("Mã đơn hàng PayOS vượt phạm vi tham chiếu 9 ký tự");
+        }
+        return reference;
     }
 
     /**
@@ -117,8 +134,8 @@ public class PayOSConfig {
         }
         String signature = queryParams.get("signature");
         if (signature == null || signature.isBlank()) {
-            // Không có signature: kiểm tra mã code=00 và status=PAID, không cancel
-            return "00".equals(queryParams.get("code")) && !"true".equalsIgnoreCase(queryParams.get("cancel"));
+            // Bắt buộc phải có chữ ký HMAC hợp lệ từ PayOS trên Return URL
+            return false;
         }
 
         // Sắp xếp các tham số alphabet key=value theo đặc tả PayOS (loại trừ signature)

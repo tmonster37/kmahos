@@ -15,30 +15,31 @@ export default function MainLayout() {
         <Box display="flex" flexDirection="column" minHeight="100vh" position="relative" sx={{ bgcolor: "#F4F7FB" }}>
             <Navbar />
             
-            <Box component="main" flexGrow={1}>
+            <Box component="main" flexGrow={1} sx={{ pb: { xs: 8, md: 0 } }}>
                 <Outlet />
             </Box>
 
             {/* Floating Live Chat & AI Consultation Widget */}
             <LiveChatWidget />
 
-            {/* YOUMED STYLE CLEAN COMPACT FOOTER */}
+            {/* YOUMED STYLE CLEAN LIGHT FOOTER */}
             <Box
                 component="footer"
                 sx={{
-                    bgcolor: "#0F172A",
-                    color: "#94A3B8",
+                    bgcolor: "#FFFFFF",
+                    color: "#475569",
                     pt: 6,
-                    pb: 3,
+                    pb: { xs: 10, md: 4 },
                     mt: 8,
-                    borderTop: "1px solid #1E293B"
+                    borderTop: "1px solid #E2E8F0",
+                    boxShadow: "0 -4px 20px rgba(0, 0, 0, 0.02)"
                 }}
             >
                 <Container maxWidth="xl">
                     {/* Top Footer Banner: Hotline */}
                     <Box
                         sx={{
-                            bgcolor: "#1E293B",
+                            background: "linear-gradient(135deg, #F0FDFA 0%, #E0F2FE 100%)",
                             borderRadius: 3,
                             p: { xs: 2.5, md: 3 },
                             mb: 5,
@@ -47,7 +48,8 @@ export default function MainLayout() {
                             justifyContent: "space-between",
                             flexWrap: "wrap",
                             gap: 2,
-                            border: "1px solid #334155"
+                            border: "1px solid #99F6E4",
+                            boxShadow: "0 4px 16px rgba(13, 148, 136, 0.08)"
                         }}
                     >
                         <Box display="flex" alignItems="center" gap={2}>
@@ -56,21 +58,22 @@ export default function MainLayout() {
                                     width: 48,
                                     height: 48,
                                     borderRadius: 2.5,
-                                    bgcolor: "#0088D6",
+                                    bgcolor: "#0D9488",
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "center",
-                                    color: "white"
+                                    color: "white",
+                                    boxShadow: "0 4px 12px rgba(13, 148, 136, 0.25)"
                                 }}
                             >
                                 <PhoneInTalkIcon sx={{ fontSize: 26 }} />
                             </Box>
                             <Box>
-                                <Typography variant="subtitle1" fontWeight="bold" color="white">
+                                <Typography variant="subtitle1" fontWeight="bold" color="#0F172A">
                                     Cần Hỗ Trợ Đặt Khám & Tra Cứu Y Khoa?
                                 </Typography>
-                                <Typography variant="body2" color="#94A3B8" fontSize="0.85rem">
-                                    Đội ngũ y tế TNT luôn túc trực hỗ trợ người bệnh 24/7.
+                                <Typography variant="body2" color="#475569" fontSize="0.85rem">
+                                    Đội ngũ y tế TNT HOSPITAL luôn túc trực hỗ trợ người bệnh 24/7.
                                 </Typography>
                             </Box>
                         </Box>
@@ -88,7 +91,8 @@ export default function MainLayout() {
                                     borderRadius: 2,
                                     px: 2.5,
                                     py: 1,
-                                    fontSize: "0.875rem"
+                                    fontSize: "0.875rem",
+                                    boxShadow: "0 4px 12px rgba(239, 68, 68, 0.25)"
                                 }}
                             >
                                 Hotline: 1900 8888
@@ -97,13 +101,15 @@ export default function MainLayout() {
                                 component={Link}
                                 to="/booking"
                                 variant="contained"
-                                color="primary"
                                 sx={{
+                                    bgcolor: "#0D9488",
+                                    "&:hover": { bgcolor: "#0F766E" },
                                     fontWeight: "bold",
                                     borderRadius: 2,
                                     px: 2.5,
                                     py: 1,
-                                    fontSize: "0.875rem"
+                                    fontSize: "0.875rem",
+                                    boxShadow: "0 4px 12px rgba(13, 148, 136, 0.25)"
                                 }}
                             >
                                 Đặt Lịch Khám Ngay
@@ -121,7 +127,7 @@ export default function MainLayout() {
                                         width: 34,
                                         height: 34,
                                         borderRadius: 2,
-                                        background: "linear-gradient(135deg, #0088D6 0%, #00C292 100%)",
+                                        background: "linear-gradient(135deg, #0D9488 0%, #0088D6 100%)",
                                         display: "flex",
                                         alignItems: "center",
                                         justifyContent: "center",
@@ -130,21 +136,21 @@ export default function MainLayout() {
                                 >
                                     <LocalHospitalIcon sx={{ fontSize: 20 }} />
                                 </Box>
-                                <Typography variant="subtitle1" fontWeight="800" color="white">
-                                    Bệnh Viện Đa Khoa Quốc Tế TNT
+                                <Typography variant="subtitle1" fontWeight="800" color="#0F172A">
+                                    TNT HOSPITAL
                                 </Typography>
                             </Box>
-                            <Typography variant="body2" sx={{ lineHeight: 1.6, mb: 2, fontSize: "0.85rem" }}>
+                            <Typography variant="body2" sx={{ lineHeight: 1.6, mb: 2, fontSize: "0.85rem", color: "#475569" }}>
                                 Nền tảng y tế số kết nối người bệnh với hệ thống khám chữa bệnh chuẩn chất lượng cao, đơn giản hóa quy trình đăng ký, khám và thanh toán viện phí.
                             </Typography>
-                            <Box display="flex" flexDirection="column" gap={0.8} fontSize="0.825rem">
+                            <Box display="flex" flexDirection="column" gap={0.8} fontSize="0.825rem" color="#334155">
                                 <Box display="flex" alignItems="flex-start" gap={1}>
-                                    <LocationOnIcon sx={{ fontSize: 16, color: "#0088D6", mt: 0.3 }} />
-                                    <span>Địa chỉ: Lô đất CC2, Khu đô thị mới Văn Quán, số 114 Nguyễn Khuyến, phường Văn Quán, quận Hà Đông, Hà Nội</span>
+                                    <LocationOnIcon sx={{ fontSize: 16, color: "#0D9488", mt: 0.3 }} />
+                                    <span>Địa chỉ: số 114 Nguyễn Khuyến, phường Văn Quán, quận Hà Đông, Hà Nội</span>
                                 </Box>
                                 <Box display="flex" alignItems="center" gap={1}>
-                                    <PhoneInTalkIcon sx={{ fontSize: 16, color: "#00C292" }} />
-                                    <span>Cấp cứu 24/7: (024) 3888 9999 - Hotline: 1900 8888</span>
+                                    <PhoneInTalkIcon sx={{ fontSize: 16, color: "#0D9488" }} />
+                                    <span>Hotline: 1900 8888</span>
                                 </Box>
                                 <Box display="flex" alignItems="center" gap={1}>
                                     <EmailIcon sx={{ fontSize: 16, color: "#F59E0B" }} />
@@ -155,36 +161,36 @@ export default function MainLayout() {
 
                         {/* Column 2: Quick Links / Dịch Vụ */}
                         <Grid item xs={6} sm={3} md={3}>
-                            <Typography variant="subtitle2" fontWeight="bold" color="white" gutterBottom>
+                            <Typography variant="subtitle2" fontWeight="bold" color="#0F172A" gutterBottom>
                                 Chức Năng Bệnh Nhân
                             </Typography>
                             <Stack spacing={1} fontSize="0.825rem">
-                                <Link to="/booking" style={{ color: "#94A3B8", textDecoration: "none" }}>Đặt lịch khám bệnh</Link>
-                                <Link to="/profiles" style={{ color: "#94A3B8", textDecoration: "none" }}>Quản lý hồ sơ bệnh nhân</Link>
-                                <Link to="/lookup" style={{ color: "#94A3B8", textDecoration: "none" }}>Tìm hồ sơ bệnh nhân đã mất</Link>
-                                <Link to="/my-history" style={{ color: "#94A3B8", textDecoration: "none" }}>Xem phiếu khám & lịch sử</Link>
-                                <Link to="/payment" style={{ color: "#94A3B8", textDecoration: "none" }}>Nạp tiền & Thanh toán viện phí</Link>
-                                <Link to="/reminders" style={{ color: "#94A3B8", textDecoration: "none" }}>Nhắc uống thuốc theo đơn</Link>
+                                <Link to="/booking" style={{ color: "#64748B", textDecoration: "none" }}>Đặt lịch khám bệnh</Link>
+                                <Link to="/profiles" style={{ color: "#64748B", textDecoration: "none" }}>Quản lý hồ sơ bệnh nhân</Link>
+                                <Link to="/lookup" style={{ color: "#64748B", textDecoration: "none" }}>Tìm hồ sơ bệnh nhân đã mất</Link>
+                                <Link to="/my-history" style={{ color: "#64748B", textDecoration: "none" }}>Xem phiếu khám & lịch sử</Link>
+                                <Link to="/payment" style={{ color: "#64748B", textDecoration: "none" }}>Nạp tiền & Thanh toán viện phí</Link>
+                                <Link to="/reminders" style={{ color: "#64748B", textDecoration: "none" }}>Nhắc uống thuốc theo đơn</Link>
                             </Stack>
                         </Grid>
 
                         {/* Column 3: Chuyên Khoa */}
                         <Grid item xs={6} sm={3} md={4}>
-                            <Typography variant="subtitle2" fontWeight="bold" color="white" gutterBottom>
+                            <Typography variant="subtitle2" fontWeight="bold" color="#0F172A" gutterBottom>
                                 Khoa Khám Chuyên Sâu
                             </Typography>
                             <Stack spacing={1} fontSize="0.825rem">
-                                <Link to="/booking" style={{ color: "#94A3B8", textDecoration: "none" }}>Khoa Nội Tổng Hợp & Tim Mạch</Link>
-                                <Link to="/booking" style={{ color: "#94A3B8", textDecoration: "none" }}>Khoa Ngoại Tổng Quát & Chấn Thương</Link>
-                                <Link to="/booking" style={{ color: "#94A3B8", textDecoration: "none" }}>Khoa Nhi & Tiêm Chủng</Link>
-                                <Link to="/booking" style={{ color: "#94A3B8", textDecoration: "none" }}>Khoa Sản Phụ Khoa</Link>
-                                <Link to="/booking" style={{ color: "#94A3B8", textDecoration: "none" }}>Khoa Mắt - Tai Mũi Họng - Răng Hàm Mặt</Link>
-                                <Link to="/booking" style={{ color: "#94A3B8", textDecoration: "none" }}>Trung Tâm Xét Nghiệm & Chẩn Đoán Hình Ảnh</Link>
+                                <Link to="/booking" style={{ color: "#64748B", textDecoration: "none" }}>Khoa Nội Tổng Hợp & Tim Mạch</Link>
+                                <Link to="/booking" style={{ color: "#64748B", textDecoration: "none" }}>Khoa Ngoại Tổng Quát & Chấn Thương</Link>
+                                <Link to="/booking" style={{ color: "#64748B", textDecoration: "none" }}>Khoa Nhi & Tiêm Chủng</Link>
+                                <Link to="/booking" style={{ color: "#64748B", textDecoration: "none" }}>Khoa Sản Phụ Khoa</Link>
+                                <Link to="/booking" style={{ color: "#64748B", textDecoration: "none" }}>Khoa Mắt - Tai Mũi Họng - Răng Hàm Mặt</Link>
+                                <Link to="/booking" style={{ color: "#64748B", textDecoration: "none" }}>Trung Tâm Xét Nghiệm & Chẩn Đoán Hình Ảnh</Link>
                             </Stack>
                         </Grid>
                     </Grid>
 
-                    <Divider sx={{ borderColor: "#1E293B", my: 2.5 }} />
+                    <Divider sx={{ borderColor: "#E2E8F0", my: 2.5 }} />
 
                     {/* Bottom Copyright & Security */}
                     <Box
@@ -196,11 +202,11 @@ export default function MainLayout() {
                         fontSize="0.8rem"
                     >
                         <Typography variant="caption" color="#64748B">
-                            © {new Date().getFullYear()} TNT Hospital System. Giấy phép hoạt động KCB số: 188/BYT-GPHĐ cấp bởi Bộ Y Tế.
+                            © {new Date().getFullYear()} TNT HOSPITAL. Giấy phép hoạt động KCB số: 188/BYT-GPHĐ cấp bởi Bộ Y Tế.
                         </Typography>
                         <Box display="flex" alignItems="center" gap={1}>
-                            <SecurityIcon sx={{ fontSize: 16, color: "#00C292" }} />
-                            <Typography variant="caption" color="#94A3B8">
+                            <SecurityIcon sx={{ fontSize: 16, color: "#0D9488" }} />
+                            <Typography variant="caption" color="#64748B">
                                 Bảo mật hồ sơ bệnh án theo tiêu chuẩn Bộ Y Tế
                             </Typography>
                         </Box>

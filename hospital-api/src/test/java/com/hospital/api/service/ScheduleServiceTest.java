@@ -12,6 +12,7 @@ import com.hospital.api.entity.Doctor;
 import com.hospital.api.entity.DoctorSchedule;
 import com.hospital.api.entity.Room;
 import com.hospital.api.exception.AppException;
+import com.hospital.api.repository.BookingRepository;
 import com.hospital.api.repository.DoctorRepository;
 import com.hospital.api.repository.DoctorScheduleRepository;
 import com.hospital.api.repository.RoomRepository;
@@ -46,6 +47,9 @@ class ScheduleServiceTest {
 
     @Mock
     private RoomRepository roomRepository;
+
+    @Mock
+    private BookingRepository bookingRepository;
 
     @InjectMocks
     private ScheduleServiceImpl scheduleService;

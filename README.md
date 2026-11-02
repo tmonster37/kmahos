@@ -224,7 +224,7 @@ Dữ liệu khởi tạo mẫu của hệ thống cung cấp sẵn các tài kho
 | Vai trò (Role) | Số điện thoại / Tài khoản | Mật khẩu | Họ và tên | Quyền hạn & Màn hình trải nghiệm |
 | :--- | :---: | :---: | :--- | :--- |
 | **Quản trị viên (ADMIN)** | `0937050537` | `taizz0537` | Quản Trị Viên (Tài) | Toàn quyền quản trị nhân sự, khoa phòng, ca trực, doanh thu, KPI |
-| **Trưởng khoa (HEAD_OF_DEPT)** | `0900000002` | `password123` | PGS. TS Lê Văn Thịnh | Quản lý chuyên khoa Nội, duyệt chuyển khoa, điều phối |
+| **Trưởng khoa (HEAD_OF_DEPT)** | `0900000002` | `password123` | PGS. TS Lê Văn Thịnh | Quản lý nhân sự, lịch trực và buồng phòng chuyên khoa Nội |
 | **Bác sĩ Lâm sàng (DOCTOR)** | `0911000001` | `password123` | BS.CKII Nguyễn Văn Hoàng | Bàn khám bệnh, chẩn đoán ICD-10, kê đơn thuốc, chỉ định CLS |
 | **Điều dưỡng tiếp đón (NURSE)** | `0900000004` | `password123` | ĐD. Nguyễn Mai Hoa | Mở quầy tiếp đón, nhận ca trực, phân buồng khám, gọi số LED |
 | **Thu ngân viện phí (CASHIER)** | `0900000007` | `password123` | TN. Hoàng Kim Ngân | Quầy thu ngân, thu tiền mặt/thẻ, thanh toán đa hóa đơn |
@@ -412,6 +412,25 @@ Hệ thống được thiết kế tối ưu để triển khai trực tuyến t
 - **Frontend (hospital-ui):** Triển khai lên **Vercel** hoặc **Cloudflare Pages** (Build: `npm run build`, Output: `dist`, biến `VITE_API_URL`).
 - **Backend (hospital-api):** Triển khai lên **Railway.app** hoặc **Render.com** (Tự động nhận diện Dockerfile Eclipse Temurin 21).
 - **PostgreSQL Database:** Sử dụng dịch vụ cơ sở dữ liệu đám mây **Neon.tech** hoặc **Supabase**.
+
+### 12.3. Hướng dẫn Cấu hình Cổng Thanh toán PayOS Open Banking (VietQR 24/7)
+Hệ thống tích hợp cổng thanh toán trực tiếp PayOS chuẩn Napas 24/7 với xác thực chữ ký HMAC-SHA256 hai chiều và cơ chế Zero-Trust:
+1. **Thiết lập trên PayOS Dashboard (https://payos.vn):**
+   - Lấy `Client ID`, `API Key` và `Checksum Key`.
+   - Cấu hình Webhook URL chính thức: `https://<domain_api>/api/payment/payos/webhook`.
+2. **Khai báo biến môi trường trên máy chủ Production:**
+   - `PAYOS_CLIENT_ID`: Client ID thật từ PayOS.
+   - `PAYOS_API_KEY`: API Key thật.
+   - `PAYOS_CHECKSUM_KEY`: Checksum Key để xác thực chữ ký Webhook và Return URL.
+   - `PAYOS_RETURN_URL`: `https://<domain_web>/payment` (Tuyệt đối không dùng `localhost` trong production).
+   - `PAYOS_CANCEL_URL`: `https://<domain_web>/payment`.
+   - `PAYOS_BANK_BIN`: Mã BIN ngân hàng thụ hưởng (vd: `970422` cho MBBank).
+   - `PAYOS_BANK_ACCOUNT`: Số tài khoản ngân hàng thụ hưởng thực tế.
+   - `PAYOS_ACCOUNT_HOLDER`: Tên chủ tài khoản in hoa không dấu.
+3. **Cơ chế An toàn & Vận hành:**
+   - **Xác thực HMAC bắt buộc:** Mọi webhook và dữ liệu trả về qua return URL đều được tính toán và kiểm tra chữ ký HMAC-SHA256; không ghi nhận thành công từ query string đơn thuần.
+   - **Chống giao dịch trùng lặp:** Hệ thống lưu trữ `order_code` duy nhất trong CSDL (Unique Constraint), chống va chạm ngẫu nhiên và tự động tái sử dụng mã đơn trong 15 phút nếu người bệnh yêu cầu mã QR cho cùng một lượt khám.
+   - **Chống giả mạo trong Production:** Bộ kiểm tra `ProductionSecurityValidator` tự động chặn khởi động nếu thiếu khóa PayOS hoặc chứa địa chỉ localhost trên profile `prod`. Tuyệt đối không sinh mã QR hoặc số tài khoản giả lập khi xảy ra sự cố kết nối trong production.
 
 ---
 *Dự án phát triển phục vụ công tác chuyển đổi số y tế và quản lý bệnh viện thông minh.*

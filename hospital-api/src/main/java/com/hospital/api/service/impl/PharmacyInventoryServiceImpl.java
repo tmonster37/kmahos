@@ -301,7 +301,7 @@ public class PharmacyInventoryServiceImpl implements PharmacyInventoryService {
     @Override
     @Transactional
     public PrescriptionDispenseResponse dispensePrescription(UUID prescriptionId, DispensePrescriptionRequest request) {
-        Prescription prescription = prescriptionRepository.findById(prescriptionId)
+        Prescription prescription = prescriptionRepository.findByIdWithLock(prescriptionId)
                 .orElseThrow(() -> new AppException("Không tìm thấy đơn thuốc với ID: " + prescriptionId, HttpStatus.NOT_FOUND));
 
         // 1. Chống xuất kho lặp lại (Chống Double Dispense)
@@ -408,6 +408,8 @@ public class PharmacyInventoryServiceImpl implements PharmacyInventoryService {
 
         dispense.setItems(dispenseItems);
         PrescriptionDispense savedDispense = dispenseRepository.save(dispense);
+        prescription.setIsPaid(true);
+        prescriptionRepository.save(prescription);
 
         // 4. Ghi Audit Log theo quy định y tế
         auditLogService.log(

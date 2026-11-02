@@ -8,14 +8,18 @@ const API_BASE_URL =
 const axiosInstance = axios.create({
     baseURL: API_BASE_URL,
     timeout: 75000,
+    withCredentials: true,
     headers: {
         "Content-Type": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
     },
 });
 
-// Request Interceptor: Tự động đính kèm JWT Token vào Header
+// Request Interceptor: Tự động đính kèm cookie (withCredentials) và fallback Authorization header nếu có
 axiosInstance.interceptors.request.use(
     (config) => {
+        config.withCredentials = true;
+        config.headers["X-Requested-With"] = "XMLHttpRequest";
         const token = localStorage.getItem("accessToken");
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;

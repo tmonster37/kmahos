@@ -1,5 +1,9 @@
 package com.hospital.api.service.impl;
 
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.hospital.api.constant.PaymentMethod;
+import com.hospital.api.constant.TransactionType;
 import com.hospital.api.constant.BookingStatus;
 import com.hospital.api.constant.CheckInWindowStatus;
 import com.hospital.api.constant.Role;
@@ -31,7 +35,6 @@ import java.util.List;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 public class BookingServiceImpl implements BookingService {
 
     private final BookingRepository bookingRepository;
@@ -41,8 +44,58 @@ public class BookingServiceImpl implements BookingService {
     private final DoctorRepository doctorRepository;
     private final DoctorScheduleRepository scheduleRepository;
     private final RoomRepository roomRepository;
+    private final TransactionRepository transactionRepository;
     private final com.hospital.api.service.SlotReservationService slotReservationService;
+    private final BookingReceptionTransition reception;
+    private final CounterTicketRepository counterTicketRepository;
     private final Clock hospitalClock;
+
+    @Autowired
+    public BookingServiceImpl(
+            BookingRepository bookingRepository,
+            TimeSlotRepository timeSlotRepository,
+            PatientProfileRepository patientProfileRepository,
+            AccountRepository accountRepository,
+            DoctorRepository doctorRepository,
+            DoctorScheduleRepository scheduleRepository,
+            RoomRepository roomRepository,
+            TransactionRepository transactionRepository,
+            com.hospital.api.service.SlotReservationService slotReservationService,
+            BookingReceptionTransition reception,
+            CounterTicketRepository counterTicketRepository,
+            Clock hospitalClock
+    ) {
+        this.bookingRepository = bookingRepository;
+        this.timeSlotRepository = timeSlotRepository;
+        this.patientProfileRepository = patientProfileRepository;
+        this.accountRepository = accountRepository;
+        this.doctorRepository = doctorRepository;
+        this.scheduleRepository = scheduleRepository;
+        this.roomRepository = roomRepository;
+        this.transactionRepository = transactionRepository;
+        this.slotReservationService = slotReservationService;
+        this.reception = reception;
+        this.counterTicketRepository = counterTicketRepository;
+        this.hospitalClock = hospitalClock;
+    }
+
+    public BookingServiceImpl(
+            BookingRepository bookingRepository,
+            TimeSlotRepository timeSlotRepository,
+            PatientProfileRepository patientProfileRepository,
+            AccountRepository accountRepository,
+            DoctorRepository doctorRepository,
+            DoctorScheduleRepository scheduleRepository,
+            RoomRepository roomRepository,
+            TransactionRepository transactionRepository,
+            com.hospital.api.service.SlotReservationService slotReservationService,
+            BookingReceptionTransition reception,
+            Clock hospitalClock
+    ) {
+        this(bookingRepository, timeSlotRepository, patientProfileRepository, accountRepository,
+                doctorRepository, scheduleRepository, roomRepository, transactionRepository,
+                slotReservationService, reception, null, hospitalClock);
+    }
 
     @Override
     @Transactional
@@ -62,11 +115,11 @@ public class BookingServiceImpl implements BookingService {
         int maxCap = timeSlot.getMaxCapacity() != null ? timeSlot.getMaxCapacity() : 5;
 
         if (request.reservationId() != null) {
-            slotReservationService.confirmSlotReservation(request.reservationId());
-        } else {
-            if (current + holding >= maxCap) {
-                throw new AppException("Khung giờ khám này đã kín chỗ hoặc đang có người giữ chỗ, vui lòng chọn khung giờ khác", HttpStatus.BAD_REQUEST);
-            }
+            slotReservationService.consumeReservation(request.reservationId(), request.timeSlotId(), accountId, request.patientProfileId());
+            holding = timeSlot.getHoldingCount() != null ? timeSlot.getHoldingCount() : 0;
+        }
+        if (current + holding >= maxCap) {
+            throw new AppException("Khung giờ khám này đã kín chỗ hoặc đang có người giữ chỗ, vui lòng chọn khung giờ khác", HttpStatus.CONFLICT);
         }
 
         DoctorSchedule schedule = timeSlot.getDoctorSchedule();
@@ -74,19 +127,19 @@ public class BookingServiceImpl implements BookingService {
         LocalDate bookingDate = schedule.getScheduleDate();
 
         // 4. Tăng số lượng người đã đặt trong TimeSlot
-        timeSlot.setCurrentBookings(timeSlot.getCurrentBookings() + 1);
+        timeSlot.setCurrentBookings(current + 1);
         timeSlotRepository.save(timeSlot);
 
         // 5. Cấp số thứ tự khám trong ngày (1, 2, 3...)
-        int currentCount = bookingRepository.countBookingsByDoctorAndDate(doctor.getDoctorId(), bookingDate);
-        int queueNumber = currentCount + 1;
+        int queueNumber = reception.nextQueueNumber(doctor, bookingDate);
 
         // 6. Sinh mã đặt lịch duy nhất: BK + YYYYMMDD + 6 ký tự ngẫu nhiên entropy cao
         String randomSuffix = UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase();
         String bookingCode = "BK" + bookingDate.format(DateTimeFormatter.ofPattern("yyyyMMdd")) + randomSuffix;
 
         BigDecimal fee = doctor.getConsultationFee() != null ? doctor.getConsultationFee() : BigDecimal.ZERO;
-        BookingStatus initialStatus = fee.compareTo(BigDecimal.ZERO) > 0 ? BookingStatus.PENDING_PAYMENT : BookingStatus.CONFIRMED;
+        boolean isFree = fee.compareTo(BigDecimal.ZERO) <= 0;
+        BookingStatus initialStatus = isFree ? BookingStatus.CONFIRMED : BookingStatus.PENDING_PAYMENT;
 
         // 7. Tạo Booking
         Booking booking = Booking.builder()
@@ -94,8 +147,9 @@ public class BookingServiceImpl implements BookingService {
                 .queueNumber(queueNumber)
                 .bookingDate(bookingDate)
                 .symptoms(request.symptoms())
-                .price(doctor.getConsultationFee())
+                .price(fee)
                 .status(initialStatus)
+                .isPaid(false)
                 .patientProfile(patientProfile)
                 .timeSlot(timeSlot)
                 .doctor(doctor)
@@ -108,6 +162,7 @@ public class BookingServiceImpl implements BookingService {
     @Override
     @Transactional
     public BookingResponse createKioskBooking(KioskBookingRequest request) {
+        reception.lockCounters();
         LocalDate today = LocalDate.now(hospitalClock);
 
         // 1. Tìm hoặc tạo Account theo số điện thoại
@@ -121,19 +176,25 @@ public class BookingServiceImpl implements BookingService {
                     return accountRepository.save(newAcc);
                 });
 
-        // 2. Tìm hoặc tạo PatientProfile
+        // 2. Tìm hoặc tạo PatientProfile theo họ tên của người khám trong gia đình
+        String patientFullName = request.fullName() != null ? request.fullName().trim() : "";
+        LocalDate patientDob = request.birthYear() != null ? LocalDate.of(request.birthYear(), 1, 1) : LocalDate.of(1990, 1, 1);
+
         PatientProfile patientProfile = patientProfileRepository
                 .findAllByAccount_UserIdAndDeletedFalse(account.getUserId())
-                .stream().findFirst()
+                .stream()
+                .filter(p -> p.getFullName() != null && p.getFullName().trim().equalsIgnoreCase(patientFullName))
+                .findFirst()
                 .orElseGet(() -> {
                     PatientProfile profile = PatientProfile.builder()
                             .account(account)
-                            .fullName(request.fullName())
-                            .phoneNumber(request.phoneNumber())
+                            .fullName(patientFullName)
+                            .phoneNumber(request.phoneNumber() != null ? request.phoneNumber().trim() : account.getPhoneNumber())
                             .gender(com.hospital.api.constant.Gender.OTHER)
-                            .dateOfBirth(LocalDate.of(1990, 1, 1))
+                            .dateOfBirth(patientDob)
                             .build();
-                    return patientProfileRepository.save(profile);
+                    PatientProfile saved = patientProfileRepository.save(profile);
+                    return saved != null ? saved : profile;
                 });
 
         // 3. Tìm Lịch trực hôm nay cho chuyên khoa được chọn
@@ -165,18 +226,45 @@ public class BookingServiceImpl implements BookingService {
                 doctor = schedule.getDoctor();
                 break;
             }
-            if (timeSlot != null) {
-                break;
+            if (timeSlot != null) break;
+        }
+
+        // Fallback pass: Nếu đã qua giờ các slot trong ngày nhưng vẫn có bác sĩ trực hôm nay (khám ca tối / ngoài giờ),
+        // lấy khung giờ phù hợp của lịch trực hôm nay để tiếp nhận bệnh nhân tại Kiosk.
+        if (timeSlot == null && !schedules.isEmpty()) {
+            for (DoctorSchedule schedule : schedules) {
+                List<TimeSlot> slots = timeSlotRepository.findAllByDoctorSchedule_DoctorScheduleIdAndDeletedFalseOrderByStartTimeAsc(
+                        schedule.getDoctorScheduleId());
+                for (int i = slots.size() - 1; i >= 0; i--) {
+                    TimeSlot candidate = slots.get(i);
+                    TimeSlot lockedSlot = timeSlotRepository.findByIdWithLock(candidate.getTimeSlotId()).orElse(null);
+                    if (lockedSlot == null) {
+                        continue;
+                    }
+                    int currentBookings = lockedSlot.getCurrentBookings() != null ? lockedSlot.getCurrentBookings() : 0;
+                    int holdingCount = lockedSlot.getHoldingCount() != null ? lockedSlot.getHoldingCount() : 0;
+                    int maxCapacity = lockedSlot.getMaxCapacity() != null ? lockedSlot.getMaxCapacity() : 5;
+                    if (currentBookings + holdingCount >= maxCapacity) {
+                        continue;
+                    }
+                    lockedSlot.setCurrentBookings(currentBookings + 1);
+                    timeSlotRepository.save(lockedSlot);
+                    timeSlot = lockedSlot;
+                    doctor = schedule.getDoctor();
+                    break;
+                }
+                if (timeSlot != null) {
+                    break;
+                }
             }
         }
 
         if (timeSlot == null || doctor == null) {
-            throw new AppException("Khung gi\u1edd \u0111\u00e3 h\u1ebft ch\u1ed7, vui l\u00f2ng th\u1eed l\u1ea1i sau", HttpStatus.CONFLICT);
+            throw new AppException("Khung giờ đã hết chỗ, vui lòng thử lại sau", HttpStatus.CONFLICT);
         }
         LocalDate bookingDate = today;
         // 4. Cấp số thứ tự khám
-        int currentCount = bookingRepository.countBookingsByDoctorAndDate(doctor.getDoctorId(), today);
-        int queueNumber = currentCount + 1;
+        int queueNumber = reception.nextQueueNumber(doctor, today);
 
         // 5. Sinh mã đặt lịch Kiosk entropy cao
         String randomSuffix = UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase();
@@ -189,9 +277,11 @@ public class BookingServiceImpl implements BookingService {
         int age = -1;
         if (request.birthYear() != null && request.birthYear() > 1900 && request.birthYear() <= today.getYear()) {
             age = today.getYear() - request.birthYear();
-            patientProfile.setDateOfBirth(LocalDate.of(request.birthYear(), 1, 1));
-            patientProfileRepository.save(patientProfile);
-        } else if (patientProfile.getDateOfBirth() != null) {
+            if (patientProfile != null) {
+                patientProfile.setDateOfBirth(LocalDate.of(request.birthYear(), 1, 1));
+                patientProfileRepository.save(patientProfile);
+            }
+        } else if (patientProfile != null && patientProfile.getDateOfBirth() != null) {
             age = java.time.Period.between(patientProfile.getDateOfBirth(), today).getYears();
         }
 
@@ -209,6 +299,11 @@ public class BookingServiceImpl implements BookingService {
 
         BigDecimal kioskFee = doctor.getConsultationFee() != null ? doctor.getConsultationFee() : BigDecimal.valueOf(150000);
         BookingStatus kioskStatus = BookingStatus.CONFIRMED;
+        boolean isKioskFree = kioskFee.compareTo(BigDecimal.ZERO) <= 0;
+        boolean isPaid = false; // A client payment preference is not verified payment.
+
+        LocalDateTime now = LocalDateTime.now(hospitalClock);
+        LocalDateTime dispatchedAt = null;
 
         Booking booking = Booking.builder()
                 .bookingCode(bookingCode)
@@ -217,15 +312,22 @@ public class BookingServiceImpl implements BookingService {
                 .symptoms(request.symptoms() != null ? request.symptoms() : (isPriority ? "Khám ưu tiên tại sảnh Kiosk" : "Khám tiếp nhận tại sảnh Kiosk"))
                 .price(kioskFee)
                 .status(kioskStatus)
+                .isPaid(isPaid)
                 .patientProfile(patientProfile)
                 .timeSlot(timeSlot)
                 .doctor(doctor)
                 .isPriority(isPriority)
                 .priorityReason(priorityReason)
-                .checkedInAt(LocalDateTime.now(hospitalClock))
+                .checkedInAt(now)
+                .dispatchedAt(dispatchedAt)
                 .build();
 
-        return BookingResponse.fromEntity(bookingRepository.save(booking));
+        Booking savedBooking = bookingRepository.save(booking);
+
+        com.hospital.api.constant.CounterType type = isPriority ? com.hospital.api.constant.CounterType.PRIORITY : com.hospital.api.constant.CounterType.GENERAL;
+        reception.checkIn(savedBooking, type, false);
+        reception.ensureTicket(savedBooking, type, false);
+        return BookingResponse.fromEntity(savedBooking);
     }
 
     @Override
@@ -268,12 +370,19 @@ public class BookingServiceImpl implements BookingService {
             throw new AppException("Không thể đổi lịch đã hủy, đã check-in, đang khám hoặc đã hoàn tất", HttpStatus.CONFLICT);
         }
 
+        reception.lockCounters(); // Same order as kiosk/reception before locking multiple slots.
         TimeSlot oldSlot = booking.getTimeSlot();
         if (oldSlot != null && oldSlot.getTimeSlotId().equals(request.timeSlotId())) {
             return AdminBookingResponse.fromEntity(booking);
         }
-        TimeSlot newSlot = timeSlotRepository.findByIdWithLock(request.timeSlotId())
-                .orElseThrow(() -> new AppException("Khung giờ mới không tồn tại", HttpStatus.NOT_FOUND));
+        java.util.List<UUID> slotIds = new java.util.ArrayList<>();
+        slotIds.add(request.timeSlotId());
+        if (oldSlot != null) slotIds.add(oldSlot.getTimeSlotId());
+        slotIds.sort(java.util.Comparator.naturalOrder());
+        java.util.Map<UUID, TimeSlot> lockedSlots = new java.util.HashMap<>();
+        for (UUID slotId : slotIds) lockedSlots.put(slotId, timeSlotRepository.findByIdWithLock(slotId)
+                .orElseThrow(() -> new AppException("Khung giờ không tồn tại", HttpStatus.NOT_FOUND)));
+        TimeSlot newSlot = lockedSlots.get(request.timeSlotId());
         DoctorSchedule newSchedule = newSlot.getDoctorSchedule();
         LocalDate today = LocalDate.now(hospitalClock);
         if (newSchedule.getScheduleDate().isBefore(today)
@@ -299,7 +408,7 @@ public class BookingServiceImpl implements BookingService {
         }
 
         if (oldSlot != null) {
-            TimeSlot lockedOldSlot = timeSlotRepository.findByIdWithLock(oldSlot.getTimeSlotId()).orElse(oldSlot);
+            TimeSlot lockedOldSlot = lockedSlots.get(oldSlot.getTimeSlotId());
             int oldCount = lockedOldSlot.getCurrentBookings() != null ? lockedOldSlot.getCurrentBookings() : 0;
             lockedOldSlot.setCurrentBookings(Math.max(0, oldCount - 1));
             timeSlotRepository.save(lockedOldSlot);
@@ -311,8 +420,7 @@ public class BookingServiceImpl implements BookingService {
         booking.setBookingDate(newSchedule.getScheduleDate());
         if (!java.util.Objects.equals(previousDoctorId, newSchedule.getDoctor().getDoctorId())
                 || !previousBookingDate.isEqual(newSchedule.getScheduleDate())) {
-            booking.setQueueNumber(bookingRepository.countBookingsByDoctorAndDate(
-                    newSchedule.getDoctor().getDoctorId(), newSchedule.getScheduleDate()) + 1);
+            booking.setQueueNumber(reception.nextQueueNumber(newSchedule.getDoctor(), newSchedule.getScheduleDate()));
         }
         return AdminBookingResponse.fromEntity(bookingRepository.save(booking));
     }
@@ -320,17 +428,47 @@ public class BookingServiceImpl implements BookingService {
     @Override
     @Transactional
     public void adminCancelBooking(UUID bookingId) {
+        cancelBooking(null, bookingId, true);
+    }
+
+    @Override
+    @Transactional
+    public void cancelBooking(UUID accountId, UUID bookingId, boolean isStaff) {
         Booking booking = bookingRepository.findByIdWithLock(bookingId)
                 .orElseThrow(() -> new AppException("Lịch hẹn không tồn tại", HttpStatus.NOT_FOUND));
+
+        if (!isStaff) {
+            boolean isOwner = booking.getPatientProfile() != null
+                    && booking.getPatientProfile().getAccount() != null
+                    && booking.getPatientProfile().getAccount().getUserId().equals(accountId);
+            if (!isOwner) {
+                throw new AppException("Bạn không có quyền hủy lịch khám của bệnh nhân khác", HttpStatus.FORBIDDEN);
+            }
+        }
+
         if (booking.getStatus() == BookingStatus.CANCELLED) {
             throw new AppException("Lịch hẹn đã được hủy trước đó", HttpStatus.CONFLICT);
         }
         if (booking.getStatus() == BookingStatus.COMPLETED || booking.getStatus() == BookingStatus.IN_PROGRESS
                 || booking.getCheckedInAt() != null) {
-            throw new AppException("Không thể hủy lịch đã check-in, đang khám hoặc đã hoàn tất", HttpStatus.CONFLICT);
+            throw new AppException("Không thể hủy lịch đã tiếp đón, đang khám hoặc đã hoàn tất", HttpStatus.CONFLICT);
         }
+
         booking.setStatus(BookingStatus.CANCELLED);
         bookingRepository.save(booking);
+
+        // Hủy mọi phiếu quầy còn đang chờ phục vụ
+        List<CounterTicket> linkedTickets = counterTicketRepository != null ? counterTicketRepository.findAllByBookingForUpdate(booking.getBookingId()) : null;
+        if (linkedTickets != null) {
+            for (CounterTicket ticket : linkedTickets) {
+                if (ticket.getStatus() == com.hospital.api.constant.CounterTicketStatus.WAITING ||
+                    ticket.getStatus() == com.hospital.api.constant.CounterTicketStatus.CALLING) {
+                    ticket.setStatus(com.hospital.api.constant.CounterTicketStatus.SKIPPED);
+                    counterTicketRepository.save(ticket);
+                }
+            }
+        }
+
         if (booking.getTimeSlot() != null) {
             TimeSlot slot = timeSlotRepository.findByIdWithLock(booking.getTimeSlot().getTimeSlotId())
                     .orElse(booking.getTimeSlot());
@@ -340,17 +478,55 @@ public class BookingServiceImpl implements BookingService {
                 timeSlotRepository.save(slot);
             }
         }
+
+        // Hoàn tiền vào ví tài khoản bệnh nhân nếu đã thanh toán trước
+        if (Boolean.TRUE.equals(booking.getIsPaid()) && booking.getPrice() != null && booking.getPrice().compareTo(BigDecimal.ZERO) > 0) {
+            Account account = booking.getPatientProfile() != null ? booking.getPatientProfile().getAccount() : null;
+            if (account != null) {
+                BigDecimal currentBalance = account.getBalance() != null ? account.getBalance() : BigDecimal.ZERO;
+                account.setBalance(currentBalance.add(booking.getPrice()));
+                accountRepository.save(account);
+
+                Transaction refundTx = Transaction.builder()
+                        .account(account)
+                        .amount(booking.getPrice())
+                        .transactionType(TransactionType.REFUND)
+                        .status("SUCCESS")
+                        .description("Hoàn tiền hủy lịch khám mã " + booking.getBookingCode())
+                        .paymentMethod(PaymentMethod.INTERNAL_WALLET)
+                        .build();
+                transactionRepository.save(refundTx);
+            }
+        }
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<BookingResponse> getMyBookings(UUID accountId) {
         return bookingRepository.findAllByPatientProfile_Account_UserIdAndDeletedFalseOrderByCreatedAtDesc(accountId)
                 .stream()
-                .map(BookingResponse::fromEntity)
+                .map(b -> {
+                    String tCode = null;
+                    Integer qNum = null;
+                    String cName = null;
+                    try {
+                        var tickets = counterTicketRepository != null ? counterTicketRepository.findAllByBooking(b.getBookingId()) : null;
+                        if (tickets != null && !tickets.isEmpty()) {
+                            var latest = tickets.get(tickets.size() - 1);
+                            tCode = latest.getTicketCode();
+                            qNum = latest.getQueueNumber();
+                            cName = latest.getCounter() != null ? latest.getCounter().getCounterName() : null;
+                        }
+                    } catch (Exception ignored) {
+                        // Safe fallback - avoid failing user booking history if ticket resolution fails
+                    }
+                    return BookingResponse.fromEntity(b, tCode, qNum, cName);
+                })
                 .toList();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public BookingResponse getBookingByCode(String bookingCode) {
         Booking booking = bookingRepository.findByBookingCode(bookingCode)
                 .orElseThrow(() -> new AppException("Không tìm thấy phiếu đặt khám", HttpStatus.NOT_FOUND));
@@ -375,29 +551,32 @@ public class BookingServiceImpl implements BookingService {
             }
         }
 
-        BookingResponse response = BookingResponse.fromEntity(booking);
+        String tCode = null;
+        Integer qNum = null;
+        String cName = null;
+        try {
+            var tickets = counterTicketRepository != null ? counterTicketRepository.findAllByBooking(booking.getBookingId()) : null;
+            if (tickets != null && !tickets.isEmpty()) {
+                var latest = tickets.get(tickets.size() - 1);
+                tCode = latest.getTicketCode();
+                qNum = latest.getQueueNumber();
+                cName = latest.getCounter() != null ? latest.getCounter().getCounterName() : null;
+            }
+        } catch (Exception ignored) {
+            // Safe fallback
+        }
+
+        BookingResponse response = BookingResponse.fromEntity(booking, tCode, qNum, cName);
         if (!isStaffOrOwner) {
             String maskedName = maskPatientName(response.patientName());
-            return new BookingResponse(
-                    response.bookingId(),
-                    response.bookingCode(),
-                    response.queueNumber(),
-                    response.queueCode(),
-                    response.isPriority(),
-                    response.priorityReason(),
-                    response.bookingDate(),
-                    response.startTime(),
-                    response.endTime(),
-                    maskedName,
-                    response.doctorName(),
-                    response.departmentName(),
-                    response.roomName(),
-                    response.price(),
-                    response.status(),
-                    null // Bảo vệ bí mật y tế: Không trả về triệu chứng bệnh lý cho truy vấn công khai
-            );
+            return response.withMaskedPatientInfo(maskedName, maskPhoneNumber(response.patientPhone()));
         }
         return response;
+    }
+
+    private String maskPhoneNumber(String phone) {
+        if (phone == null || phone.length() < 7) return phone;
+        return phone.substring(0, 3) + "****" + phone.substring(phone.length() - 3);
     }
 
     private String maskPatientName(String name) {
@@ -433,14 +612,10 @@ public class BookingServiceImpl implements BookingService {
 
         // 2. Nếu không tìm thấy theo mã, thử tìm theo số điện thoại trong ngày hôm nay
         if (booking == null) {
-            List<Booking> todayBookings = bookingRepository.findAllByPatientProfile_PhoneNumberAndBookingDateAndDeletedFalse(input, today);
-            Booking match = todayBookings.stream()
-                    .filter(b -> b.getStatus() != BookingStatus.CANCELLED && b.getStatus() != BookingStatus.COMPLETED)
-                    .findFirst()
-                    .orElse(null);
-            booking = match != null
-                    ? bookingRepository.findByBookingCodeForUpdate(match.getBookingCode()).orElse(match)
-                    : null;
+            List<String> matches = bookingRepository.findActiveBookingCodesByPhoneAndDate(input, today,
+                    List.of(BookingStatus.CANCELLED, BookingStatus.COMPLETED));
+            if (matches.size() > 1) throw new AppException("Có nhiều lịch khám, vui lòng nhập mã đặt khám chính xác", HttpStatus.CONFLICT);
+            booking = matches.isEmpty() ? null : bookingRepository.findByBookingCodeForUpdate(matches.get(0)).orElse(null);
         }
 
         if (booking == null) {
@@ -490,54 +665,114 @@ public class BookingServiceImpl implements BookingService {
             }
         }
 
-        // 6. Cập nhật trạng thái và bảo đảm có số thứ tự
-        if (!alreadyCheckedIn) {
-            if (booking.getStatus() == BookingStatus.PENDING_PAYMENT) {
-                booking.setStatus(BookingStatus.CONFIRMED);
-            }
-            if (booking.getQueueNumber() == null || booking.getQueueNumber() <= 0) {
-                int queueNumber = bookingRepository.countBookingsByDoctorAndDate(booking.getDoctor().getDoctorId(), today) + 1;
-                booking.setQueueNumber(queueNumber);
-            }
-            booking.setCheckedInAt(LocalDateTime.now(hospitalClock));
-        }
-        bookingRepository.save(booking);
+        reception.checkIn(booking, com.hospital.api.constant.CounterType.APPOINTMENT, false);
+        boolean isPaid = Boolean.TRUE.equals(booking.getIsPaid());
+        Booking savedBooking = bookingRepository.save(booking);
 
         // 7. Chuẩn bị thông tin phản hồi
-        boolean priority = Boolean.TRUE.equals(booking.getIsPriority());
-        String qCode = (priority ? "UT-" : "KB-") + String.format("%02d", booking.getQueueNumber());
+        boolean priority = Boolean.TRUE.equals(savedBooking.getIsPriority());
+        String qCode = (priority ? "UT-" : "KB-") + String.format("%02d", savedBooking.getQueueNumber());
         String roomName = (slot != null && slot.getDoctorSchedule() != null && slot.getDoctorSchedule().getRoom() != null)
                 ? slot.getDoctorSchedule().getRoom().getRoomName()
                 : "Phòng khám chuyên khoa";
-        String deptName = (booking.getDoctor() != null && booking.getDoctor().getDepartment() != null)
-                ? booking.getDoctor().getDepartment().getDepartmentName()
+        String deptName = (savedBooking.getDoctor() != null && savedBooking.getDoctor().getDepartment() != null)
+                ? savedBooking.getDoctor().getDepartment().getDepartmentName()
                 : "Khoa khám bệnh";
-        String doctorName = (booking.getDoctor() != null && booking.getDoctor().getAccount() != null)
-                ? booking.getDoctor().getAccount().getFullName()
+        String doctorName = (savedBooking.getDoctor() != null && savedBooking.getDoctor().getAccount() != null)
+                ? savedBooking.getDoctor().getAccount().getFullName()
                 : "Bác sĩ phụ trách";
         String timeSlotRange = (slot != null && slot.getStartTime() != null && slot.getEndTime() != null)
                 ? (slot.getStartTime().format(DateTimeFormatter.ofPattern("HH:mm")) + " - " + slot.getEndTime().format(DateTimeFormatter.ofPattern("HH:mm")))
                 : "Trong ngày";
 
-        String message = "Check-in thành công! Vui lòng nhận phiếu in nhiệt và di chuyển đến " + roomName + " (" + deptName + ").";
+        String message;
+        if (isPaid) {
+            message = "Check-in thành công! Bạn đã hoàn tất thanh toán, vui lòng di chuyển thẳng đến " + roomName + " (" + deptName + ") chờ Bác sĩ gọi số.";
+        } else {
+            message = "Check-in thành công! Lịch khám chưa thanh toán viện phí, vui lòng quét mã QR hoặc nộp tại Quầy tiếp đón để vào buồng khám " + roomName + ".";
+        }
 
         return new KioskCheckInResponse(
-                booking.getBookingId(),
-                booking.getBookingCode(),
-                booking.getQueueNumber(),
+                savedBooking.getBookingId(),
+                savedBooking.getBookingCode(),
+                savedBooking.getQueueNumber(),
                 qCode,
-                booking.getPatientProfile() != null ? booking.getPatientProfile().getFullName() : "N/A",
-                booking.getPatientProfile() != null ? booking.getPatientProfile().getPhoneNumber() : "",
+                savedBooking.getPatientProfile() != null ? savedBooking.getPatientProfile().getFullName() : "N/A",
+                savedBooking.getPatientProfile() != null ? savedBooking.getPatientProfile().getPhoneNumber() : "",
                 doctorName,
                 deptName,
                 roomName,
-                booking.getBookingDate(),
+                savedBooking.getBookingDate(),
                 timeSlotRange,
                 CheckInWindowStatus.OPEN,
                 priority,
-                booking.getPriorityReason(),
+                savedBooking.getPriorityReason(),
                 message,
-                booking.getCheckedInAt()
+                savedBooking.getCheckedInAt(),
+                isPaid,
+                savedBooking.getPrice(),
+                savedBooking.getDispatchedAt()
+        );
+    }
+
+    @Override
+    @Transactional
+    public KioskCheckInResponse payKioskBooking(com.hospital.api.dto.request.KioskPayRequest request) {
+        String code = request.bookingCode() != null ? request.bookingCode().trim() : "";
+        Booking booking = bookingRepository.findByBookingCodeForUpdate(code)
+                .orElseThrow(() -> new AppException("Không tìm thấy thông tin lịch khám: " + code, HttpStatus.NOT_FOUND));
+
+        if (booking.getStatus() == BookingStatus.CANCELLED) {
+            throw new AppException("Lịch khám này đã bị hủy trước đó!", HttpStatus.BAD_REQUEST);
+        }
+
+        if (!Boolean.TRUE.equals(booking.getIsPaid())) {
+            throw new AppException("Chưa có xác nhận thanh toán từ cổng thanh toán", HttpStatus.CONFLICT);
+        }
+        // Read the verified result only; this request cannot create payment, check-in, or dispatch.
+        BigDecimal amount = booking.getPrice();
+        Booking saved = booking;
+
+        TimeSlot slot = saved.getTimeSlot();
+        boolean priority = Boolean.TRUE.equals(saved.getIsPriority());
+        String qCode = (priority ? "UT-" : "KB-") + String.format("%02d", saved.getQueueNumber());
+        String roomName = (slot != null && slot.getDoctorSchedule() != null && slot.getDoctorSchedule().getRoom() != null)
+                ? slot.getDoctorSchedule().getRoom().getRoomName()
+                : "Phòng khám chuyên khoa";
+        String deptName = (saved.getDoctor() != null && saved.getDoctor().getDepartment() != null)
+                ? saved.getDoctor().getDepartment().getDepartmentName()
+                : "Khoa khám bệnh";
+        String doctorName = (saved.getDoctor() != null && saved.getDoctor().getAccount() != null)
+                ? saved.getDoctor().getAccount().getFullName()
+                : "Bác sĩ phụ trách";
+        String timeSlotRange = (slot != null && slot.getStartTime() != null && slot.getEndTime() != null)
+                ? (slot.getStartTime().format(DateTimeFormatter.ofPattern("HH:mm")) + " - " + slot.getEndTime().format(DateTimeFormatter.ofPattern("HH:mm")))
+                : "Trong ngày";
+
+        String message = saved.getDispatchedAt() != null
+                ? "Đã xác nhận thanh toán. Vui lòng đến " + roomName + " (" + deptName + ") chờ Bác sĩ gọi số."
+                : "Đã ghi nhận thanh toán. Vui lòng chờ tiếp đón xác nhận phân phòng khám.";
+
+        return new KioskCheckInResponse(
+                saved.getBookingId(),
+                saved.getBookingCode(),
+                saved.getQueueNumber(),
+                qCode,
+                saved.getPatientProfile() != null ? saved.getPatientProfile().getFullName() : "N/A",
+                saved.getPatientProfile() != null ? saved.getPatientProfile().getPhoneNumber() : "",
+                doctorName,
+                deptName,
+                roomName,
+                saved.getBookingDate(),
+                timeSlotRange,
+                CheckInWindowStatus.OPEN,
+                priority,
+                saved.getPriorityReason(),
+                message,
+                saved.getCheckedInAt(),
+                true,
+                amount,
+                saved.getDispatchedAt()
         );
     }
 }

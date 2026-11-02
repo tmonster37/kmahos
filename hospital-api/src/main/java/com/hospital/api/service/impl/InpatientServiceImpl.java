@@ -7,6 +7,7 @@ import com.hospital.api.dto.response.*;
 import com.hospital.api.entity.*;
 import com.hospital.api.exception.AppException;
 import com.hospital.api.repository.*;
+import com.hospital.api.security.UserPrincipal;
 import com.hospital.api.service.InpatientService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -48,8 +49,15 @@ public class InpatientServiceImpl implements InpatientService {
                 .orElseThrow(() -> new AppException("Không tìm thấy bác sĩ", HttpStatus.NOT_FOUND));
 
         Room room = roomRepository.findById(request.roomId())
-                .orElseGet(() -> roomRepository.findAll().stream().findFirst()
-                        .orElseThrow(() -> new AppException("Không tìm thấy buồng bệnh phù hợp", HttpStatus.NOT_FOUND)));
+                .orElseThrow(() -> new AppException("Không tìm thấy buồng bệnh với ID: " + request.roomId(), HttpStatus.NOT_FOUND));
+
+        // Ràng buộc 3: Khám chuyên khoa nào thì chỉ được nhập viện vào buồng nội trú thuộc đúng chuyên khoa đó
+        if (doctor.getDepartment() != null && room.getDepartment() != null
+                && !doctor.getDepartment().getDepartmentId().equals(room.getDepartment().getDepartmentId())) {
+            throw new AppException(String.format("Bệnh nhân điều trị chuyên khoa [%s], chỉ được nhập viện vào buồng nội trú thuộc chuyên khoa này (Buồng [%s] thuộc khoa [%s])!",
+                    doctor.getDepartment().getDepartmentName(), room.getRoomName(), room.getDepartment().getDepartmentName()),
+                    HttpStatus.BAD_REQUEST);
+        }
 
         // Xử lý phân bổ giường bệnh có khóa bi quan PESSIMISTIC_WRITE (BIZ-P1-04)
         Bed assignedBed = null;
@@ -58,6 +66,12 @@ public class InpatientServiceImpl implements InpatientService {
                     .orElseThrow(() -> new AppException("Không tìm thấy giường bệnh với ID: " + request.bedId(), HttpStatus.NOT_FOUND));
             if (assignedBed.getStatus() != BedStatus.AVAILABLE) {
                 throw new AppException("Giường [" + assignedBed.getBedNumber() + "] hiện không khả dụng (Trạng thái: " + assignedBed.getStatus() + ")", HttpStatus.BAD_REQUEST);
+            }
+            if (assignedBed.getRoom() != null && assignedBed.getRoom().getDepartment() != null && doctor.getDepartment() != null
+                    && !doctor.getDepartment().getDepartmentId().equals(assignedBed.getRoom().getDepartment().getDepartmentId())) {
+                throw new AppException(String.format("Giường bệnh [%s] thuộc buồng [%s] (Khoa %s) không thuộc chuyên khoa [%s] của bác sĩ điều trị!",
+                        assignedBed.getBedNumber(), assignedBed.getRoom().getRoomName(), assignedBed.getRoom().getDepartment().getDepartmentName(), doctor.getDepartment().getDepartmentName()),
+                        HttpStatus.BAD_REQUEST);
             }
             assignedBed.setStatus(BedStatus.OCCUPIED);
             bedRepository.save(assignedBed);
@@ -126,6 +140,10 @@ public class InpatientServiceImpl implements InpatientService {
         HospitalAdmission admission = admissionRepository.findById(admissionId)
                 .orElseThrow(() -> new AppException("Không tìm thấy hồ sơ nhập viện", HttpStatus.NOT_FOUND));
 
+        if (request.dischargeSummary() == null || request.dischargeSummary().isBlank()) {
+            throw new AppException("Bác sĩ phải nhập tóm tắt quá trình điều trị xuất viện trước khi hoàn tất thủ tục xuất viện!", HttpStatus.BAD_REQUEST);
+        }
+
         Instant now = Instant.now();
         admission.setDischargeDate(now);
         admission.setState(HospitalAdmissionState.DISCHARGED);
@@ -153,7 +171,20 @@ public class InpatientServiceImpl implements InpatientService {
         }
 
         admissionRepository.save(admission);
-        return dischargeRepository.save(discharge);
+        Discharge savedDischarge = dischargeRepository.save(discharge);
+
+        auditLogService.log(
+                null,
+                "Bác sĩ điều trị",
+                "ROLE_DOCTOR",
+                "DISCHARGE_PATIENT",
+                "INPATIENT_ADMISSION",
+                admission.getAdmissionId().toString(),
+                "Ký duyệt xuất viện cho bệnh nhân [" + (admission.getPatientProfile() != null ? admission.getPatientProfile().getFullName() : "") + "] - Giường chuyển sang dọn vệ sinh",
+                null
+        );
+
+        return savedDischarge;
     }
 
     @Override
@@ -201,7 +232,37 @@ public class InpatientServiceImpl implements InpatientService {
     @Override
     @Transactional(readOnly = true)
     public List<HospitalAdmission> getActiveAdmissions() {
-        return admissionRepository.findAllByState(HospitalAdmissionState.ADMITTED);
+        return getActiveAdmissions(null, null, true);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<HospitalAdmission> getActiveAdmissions(UUID currentUserId, Integer departmentId, boolean isAdmin) {
+        if (isAdmin) {
+            if (departmentId != null) {
+                return admissionRepository.findAllByState(HospitalAdmissionState.ADMITTED).stream()
+                        .filter(a -> a.getDepartment() != null && departmentId.equals(a.getDepartment().getDepartmentId()))
+                        .toList();
+            }
+            return admissionRepository.findAllByState(HospitalAdmissionState.ADMITTED);
+        }
+
+        Integer userDeptId = null;
+        if (currentUserId != null) {
+            var docOpt = doctorRepository.findByAccount_UserId(currentUserId);
+            if (docOpt.isPresent() && docOpt.get().getDepartment() != null) {
+                userDeptId = docOpt.get().getDepartment().getDepartmentId();
+            }
+        }
+
+        final Integer targetDeptId = (departmentId != null) ? departmentId : userDeptId;
+        if (targetDeptId == null) {
+            return admissionRepository.findAllByState(HospitalAdmissionState.ADMITTED);
+        }
+
+        return admissionRepository.findAllByState(HospitalAdmissionState.ADMITTED).stream()
+                .filter(a -> a.getDepartment() != null && targetDeptId.equals(a.getDepartment().getDepartmentId()))
+                .toList();
     }
 
     @Override
@@ -234,16 +295,56 @@ public class InpatientServiceImpl implements InpatientService {
         Room newRoom = roomRepository.findById(newRoomId)
                 .orElseThrow(() -> new AppException("Không tìm thấy phòng chuyển đến", HttpStatus.NOT_FOUND));
 
+        // Ràng buộc 3: Chuyển buồng nội trú phải thuộc đúng chuyên khoa
+        Department expectedDept = admission.getTreatingDoctor() != null ? admission.getTreatingDoctor().getDepartment() : null;
+        if (expectedDept == null && admission.getRoom() != null) {
+            expectedDept = admission.getRoom().getDepartment();
+        }
+        if (expectedDept != null && newRoom.getDepartment() != null
+                && !expectedDept.getDepartmentId().equals(newRoom.getDepartment().getDepartmentId())) {
+            throw new AppException(String.format("Chỉ được chuyển buồng nội trú trong cùng chuyên khoa [%s] (Buồng [%s] thuộc khoa [%s])!",
+                    expectedDept.getDepartmentName(), newRoom.getRoomName(), newRoom.getDepartment().getDepartmentName()),
+                    HttpStatus.BAD_REQUEST);
+        }
+
         admission.setRoom(newRoom);
         return admissionRepository.save(admission);
+    }
+
+    private Integer validateAndGetHodDepartmentId(UserPrincipal currentUser) {
+        if (currentUser == null) return null;
+        boolean isHod = currentUser.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_HEAD_OF_DEPARTMENT"));
+        boolean isAdmin = currentUser.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        if (isHod && !isAdmin) {
+            Doctor headDoc = doctorRepository.findByAccount_UserId(currentUser.getId())
+                    .orElseThrow(() -> new AppException("Tài khoản không gắn với thông tin trưởng khoa", HttpStatus.FORBIDDEN));
+            if (headDoc.getDepartment() == null) {
+                throw new AppException("Trưởng khoa chưa được gán chuyên khoa quản lý", HttpStatus.FORBIDDEN);
+            }
+            return headDoc.getDepartment().getDepartmentId();
+        }
+        return null;
     }
 
     // 1. Quản lý Giường bệnh (Bed Allocation)
     @Override
     @Transactional
     public BedResponse createBed(CreateBedRequest request) {
+        return createBed(request, null);
+    }
+
+    @Override
+    @Transactional
+    public BedResponse createBed(CreateBedRequest request, UserPrincipal currentUser) {
         Room room = roomRepository.findById(request.roomId())
                 .orElseThrow(() -> new AppException("Không tìm thấy buồng bệnh với ID: " + request.roomId(), HttpStatus.NOT_FOUND));
+
+        Integer headDeptId = validateAndGetHodDepartmentId(currentUser);
+        if (headDeptId != null) {
+            if (room.getDepartment() == null || !headDeptId.equals(room.getDepartment().getDepartmentId())) {
+                throw new AppException("Trưởng khoa chỉ có quyền tạo giường cho buồng bệnh thuộc khoa mình phụ trách", HttpStatus.FORBIDDEN);
+            }
+        }
 
         Bed bed = Bed.builder()
                 .room(room)
@@ -266,6 +367,11 @@ public class InpatientServiceImpl implements InpatientService {
     @Override
     @Transactional(readOnly = true)
     public List<BedResponse> getBedsByRoom(Integer roomId) {
+        if (roomId == null) {
+            return bedRepository.findAll().stream()
+                    .map(BedResponse::fromEntity)
+                    .toList();
+        }
         return bedRepository.findByRoom_RoomIdOrderByBedNumberAsc(roomId)
                 .stream()
                 .map(BedResponse::fromEntity)
@@ -275,6 +381,17 @@ public class InpatientServiceImpl implements InpatientService {
     @Override
     @Transactional(readOnly = true)
     public List<BedResponse> getBedsByDepartment(Integer departmentId) {
+        return getBedsByDepartment(departmentId, null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<BedResponse> getBedsByDepartment(Integer departmentId, UserPrincipal currentUser) {
+        Integer headDeptId = validateAndGetHodDepartmentId(currentUser);
+        if (headDeptId != null && !headDeptId.equals(departmentId)) {
+            throw new AppException("Trưởng khoa chỉ có quyền xem danh sách giường thuộc khoa mình phụ trách", HttpStatus.FORBIDDEN);
+        }
+
         return bedRepository.findByRoom_Department_DepartmentIdOrderByRoom_RoomNameAscBedNumberAsc(departmentId)
                 .stream()
                 .map(BedResponse::fromEntity)
@@ -284,8 +401,22 @@ public class InpatientServiceImpl implements InpatientService {
     @Override
     @Transactional
     public BedResponse updateBedStatus(UUID bedId, BedStatus status) {
+        return updateBedStatus(bedId, status, null);
+    }
+
+    @Override
+    @Transactional
+    public BedResponse updateBedStatus(UUID bedId, BedStatus status, UserPrincipal currentUser) {
         Bed bed = bedRepository.findById(bedId)
                 .orElseThrow(() -> new AppException("Không tìm thấy giường với ID: " + bedId, HttpStatus.NOT_FOUND));
+
+        Integer headDeptId = validateAndGetHodDepartmentId(currentUser);
+        if (headDeptId != null) {
+            if (bed.getRoom() == null || bed.getRoom().getDepartment() == null || !headDeptId.equals(bed.getRoom().getDepartment().getDepartmentId())) {
+                throw new AppException("Trưởng khoa chỉ có quyền cập nhật trạng thái giường thuộc buồng bệnh khoa mình phụ trách", HttpStatus.FORBIDDEN);
+            }
+        }
+
         bed.setStatus(status);
         return BedResponse.fromEntity(bedRepository.save(bed));
     }
@@ -307,6 +438,18 @@ public class InpatientServiceImpl implements InpatientService {
         Bed fromBed = admission.getBed();
         Room fromRoom = admission.getRoom();
         Room toRoom = toBed.getRoom();
+
+        // Ràng buộc 3: Chuyển giường nội trú phải thuộc đúng chuyên khoa
+        Department expectedDept = admission.getTreatingDoctor() != null ? admission.getTreatingDoctor().getDepartment() : null;
+        if (expectedDept == null && fromRoom != null) {
+            expectedDept = fromRoom.getDepartment();
+        }
+        if (expectedDept != null && toRoom != null && toRoom.getDepartment() != null
+                && !expectedDept.getDepartmentId().equals(toRoom.getDepartment().getDepartmentId())) {
+            throw new AppException(String.format("Chỉ được chuyển sang giường bệnh thuộc buồng bệnh cùng chuyên khoa [%s] (Buồng [%s] thuộc khoa [%s])!",
+                    expectedDept.getDepartmentName(), toRoom.getRoomName(), toRoom.getDepartment().getDepartmentName()),
+                    HttpStatus.BAD_REQUEST);
+        }
 
         // Giải phóng giường cũ
         if (fromBed != null) {

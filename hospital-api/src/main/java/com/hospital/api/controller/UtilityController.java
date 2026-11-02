@@ -123,8 +123,11 @@ public class UtilityController {
     // 6. Dashboard Thống kê dành cho Admin & Trưởng khoa
     @GetMapping("/admin/dashboard")
     @PreAuthorize("hasAnyRole('ADMIN', 'HEAD_OF_DEPARTMENT')")
-    public ResponseEntity<ApiResponse<DashboardStatisticsResponse>> getDashboardStats() {
-        return ResponseEntity.ok(ApiResponse.ok(dashboardService.getDashboardStatistics(), "Lấy số liệu thống kê thành công"));
+    public ResponseEntity<ApiResponse<DashboardStatisticsResponse>> getDashboardStats(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate startDate,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate endDate
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(dashboardService.getDashboardStatistics(userPrincipal, startDate, endDate), "Lấy số liệu thống kê thành công"));
     }
 }
-

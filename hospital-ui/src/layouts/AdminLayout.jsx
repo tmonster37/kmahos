@@ -89,60 +89,65 @@ export default function AdminLayout() {
         navigate("/login");
     };
 
-    // Phân nhóm danh mục quản trị theo khối nghiệp vụ y tế chuẩn mực Enterprise HIS
+    // Phân nhóm danh mục quản trị theo đúng luồng biểu đồ tuần tự & thiết kế chuẩn HIS (Hình 165 - 173)
     const adminMenuGroups = [
         {
-            title: "Tổng Quan & Điều Hành",
+            title: "1. Thống Kê & Báo Cáo",
             items: [
-                { text: "Dashboard Chỉ Huy", icon: <DashboardIcon />, path: "/admin/dashboard" },
-                { text: "Quản Lý Lịch Hẹn", icon: <EventIcon />, path: "/admin/bookings" }
+                { text: "Dashboard Thống Kê", icon: <DashboardIcon />, path: "/admin/dashboard" }
             ]
         },
         {
-            title: "Khám Chữa Bệnh & Lâm Sàng",
+            title: "2. Quản Trị Tài Khoản",
             items: [
-                { text: "Bàn Khám Lâm Sàng", icon: <MedicalServicesIcon />, path: "/doctor/examinations" },
-                { text: "Buồng Bệnh Nội Trú", icon: <HotelIcon />, path: "/doctor/inpatient" },
-                { text: "Xét Nghiệm & CĐHA", icon: <ScienceIcon />, path: "/doctor/lab-tests" },
+                { text: "Tài Khoản & Phân Quyền", icon: <ManageAccountsIcon />, path: "/admin/accounts" }
+            ]
+        },
+        {
+            title: "3. Quản Lý Bác Sĩ & Nhân Sự",
+            items: [
+                { text: "Danh Sách Bác Sĩ & CCHN", icon: <PersonSearchIcon />, path: "/admin/doctors" },
+                { text: "Phân Lịch Trực & Ca Khám", icon: <EventIcon />, path: "/admin/schedules" }
+            ]
+        },
+        {
+            title: "4. Quản Lý Bệnh Nhân",
+            items: [
                 { text: "Hồ Sơ Bệnh Nhân", icon: <PeopleAltIcon />, path: "/admin/patients" }
             ]
         },
         {
-            title: "Tiếp Đón & Thiết Bị Sảnh",
+            title: "5. Quản Lý Khoa Phòng",
             items: [
+                { text: "Danh Mục Khoa & Buồng Khám", icon: <LocalHospitalIcon />, path: "/admin/departments" }
+            ]
+        },
+        {
+            title: "6. Dịch Vụ Y Tế & Dược Phẩm",
+            items: [
+                { text: "Bảng Giá Dịch Vụ Khám", icon: <ScienceIcon />, path: "/admin/services" },
+                { text: "Danh Mục Thuốc & Biệt Dược", icon: <MedicationIcon />, path: "/admin/medicines" },
+                { text: "Kho Dược Đa Cấp & FEFO", icon: <Inventory2Icon />, path: "/admin/pharmacy-inventory" }
+            ]
+        },
+        {
+            title: "7. Quản Lý Thanh Toán & Lịch Hẹn",
+            items: [
+                { text: "Quản Lý Lịch Hẹn", icon: <EventIcon />, path: "/admin/bookings" },
+                { text: "Đối Soát Giao Dịch & Viện Phí", icon: <ReceiptLongIcon />, path: "/admin/transactions" },
+                { text: "Kế Toán & Thu Ngân", icon: <PointOfSaleIcon />, path: "/cashier" }
+            ]
+        },
+        {
+            title: "8. Cổng Chuyên Môn & Lâm Sàng",
+            items: [
+                { text: "Bàn Khám Lâm Sàng", icon: <MedicalServicesIcon />, path: "/doctor/examinations" },
+                { text: "Buồng Bệnh Nội Trú", icon: <HotelIcon />, path: "/doctor/inpatient" },
+                { text: "Xét Nghiệm & CĐHA", icon: <ScienceIcon />, path: "/doctor/lab-tests" },
                 { text: "Bàn Tiếp Đón & STT", icon: <HowToRegIcon />, path: "/nurse/reception" },
                 { text: "Cây Kiosk Bốc Số", icon: <QrCodeScannerIcon />, path: "/kiosk", external: true },
-                { text: "Màn Hình LED Gọi Số", icon: <TvIcon />, path: "/queue-display", external: true }
-            ]
-        },
-        {
-            title: "Dược Phẩm & Kho FEFO",
-            items: [
-                { text: "Kho Dược Đa Cấp & FEFO", icon: <Inventory2Icon />, path: "/admin/pharmacy-inventory" },
-                { text: "Danh Mục Thuốc & Dược", icon: <MedicationIcon />, path: "/admin/medicines" }
-            ]
-        },
-        {
-            title: "Nhân Lực & Khoa Phòng",
-            items: [
-                { text: "Bác Sĩ & CCHN", icon: <PersonSearchIcon />, path: "/admin/doctors" },
-                { text: "Phân Lịch Trực Ca", icon: <EventIcon />, path: "/admin/schedules" },
-                { text: "Danh Mục Khoa & Buồng", icon: <LocalHospitalIcon />, path: "/admin/departments" }
-            ]
-        },
-        {
-            title: "Tài Chính & Viện Phí",
-            items: [
-                { text: "Quầy Thu Ngân Viện Phí", icon: <PointOfSaleIcon />, path: "/cashier" },
-                { text: "Đối Soát Giao Dịch", icon: <ReceiptLongIcon />, path: "/admin/transactions" },
-                { text: "Bảng Giá Dịch Vụ Khám", icon: <ScienceIcon />, path: "/admin/services" }
-            ]
-        },
-        {
-            title: "Hạ Tầng Kỹ Thuật & Bảo Mật",
-            items: [
-                { text: "Cổng LIS/RIS & EHR", icon: <HubIcon />, path: "/admin/ehr-gateway" },
-                { text: "Tài Khoản & Phân Quyền", icon: <ManageAccountsIcon />, path: "/admin/accounts" }
+                { text: "Màn Hình LED Gọi Số", icon: <TvIcon />, path: "/queue-display", external: true },
+                { text: "Cổng LIS/RIS & EHR Gateway", icon: <HubIcon />, path: "/admin/ehr-gateway" }
             ]
         }
     ];

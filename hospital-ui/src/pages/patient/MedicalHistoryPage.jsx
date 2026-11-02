@@ -55,6 +55,7 @@ import axiosInstance, { API_BASE_URL } from "../../services/AxiosInstance";
 import { formatCurrency, formatDate, formatDateTime } from "../../utils/formatters";
 import { useNavigate } from "react-router-dom";
 import MedicalRecordPrintModal from "../Doctor/MedicalRecordPrintModal";
+import ElectronicMedicalRecordModal from "../../components/common/ElectronicMedicalRecordModal";
 
 const QUICK_TAGS = [
     "Bác sĩ khám kỹ lưỡng",
@@ -237,27 +238,6 @@ export default function MedicalHistoryPage() {
             b.departmentName?.toLowerCase().includes(searchKeyword.toLowerCase());
         return matchesStatus && matchesKeyword;
     });
-
-    const getDetailedRecordData = (booking) => {
-        const isCompleted = booking?.status === "COMPLETED";
-        return {
-            diagnosis: isCompleted
-                ? (booking?.symptoms ? `Ghi nhận triệu chứng lâm sàng: ${booking.symptoms}` : "Đã hoàn tất khám ngoại trú")
-                : "Chưa có chẩn đoán (Lịch khám chưa diễn ra hoặc đang trong phiên khám)",
-            doctorAdvice: isCompleted
-                ? "Bệnh nhân tuân thủ phác đồ điều trị và hướng dẫn trực tiếp của bác sĩ chuyên khoa. Tái khám đúng hẹn nếu có chỉ định."
-                : "Vui lòng có mặt trước 15 phút tại phòng khám chuyên khoa.",
-            medicines: [],
-            labTests: [],
-            billing: {
-                consultationFee: booking?.price || 200000,
-                labTestsFee: 0,
-                medicineFee: 0,
-                insuranceDiscount: 0,
-                totalPaid: booking?.price || 200000
-            }
-        };
-    };
 
     return (
         <Container maxWidth="md" sx={{ py: 3 }}>
@@ -657,202 +637,12 @@ export default function MedicalHistoryPage() {
                 </>
             )}
 
-            {/* MODAL 1: BỆNH ÁN NGOẠI TRÚ CHI TIẾT */}
-            {selectedBooking && (() => {
-                const recordData = getDetailedRecordData(selectedBooking);
-                return (
-                    <Dialog
-                        open={!!selectedBooking}
-                        onClose={() => setSelectedBooking(null)}
-                        maxWidth="sm"
-                        fullWidth
-                        PaperProps={{ sx: { borderRadius: 3 } }}
-                    >
-                        <DialogTitle sx={{ py: 2, px: 2.5, bgcolor: "#0f172a", color: "white" }}>
-                            <Box display="flex" justifyContent="space-between" alignItems="center">
-                                <Box>
-                                    <Typography variant="subtitle1" fontWeight="bold">
-                                        BỆNH ÁN ĐIỆN TỬ: {selectedBooking.bookingCode}
-                                    </Typography>
-                                    <Typography variant="caption" sx={{ color: "#94a3b8" }}>
-                                        Bệnh nhân: {selectedBooking.patientName} | Ngày khám: {formatDate(selectedBooking.bookingDate)}
-                                    </Typography>
-                                </Box>
-                                <IconButton onClick={() => setSelectedBooking(null)} sx={{ color: "white" }} size="small">
-                                    <CloseIcon fontSize="small" />
-                                </IconButton>
-                            </Box>
-                        </DialogTitle>
-
-                        <Tabs
-                            value={activeDetailTab}
-                            onChange={(e, val) => setActiveDetailTab(val)}
-                            textColor="primary"
-                            indicatorColor="primary"
-                            variant="fullWidth"
-                            sx={{ borderBottom: 1, borderColor: "divider", minHeight: 40, bgcolor: "#f8fafc" }}
-                        >
-                            <Tab label="1. Chẩn đoán" sx={{ fontWeight: "600", textTransform: "none", minHeight: 40, py: 0.8, fontSize: "0.85rem" }} />
-                            <Tab label="2. Đơn thuốc" sx={{ fontWeight: "600", textTransform: "none", minHeight: 40, py: 0.8, fontSize: "0.85rem" }} />
-                            <Tab label="3. Xét nghiệm" sx={{ fontWeight: "600", textTransform: "none", minHeight: 40, py: 0.8, fontSize: "0.85rem" }} />
-                            <Tab label="4. Viện phí" sx={{ fontWeight: "600", textTransform: "none", minHeight: 40, py: 0.8, fontSize: "0.85rem" }} />
-                        </Tabs>
-
-                        <DialogContent dividers sx={{ p: 2.5 }}>
-                            {/* TAB 0: CHẨN ĐOÁN */}
-                            {activeDetailTab === 0 && (
-                                <Box display="flex" flexDirection="column" gap={2}>
-                                    <Box sx={{ p: 2, bgcolor: "#f8fafc", borderRadius: 2, border: "1px solid #e2e8f0" }}>
-                                        <Typography variant="caption" color="text.secondary">Chẩn đoán xác định:</Typography>
-                                        <Typography variant="body2" fontWeight="bold" color="#1e293b" mt={0.5}>
-                                            {recordData.diagnosis}
-                                        </Typography>
-                                    </Box>
-
-                                    <Box sx={{ p: 2, bgcolor: "#f8fafc", borderRadius: 2, border: "1px solid #e2e8f0" }}>
-                                        <Typography variant="caption" color="text.secondary">Lời dặn của Bác sĩ:</Typography>
-                                        <Typography variant="body2" color="#334155" mt={0.5}>
-                                            {recordData.doctorAdvice}
-                                        </Typography>
-                                    </Box>
-
-                                    {selectedBooking.symptoms && (
-                                        <Typography variant="caption" color="text.secondary">
-                                            Triệu chứng ghi nhận: <i>"{selectedBooking.symptoms}"</i>
-                                        </Typography>
-                                    )}
-                                </Box>
-                            )}
-
-                            {/* TAB 1: ĐƠN THUỐC */}
-                            {activeDetailTab === 1 && (
-                                <Box>
-                                    {recordData.medicines.length === 0 ? (
-                                        <Alert severity="info" sx={{ borderRadius: 2 }}>Chưa có đơn thuốc cho lượt khám này.</Alert>
-                                    ) : (
-                                        <TableContainer component={Paper} elevation={0} sx={{ border: "1px solid #e2e8f0", borderRadius: 2 }}>
-                                            <Table size="small">
-                                                <TableHead sx={{ bgcolor: "#f8fafc" }}>
-                                                    <TableRow>
-                                                        <TableCell><b>Tên thuốc</b></TableCell>
-                                                        <TableCell><b>SL</b></TableCell>
-                                                        <TableCell><b>Liều dùng / Cách uống</b></TableCell>
-                                                    </TableRow>
-                                                </TableHead>
-                                                <TableBody>
-                                                    {recordData.medicines.map((m) => (
-                                                        <TableRow key={m.id}>
-                                                            <TableCell>
-                                                                <Typography variant="body2" fontWeight="600">{m.name}</Typography>
-                                                                <Typography variant="caption" color="text.secondary">{m.note}</Typography>
-                                                            </TableCell>
-                                                            <TableCell><b>{m.quantity}</b></TableCell>
-                                                            <TableCell><Typography variant="body2">{m.dosage}</Typography></TableCell>
-                                                        </TableRow>
-                                                    ))}
-                                                </TableBody>
-                                            </Table>
-                                        </TableContainer>
-                                    )}
-                                </Box>
-                            )}
-
-                            {/* TAB 2: XÉT NGHIỆM */}
-                            {activeDetailTab === 2 && (
-                                <Box>
-                                    {recordData.labTests.length === 0 ? (
-                                        <Alert severity="info" sx={{ borderRadius: 2 }}>Không có chỉ định cận lâm sàng.</Alert>
-                                    ) : (
-                                        <TableContainer component={Paper} elevation={0} sx={{ border: "1px solid #e2e8f0", borderRadius: 2 }}>
-                                            <Table size="small">
-                                                <TableHead sx={{ bgcolor: "#f8fafc" }}>
-                                                    <TableRow>
-                                                        <TableCell><b>Tên xét nghiệm</b></TableCell>
-                                                        <TableCell><b>Kết quả</b></TableCell>
-                                                        <TableCell><b>Tham chiếu</b></TableCell>
-                                                    </TableRow>
-                                                </TableHead>
-                                                <TableBody>
-                                                    {recordData.labTests.map((t, idx) => (
-                                                        <TableRow key={idx}>
-                                                            <TableCell><Typography variant="body2" fontWeight="600">{t.testName}</Typography></TableCell>
-                                                            <TableCell><Typography variant="body2" color="primary.main" fontWeight="bold">{t.result}</Typography></TableCell>
-                                                            <TableCell><Typography variant="caption" color="text.secondary">{t.reference}</Typography></TableCell>
-                                                        </TableRow>
-                                                    ))}
-                                                </TableBody>
-                                            </Table>
-                                        </TableContainer>
-                                    )}
-                                </Box>
-                            )}
-
-                            {/* TAB 3: VIỆN PHÍ */}
-                            {activeDetailTab === 3 && (
-                                <Box display="flex" flexDirection="column" gap={1.5}>
-                                    <Box display="flex" justifyContent="space-between" py={0.5}>
-                                        <Typography variant="body2" color="text.secondary">1. Công khám:</Typography>
-                                        <Typography variant="body2" fontWeight="600">{formatCurrency(recordData.billing.consultationFee)}</Typography>
-                                    </Box>
-                                    <Box display="flex" justifyContent="space-between" py={0.5}>
-                                        <Typography variant="body2" color="text.secondary">2. Phí xét nghiệm:</Typography>
-                                        <Typography variant="body2" fontWeight="600">{formatCurrency(recordData.billing.labTestsFee)}</Typography>
-                                    </Box>
-                                    <Box display="flex" justifyContent="space-between" py={0.5}>
-                                        <Typography variant="body2" color="text.secondary">3. Tiền thuốc:</Typography>
-                                        <Typography variant="body2" fontWeight="600">{formatCurrency(recordData.billing.medicineFee)}</Typography>
-                                    </Box>
-                                    <Box display="flex" justifyContent="space-between" py={0.5}>
-                                        <Typography variant="body2" color="success.main">4. BHYT chi trả:</Typography>
-                                        <Typography variant="body2" fontWeight="600" color="success.main">-{formatCurrency(recordData.billing.insuranceDiscount)}</Typography>
-                                    </Box>
-                                    <Divider />
-                                    <Box display="flex" justifyContent="space-between" alignItems="center" pt={0.5}>
-                                        <Typography variant="subtitle2" fontWeight="bold">Tổng thực thu:</Typography>
-                                        <Typography variant="subtitle1" fontWeight="bold" color="success.main">
-                                            {formatCurrency(recordData.billing.totalPaid)}
-                                        </Typography>
-                                    </Box>
-                                </Box>
-                            )}
-                        </DialogContent>
-
-                        <DialogActions sx={{ p: 2, justifyContent: "space-between" }}>
-                            <Box display="flex" gap={1}>
-                                <Button
-                                    size="small"
-                                    variant="outlined"
-                                    startIcon={<PrintIcon fontSize="small" />}
-                                    onClick={() => {
-                                        setPrintRecordData(recordData);
-                                        setPrintModalOpen(true);
-                                    }}
-                                    sx={{ textTransform: "none", fontWeight: "bold" }}
-                                >
-                                    In Bản Bệnh Án
-                                </Button>
-                                {selectedBooking?.status === "COMPLETED" && (
-                                    <Button
-                                        size="small"
-                                        variant="contained"
-                                        color="error"
-                                        startIcon={<PictureAsPdfIcon fontSize="small" />}
-                                        href={`${API_BASE_URL}/api/prescriptions/${recordData?.prescription?.prescriptionCode || selectedBooking.bookingCode}/pdf`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        sx={{ textTransform: "none", fontWeight: "bold" }}
-                                    >
-                                        Tải Đơn Thuốc PDF (A5)
-                                    </Button>
-                                )}
-                            </Box>
-                            <Button size="small" variant="contained" onClick={() => setSelectedBooking(null)} sx={{ textTransform: "none", bgcolor: "#0284c7" }}>
-                                Đóng
-                            </Button>
-                        </DialogActions>
-                    </Dialog>
-                );
-            })()}
+            {/* MODAL 1: BỆNH ÁN ĐIỆN TỬ (EMR / EHR) CHUẨN THÔNG TƯ 46/2018/TT-BYT */}
+            <ElectronicMedicalRecordModal
+                open={Boolean(selectedBooking)}
+                onClose={() => setSelectedBooking(null)}
+                booking={selectedBooking}
+            />
 
             {/* MODAL 2: ĐÁNH GIÁ BÁC SĨ & DỊCH VỤ */}
             <Dialog

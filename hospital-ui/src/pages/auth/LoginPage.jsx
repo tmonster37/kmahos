@@ -10,9 +10,18 @@ import {
     IconButton,
     InputAdornment,
     Chip,
-    Tooltip,
     Stack,
-    Divider
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Avatar,
+    List,
+    ListItem,
+    ListItemAvatar,
+    ListItemText,
+    ListItemButton,
+    CircularProgress
 } from "@mui/material";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import LocalHospitalIcon from "@mui/icons-material/LocalHospital";
@@ -21,11 +30,13 @@ import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import KeyIcon from "@mui/icons-material/Key";
-import ShieldIcon from "@mui/icons-material/Shield";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
+import MarkEmailReadIcon from "@mui/icons-material/MarkEmailRead";
+import VpnKeyIcon from "@mui/icons-material/VpnKey";
 import { useAuth } from "../../context/AuthContext";
 import axiosInstance from "../../services/AxiosInstance";
+
+const GOOGLE_CLIENT_ID = "1038814592004-8fua2p0vpn2988932qe6jnhef73drop2.apps.googleusercontent.com";
 
 export default function LoginPage() {
     const [phoneNumber, setPhoneNumber] = useState("");
@@ -34,6 +45,20 @@ export default function LoginPage() {
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const [expiredNotice, setExpiredNotice] = useState(false);
+
+    // Google OpenID Connect State
+    const [googleDialogOpen, setGoogleDialogOpen] = useState(false);
+    const [googleLoading, setGoogleLoading] = useState(false);
+    const [customGoogleMode, setCustomGoogleMode] = useState(false);
+    const [customEmail, setCustomEmail] = useState("");
+
+    // Account Linking Confirmation State (Khi email đã tồn tại và cần xác minh OTP)
+    const [linkModalOpen, setLinkModalOpen] = useState(false);
+    const [linkOtpCode, setLinkOtpCode] = useState("");
+    const [linkPendingIdToken, setLinkPendingIdToken] = useState("");
+    const [linkLoading, setLinkLoading] = useState(false);
+    const [linkNotice, setLinkNotice] = useState("");
+
     const { login } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
@@ -45,6 +70,74 @@ export default function LoginPage() {
         }
     }, [location]);
 
+    // Khởi tạo Google Identity Services (GIS) Button
+    useEffect(() => {
+        const renderGoogleBtn = () => {
+            if (window.google?.accounts?.id) {
+                try {
+                    window.google.accounts.id.initialize({
+                        client_id: GOOGLE_CLIENT_ID,
+                        callback: (res) => {
+                            if (res?.credential) {
+                                handleGoogleIdTokenAuth(res.credential);
+                            }
+                        }
+                    });
+
+                    const container = document.getElementById("g-signin-container");
+                    if (container) {
+                        container.innerHTML = "";
+                        window.google.accounts.id.renderButton(container, {
+                            theme: "outline",
+                            size: "large",
+                            width: 320,
+                            text: "continue_with",
+                            shape: "rectangular"
+                        });
+                    }
+                } catch (e) {
+                    console.warn("GIS initialization notice:", e);
+                }
+            }
+        };
+
+        if (window.google?.accounts?.id) {
+            renderGoogleBtn();
+        } else {
+            const interval = setInterval(() => {
+                if (window.google?.accounts?.id) {
+                    clearInterval(interval);
+                    renderGoogleBtn();
+                }
+            }, 300);
+            return () => clearInterval(interval);
+        }
+    }, []);
+
+    const redirectAfterLogin = (role) => {
+        const redirectUrl = sessionStorage.getItem("redirectUrl");
+        if (redirectUrl) {
+            sessionStorage.removeItem("redirectUrl");
+            navigate(redirectUrl);
+            return;
+        }
+
+        // Điều hướng mặc định theo vai trò
+        if (role === "ROLE_DOCTOR" || role === "ROLE_HEAD_OF_DEPARTMENT") {
+            navigate("/doctor/examinations");
+        } else if (role === "ROLE_ADMIN") {
+            navigate("/admin/dashboard");
+        } else if (role === "ROLE_LAB_TECHNICIAN") {
+            navigate("/doctor/lab-tests");
+        } else if (role === "ROLE_NURSE") {
+            navigate("/nurse/reception");
+        } else if (role === "ROLE_CASHIER") {
+            navigate("/cashier");
+        } else {
+            navigate("/booking");
+        }
+    };
+
     const handleLogin = async (e) => {
         if (e) e.preventDefault();
         setError("");
@@ -53,34 +146,61 @@ export default function LoginPage() {
             const res = await axiosInstance.post("/api/auth/login", { phoneNumber, password });
             if (res.success) {
                 login(res.data);
-
-                // Kiểm tra xem có URL đang dở trước đó không
-                const redirectUrl = sessionStorage.getItem("redirectUrl");
-                if (redirectUrl) {
-                    sessionStorage.removeItem("redirectUrl");
-                    navigate(redirectUrl);
-                    return;
-                }
-
-                // Điều hướng mặc định theo vai trò
-                if (res.data.role === "ROLE_DOCTOR" || res.data.role === "ROLE_HEAD_OF_DEPARTMENT") {
-                    navigate("/doctor/examinations");
-                } else if (res.data.role === "ROLE_ADMIN") {
-                    navigate("/admin/dashboard");
-                } else if (res.data.role === "ROLE_LAB_TECHNICIAN") {
-                    navigate("/doctor/lab-tests");
-                } else if (res.data.role === "ROLE_NURSE") {
-                    navigate("/nurse/reception");
-                } else if (res.data.role === "ROLE_CASHIER") {
-                    navigate("/cashier");
-                } else {
-                    navigate("/booking");
-                }
+                redirectAfterLogin(res.data.role);
             }
         } catch (err) {
             setError(err.message || "Số điện thoại hoặc mật khẩu không chính xác!");
         } finally {
             setLoading(false);
+        }
+    };
+
+    // Gửi ID Token OpenID Connect lên Backend để xác thực chữ ký số
+    const handleGoogleIdTokenAuth = async (idToken, otpCode = null) => {
+        setGoogleLoading(true);
+        setError("");
+        try {
+            const res = await axiosInstance.post("/api/auth/google", {
+                idToken,
+                otpCode
+            });
+
+            const authData = res.data || res;
+            if (authData.accessToken) {
+                setGoogleDialogOpen(false);
+                setLinkModalOpen(false);
+                login(authData);
+                redirectAfterLogin(authData.role);
+            } else {
+                setError("Đăng nhập Google không thành công, vui lòng thử lại.");
+            }
+        } catch (err) {
+            const msg = err.message || "";
+            // Nếu phát hiện tài khoản đã tồn tại và backend yêu cầu xác minh quyền sở hữu
+            if (msg.includes("NEEDS_LINK_CONFIRM") || msg.includes("Mã OTP xác nhận liên kết")) {
+                setGoogleDialogOpen(false);
+                setLinkPendingIdToken(idToken);
+                setLinkNotice(msg.replace("NEEDS_LINK_CONFIRM:", "").trim());
+                setLinkModalOpen(true);
+            } else {
+                setError(msg || "Không thể xác minh Google OpenID Connect ID Token!");
+            }
+        } finally {
+            setGoogleLoading(false);
+        }
+    };
+
+    const handleConfirmLinkWithOtp = async () => {
+        if (!linkOtpCode || linkOtpCode.trim().length !== 6) {
+            setError("Vui lòng nhập đủ 6 chữ số mã OTP xác nhận gửi về email!");
+            return;
+        }
+        setLinkLoading(true);
+        setError("");
+        try {
+            await handleGoogleIdTokenAuth(linkPendingIdToken, linkOtpCode.trim());
+        } finally {
+            setLinkLoading(false);
         }
     };
 
@@ -103,22 +223,6 @@ export default function LoginPage() {
                 overflow: "hidden"
             }}
         >
-            {/* Subtle background aura */}
-            <Box
-                sx={{
-                    position: "absolute",
-                    top: "10%",
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    width: 500,
-                    height: 500,
-                    borderRadius: 999,
-                    bgcolor: "rgba(0, 136, 214, 0.05)",
-                    filter: "blur(80px)",
-                    pointerEvents: "none"
-                }}
-            />
-
             <Container maxWidth="xs" sx={{ position: "relative", zIndex: 1 }}>
                 <Paper
                     elevation={0}
@@ -154,7 +258,7 @@ export default function LoginPage() {
                         Đăng Nhập Cổng Y Tế
                     </Typography>
                     <Typography variant="body2" sx={{ color: "#64748B", mb: 3 }}>
-                        Nền tảng quản trị & tiếp đón bệnh nhân Bệnh viện TNT
+                        Nền tảng tiếp đón & chăm sóc sức khỏe  TNT HOSPITAL
                     </Typography>
 
                     {expiredNotice && (
@@ -172,11 +276,11 @@ export default function LoginPage() {
                     <Box component="form" onSubmit={handleLogin}>
                         <TextField
                             fullWidth
-                            label="Số điện thoại"
+                            label="Số điện thoại hoặc Email"
                             margin="normal"
                             value={phoneNumber}
                             onChange={(e) => setPhoneNumber(e.target.value)}
-                            placeholder="0987654321"
+                            placeholder="0987654321 hoặc email@example.com"
                             required
                             InputProps={{
                                 startAdornment: (
@@ -186,7 +290,6 @@ export default function LoginPage() {
                                 ),
                                 sx: {
                                     borderRadius: 2.5,
-                                    fontFamily: "monospace",
                                     fontWeight: 700
                                 }
                             }}
@@ -237,9 +340,7 @@ export default function LoginPage() {
                                 textTransform: "none",
                                 bgcolor: "#0088D6",
                                 boxShadow: "0 6px 20px rgba(0, 136, 214, 0.3)",
-                                "&:hover": {
-                                    bgcolor: "#0073B7"
-                                }
+                                "&:hover": { bgcolor: "#0073B7" }
                             }}
                         >
                             {loading ? "Đang xác thực..." : "Đăng Nhập"}
@@ -283,41 +384,45 @@ export default function LoginPage() {
                         <Box display="flex" alignItems="center" my={2.5}>
                             <Box flexGrow={1} height="1px" bgcolor="rgba(15, 23, 42, 0.08)" />
                             <Typography variant="caption" sx={{ color: "#94A3B8", px: 1.5, fontWeight: 700 }}>
-                                HOẶC
+                                HOẶC DÀNH CHO BỆNH NHÂN (GOOGLE SIGN-IN)
                             </Typography>
                             <Box flexGrow={1} height="1px" bgcolor="rgba(15, 23, 42, 0.08)" />
                         </Box>
 
-                        {/* Microsoft Account Login Button */}
-                        <Button
-                            fullWidth
-                            variant="outlined"
-                            size="large"
-                            onClick={() => {
-                                handleQuickFill("0988889999", "password123");
-                                alert("Đã liên kết tài khoản Microsoft! Nhấn Đăng Nhập để vào hệ thống.");
-                            }}
-                            startIcon={
-                                <Box component="svg" width="18" height="18" viewBox="0 0 21 21" fill="none">
-                                    <path d="M1 1h9v9H1V1z" fill="#f25022"/>
-                                    <path d="M11 1h9v9h-9V1z" fill="#7fba00"/>
-                                    <path d="M1 11h9v9H1v-9z" fill="#00a4ef"/>
-                                    <path d="M11 11h9v9h-9v-9z" fill="#ffb900"/>
-                                </Box>
-                            }
-                            sx={{
-                                py: 1.2,
-                                borderRadius: 2.5,
-                                fontWeight: 700,
-                                fontSize: "0.875rem",
-                                textTransform: "none",
-                                color: "#334155",
-                                borderColor: "rgba(15, 23, 42, 0.15)",
-                                "&:hover": { bgcolor: "#F8FAFC", borderColor: "#94A3B8" }
-                            }}
-                        >
-                            Đăng nhập bằng Microsoft Entra ID
-                        </Button>
+                        <Stack spacing={1.5}>
+                            {/* Google Official GSI Button Container */}
+                            <Box id="g-signin-container" sx={{ display: "flex", justifyContent: "center", minHeight: 44 }} />
+
+                            {/* Thử nghiệm dev-mock chỉ hiển thị trong môi trường phát triển cục bộ */}
+                            {import.meta.env.DEV && (
+                                <Button
+                                    fullWidth
+                                    variant="outlined"
+                                    size="small"
+                                    onClick={() => setGoogleDialogOpen(true)}
+                                    startIcon={
+                                        <Box component="svg" width="16" height="16" viewBox="0 0 48 48">
+                                            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+                                            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+                                            <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+                                            <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+                                        </Box>
+                                    }
+                                    sx={{
+                                        py: 0.9,
+                                        borderRadius: 2,
+                                        textTransform: "none",
+                                        color: "#64748B",
+                                        borderColor: "rgba(15, 23, 42, 0.12)",
+                                        fontSize: "0.8rem",
+                                        fontWeight: 600,
+                                        "&:hover": { bgcolor: "#F8FAFC", borderColor: "#4285F4", color: "#1E293B" }
+                                    }}
+                                >
+                                    Tuỳ chọn Google khác (Dev Mode)
+                                </Button>
+                            )}
+                        </Stack>
 
                         <Box textAlign="center" mt={3} pt={2} borderTop="1px solid rgba(15, 23, 42, 0.06)">
                             <Typography variant="body2" sx={{ color: "#64748B", mb: 1.5 }}>
@@ -350,6 +455,169 @@ export default function LoginPage() {
                     </Box>
                 </Paper>
             </Container>
+
+            {/* Google OIDC ID Token Selector Modal */}
+            {/* Dialog Tùy chọn / Thử nghiệm Google Token - Chỉ có trong môi trường phát triển DEV */}
+            {import.meta.env.DEV && (
+                <Dialog
+                    open={googleDialogOpen}
+                    onClose={() => !googleLoading && setGoogleDialogOpen(false)}
+                    maxWidth="xs"
+                    fullWidth
+                    PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
+                >
+                    <DialogTitle sx={{ textAlign: "center", pb: 1 }}>
+                        <Box display="flex" justifyContent="center" mb={1}>
+                            <Box component="svg" width="32" height="32" viewBox="0 0 48 48">
+                                <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+                                <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+                                <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+                                <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+                            </Box>
+                        </Box>
+                        <Typography variant="h6" fontWeight={800} color="#0F172A">
+                            Google Sign-In (Dev Sandbox)
+                        </Typography>
+                        <Typography variant="caption" color="#64748B">
+                            Chỉ khả dụng trong môi trường phát triển cục bộ với Whitelist tài khoản cố định
+                        </Typography>
+                    </DialogTitle>
+
+                    <DialogContent>
+                        {googleLoading ? (
+                            <Box py={4} textAlign="center">
+                                <CircularProgress size={36} sx={{ color: "#4285F4", mb: 2 }} />
+                                <Typography variant="body2" color="#64748B" fontWeight={600}>
+                                    Đang kiểm tra chữ ký số token và khởi tạo phiên JWT...
+                                </Typography>
+                            </Box>
+                        ) : (
+                            <List sx={{ pt: 0 }}>
+                                <ListItem disablePadding sx={{ mb: 1 }}>
+                                    <ListItemButton
+                                        onClick={() => handleGoogleIdTokenAuth("dev-mock-nguyenvanan.patient@gmail.com")}
+                                        sx={{
+                                            borderRadius: 2,
+                                            border: "1px solid rgba(15, 23, 42, 0.08)",
+                                            "&:hover": { bgcolor: "#F1F5F9" }
+                                        }}
+                                    >
+                                        <ListItemAvatar>
+                                            <Avatar sx={{ bgcolor: "#4285F4" }}>A</Avatar>
+                                        </ListItemAvatar>
+                                        <ListItemText
+                                            primary={<Typography variant="subtitle2" fontWeight={700}>Nguyễn Văn An</Typography>}
+                                            secondary="nguyenvanan.patient@gmail.com (Whitelist)"
+                                        />
+                                    </ListItemButton>
+                                </ListItem>
+
+                                <ListItem disablePadding sx={{ mb: 1 }}>
+                                    <ListItemButton
+                                        onClick={() => handleGoogleIdTokenAuth("dev-mock-tranbaongoc.patient@gmail.com")}
+                                        sx={{
+                                            borderRadius: 2,
+                                            border: "1px solid rgba(15, 23, 42, 0.08)",
+                                            "&:hover": { bgcolor: "#F1F5F9" }
+                                        }}
+                                    >
+                                        <ListItemAvatar>
+                                            <Avatar sx={{ bgcolor: "#EA4335" }}>N</Avatar>
+                                        </ListItemAvatar>
+                                        <ListItemText
+                                            primary={<Typography variant="subtitle2" fontWeight={700}>Trần Bảo Ngọc</Typography>}
+                                            secondary="tranbaongoc.patient@gmail.com (Whitelist)"
+                                        />
+                                    </ListItemButton>
+                                </ListItem>
+                            </List>
+                        )}
+                    </DialogContent>
+                </Dialog>
+            )}
+
+
+
+            {/* Modal Xác nhận Liên kết Tài khoản qua Email OTP khi phát hiện Email đã có sẵn */}
+            <Dialog
+                open={linkModalOpen}
+                onClose={() => !linkLoading && setLinkModalOpen(false)}
+                maxWidth="xs"
+                fullWidth
+                PaperProps={{ sx: { borderRadius: 3, p: 1.5 } }}
+            >
+                <DialogTitle sx={{ textAlign: "center", pb: 1 }}>
+                    <Box display="flex" justifyContent="center" mb={1}>
+                        <Box
+                            sx={{
+                                width: 48,
+                                height: 48,
+                                borderRadius: "12px",
+                                bgcolor: "rgba(0, 136, 214, 0.1)",
+                                color: "#0088D6",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center"
+                            }}
+                        >
+                            <MarkEmailReadIcon sx={{ fontSize: 28 }} />
+                        </Box>
+                    </Box>
+                    <Typography variant="h6" fontWeight={800} color="#0F172A">
+                        Xác Nhận Quyền Sở Hữu Tài Khoản
+                    </Typography>
+                    <Typography variant="caption" color="#64748B">
+                        Bảo vệ hồ sơ y tế chống truy cập trái phép
+                    </Typography>
+                </DialogTitle>
+
+                <DialogContent>
+                    <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>
+                        {linkNotice || "Email của bạn đã tồn tại trên hệ thống. Vui lòng nhập mã OTP gửi tới email để xác nhận liên kết Google ID với tài khoản này."}
+                    </Alert>
+
+                    <TextField
+                        fullWidth
+                        size="small"
+                        label="Nhập mã OTP (6 số từ Email)"
+                        value={linkOtpCode}
+                        onChange={(e) => setLinkOtpCode(e.target.value)}
+                        placeholder="123456"
+                        InputProps={{
+                            startAdornment: (
+                                <InputAdornment position="start">
+                                    <VpnKeyIcon sx={{ color: "#94A3B8" }} />
+                                </InputAdornment>
+                            ),
+                            sx: { borderRadius: 2, fontFamily: "monospace", letterSpacing: 3, fontWeight: 700 }
+                        }}
+                    />
+                </DialogContent>
+
+                <DialogActions sx={{ px: 3, pb: 2, justifyContent: "space-between" }}>
+                    <Button
+                        size="small"
+                        onClick={() => setLinkModalOpen(false)}
+                        disabled={linkLoading}
+                        sx={{ textTransform: "none", color: "#64748B" }}
+                    >
+                        Hủy bỏ
+                    </Button>
+                    <Button
+                        variant="contained"
+                        onClick={handleConfirmLinkWithOtp}
+                        disabled={linkLoading || !linkOtpCode}
+                        sx={{
+                            textTransform: "none",
+                            fontWeight: 700,
+                            bgcolor: "#0088D6",
+                            "&:hover": { bgcolor: "#0073B7" }
+                        }}
+                    >
+                        {linkLoading ? "Đang xác minh..." : "Xác nhận liên kết"}
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 }

@@ -57,6 +57,8 @@ import HealingIcon from "@mui/icons-material/Healing";
 import MedicationIcon from "@mui/icons-material/Medication";
 import BadgeIcon from "@mui/icons-material/Badge";
 import DeleteIcon from "@mui/icons-material/Delete";
+import VolunteerActivismIcon from "@mui/icons-material/VolunteerActivism";
+import { useAuth } from "../../context/AuthContext";
 import axiosInstance from "../../services/AxiosInstance";
 import { formatCurrency, formatDate, formatDateTime, formatISODate } from "../../utils/formatters";
 import { printReceipt, printTreatmentSheet, printBedsideCard } from "../../utils/printHelper";
@@ -127,6 +129,10 @@ const DRUG_PROTOCOL_PRESETS = [
 ];
 
 export default function InpatientPage() {
+    const { user } = useAuth();
+    const isNurse = user?.role === "ROLE_NURSE";
+    const isDoctor = user?.role === "ROLE_DOCTOR" || user?.role === "ROLE_HEAD_OF_DEPARTMENT" || user?.role === "ROLE_ADMIN";
+
     const [admissions, setAdmissions] = useState([]);
     const [departments, setDepartments] = useState([]);
     const [rooms, setRooms] = useState([]);
@@ -144,10 +150,27 @@ export default function InpatientPage() {
 
     // Tracking cleaning beds (roomId_bedNum)
     const [cleaningBeds, setCleaningBeds] = useState(new Set());
+    const [allBeds, setAllBeds] = useState([]);
 
     // Selected Patient & Treatment Sheet State
     const [selectedAdmission, setSelectedAdmission] = useState(null);
     const [openTreatmentSheetModal, setOpenTreatmentSheetModal] = useState(false);
+
+    // Modal Phiếu Chăm Sóc Điều Dưỡng (Nursing Care)
+    const [openNursingCareModal, setOpenNursingCareModal] = useState(false);
+    const [nursingCareList, setNursingCareList] = useState([]);
+    const [loadingNursingCare, setLoadingNursingCare] = useState(false);
+    const [submittingNursingCare, setSubmittingNursingCare] = useState(false);
+    const [nursingCareForm, setNursingCareForm] = useState({
+        temperature: "36.8",
+        bloodPressure: "120/80",
+        pulse: "76",
+        respiratoryRate: "18",
+        spo2: "98",
+        careLevel: "LEVEL_1",
+        nursingNote: "",
+        medicationAdministered: ""
+    });
     const [treatmentSheetData, setTreatmentSheetData] = useState({
         sheetNumber: "01",
         date: formatISODate(new Date()),
@@ -243,145 +266,24 @@ export default function InpatientPage() {
                     return {
                         ...item,
                         bedNumber: assignedBed,
-                        severity: item.severity || (assignedBed === 1 ? "CRITICAL" : (assignedBed === 2 ? "POST_OP" : "NORMAL")),
-                        careLevel: item.careLevel || (assignedBed === 1 ? "Mức 1" : (assignedBed === 2 ? "Mức 2" : "Mức 3")),
-                        allergies: item.allergies || (assignedBed === 1 ? "Dị ứng Penicillin, Aspirin" : "Không ghi nhận"),
-                        bloodType: item.bloodType || (assignedBed % 2 === 1 ? "O+" : "A+"),
-                        diet: item.diet || (assignedBed === 1 ? "Nhịn ăn hoàn toàn, nuôi dưỡng tĩnh mạch" : (assignedBed === 2 ? "Cháo súp dinh dưỡng" : "Cơm mềm bệnh lý")),
-                        latestVitals: item.latestVitals || {
-                            temperature: assignedBed === 1 ? "38.5" : "36.8",
-                            bloodPressure: assignedBed === 1 ? "150/95" : "120/80",
-                            heartRate: assignedBed === 1 ? "102" : "78",
-                            respiratoryRate: assignedBed === 1 ? "24" : "18",
-                            spO2: assignedBed === 1 ? "93" : "98"
-                        }
+                        severity: item.severity || "NORMAL",
+                        careLevel: item.careLevel || "Chưa phân loại",
+                        allergies: item.allergies || "Chưa ghi nhận",
+                        bloodType: item.bloodType || "Chưa có dữ liệu",
+                        diet: item.diet || "Chưa có dữ liệu",
+                        latestVitals: item.latestVitals || null
                     };
                 });
                 setAdmissions(enriched);
             } else {
-                // Mock data phong phú mô phỏng chuẩn SmartHos-365
-                setAdmissions([
-                    {
-                        admissionId: "33333333-3333-3333-3333-333333333333",
-                        admissionCode: "SBA-TIMMACH-01",
-                        patientProfile: {
-                            patientProfileId: "p-01",
-                            fullName: "Bùi Thị Cúc",
-                            gender: "FEMALE",
-                            dateOfBirth: "1948-05-12",
-                            phoneNumber: "0912345678",
-                            identityNumber: "001048001234"
-                        },
-                        room: {
-                            roomId: 101,
-                            roomNumber: "301",
-                            roomType: "ICU",
-                            department: { departmentId: 1, departmentName: "Khoa Tim Mạch" }
-                        },
-                        bedNumber: 1,
-                        treatingDoctor: {
-                            fullName: "BS. CKI Trần Đình Trọng",
-                            academicTitle: "BSCKI"
-                        },
-                        admissionDate: new Date(Date.now() - 6 * 24 * 3600 * 1000).toISOString(),
-                        initialDiagnosis: "Cơn đau thắt ngực không ổn định, theo dõi nhồi máu cơ tim cấp / Tăng huyết áp độ 3",
-                        dailyRoomFee: 500000,
-                        state: "ADMITTED",
-                        severity: "CRITICAL",
-                        careLevel: "Mức 1",
-                        allergies: "Dị ứng Penicillin, Aspirin",
-                        bloodType: "A+",
-                        diet: "Ăn cháo dinh dưỡng giảm muối tuyệt đối",
-                        latestVitals: {
-                            temperature: "37.4",
-                            bloodPressure: "165/100",
-                            heartRate: "98",
-                            respiratoryRate: "22",
-                            spO2: "94"
-                        }
-                    },
-                    {
-                        admissionId: "44444444-4444-4444-4444-444444444444",
-                        admissionCode: "SBA-NGOAI-02",
-                        patientProfile: {
-                            patientProfileId: "p-02",
-                            fullName: "Lê Thị Bích Hạnh",
-                            gender: "FEMALE",
-                            dateOfBirth: "1989-11-20",
-                            phoneNumber: "0987654321",
-                            identityNumber: "001189005678"
-                        },
-                        room: {
-                            roomId: 101,
-                            roomNumber: "301",
-                            roomType: "ICU",
-                            department: { departmentId: 1, departmentName: "Khoa Tim Mạch" }
-                        },
-                        bedNumber: 3,
-                        treatingDoctor: {
-                            fullName: "PGS. TS Nguyễn Văn Minh",
-                            academicTitle: "PGS_TS"
-                        },
-                        admissionDate: new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString(),
-                        initialDiagnosis: "Hậu phẫu nội soi viêm ruột thừa cấp ngày thứ 2, dẫn lưu ổn định",
-                        dailyRoomFee: 400000,
-                        state: "ADMITTED",
-                        severity: "POST_OP",
-                        careLevel: "Mức 2",
-                        allergies: "Không ghi nhận",
-                        bloodType: "O+",
-                        diet: "Cháo loãng thịt nạc",
-                        latestVitals: {
-                            temperature: "36.8",
-                            bloodPressure: "120/80",
-                            heartRate: "76",
-                            respiratoryRate: "18",
-                            spO2: "98"
-                        }
-                    },
-                    {
-                        admissionId: "55555555-5555-5555-5555-555555555555",
-                        admissionCode: "SBA-NOI-03",
-                        patientProfile: {
-                            patientProfileId: "p-03",
-                            fullName: "Phạm Hải Phong",
-                            gender: "MALE",
-                            dateOfBirth: "1995-02-14",
-                            phoneNumber: "0904123888",
-                            identityNumber: "001095009988"
-                        },
-                        room: {
-                            roomId: 102,
-                            roomNumber: "302",
-                            roomType: "INPATIENT",
-                            department: { departmentId: 2, departmentName: "Khoa Ngoại Tổng Hợp" }
-                        },
-                        bedNumber: 1,
-                        treatingDoctor: {
-                            fullName: "BS. CKI Lê Hoàng Nam",
-                            academicTitle: "BSCKI"
-                        },
-                        admissionDate: new Date(Date.now() - 1 * 24 * 3600 * 1000).toISOString(),
-                        initialDiagnosis: "Viêm phế quản phổi cấp, sốt virus ngày thứ 3, hạ natri máu",
-                        dailyRoomFee: 350000,
-                        state: "ADMITTED",
-                        severity: "NORMAL",
-                        careLevel: "Mức 3",
-                        allergies: "Không ghi nhận",
-                        bloodType: "B+",
-                        diet: "Cơm mềm bệnh lý",
-                        latestVitals: {
-                            temperature: "37.5",
-                            bloodPressure: "115/75",
-                            heartRate: "82",
-                            respiratoryRate: "19",
-                            spO2: "97"
-                        }
-                    }
-                ]);
+                setAdmissions([]);
             }
         } catch (err) {
             console.error("Lỗi tải dữ liệu nội trú:", err);
+            setFeedback({
+                type: "error",
+                message: err.response?.data?.message || err.message || "Không thể tải dữ liệu bệnh nhân nội trú từ máy chủ."
+            });
         } finally {
             setLoading(false);
         }
@@ -451,9 +353,12 @@ export default function InpatientPage() {
     // Thống kê KPIs theo thời gian thực (chuẩn SmartHos-365 Slide 28)
     const stats = useMemo(() => {
         const totalRooms = allRooms.length;
-        const totalBeds = totalRooms * 4; // Mỗi phòng chuẩn 4 giường
+        const totalBeds = allBeds.length > 0 ? allBeds.length : totalRooms * 4;
         const occupiedBeds = admissions.length;
-        const availableBeds = Math.max(0, totalBeds - occupiedBeds - cleaningBeds.size);
+        const cleaningCount = allBeds.length > 0 ? allBeds.filter(b => b.status === "CLEANING").length : cleaningBeds.size;
+        const availableBeds = allBeds.length > 0
+            ? allBeds.filter(b => b.status === "AVAILABLE").length
+            : Math.max(0, totalBeds - occupiedBeds - cleaningCount);
         const criticalBeds = admissions.filter((a) => a.severity === "CRITICAL" || a.careLevel === "Mức 1").length;
         const postOpBeds = admissions.filter((a) => a.severity === "POST_OP" || a.careLevel === "Mức 2").length;
         const occupancyRate = totalBeds > 0 ? Math.round((occupiedBeds / totalBeds) * 100) : 0;
@@ -465,10 +370,10 @@ export default function InpatientPage() {
             availableBeds,
             criticalBeds,
             postOpBeds,
-            cleaningCount: cleaningBeds.size,
+            cleaningCount,
             occupancyRate
         };
-    }, [allRooms, admissions, cleaningBeds]);
+    }, [allRooms, admissions, allBeds, cleaningBeds]);
 
     // Tính tuổi bệnh nhân
     const calculateAge = (dob) => {
@@ -507,7 +412,7 @@ export default function InpatientPage() {
             date: formatISODate(new Date()),
             time: new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }),
             temperature: admission.latestVitals?.temperature || "36.8",
-            bloodPressure: admission.latestVitals?.bloodPressure || "120/80",
+            bloodPressure: admission.latestVitals?.bloodPressure || "",
             heartRate: admission.latestVitals?.heartRate || "78",
             respiratoryRate: admission.latestVitals?.respiratoryRate || "18",
             spO2: admission.latestVitals?.spO2 || "98",
@@ -532,39 +437,20 @@ export default function InpatientPage() {
             if (res.data && res.data.length > 0) {
                 setTreatmentHistory(res.data);
             } else {
-                setTreatmentHistory([
-                    {
-                        detailId: "h-01",
-                        logDate: formatISODate(new Date(Date.now() - 24 * 3600 * 1000)),
-                        temperature: "37.2",
-                        bloodPressure: "125/80",
-                        heartRate: "80",
-                        spO2: "98",
-                        diseaseProgression: "Bệnh nhân đỡ đau tức ngực, sinh hiệu ổn định, ăn ngủ được. Vết mổ khô.",
-                        doctorInstruction: "Chăm sóc cấp II. Duy trì phác đồ kháng sinh, kiểm tra điện tim sáng mai.",
-                        doctorName: "BS. CKI Trần Đình Trọng"
-                    },
-                    {
-                        detailId: "h-02",
-                        logDate: formatISODate(new Date(Date.now() - 48 * 3600 * 1000)),
-                        temperature: "37.5",
-                        bloodPressure: "135/85",
-                        heartRate: "88",
-                        spO2: "96",
-                        diseaseProgression: "Bệnh nhân mới vào viện, đau quặn bụng từng cơn, mệt mỏi, sốt nhẹ.",
-                        doctorInstruction: "Chăm sóc cấp I. Bất động tại giường, nhịn ăn, bù dịch Ringer Lactat 1000ml/24h.",
-                        doctorName: "BS. CKI Trần Đình Trọng"
-                    }
-                ]);
+                setTreatmentHistory([]);
             }
-        } catch {
+        } catch (err) {
+            console.warn("Không thể tải lịch sử điều trị:", err);
             setTreatmentHistory([]);
+            setFeedback({
+                type: "warning",
+                message: "Không thể tải lịch sử điều trị của bệnh nhân từ máy chủ."
+            });
         } finally {
             setLoadingHistory(false);
         }
     };
 
-    // Áp dụng mẫu diễn tiến lâm sàng nhanh
     const handleApplyPreset = (preset) => {
         setTreatmentSheetData((prev) => ({
             ...prev,
@@ -722,6 +608,70 @@ export default function InpatientPage() {
     };
 
     // ==========================================
+    // PHIẾU CHĂM SÓC ĐIỀU DƯỠNG (NURSING CARE)
+    // ==========================================
+    const loadNursingCares = async (admissionId) => {
+        if (!admissionId) return;
+        setLoadingNursingCare(true);
+        try {
+            const res = await axiosInstance.get(`/api/inpatient/${admissionId}/nursing-cares`);
+            const data = Array.isArray(res.data?.data) ? res.data.data : (Array.isArray(res.data) ? res.data : []);
+            setNursingCareList(data);
+        } catch (err) {
+            console.warn("Lỗi tải phiếu chăm sóc điều dưỡng:", err);
+            setNursingCareList([]);
+        } finally {
+            setLoadingNursingCare(false);
+        }
+    };
+
+    const handleOpenNursingCareModal = (admission) => {
+        setSelectedAdmission(admission);
+        setNursingCareForm({
+            temperature: "36.8",
+            bloodPressure: "120/80",
+            pulse: "76",
+            respiratoryRate: "18",
+            spo2: "98",
+            careLevel: "LEVEL_1",
+            nursingNote: "",
+            medicationAdministered: ""
+        });
+        loadNursingCares(admission.admissionId);
+        setOpenNursingCareModal(true);
+    };
+
+    const handleSaveNursingCare = async () => {
+        if (!selectedAdmission?.admissionId) return;
+        if (!nursingCareForm.nursingNote?.trim()) {
+            setFeedback({ type: "warning", message: "Vui lòng nhập diễn biến / ghi chú chăm sóc bệnh nhân!" });
+            return;
+        }
+        setSubmittingNursingCare(true);
+        try {
+            const payload = {
+                temperature: nursingCareForm.temperature ? parseFloat(nursingCareForm.temperature) : null,
+                bloodPressure: nursingCareForm.bloodPressure?.trim() || null,
+                pulse: nursingCareForm.pulse ? parseInt(nursingCareForm.pulse) : null,
+                respiratoryRate: nursingCareForm.respiratoryRate ? parseInt(nursingCareForm.respiratoryRate) : null,
+                spo2: nursingCareForm.spo2 ? parseInt(nursingCareForm.spo2) : null,
+                careLevel: nursingCareForm.careLevel || "LEVEL_1",
+                nursingNote: nursingCareForm.nursingNote.trim(),
+                medicationAdministered: nursingCareForm.medicationAdministered?.trim() || null
+            };
+            await axiosInstance.post(`/api/inpatient/${selectedAdmission.admissionId}/nursing-cares`, payload);
+            setFeedback({ type: "success", message: "Đã lưu phiếu chăm sóc điều dưỡng thành công!" });
+            await loadNursingCares(selectedAdmission.admissionId);
+            setNursingCareForm(prev => ({ ...prev, nursingNote: "", medicationAdministered: "" }));
+        } catch (err) {
+            console.error("Lỗi lưu phiếu chăm sóc:", err);
+            setFeedback({ type: "error", message: err.response?.data?.message || err.message || "Lỗi lưu phiếu chăm sóc!" });
+        } finally {
+            setSubmittingNursingCare(false);
+        }
+    };
+
+    // ==========================================
     // CHUYỂN GIƯỜNG / BUỒNG BỆNH
     // ==========================================
     const handleOpenTransferModal = (admission) => {
@@ -787,10 +737,14 @@ export default function InpatientPage() {
 
     const handleSaveDischarge = async () => {
         if (!selectedAdmission) return;
+        if (!dischargeData.dischargeSummary?.trim()) {
+            setFeedback({ type: "warning", message: "Bác sĩ phải nhập tóm tắt quá trình điều trị xuất viện trước khi kết thúc ca điều trị nội trú!" });
+            return;
+        }
         setSubmittingDischarge(true);
         try {
             const res = await axiosInstance.post(`/api/inpatient/${selectedAdmission.admissionId}/discharge`, {
-                dischargeSummary: dischargeData.dischargeSummary,
+                dischargeSummary: dischargeData.dischargeSummary.trim(),
                 doctorRecommendation: dischargeData.doctorRecommendation,
                 reExaminationDate: dischargeData.reExaminationDate
             });
@@ -832,7 +786,10 @@ export default function InpatientPage() {
 
     const handleSaveAdmit = async () => {
         if (!admitForm.patientProfileId || !admitForm.roomId) {
-            alert("Vui lòng chọn đầy đủ người bệnh và phòng điều trị!");
+            setFeedback({
+                type: "warning",
+                message: "Vui lòng chọn đầy đủ người bệnh và phòng điều trị!"
+            });
             return;
         }
         setSubmittingAdmit(true);
@@ -894,7 +851,10 @@ export default function InpatientPage() {
             loadData();
         } catch (err) {
             console.error("Lỗi tiếp nhận bệnh nhân:", err);
-            alert(err.message || "Lỗi tiếp nhận bệnh nhân!");
+            setFeedback({
+                type: "error",
+                message: err.response?.data?.message || err.message || "Lỗi tiếp nhận bệnh nhân nội trú!"
+            });
         } finally {
             setSubmittingAdmit(false);
         }
@@ -1424,21 +1384,34 @@ export default function InpatientPage() {
                                                                         </Typography>
                                                                         <Box display="flex" alignItems="center" gap={1.5} mt={0.4} flexWrap="wrap">
                                                                             <Typography variant="caption" fontWeight="700" color={isCritical ? "error.main" : "primary.main"} sx={{ fontFamily: "monospace" }}>
-                                                                                HA: {patientInBed.latestVitals?.bloodPressure || "120/80"}
+                                                                                HA: {patientInBed.latestVitals?.bloodPressure || "Chưa đo"}
                                                                             </Typography>
                                                                             <Typography variant="caption" fontWeight="600" color="#475569" sx={{ fontFamily: "monospace" }}>
-                                                                                Mạch: {patientInBed.latestVitals?.heartRate || "78"} bpm
+                                                                                Mạch: {patientInBed.latestVitals?.heartRate ? `${patientInBed.latestVitals.heartRate} bpm` : "Chưa đo"}
                                                                             </Typography>
                                                                             <Typography variant="caption" fontWeight="700" color={Number(patientInBed.latestVitals?.spO2) < 95 ? "error.main" : "success.main"} sx={{ fontFamily: "monospace" }}>
-                                                                                SpO2: {patientInBed.latestVitals?.spO2 || "98"}%
+                                                                                SpO2: {patientInBed.latestVitals?.spO2 ? `${patientInBed.latestVitals.spO2}%` : "Chưa đo"}
                                                                             </Typography>
                                                                         </Box>
                                                                     </Box>
 
                                                                     {/* Thao tác 1-Click chuẩn Y tế */}
                                                                     <Grid container spacing={0.8} mt={0.5}>
-                                                                        <Grid item xs={6}>
+                                                                        <Grid item xs={isNurse ? 6 : 6}>
                                                                             <Button
+                                                                                fullWidth
+                                                                                size="small"
+                                                                                variant="contained"
+                                                                                startIcon={<VolunteerActivismIcon sx={{ fontSize: 14 }} />}
+                                                                                onClick={() => handleOpenNursingCareModal(patientInBed)}
+                                                                                sx={{ fontSize: "0.7rem", py: 0.5, fontWeight: 700, borderRadius: 2, textTransform: "none", bgcolor: "#0D9488", "&:hover": { bgcolor: "#0F766E" } }}
+                                                                            >
+                                                                                Chăm Sóc
+                                                                            </Button>
+                                                                        </Grid>
+                                                                        {!isNurse && (
+                                                                            <Grid item xs={6}>
+                                                                                <Button
                                                                                 fullWidth
                                                                                 size="small"
                                                                                 variant="contained"
@@ -1450,8 +1423,10 @@ export default function InpatientPage() {
                                                                                 Tờ Bệnh Trình
                                                                             </Button>
                                                                         </Grid>
-                                                                        <Grid item xs={6}>
-                                                                            <Button
+                                                                        )}
+                                                                        {!isNurse && (
+                                                                            <Grid item xs={6}>
+                                                                                <Button
                                                                                 fullWidth
                                                                                 size="small"
                                                                                 variant="outlined"
@@ -1463,7 +1438,8 @@ export default function InpatientPage() {
                                                                                 Đổi Giường
                                                                             </Button>
                                                                         </Grid>
-                                                                        <Grid item xs={6}>
+                                                                        )}
+                                                                        <Grid item xs={isNurse ? 6 : 6}>
                                                                             <Button
                                                                                 fullWidth
                                                                                 size="small"
@@ -1476,8 +1452,9 @@ export default function InpatientPage() {
                                                                                 Thẻ Giường
                                                                             </Button>
                                                                         </Grid>
-                                                                        <Grid item xs={6}>
-                                                                            <Button
+                                                                        {!isNurse && (
+                                                                            <Grid item xs={6}>
+                                                                                <Button
                                                                                 fullWidth
                                                                                 size="small"
                                                                                 variant="outlined"
@@ -1489,6 +1466,7 @@ export default function InpatientPage() {
                                                                                 Xuất Viện
                                                                             </Button>
                                                                         </Grid>
+                                                                        )}
                                                                     </Grid>
                                                                 </Box>
                                                             ) : (
@@ -1552,7 +1530,16 @@ export default function InpatientPage() {
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {admissions.map((item) => (
+                            {admissions.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
+                                        <Typography variant="body1" fontWeight={700} color="#64748B">
+                                            Hiện tại khoa chưa có bệnh nhân nào đang điều trị nội trú
+                                        </Typography>
+                                    </TableCell>
+                                </TableRow>
+                            ) : (
+                                admissions.map((item) => (
                                 <TableRow key={item.admissionId} hover sx={{ "&:hover": { bgcolor: "rgba(0, 136, 214, 0.02)" } }}>
                                     <TableCell sx={{ whiteSpace: "nowrap" }}>
                                         <Typography variant="body2" fontWeight={700} sx={{ fontFamily: "monospace", color: "#0088D6", bgcolor: "rgba(0, 136, 214, 0.08)", px: 1, py: 0.35, borderRadius: 1.5, display: "inline-block" }}>
@@ -1597,23 +1584,36 @@ export default function InpatientPage() {
                                             <Button
                                                 size="small"
                                                 variant="contained"
-                                                color="primary"
-                                                startIcon={<AssignmentIcon />}
-                                                onClick={() => handleOpenTreatmentSheet(item)}
-                                                sx={{ borderRadius: 2, whiteSpace: "nowrap", fontSize: "0.75rem", px: 1.2 }}
+                                                startIcon={<VolunteerActivismIcon />}
+                                                onClick={() => handleOpenNursingCareModal(item)}
+                                                sx={{ borderRadius: 2, whiteSpace: "nowrap", fontSize: "0.75rem", px: 1.2, bgcolor: "#0D9488", "&:hover": { bgcolor: "#0F766E" } }}
                                             >
-                                                Tờ Bệnh Trình
+                                                Phiếu Chăm Sóc
                                             </Button>
-                                            <Button
-                                                size="small"
-                                                variant="outlined"
-                                                color="info"
-                                                startIcon={<SwapHorizIcon />}
-                                                onClick={() => handleOpenTransferModal(item)}
-                                                sx={{ borderRadius: 2, whiteSpace: "nowrap", fontSize: "0.75rem", px: 1 }}
-                                            >
-                                                Đổi Giường
-                                            </Button>
+                                            {!isNurse && (
+                                                <Button
+                                                    size="small"
+                                                    variant="contained"
+                                                    color="primary"
+                                                    startIcon={<AssignmentIcon />}
+                                                    onClick={() => handleOpenTreatmentSheet(item)}
+                                                    sx={{ borderRadius: 2, whiteSpace: "nowrap", fontSize: "0.75rem", px: 1.2 }}
+                                                >
+                                                    Tờ Bệnh Trình
+                                                </Button>
+                                            )}
+                                            {!isNurse && (
+                                                <Button
+                                                    size="small"
+                                                    variant="outlined"
+                                                    color="info"
+                                                    startIcon={<SwapHorizIcon />}
+                                                    onClick={() => handleOpenTransferModal(item)}
+                                                    sx={{ borderRadius: 2, whiteSpace: "nowrap", fontSize: "0.75rem", px: 1 }}
+                                                >
+                                                    Đổi Giường
+                                                </Button>
+                                            )}
                                             <Button
                                                 size="small"
                                                 variant="outlined"
@@ -1624,20 +1624,23 @@ export default function InpatientPage() {
                                             >
                                                 Thẻ Giường
                                             </Button>
-                                            <Button
-                                                size="small"
-                                                variant="contained"
-                                                color="error"
-                                                startIcon={<ExitToAppIcon />}
-                                                onClick={() => handleOpenDischargeModal(item)}
-                                                sx={{ borderRadius: 2, whiteSpace: "nowrap", fontSize: "0.75rem", px: 1 }}
-                                            >
-                                                Xuất Viện
-                                            </Button>
+                                            {!isNurse && (
+                                                <Button
+                                                    size="small"
+                                                    variant="contained"
+                                                    color="error"
+                                                    startIcon={<ExitToAppIcon />}
+                                                    onClick={() => handleOpenDischargeModal(item)}
+                                                    sx={{ borderRadius: 2, whiteSpace: "nowrap", fontSize: "0.75rem", px: 1 }}
+                                                >
+                                                    Xuất Viện
+                                                </Button>
+                                            )}
                                         </Stack>
                                     </TableCell>
                                 </TableRow>
-                            ))}
+                            ))
+                            )}
                         </TableBody>
                     </Table>
                 </TableContainer>
@@ -2197,30 +2200,31 @@ export default function InpatientPage() {
                                 <Typography variant="body2">Tổng viện phí ngày giường: <b style={{ color: "#16a34a", fontSize: "1.1rem" }}>{formatCurrency(dischargeResult.totalInpatientCost)}</b></Typography>
                                 <Typography variant="body2">Ngày xuất viện: <b>{formatDateTime(dischargeResult.dischargeDate)}</b></Typography>
                             </Paper>
+                            <Alert severity="info" sx={{ mt: 1.5, mb: 2, textAlign: "left", borderRadius: 2 }}>
+                                <strong>Lưu ý quyết toán viện phí:</strong> Hồ sơ xuất viện lâm sàng đã được ký duyệt. Giường bệnh đã chuyển sang chế độ chờ vệ sinh khử khuẩn. Người bệnh/thân nhân vui lòng tới <strong>Quầy Thu Ngân</strong> để quyết toán viện phí và nhận biên lai tài chính chính thức.
+                            </Alert>
                             <Button
                                 variant="contained"
+                                color="success"
                                 startIcon={<PrintIcon />}
-                                onClick={() => printReceipt({
-                                    receiptCode: `RV-${dischargeResult.admissionId ? String(dischargeResult.admissionId).slice(0, 8) : '2026'}`,
-                                    patientName: selectedAdmission?.patientProfile?.fullName || "Bệnh nhân nội trú",
-                                    phoneNumber: selectedAdmission?.patientProfile?.phoneNumber || "---",
+                                onClick={() => printTreatmentSheet({
+                                    hospitalName: "BỆNH VIỆN ĐA KHOA QUỐC TẾ TNT",
                                     departmentName: selectedAdmission?.room?.department?.departmentName || "Khoa Điều Trị Nội Trú",
+                                    roomName: selectedAdmission?.room?.roomName || "---",
+                                    bedNumber: selectedAdmission?.bed?.bedNumber || "---",
+                                    patientName: selectedAdmission?.patientProfile?.fullName || "Bệnh nhân nội trú",
+                                    patientAge: selectedAdmission?.patientProfile?.dateOfBirth ? (new Date().getFullYear() - new Date(selectedAdmission.patientProfile.dateOfBirth).getFullYear()) : "---",
+                                    patientGender: selectedAdmission?.patientProfile?.gender === "MALE" ? "Nam" : "Nữ",
+                                    diagnosis: selectedAdmission?.initialDiagnosis || "Điều trị nội trú",
+                                    dischargeSummary: dischargeData.dischargeSummary,
+                                    doctorRecommendation: dischargeData.doctorRecommendation,
+                                    reExamDate: dischargeData.reExaminationDate,
                                     doctorName: selectedAdmission?.treatingDoctor?.fullName || "Bác sĩ điều trị",
-                                    items: [
-                                        {
-                                            name: `Viện phí ngày giường điều trị (${dischargeResult.totalDays} ngày)`,
-                                            qty: dischargeResult.totalDays,
-                                            price: (dischargeResult.totalInpatientCost || 0) / (dischargeResult.totalDays || 1)
-                                        }
-                                    ],
-                                    totalAmount: dischargeResult.totalInpatientCost,
-                                    paymentMethod: "CASH",
-                                    paidAt: dischargeResult.dischargeDate,
-                                    cashierName: "Khoa Nội Trú - Bệnh Viện TNT"
+                                    dischargeDate: dischargeResult.dischargeDate
                                 })}
-                                sx={{ mt: 1, fontWeight: "bold" }}
+                                sx={{ mt: 1, fontWeight: "bold", textTransform: "none" }}
                             >
-                                In Giấy Ra Viện & Bảng Kê Viện Phí
+                                In Giấy Ra Viện (TT 56/2017/TT-BYT)
                             </Button>
                         </Box>
                     ) : (
@@ -2369,6 +2373,208 @@ export default function InpatientPage() {
                     <Button variant="contained" color="success" onClick={handleSaveAdmit} disabled={submittingAdmit} sx={{ bgcolor: "#16a34a", "&:hover": { bgcolor: "#15803d" }, fontWeight: "bold" }}>
                         {submittingAdmit ? "Đang tiếp nhận..." : "Xác Nhận Tiếp Nhận"}
                     </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* ======================================================= */}
+            {/* MODAL: PHIẾU CHĂM SÓC ĐIỀU DƯỠNG (NURSING CARE SHEET)  */}
+            {/* ======================================================= */}
+            <Dialog
+                open={openNursingCareModal}
+                onClose={() => setOpenNursingCareModal(false)}
+                maxWidth="md"
+                fullWidth
+                PaperProps={{ sx: { borderRadius: 3.5, overflow: "hidden" } }}
+            >
+                <DialogTitle sx={{ fontWeight: "bold", bgcolor: "#0D9488", color: "#FFFFFF", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <Box display="flex" alignItems="center" gap={1}>
+                        <VolunteerActivismIcon />
+                        <span>Phiếu Chăm Sóc Điều Dưỡng (Nursing Care)</span>
+                    </Box>
+                    {selectedAdmission && (
+                        <Chip
+                            label={`Hồ sơ: ${selectedAdmission.admissionCode || ""}`}
+                            sx={{ bgcolor: "rgba(255,255,255,0.2)", color: "#FFFFFF", fontWeight: "bold" }}
+                            size="small"
+                        />
+                    )}
+                </DialogTitle>
+                <DialogContent dividers sx={{ maxHeight: "75vh", overflowY: "auto", p: 2.5 }}>
+                    {selectedAdmission && (
+                        <Box sx={{ mb: 2.5, p: 2, bgcolor: "#F0FDFA", border: "1px solid #99F6E4", borderRadius: 2.5 }}>
+                            <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
+                                <Typography variant="subtitle1" fontWeight="900" color="#0F766E">
+                                    {selectedAdmission.patientProfile?.fullName}
+                                </Typography>
+                                <Typography variant="body2" color="#0F766E">
+                                    Phòng: <b>{selectedAdmission.room?.roomNumber || "---"}</b> • Giường: <b>{selectedAdmission.bedNumber || "01"}</b> • Khoa: <b>{selectedAdmission.room?.department?.departmentName || "Nội trú"}</b>
+                                </Typography>
+                            </Box>
+                            <Typography variant="caption" color="#475569" display="block" mt={0.5}>
+                                Bác sĩ điều trị: <b>{selectedAdmission.treatingDoctor?.fullName || "BS. Trực khoa"}</b> • Chẩn đoán: <i>{selectedAdmission.initialDiagnosis || "Chưa có"}</i>
+                            </Typography>
+                        </Box>
+                    )}
+
+                    {/* Form Ghi nhận chăm sóc mới */}
+                    <Paper elevation={0} sx={{ p: 2, mb: 3, border: "1px solid #E2E8F0", borderRadius: 2.5, bgcolor: "#FAFAFA" }}>
+                        <Typography variant="subtitle2" fontWeight="bold" color="#0F172A" mb={1.5} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                            <MonitorHeartIcon fontSize="small" sx={{ color: "#0D9488" }} />
+                            Ghi Phiếu Chăm Sóc / Theo Dõi Ca Trực:
+                        </Typography>
+                        <Grid container spacing={2}>
+                            <Grid item xs={6} sm={2.4}>
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    label="Nhiệt độ (°C)"
+                                    value={nursingCareForm.temperature}
+                                    onChange={(e) => setNursingCareForm({ ...nursingCareForm, temperature: e.target.value })}
+                                />
+                            </Grid>
+                            <Grid item xs={6} sm={2.4}>
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    label="Huyết áp"
+                                    placeholder="120/80"
+                                    value={nursingCareForm.bloodPressure}
+                                    onChange={(e) => setNursingCareForm({ ...nursingCareForm, bloodPressure: e.target.value })}
+                                />
+                            </Grid>
+                            <Grid item xs={6} sm={2.4}>
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    label="Mạch (lần/phút)"
+                                    value={nursingCareForm.pulse}
+                                    onChange={(e) => setNursingCareForm({ ...nursingCareForm, pulse: e.target.value })}
+                                />
+                            </Grid>
+                            <Grid item xs={6} sm={2.4}>
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    label="Nhịp thở (lần/p)"
+                                    value={nursingCareForm.respiratoryRate}
+                                    onChange={(e) => setNursingCareForm({ ...nursingCareForm, respiratoryRate: e.target.value })}
+                                />
+                            </Grid>
+                            <Grid item xs={6} sm={2.4}>
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    label="SpO2 (%)"
+                                    value={nursingCareForm.spo2}
+                                    onChange={(e) => setNursingCareForm({ ...nursingCareForm, spo2: e.target.value })}
+                                />
+                            </Grid>
+
+                            <Grid item xs={12} sm={4}>
+                                <TextField
+                                    select
+                                    fullWidth
+                                    size="small"
+                                    label="Cấp độ chăm sóc"
+                                    value={nursingCareForm.careLevel}
+                                    onChange={(e) => setNursingCareForm({ ...nursingCareForm, careLevel: e.target.value })}
+                                >
+                                    <MenuItem value="LEVEL_1">Cấp I - Chăm sóc toàn diện</MenuItem>
+                                    <MenuItem value="LEVEL_2">Cấp II - Chăm sóc một phần</MenuItem>
+                                    <MenuItem value="LEVEL_3">Cấp III - Tự chăm sóc</MenuItem>
+                                </TextField>
+                            </Grid>
+
+                            <Grid item xs={12} sm={8}>
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    label="Thực hiện y lệnh thuốc & Dịch truyền"
+                                    placeholder="Đã tiêm / cho uống thuốc theo y lệnh..."
+                                    value={nursingCareForm.medicationAdministered}
+                                    onChange={(e) => setNursingCareForm({ ...nursingCareForm, medicationAdministered: e.target.value })}
+                                />
+                            </Grid>
+
+                            <Grid item xs={12}>
+                                <TextField
+                                    fullWidth
+                                    required
+                                    multiline
+                                    rows={2}
+                                    size="small"
+                                    label="Diễn biến lâm sàng / Ghi chú điều dưỡng *"
+                                    placeholder="Tình trạng người bệnh, ăn uống, ngủ nghỉ, triệu chứng bất thường, xử trí điều dưỡng..."
+                                    value={nursingCareForm.nursingNote}
+                                    onChange={(e) => setNursingCareForm({ ...nursingCareForm, nursingNote: e.target.value })}
+                                />
+                            </Grid>
+
+                            <Grid item xs={12} textAlign="right">
+                                <Button
+                                    variant="contained"
+                                    onClick={handleSaveNursingCare}
+                                    disabled={submittingNursingCare}
+                                    sx={{ bgcolor: "#0D9488", "&:hover": { bgcolor: "#0F766E" }, fontWeight: "bold", borderRadius: 2, px: 3 }}
+                                >
+                                    {submittingNursingCare ? "Đang lưu..." : "Lưu Phiếu Chăm Sóc"}
+                                </Button>
+                            </Grid>
+                        </Grid>
+                    </Paper>
+
+                    {/* Danh sách các lần chăm sóc trước */}
+                    <Typography variant="subtitle2" fontWeight="bold" color="#475569" mb={1}>
+                        Lịch Sử Phiếu Chăm Sóc Trước Đó ({nursingCareList.length}):
+                    </Typography>
+                    {loadingNursingCare ? (
+                        <Box textAlign="center" py={3}><CircularProgress size={24} /></Box>
+                    ) : nursingCareList.length === 0 ? (
+                        <Box textAlign="center" py={3} color="#94A3B8" bgcolor="#F8FAFC" borderRadius={2}>
+                            <Typography variant="body2">Chưa có phiếu chăm sóc nào được ghi nhận cho đợt điều trị này.</Typography>
+                        </Box>
+                    ) : (
+                        <Stack spacing={1.5}>
+                            {nursingCareList.map((care, idx) => (
+                                <Card key={care.careId || idx} elevation={0} sx={{ p: 2, border: "1px solid #E2E8F0", borderRadius: 2 }}>
+                                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                                        <Box display="flex" alignItems="center" gap={1}>
+                                            <Typography variant="body2" fontWeight="800" color="#0F172A">
+                                                {care.nurseName || "Điều dưỡng ca trực"}
+                                            </Typography>
+                                            <Chip
+                                                label={care.careLevel === "LEVEL_1" ? "Cấp I" : care.careLevel === "LEVEL_2" ? "Cấp II" : "Cấp III"}
+                                                size="small"
+                                                color={care.careLevel === "LEVEL_1" ? "error" : care.careLevel === "LEVEL_2" ? "warning" : "info"}
+                                                sx={{ height: 20, fontSize: "0.68rem", fontWeight: "bold" }}
+                                            />
+                                        </Box>
+                                        <Typography variant="caption" color="#64748B">
+                                            {care.careTime ? formatDateTime(care.careTime) : "Vừa xong"}
+                                        </Typography>
+                                    </Box>
+                                    <Box display="flex" gap={2} mb={1} flexWrap="wrap">
+                                        <Typography variant="caption" color="#475569">Nhiệt độ: <b>{care.temperature ? `${care.temperature}°C` : "---"}</b></Typography>
+                                        <Typography variant="caption" color="#475569">Huyết áp: <b>{care.bloodPressure || "---"}</b></Typography>
+                                        <Typography variant="caption" color="#475569">Mạch: <b>{care.pulse ? `${care.pulse} bpm` : "---"}</b></Typography>
+                                        <Typography variant="caption" color="#475569">Nhịp thở: <b>{care.respiratoryRate ? `${care.respiratoryRate} l/p` : "---"}</b></Typography>
+                                        <Typography variant="caption" color="#475569">SpO2: <b>{care.spo2 ? `${care.spo2}%` : "---"}</b></Typography>
+                                    </Box>
+                                    <Typography variant="body2" color="#1E293B" sx={{ bgcolor: "#F8FAFC", p: 1, borderRadius: 1.5, mb: care.medicationAdministered ? 1 : 0 }}>
+                                        {care.nursingNote}
+                                    </Typography>
+                                    {care.medicationAdministered && (
+                                        <Typography variant="caption" color="#0F766E" fontWeight="600" display="block">
+                                            💊 Thực hiện thuốc: {care.medicationAdministered}
+                                        </Typography>
+                                    )}
+                                </Card>
+                            ))}
+                        </Stack>
+                    )}
+                </DialogContent>
+                <DialogActions sx={{ p: 2 }}>
+                    <Button onClick={() => setOpenNursingCareModal(false)} sx={{ fontWeight: "bold" }}>Đóng</Button>
                 </DialogActions>
             </Dialog>
         </Container>

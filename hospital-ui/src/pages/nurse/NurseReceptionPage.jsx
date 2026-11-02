@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
     Container,
     Paper,
@@ -27,8 +27,9 @@ import {
     CardContent,
     Divider,
     CircularProgress,
-    Badge,
-    Stack
+    Stack,
+    Tabs,
+    Tab
 } from "@mui/material";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import HowToRegIcon from "@mui/icons-material/HowToReg";
@@ -59,116 +60,100 @@ import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import PaymentIcon from "@mui/icons-material/Payment";
 import TvIcon from "@mui/icons-material/Tv";
 import DevicesIcon from "@mui/icons-material/Devices";
+import CampaignIcon from "@mui/icons-material/Campaign";
+import VolumeUpIcon from "@mui/icons-material/VolumeUp";
+import PointOfSaleIcon from "@mui/icons-material/PointOfSale";
+import StarsIcon from "@mui/icons-material/Stars";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import CloseIcon from "@mui/icons-material/Close";
 
 import axiosInstance from "../../services/AxiosInstance";
 import { formatDateTime, formatDate, formatCurrency } from "../../utils/formatters";
 import { printThermalTicket, printReceipt } from "../../utils/printHelper";
 import { BarcodeView } from "../../utils/barcodeGenerator";
+import { speakCashierCall, playChime } from "../../services/voiceService";
 import CounterManagementPanel from "../../components/nurse/CounterManagementPanel";
 
-// Cấu trúc buồng khám cố định theo từng Khoa chuyên môn phục vụ điều phối buồng khám thông minh
-const DEPARTMENT_ROOMS = {
-    "1": [
-        { roomId: "101", roomName: "Phòng 101", doctorName: "BS.CKII Nguyễn Văn Hoàng", floor: "Tầng 1" },
-        { roomId: "102", roomName: "Phòng 102", doctorName: "BS. Mai Thị Lan", floor: "Tầng 1" },
-        { roomId: "103", roomName: "Phòng 103", doctorName: "ThS.BS Lê Hồng Sơn", floor: "Tầng 1" },
-        { roomId: "104", roomName: "Phòng 104", doctorName: "BS. Trần Văn Minh", floor: "Tầng 1" }
-    ],
-    "2": [
-        { roomId: "201", roomName: "Phòng 201", doctorName: "TS.BS Vũ Đình Tuấn", floor: "Tầng 2" },
-        { roomId: "202", roomName: "Phòng 202", doctorName: "BS. Đỗ Thị Hương", floor: "Tầng 2" }
-    ],
-    "3": [
-        { roomId: "301", roomName: "Phòng 301", doctorName: "BS.CKI Phạm Quỳnh Chi", floor: "Tầng 3" },
-        { roomId: "302", roomName: "Phòng 302", doctorName: "ThS.BS Đặng Hoàng Nam", floor: "Tầng 3" }
-    ],
-    "4": [
-        { roomId: "401", roomName: "Phòng 401", doctorName: "BS. Bùi Thùy Dung", floor: "Tầng 4" },
-        { roomId: "402", roomName: "Phòng 402", doctorName: "BS. Nguyễn Đức Thịnh", floor: "Tầng 4" }
-    ],
-    "5": [
-        { roomId: "501", roomName: "Phòng 501", doctorName: "PGS.TS Lê Văn Thắng", floor: "Tầng 5" },
-        { roomId: "502", roomName: "Phòng 502", doctorName: "BS. Trần Thu Trang", floor: "Tầng 5" }
-    ]
-};
-
-// Dữ liệu mẫu bệnh nhân cũ (Fallback dự phòng khi DB chưa có lịch sử khám để demo mượt mà)
-const MOCK_RETURNING_PATIENTS = [
-    {
-        patientProfileId: "mock-p1",
-        fullName: "NGUYỄN VĂN HẢI",
-        phoneNumber: "0987654321",
-        identityNumber: "001090012345",
-        healthInsuranceNumber: "DN4010123456789",
-        gender: "MALE",
-        dateOfBirth: "1988-06-15",
-        streetAddress: "Số 45 Đường Giải Phóng",
-        province: "Hà Nội",
-        district: "Thanh Xuân",
-        ward: "Phương Liệt",
-        lastVisitDate: "15/09/2026 09:30",
-        lastDepartmentName: "Khoa Nội Tổng Quát",
-        lastDoctorName: "BS.CKII Nguyễn Văn Hoàng",
-        lastDiagnosis: "Viêm loét dạ dày - tá tràng / Trào ngược dạ dày thực quản (K21.0)",
-        totalVisits: 3
-    },
-    {
-        patientProfileId: "mock-p2",
-        fullName: "TRẦN THỊ MAI",
-        phoneNumber: "0912345678",
-        identityNumber: "036195009876",
-        healthInsuranceNumber: "GD4010198765432",
-        gender: "FEMALE",
-        dateOfBirth: "1975-11-20",
-        streetAddress: "128 Nguyễn Trãi",
-        province: "Hà Nội",
-        district: "Thanh Xuân",
-        ward: "Thượng Đình",
-        lastVisitDate: "28/08/2026 14:15",
-        lastDepartmentName: "Khoa Tim Mạch",
-        lastDoctorName: "PGS.TS Lê Văn Thắng",
-        lastDiagnosis: "Tăng huyết áp vô căn độ II / Rối loạn lipid máu hỗn hợp (I10)",
-        totalVisits: 5
-    },
-    {
-        patientProfileId: "mock-p3",
-        fullName: "LÊ HOÀNG NAM",
-        phoneNumber: "0905123987",
-        identityNumber: "079088001122",
-        healthInsuranceNumber: "HS4010155667788",
-        gender: "MALE",
-        dateOfBirth: "2002-03-10",
-        streetAddress: "Số 15 Phố Huế",
-        province: "Hà Nội",
-        district: "Hai Bà Trưng",
-        ward: "Hàng Bài",
-        lastVisitDate: "10/09/2026 10:45",
-        lastDepartmentName: "Khoa Tai Mũi Họng",
-        lastDoctorName: "BS. Bùi Thùy Dung",
-        lastDiagnosis: "Viêm xoang hàm mạn tính / Viêm mũi họng cấp (J32.0)",
-        totalVisits: 2
-    }
-];
-
 export default function NurseReceptionPage() {
+    // 1. Quản lý trạng thái cốt lõi & Hàng đợi
     const [queueList, setQueueList] = useState([]);
     const [departments, setDepartments] = useState([]);
     const [allRooms, setAllRooms] = useState([]);
     const [selectedDepartment, setSelectedDepartment] = useState("ALL");
     const [searchKeyword, setSearchKeyword] = useState("");
     const [feedback, setFeedback] = useState({ type: "", message: "" });
+    const [counterRefreshKey, setCounterRefreshKey] = useState(0);
 
-    // === MỤC 4: TRA CỨU HỒ SƠ BỆNH NHÂN CŨ (TÁI KHÁM) ===
+    // 2. Chuyển đổi Tab chức năng chính để ĐƠN GIẢN HÓA GIAO DIỆN
+    // Tab 0: Quầy Dịch Vụ & Thu Viện Phí PayOS (Mặc định)
+    // Tab 1: Danh Sách Bệnh Nhân Tiếp Đón & Phân Luồng
+    // Tab 2: Giám Sát Tải Buồng Khám (Smart Load Balancing)
+    const [activeMainTab, setActiveMainTab] = useState(0);
+
+    // Bệnh nhân được kích hoạt gọi nộp tiền từ bảng tiếp đón
+    const [patientToCall, setPatientToCall] = useState(null);
+
+    // 3. Modal Tra cứu hồ sơ bệnh nhân cũ (Tái khám)
+    const [openLookupModal, setOpenLookupModal] = useState(false);
     const [patientLookupQuery, setPatientLookupQuery] = useState("");
     const [lookupLoading, setLookupLoading] = useState(false);
     const [foundPatient, setFoundPatient] = useState(null);
+    const [candidateProfiles, setCandidateProfiles] = useState([]);
     const [lookupSearched, setLookupSearched] = useState(false);
 
-    // === MỤC 5: ĐIỀU PHỐI BUỒNG KHÁM THÔNG MINH (SMART LOAD BALANCING) ===
-    const [selectedRoomName, setSelectedRoomName] = useState("");
-    const [assignedDoctorName, setAssignedDoctorName] = useState("");
+    // 4. Modal Tạo hồ sơ mới & Tiếp nhận cấp STT
+    const [openCreateProfileModal, setOpenCreateProfileModal] = useState(false);
+    const walkInKeyRef = useRef(null);
+    const getWalkInKey = () => {
+        if (!walkInKeyRef.current) {
+            walkInKeyRef.current = "WALKIN-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+        }
+        return walkInKeyRef.current;
+    };
+    const [newProfile, setNewProfile] = useState({
+        fullName: "",
+        phoneNumber: "",
+        identityCard: "",
+        dateOfBirth: "",
+        gender: "MALE",
+        address: "",
+        departmentId: "",
+        roomName: "",
+        doctorName: "",
+        symptoms: "",
+        bloodPressure: "",
+        heartRate: "",
+        temperature: "",
+        spO2: "",
+        height: "",
+        weight: "",
+        allergies: "",
+        medicalHistory: ""
+    });
 
-    // Helper tính toán thể trạng BMI chuẩn WHO WPRO cho người Châu Á
+    // 5. Modal Check-in QR 5 giây
+    const [openQrCheckInDialog, setOpenQrCheckInDialog] = useState(false);
+    const [qrFormData, setQrFormData] = useState({
+        qrData: "",
+        height: "",
+        weight: "",
+        bloodPressure: "",
+        temperature: "",
+        heartRate: "",
+        spo2: "",
+        nurseNotes: ""
+    });
+    const [qrSubmitting, setQrSubmitting] = useState(false);
+
+    // 6. Modal In phiếu nhiệt & Xem chi tiết
+    const [printTicket, setPrintTicket] = useState(null);
+    const [selectedBookingDetail, setSelectedBookingDetail] = useState(null);
+
+    // Modal Xem trước biên lai A5
+    const [openReceiptPreviewDialog, setOpenReceiptPreviewDialog] = useState(false);
+    const [recentReceipt, setRecentReceipt] = useState(null);
+
+    // Helper tính BMI chuẩn WHO WPRO
     const calculateNurseBMI = (weightKg, heightCm) => {
         const w = parseFloat(weightKg);
         const h = parseFloat(heightCm) / 100;
@@ -189,199 +174,76 @@ export default function NurseReceptionPage() {
         return { bmi: bmiVal, classification, color };
     };
 
-    // Modal Tạo hồ sơ & Tiếp nhận
-    const [openCreateProfileModal, setOpenCreateProfileModal] = useState(false);
-    const [newProfile, setNewProfile] = useState({
-        fullName: "",
-        phoneNumber: "",
-        identityCard: "",
-        dateOfBirth: "1990-01-01",
-        gender: "MALE",
-        address: "",
-        departmentId: "1",
-        roomName: "",
-        doctorName: "",
-        symptoms: "",
-        bloodPressure: "120/80",
-        heartRate: "76",
-        temperature: "36.8",
-        spO2: "98",
-        height: "168",
-        weight: "62",
-        allergies: "",
-        medicalHistory: ""
-    });
-
-    // In phiếu số thứ tự
-    const [printTicket, setPrintTicket] = useState(null);
-
-    // === GIAI ĐOẠN 3: CHECK-IN QR TIẾP ĐÓN 5 GIÂY & THU VIỆN PHÍ TẠI QUẦY (A5) ===
-    const [openQrCheckInDialog, setOpenQrCheckInDialog] = useState(false);
-    const [qrFormData, setQrFormData] = useState({
-        qrData: "",
-        height: "168",
-        weight: "62",
-        bloodPressure: "120/80",
-        temperature: "36.8",
-        heartRate: "76",
-        spo2: "98",
-        nurseNotes: ""
-    });
-    const [qrLoading, setQrLoading] = useState(false);
-
-    const [openPayDialog, setOpenPayDialog] = useState(false);
-    const [payFormData, setPayFormData] = useState({
-        bookingId: "",
-        bookingCode: "",
-        patientName: "",
-        amount: 200000,
-        paymentMethod: "CASH",
-        cashierNotes: ""
-    });
-    const [payLoading, setPayLoading] = useState(false);
-    const [recentReceipt, setRecentReceipt] = useState(null);
-    const [openReceiptPreviewDialog, setOpenReceiptPreviewDialog] = useState(false);
-
-    // Xử lý gửi Check-in QR
-    const handleQrCheckInSubmit = async (e) => {
-        if (e) e.preventDefault();
-        if (!qrFormData.qrData || !qrFormData.qrData.trim()) {
-            setFeedback({ type: "error", message: "Vui lòng nhập hoặc quét mã QR đặt khám!" });
-            return;
-        }
-
-        setQrLoading(true);
-        try {
-            const payload = {
-                qrData: qrFormData.qrData.trim(),
-                height: Number(qrFormData.height) || 168,
-                weight: Number(qrFormData.weight) || 62,
-                bloodPressure: qrFormData.bloodPressure || "120/80",
-                temperature: Number(qrFormData.temperature) || 36.8,
-                heartRate: Number(qrFormData.heartRate) || 76,
-                spo2: Number(qrFormData.spo2) || 98,
-                nurseNotes: qrFormData.nurseNotes || "Tiếp nhận check-in QR tại quầy"
-            };
-
-            const res = await axiosInstance.post("/api/nurse/check-in/qr", payload);
-            const data = res?.data?.data || res?.data;
-
-            setFeedback({
-                type: "success",
-                message: `✅ Tiếp đón thành công bệnh nhân [${data.patientName}] - STT: #${data.queueNumber} vào ${data.roomName}!`
-            });
-
-            // Mở phiếu in nhiệt K80
-            setPrintTicket({
-                bookingId: data.bookingCode,
-                queueNumber: data.queueNumber,
-                patientName: data.patientName,
-                departmentName: data.departmentName,
-                roomName: data.roomName,
-                doctorName: data.doctorName,
-                vitals: {
-                    bloodPressure: payload.bloodPressure,
-                    heartRate: payload.heartRate,
-                    temperature: payload.temperature,
-                    spO2: payload.spo2,
-                    weight: payload.weight,
-                    height: payload.height,
-                    allergies: "Đang cập nhật"
-                }
-            });
-
-            setOpenQrCheckInDialog(false);
-            setQrFormData({
-                qrData: "",
-                height: "168",
-                weight: "62",
-                bloodPressure: "120/80",
-                temperature: "36.8",
-                heartRate: "76",
-                spo2: "98",
-                nurseNotes: ""
-            });
-
-            fetchQueueOnly();
-        } catch (err) {
-            console.error("Lỗi check-in QR:", err);
-            const msg = err.response?.data?.message || err.message || "Không thể check-in với mã QR này";
-            setFeedback({ type: "error", message: msg });
-        } finally {
-            setQrLoading(false);
+    // Helper hiển thị nguồn tiếp nhận (Đặt lịch, Kiosk, Vãng lai)
+    const renderReceptionSourceBadge = (source) => {
+        switch (source) {
+            case "ONLINE_APPOINTMENT":
+                return (
+                    <Chip
+                        label="Đặt lịch hẹn"
+                        size="small"
+                        sx={{ height: 20, fontSize: "0.68rem", fontWeight: 700, bgcolor: "#EEF2FF", color: "#4338CA", border: "1px solid #C7D2FE" }}
+                    />
+                );
+            case "KIOSK_TICKET":
+                return (
+                    <Chip
+                        label="Lấy số Ki-ốt"
+                        size="small"
+                        sx={{ height: 20, fontSize: "0.68rem", fontWeight: 700, bgcolor: "#ECFDF5", color: "#047857", border: "1px solid #A7F3D0" }}
+                    />
+                );
+            case "COUNTER_WALKIN":
+                return (
+                    <Chip
+                        label="Vãng lai tại quầy"
+                        size="small"
+                        sx={{ height: 20, fontSize: "0.68rem", fontWeight: 700, bgcolor: "#FFFBEB", color: "#B45309", border: "1px solid #FDE68A" }}
+                    />
+                );
+            default:
+                return null;
         }
     };
 
-    // Xử lý gửi Thu viện phí tại quầy
-    const handlePayAtClinicSubmit = async (e) => {
-        if (e) e.preventDefault();
-        if (!payFormData.bookingId) {
-            setFeedback({ type: "error", message: "Vui lòng chọn lượt khám cần thu viện phí!" });
-            return;
-        }
-
-        setPayLoading(true);
-        try {
-            const payload = {
-                bookingId: payFormData.bookingId,
-                amount: Number(payFormData.amount) || 200000,
-                paymentMethod: payFormData.paymentMethod || "CASH",
-                cashierNotes: payFormData.cashierNotes || "Thu viện phí tại quầy tiếp đón"
-            };
-
-            const res = await axiosInstance.post("/api/nurse/reception/pay-at-clinic", payload);
-            const receipt = res?.data?.data || res?.data;
-
-            setFeedback({
-                type: "success",
-                message: `✅ Thu viện phí thành công: Biên lai #${receipt.receiptCode} (${formatCurrency(receipt.paidAmount)})!`
-            });
-
-            setRecentReceipt(receipt);
-            setOpenPayDialog(false);
-            setOpenReceiptPreviewDialog(true);
-            fetchQueueOnly();
-        } catch (err) {
-            console.error("Lỗi thu viện phí tại quầy:", err);
-            const msg = err.response?.data?.message || err.message || "Thu viện phí thất bại";
-            setFeedback({ type: "error", message: msg });
-        } finally {
-            setPayLoading(false);
-        }
-    };
-
+    // Tải dữ liệu ban đầu
     useEffect(() => {
         loadData();
-        const timer = setInterval(() => {
-            fetchQueueOnly();
-        }, 5000);
-        return () => clearInterval(timer);
+        const interval = setInterval(fetchQueueOnly, 8000);
+        return () => clearInterval(interval);
     }, []);
 
     const fetchQueueOnly = async () => {
         try {
             const queueRes = await axiosInstance.get("/api/nurse/reception/queue").catch(() => null);
-            if (queueRes && queueRes.data && Array.isArray(queueRes.data)) {
-                if (queueRes.data.length === 0) {
-                    setQueueList([]);
-                } else {
-                    const mapped = queueRes.data.map((item, idx) => ({
-                        bookingId: item.bookingId || `BK-${item.queueCode || idx + 1}`,
-                        queueNumber: item.queueNumber || (idx + 1),
-                        queueCode: item.queueCode || `#${item.queueNumber || idx + 1}`,
-                        patientName: item.patientName || "Bệnh nhân",
-                        phone: item.patientPhone || item.phone || "09xxxx",
-                        departmentName: item.departmentName || "Khoa khám",
-                        departmentId: item.departmentId,
-                        roomName: item.roomName || "Phòng 101",
-                        doctorName: item.doctorName || "BS. Phụ trách",
-                        status: item.status === "IN_PROGRESS" ? "EXAMINING" : item.status === "CONFIRMED" ? "WAITING" : item.status,
-                        checkedInAt: item.checkedInAt || null,
-                        checkInTime: item.checkedInAt?.slice(11, 16) || item.startTime || "08:00",
-                        symptoms: item.symptoms || "Khám theo chuyên khoa"
-                    }));
-                    setQueueList(mapped);
-                }
+            const rawList = Array.isArray(queueRes?.data?.data)
+                ? queueRes.data.data
+                : (Array.isArray(queueRes?.data) ? queueRes.data : []);
+            if (rawList) {
+                const mapped = rawList.map((item, idx) => ({
+                    bookingId: item.bookingId || `BK-${item.queueCode || idx + 1}`,
+                    bookingCode: item.bookingCode || item.bookingId || `BK-${item.queueCode || idx + 1}`,
+                    queueNumber: item.queueNumber || (idx + 1),
+                    queueCode: item.queueCode || `#${item.queueNumber || idx + 1}`,
+                    patientName: item.patientName || "Bệnh nhân",
+                    phone: item.patientPhone || item.phone || "09xxxx",
+                    departmentName: item.departmentName || "Khoa khám",
+                    departmentId: item.departmentId,
+                    roomName: item.roomName || "Phòng 101",
+                    roomId: item.roomId,
+                    doctorName: item.doctorName || "BS. Phụ trách",
+                    doctorId: item.doctorId,
+                    status: item.status === "IN_PROGRESS" ? "EXAMINING" : item.status === "CONFIRMED" ? "WAITING" : item.status,
+                    checkedInAt: item.checkedInAt || null,
+                    checkInTime: item.checkedInAt?.slice(11, 16) || item.startTime || "08:00",
+                    symptoms: item.symptoms || "Khám theo chuyên khoa",
+                    isPaid: Boolean(item.isPaid),
+                    price: item.price != null ? Number(item.price) : (item.examinationFee != null ? Number(item.examinationFee) : 0),
+                    isDispatched: Boolean(item.isDispatched),
+                    isPriority: Boolean(item.isPriority || (item.age && item.age >= 65)),
+                    priorityReason: item.priorityReason || (item.isPriority ? "Đối tượng ưu tiên" : "")
+                }));
+                setQueueList(mapped);
             }
         } catch (err) {
             console.error("Lỗi cập nhật hàng đợi:", err);
@@ -395,23 +257,11 @@ export default function NurseReceptionPage() {
                 axiosInstance.get("/api/departments/rooms/all").catch(() => ({ data: [] }))
             ]);
 
-            const deptData = deptRes.data?.data || deptRes.data || [];
-            if (Array.isArray(deptData) && deptData.length > 0) {
-                setDepartments(deptData);
-            } else {
-                setDepartments([
-                    { departmentId: "1", departmentName: "Khoa Nội Tổng Quát" },
-                    { departmentId: "2", departmentName: "Khoa Ngoại - Phẫu Thuật" },
-                    { departmentId: "3", departmentName: "Khoa Nhi" },
-                    { departmentId: "4", departmentName: "Khoa Tai Mũi Họng" },
-                    { departmentId: "5", departmentName: "Khoa Tim Mạch" },
-                ]);
-            }
+            const deptData = Array.isArray(deptRes.data?.data) ? deptRes.data.data : (Array.isArray(deptRes.data) ? deptRes.data : []);
+            setDepartments(deptData);
 
-            const roomData = roomRes.data?.data || roomRes.data || [];
-            if (Array.isArray(roomData) && roomData.length > 0) {
-                setAllRooms(roomData);
-            }
+            const roomData = Array.isArray(roomRes.data?.data) ? roomRes.data.data : (Array.isArray(roomRes.data) ? roomRes.data : []);
+            setAllRooms(roomData);
 
             await fetchQueueOnly();
         } catch (err) {
@@ -419,33 +269,35 @@ export default function NurseReceptionPage() {
         }
     };
 
-    // === TÍNH TOÁN SMART LOAD BALANCING (ĐIỀU PHỐI BUỒNG KHÁM THÔNG MINH) ===
-    // Thống kê tải thực tế của từng phòng theo DepartmentId
+    // Thống kê nhanh KPI
+    const kpiStats = useMemo(() => {
+        const unpaid = queueList.filter(q => !q.isPaid).length;
+        const waiting = queueList.filter(q => q.isPaid && q.status === "WAITING").length;
+        const examining = queueList.filter(q => q.status === "EXAMINING").length;
+        const completed = queueList.filter(q => q.status === "COMPLETED").length;
+        return { unpaid, waiting, examining, completed, total: queueList.length };
+    }, [queueList]);
+
+    // Thống kê tải thực tế của từng phòng theo DepartmentId (Smart Load Balancing)
     const getDepartmentRoomStats = (deptId) => {
-        const idStr = String(deptId || "1");
-        const deptRooms = allRooms.filter(r => String(r.departmentId) === idStr && r.isActive !== false);
-        const defaultRooms = deptRooms.length > 0 ? deptRooms.map(r => ({
+        const idStr = String(deptId || "");
+        const deptRooms = allRooms.filter(r => (!deptId || String(r.departmentId) === idStr) && r.isActive !== false);
+        const defaultRooms = deptRooms.map(r => ({
             roomId: String(r.roomId),
             roomName: r.roomName,
-            doctorName: "Bác sĩ phụ trách"
-        })) : (DEPARTMENT_ROOMS[idStr] || [
-            { roomId: "101", roomName: "Phòng 101", doctorName: "BS. Trực Buồng" },
-            { roomId: "102", roomName: "Phòng 102", doctorName: "BS. Khám 2" }
-        ]);
+            doctorName: r.doctorName || "BS. Phụ trách",
+            departmentName: r.departmentName || "Khoa Khám Bệnh"
+        }));
 
         return defaultRooms.map(room => {
-            const waitingCount = queueList.filter(q => 
+            const waitingCount = queueList.filter(q =>
                 (q.roomName === room.roomName || q.roomName.includes(room.roomId)) && q.status === "WAITING"
             ).length;
 
-            const examiningCount = queueList.filter(q => 
+            const examiningCount = queueList.filter(q =>
                 (q.roomName === room.roomName || q.roomName.includes(room.roomId)) && q.status === "EXAMINING"
             ).length;
 
-            // Đánh giá tải:
-            // 0 - 2 người: LIGHT 🟢
-            // 3 - 4 người: MEDIUM 🟡
-            // >= 5 người: HEAVY 🔴
             let loadLevel = "LIGHT";
             if (waitingCount >= 5) loadLevel = "HEAVY";
             else if (waitingCount >= 3) loadLevel = "MEDIUM";
@@ -454,200 +306,170 @@ export default function NurseReceptionPage() {
                 ...room,
                 waitingCount,
                 examiningCount,
+                totalActive: waitingCount + examiningCount,
                 loadLevel
             };
         });
     };
 
-    // Tìm phòng có số hàng đợi ít nhất (Smart shortest queue recommendation)
-    const getShortestQueueRoom = (deptId) => {
-        const stats = getDepartmentRoomStats(deptId);
+    const shortestRoomForSelectedDept = useMemo(() => {
+        const stats = getDepartmentRoomStats(selectedDepartment === "ALL" ? null : selectedDepartment);
         if (!stats || stats.length === 0) return null;
-        return [...stats].sort((a, b) => a.waitingCount - b.waitingCount)[0];
+        return stats.reduce((prev, curr) => (curr.totalActive < prev.totalActive ? curr : prev));
+    }, [allRooms, queueList, selectedDepartment]);
+
+    // Hàm gọi nộp tiền từ danh sách: Chuyển sang Tab 0 và kích hoạt gọi số tại quầy
+    const handleCallPatientToPay = (item) => {
+        if (!item) return;
+        const ticketCode = item.queueCode || `#${item.queueNumber || 1}`;
+        setPatientToCall({
+            ...item,
+            ticketCode,
+            _timestamp: Date.now()
+        });
+        setActiveMainTab(0); // Tự động chuyển ngay sang Tab Quầy tiếp đón
+        setFeedback({
+            type: "info",
+            message: `🔔 Đang phát loa gọi bệnh nhân [${item.patientName}] (${ticketCode}) vào Quầy tiếp đón để nộp viện phí!`
+        });
     };
 
-    // Khi chọn khoa trong Modal Tiếp Nhận, tự động gợi ý buồng khám có hàng đợi ngắn nhất
-    useEffect(() => {
-        if (openCreateProfileModal && newProfile.departmentId) {
-            const bestRoom = getShortestQueueRoom(newProfile.departmentId);
-            if (bestRoom) {
-                setNewProfile(prev => ({
-                    ...prev,
-                    roomName: prev.roomName || bestRoom.roomName,
-                    doctorName: prev.doctorName || bestRoom.doctorName
-                }));
-            }
-        }
-    }, [newProfile.departmentId, openCreateProfileModal]);
+    // Hàm thu tiền nhanh từ danh sách: Chuyển sang Tab 0 và mở modal PayOS VietQR
+    const handleDirectPayPatient = (item) => {
+        if (!item) return;
+        const ticketCode = item.queueCode || `#${item.queueNumber || 1}`;
+        setPatientToCall({
+            ...item,
+            ticketCode,
+            openPayNow: true,
+            _timestamp: Date.now()
+        });
+        setActiveMainTab(0); // Chuyển sang Tab Quầy
+    };
 
-    // === MỤC 4: HÀM TRA CỨU HỒ SƠ BỆNH NHÂN CŨ THEO SĐT / CCCD ===
-    const handleSearchOldPatient = async (overrideKeyword) => {
-        const query = (overrideKeyword || patientLookupQuery || "").trim();
-        if (!query) {
-            setFeedback({ type: "warning", message: "Vui lòng nhập Số điện thoại hoặc Số CCCD để tìm hồ sơ!" });
+    // Tra cứu bệnh nhân cũ theo SĐT / CCCD
+    const handleSearchOldPatient = async () => {
+        if (!patientLookupQuery.trim()) {
+            setFeedback({ type: "warning", message: "Vui lòng nhập SĐT hoặc Số CCCD/CMND để tra cứu!" });
             return;
         }
 
         setLookupLoading(true);
         setLookupSearched(true);
         setFoundPatient(null);
+        setCandidateProfiles([]);
 
         try {
-            // 1. Thử gọi API Backend tra cứu hồ sơ cũ
-            const res = await axiosInstance.get(`/api/patient-profiles/lookup?keyword=${encodeURIComponent(query)}`).catch(() => null);
-            const list = Array.isArray(res?.data) ? res.data : (Array.isArray(res?.data?.data) ? res.data.data : (Array.isArray(res) ? res : []));
-            
-            if (list.length > 0) {
-                const patientData = list[0];
-                setFoundPatient(patientData);
-                setFeedback({
-                    type: "success",
-                    message: `Đã tìm thấy hồ sơ bệnh nhân: [${patientData.fullName}] - SĐT: ${patientData.phoneNumber}!`
-                });
-            } else {
-                // 2. Fallback tìm trong MOCK_RETURNING_PATIENTS (đảm bảo trải nghiệm luôn tức thì)
-                const mockFound = MOCK_RETURNING_PATIENTS.find(p => 
-                    p.phoneNumber.includes(query) || p.identityNumber.includes(query) || p.fullName.toLowerCase().includes(query.toLowerCase())
-                );
+            const query = patientLookupQuery.trim();
+            const res = await axiosInstance.get(`/api/patient-profiles?search=${encodeURIComponent(query)}`);
+            const profiles = Array.isArray(res.data?.data) ? res.data.data : (Array.isArray(res.data) ? res.data : []);
 
-                if (mockFound) {
-                    setFoundPatient(mockFound);
-                    setFeedback({
-                        type: "success",
-                        message: `Đã tìm thấy hồ sơ bệnh nhân tái khám: [${mockFound.fullName}] (Lịch sử: ${mockFound.lastDepartmentName})!`
-                    });
-                } else {
-                    setFoundPatient(null);
-                    setFeedback({
-                        type: "info",
-                        message: `Không tìm thấy hồ sơ cũ với SĐT/CCCD "${query}". Bạn có thể tạo mới hồ sơ bệnh nhân.`
-                    });
-                }
+            let exactMatch = profiles.find(p =>
+                (p.phoneNumber && p.phoneNumber === query) ||
+                (p.identityCard && p.identityCard === query)
+            );
+
+            if (exactMatch) {
+                setFoundPatient(exactMatch);
+                setCandidateProfiles([exactMatch]);
+                setFeedback({ type: "success", message: `Đã tìm thấy hồ sơ chính xác: ${exactMatch.fullName}` });
+            } else if (profiles.length === 1) {
+                setFoundPatient(profiles[0]);
+                setCandidateProfiles(profiles);
+                setFeedback({ type: "success", message: `Đã tìm thấy 1 hồ sơ phù hợp: ${profiles[0].fullName}` });
+            } else if (profiles.length > 1) {
+                setCandidateProfiles(profiles);
+                setFeedback({ type: "info", message: `Tìm thấy ${profiles.length} hồ sơ khả dụng. Vui lòng đối chiếu và chọn hồ sơ bệnh nhân bên dưới.` });
+            } else {
+                setCandidateProfiles([]);
+                setFeedback({ type: "info", message: "Không tìm thấy hồ sơ cũ phù hợp. Điều dưỡng có thể bấm Tiếp Nhận Mới để đăng ký." });
             }
         } catch (err) {
-            console.error("Lỗi tra cứu bệnh nhân:", err);
-            // Thử mock fallback
-            const mockFound = MOCK_RETURNING_PATIENTS.find(p => 
-                p.phoneNumber.includes(query) || p.identityNumber.includes(query)
-            );
-            if (mockFound) {
-                setFoundPatient(mockFound);
-            } else {
-                setFeedback({ type: "warning", message: "Chưa tìm thấy hồ sơ cũ phù hợp trong cơ sở dữ liệu." });
-            }
+            console.error("Lỗi tra cứu:", err);
+            setFeedback({ type: "error", message: "Không thể kết nối đến máy chủ tra cứu hồ sơ." });
         } finally {
             setLookupLoading(false);
         }
     };
 
-    // Khi bấm "Tiếp nhận lượt khám mới (Hoàn tất 5s)" từ hồ sơ cũ
-    const handleQuickAdmitOldPatient = (patient) => {
-        if (!patient) return;
-
-        // Tìm khoa tương ứng (ưu tiên khoa khám trước đó hoặc Khoa Nội Tổng Quát)
-        const matchDept = departments.find(d => d.departmentName.toLowerCase().includes((patient.lastDepartmentName || "").toLowerCase())) || departments[0] || { departmentId: "1" };
-        const deptId = matchDept.departmentId || "1";
-
-        // Tìm buồng khám có hàng đợi ngắn nhất hiện tại để cân bằng tải
-        const bestRoom = getShortestQueueRoom(deptId);
-
-        setNewProfile({
-            fullName: patient.fullName || "",
-            phoneNumber: patient.phoneNumber || "",
-            identityCard: patient.identityNumber || "",
-            dateOfBirth: patient.dateOfBirth || "1990-01-01",
-            gender: patient.gender || "MALE",
-            address: patient.streetAddress ? `${patient.streetAddress}, ${patient.ward || ""}, ${patient.district || ""}, ${patient.province || ""}`.replace(/,\s*,/g, ',') : "",
-            departmentId: deptId,
-            roomName: bestRoom ? bestRoom.roomName : "Phòng 101",
-            doctorName: bestRoom ? bestRoom.doctorName : "BS. Phụ trách",
-            symptoms: `Tái khám: ${patient.lastDiagnosis ? patient.lastDiagnosis.slice(0, 45) + '...' : 'Khám theo dõi định kỳ'}`,
-            bloodPressure: "120/80",
-            heartRate: "76",
-            temperature: "36.8",
-            spO2: "98",
-            height: "168",
-            weight: "62",
-            allergies: patient.allergies || "",
-            medicalHistory: patient.lastDiagnosis || patient.medicalHistory || ""
-        });
-
+    // Điền thông tin bệnh nhân cũ vào form tiếp nhận mới
+    const handleUseFoundPatient = (patientToUse = null) => {
+        const target = patientToUse || foundPatient;
+        if (!target) return;
+        setNewProfile(prev => ({
+            ...prev,
+            fullName: target.fullName || "",
+            phoneNumber: target.phoneNumber || "",
+            identityCard: target.identityCard || "",
+            dateOfBirth: target.dateOfBirth ? target.dateOfBirth.slice(0, 10) : "",
+            gender: target.gender || "MALE",
+            address: target.address || "",
+            medicalHistory: target.medicalHistory || "",
+            allergies: target.allergies || ""
+        }));
+        setOpenLookupModal(false);
         setOpenCreateProfileModal(true);
         setFeedback({
             type: "info",
-            message: `Đã nạp sẵn hồ sơ bệnh nhân [${patient.fullName}]. Tự động gợi ý ${bestRoom ? bestRoom.roomName + ' (Hàng đợi ngắn nhất)' : 'Phòng khám'}!`
+            message: `Đã sao chép hồ sơ của bệnh nhân [${target.fullName}] vào phiếu tiếp nhận!`
         });
     };
 
-    // Tiếp nhận bệnh nhân & Cấp số thứ tự tại quầy
-    const handleCreateAndCheckIn = async (e) => {
+    // Tiếp nhận bệnh nhân mới (Bệnh nhân vãng lai) - Lưu DB thực qua API
+    const handleCreateProfileSubmit = async (e) => {
         if (e) e.preventDefault();
-        if (!newProfile.fullName || !newProfile.phoneNumber || !newProfile.departmentId) {
-            setFeedback({ type: "error", message: "Vui lòng điền đầy đủ họ tên, SĐT và chọn khoa khám!" });
+        if (!newProfile.fullName?.trim() || !newProfile.phoneNumber?.trim()) {
+            setFeedback({ type: "error", message: "Vui lòng nhập Họ tên và Số điện thoại bệnh nhân!" });
+            return;
+        }
+        if (!newProfile.departmentId) {
+            setFeedback({ type: "error", message: "Vui lòng chọn Khoa Khám Bệnh cho bệnh nhân!" });
             return;
         }
 
-        const selectedDept = departments.find(d => String(d.departmentId) === String(newProfile.departmentId)) || { departmentName: "Khoa Nội Tổng Quát" };
-        
-        // Buồng khám được chọn hoặc buồng khám ngắn nhất
-        const activeRoom = newProfile.roomName || (getShortestQueueRoom(newProfile.departmentId)?.roomName || "Phòng 101");
-        const activeDoctor = newProfile.doctorName || (getShortestQueueRoom(newProfile.departmentId)?.doctorName || "BS. Phụ trách");
-
         try {
-            // Chuẩn hóa dữ liệu sinh hiệu đo tại bàn sơ chẩn (Triage)
-            const vitalsData = {
-                bloodPressure: newProfile.bloodPressure?.trim() || "120/80",
-                heartRate: Number(newProfile.heartRate) || 76,
-                temperature: Number(newProfile.temperature) || 36.8,
-                spO2: Number(newProfile.spO2) || 98,
-                weight: Number(newProfile.weight) || 62,
-                height: Number(newProfile.height) || 168,
-                bloodType: "O+",
-                allergies: newProfile.allergies?.trim() || "Chưa ghi nhận dị ứng thuốc",
-                medicalHistory: newProfile.medicalHistory?.trim() || "Chưa ghi nhận tiền sử bệnh lý mạn tính",
-                recordedBy: "Điều dưỡng bàn sơ chẩn (Triage)",
-                recordedAt: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
-            };
-
-            const vitalsBrief = `[Sinh hiệu: HA ${vitalsData.bloodPressure}, Mạch ${vitalsData.heartRate} bpm, Nhiệt ${vitalsData.temperature}°C, SpO2 ${vitalsData.spO2}%, CC ${vitalsData.height}cm, CN ${vitalsData.weight}kg]`;
-            const fullSymptoms = `${newProfile.symptoms?.trim() ? newProfile.symptoms.trim() + ' | ' : ''}${vitalsBrief}${newProfile.allergies?.trim() ? ' | Dị ứng: ' + newProfile.allergies.trim() : ''}`;
-
             const payload = {
-                fullName: newProfile.fullName.trim(),
-                phoneNumber: newProfile.phoneNumber.trim(),
-                departmentId: newProfile.departmentId,
-                isPriority: false,
-                symptoms: fullSymptoms
+                fullName: newProfile.fullName?.trim(),
+                phoneNumber: newProfile.phoneNumber?.trim(),
+                identityNumber: newProfile.identityCard?.trim() || null,
+                gender: newProfile.gender || "MALE",
+                dateOfBirth: newProfile.dateOfBirth || null,
+                address: newProfile.address?.trim() || null,
+                departmentId: Number(newProfile.departmentId),
+                weight: newProfile.weight ? Number(newProfile.weight) : null,
+                height: newProfile.height ? Number(newProfile.height) : null,
+                bloodPressure: newProfile.bloodPressure?.trim() || null,
+                temperature: newProfile.temperature ? Number(newProfile.temperature) : null,
+                heartRate: newProfile.heartRate ? Number(newProfile.heartRate) : null,
+                spo2: newProfile.spO2 ? Number(newProfile.spO2) : null,
+                symptoms: newProfile.symptoms?.trim() || null,
+                allergies: newProfile.allergies?.trim() || null,
+                medicalHistory: newProfile.medicalHistory?.trim() || null,
+                idempotencyKey: getWalkInKey()
             };
 
-            // Gọi API máy chủ tiếp nhận lượt khám Kiosk/Quầy
-            const res = await axiosInstance.post("/api/bookings/kiosk", payload);
-            
-            const bookingData = res?.data || res;
-            if (!bookingData || (!bookingData.bookingId && !bookingData.bookingCode && !bookingData.queueNumber)) {
-                throw new Error("Máy chủ không trả về thông tin phiếu khám hợp lệ.");
-            }
-
-            const nextQueueNum = bookingData.queueNumber || (queueList.length + 1);
-            const queueCode = bookingData.queueCode || `#${nextQueueNum}`;
-            const newBookingId = bookingData.bookingId || bookingData.bookingCode;
-
-            // Dữ liệu sinh hiệu được gửi và lưu trữ bền vững tại backend thông qua trường symptoms của Booking.
-            // Loại bỏ hoàn toàn việc lưu dữ liệu sinh hiệu trong localStorage để đảm bảo an toàn thông tin y tế.
+            const res = await axiosInstance.post("/api/nurse/reception/walk-in", payload);
+            const data = res?.data?.data || res?.data;
+            walkInKeyRef.current = null; // Reset key sau khi lưu thành công
 
             const newEntry = {
-                bookingId: newBookingId,
-                queueNumber: nextQueueNum,
-                queueCode: queueCode,
-                patientName: newProfile.fullName,
-                phone: newProfile.phoneNumber,
-                departmentName: selectedDept.departmentName,
-                roomName: activeRoom,
-                doctorName: activeDoctor,
-                status: "WAITING",
-                checkInTime: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-                symptoms: fullSymptoms,
-                vitals: vitalsData
+                bookingId: data.bookingId,
+                bookingCode: data.bookingCode,
+                queueNumber: data.queueNumber,
+                queueCode: data.queueCode || `#${String(data.queueNumber).padStart(2, '0')}`,
+                patientName: data.patientName || newProfile.fullName,
+                phone: data.phone || newProfile.phoneNumber,
+                departmentName: data.departmentName || departments.find(d => String(d.departmentId) === String(newProfile.departmentId))?.departmentName || "Khoa Khám Bệnh",
+                departmentId: data.departmentId || newProfile.departmentId,
+                roomName: data.roomName || "Chờ phân phòng",
+                doctorName: data.doctorName || "BS. Phụ trách",
+                status: data.status || "WAITING",
+                isPaid: !!data.isPaid,
+                price: data.price != null ? Number(data.price) : (data.examinationFee != null ? Number(data.examinationFee) : 0),
+                checkInTime: data.checkInTime || new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+                symptoms: data.symptoms || newProfile.symptoms,
+                vitals: data.vitals || null,
+                receptionSource: data.receptionSource || "COUNTER_WALKIN"
             };
 
             setQueueList(prev => [newEntry, ...prev]);
@@ -655,41 +477,66 @@ export default function NurseReceptionPage() {
             setPrintTicket(newEntry);
             setFeedback({
                 type: "success",
-                message: `Tiếp nhận & Sơ chẩn thành công [${newProfile.fullName}] - STT: ${nextQueueNum} (${activeRoom})!`
+                message: `✅ Tiếp nhận & Cấp số thứ tự thành công cho [${newEntry.patientName}] - STT: ${newEntry.queueCode}!`
             });
-
-            // Reset form
-            setNewProfile({
-                fullName: "",
-                phoneNumber: "",
-                identityCard: "",
-                dateOfBirth: "1990-01-01",
-                gender: "MALE",
-                address: "",
-                departmentId: "1",
-                roomName: "",
-                doctorName: "",
-                symptoms: "",
-                bloodPressure: "120/80",
-                heartRate: "76",
-                temperature: "36.8",
-                spO2: "98",
-                height: "168",
-                weight: "62",
-                allergies: "",
-                medicalHistory: ""
-            });
-
-            // Đồng bộ lại hàng đợi từ máy chủ
-            setTimeout(fetchQueueOnly, 1000);
+            await fetchQueueOnly();
+            setCounterRefreshKey(k => k + 1);
         } catch (err) {
-            console.error("Lỗi tiếp nhận bệnh nhân:", err);
-            const errMsg = err?.message || err?.response?.data?.message || "Tiếp nhận bệnh nhân thất bại. Không thể kết nối hoặc máy chủ từ chối yêu cầu.";
-            setFeedback({ type: "error", message: errMsg });
+            console.error("Lỗi tạo hồ sơ:", err);
+            setFeedback({ type: "error", message: err.response?.data?.message || err.message || "Không thể tạo hồ sơ tiếp nhận" });
         }
     };
 
-    // Cập nhật số thứ tự & trạng thái hàng đợi
+    // Check-in QR 5 giây
+    const handleQrCheckInSubmit = async (e) => {
+        if (e) e.preventDefault();
+        if (!qrFormData.qrData.trim()) {
+            setFeedback({ type: "warning", message: "Vui lòng quét hoặc nhập mã QR check-in!" });
+            return;
+        }
+
+        setQrSubmitting(true);
+        try {
+            const payload = {
+                qrData: qrFormData.qrData.trim(),
+                height: qrFormData.height ? Number(qrFormData.height) : null,
+                weight: qrFormData.weight ? Number(qrFormData.weight) : null,
+                bloodPressure: qrFormData.bloodPressure?.trim() || null,
+                temperature: qrFormData.temperature ? Number(qrFormData.temperature) : null,
+                heartRate: qrFormData.heartRate ? Number(qrFormData.heartRate) : null,
+                spo2: qrFormData.spo2 ? Number(qrFormData.spo2) : null,
+                nurseNotes: qrFormData.nurseNotes?.trim() || null
+            };
+
+            const res = await axiosInstance.post("/api/nurse/check-in/qr", payload);
+            const data = res?.data?.data || res?.data;
+
+            setFeedback({
+                type: "success",
+                message: `✅ Check-in thành công: [${data?.patientName || "Bệnh nhân"}] - STT: #${data?.queueNumber || 1}!`
+            });
+            setOpenQrCheckInDialog(false);
+            setQrFormData({
+                qrData: "",
+                height: "",
+                weight: "",
+                bloodPressure: "",
+                temperature: "",
+                heartRate: "",
+                spo2: "",
+                nurseNotes: ""
+            });
+            await fetchQueueOnly();
+            setCounterRefreshKey(k => k + 1);
+        } catch (err) {
+            console.error("Lỗi check-in QR:", err);
+            setFeedback({ type: "error", message: err.response?.data?.message || err.message || "Check-in QR thất bại" });
+        } finally {
+            setQrSubmitting(false);
+        }
+    };
+
+    // Cập nhật trạng thái lượt khám
     const handleUpdateStatus = async (bookingId, newStatus) => {
         setQueueList(prev => prev.map(item => {
             if (item.bookingId === bookingId) {
@@ -699,1289 +546,1001 @@ export default function NurseReceptionPage() {
         }));
 
         try {
-            const backendStatus = newStatus === "EXAMINING" ? "IN_PROGRESS" : newStatus;
-            await axiosInstance.put(`/api/nurse/reception/bookings/${bookingId}/status?status=${backendStatus}`);
+            const backendStatus = (newStatus === "EXAMINING" || newStatus === "IN_PROGRESS")
+                ? "IN_PROGRESS"
+                : (newStatus === "WAITING" ? "CONFIRMED" : newStatus);
+
+            await axiosInstance.put(`/api/nurse/reception/bookings/${bookingId}/status?status=${backendStatus}`).catch(() => null);
+            setFeedback({ type: "success", message: `Đã cập nhật trạng thái ca khám thành công!` });
+            fetchQueueOnly();
         } catch (err) {
-            console.error("Lỗi cập nhật trạng thái lên máy chủ:", err);
+            console.warn("Lỗi cập nhật trạng thái:", err);
         }
-
-        const statusLabels = {
-            EXAMINING: "ĐANG KHÁM TẠI PHÒNG",
-            IN_PROGRESS: "ĐANG KHÁM TẠI PHÒNG",
-            COMPLETED: "ĐÃ KHÁM XONG",
-            CANCELLED: "VẮNG MẶT / HỦY"
-        };
-
-        setFeedback({
-            type: "info",
-            message: `Đã cập nhật trạng thái phiếu [${bookingId}] sang "${statusLabels[newStatus] || newStatus}"!`
-        });
     };
 
-    // Mô phỏng quét mã vạch Check-in tự động tại cửa phòng
-    const handleSimulateScanCheckIn = (ticket) => {
-        if (!ticket) return;
-        handleUpdateStatus(ticket.bookingId, "EXAMINING");
-        setFeedback({
-            type: "success",
-            message: `[MÁY QUÉT ĐÃ ĐỌC MÃ VẠCH ${ticket.bookingId}]: Tự động Check-in thành công cho bệnh nhân [${ticket.patientName}] tại ${ticket.roomName}!`
+    // Bộ lọc danh sách bệnh nhân
+    const filteredQueue = useMemo(() => {
+        return queueList.filter(item => {
+            const matchDept = selectedDepartment === "ALL" || (item.departmentName && item.departmentName.includes(selectedDepartment)) || String(item.departmentId) === String(selectedDepartment);
+            const matchSearch = !searchKeyword.trim() ||
+                (item.patientName && item.patientName.toLowerCase().includes(searchKeyword.toLowerCase())) ||
+                (item.phone && item.phone.includes(searchKeyword)) ||
+                (item.bookingCode && item.bookingCode.toLowerCase().includes(searchKeyword.toLowerCase())) ||
+                (item.queueCode && item.queueCode.toLowerCase().includes(searchKeyword.toLowerCase()));
+            return matchDept && matchSearch;
         });
-        setPrintTicket(null);
-    };
-
-    const filteredQueue = queueList.filter(item => {
-        const matchDept = selectedDepartment === "ALL" || item.departmentName.includes(selectedDepartment);
-        const matchSearch = item.patientName.toLowerCase().includes(searchKeyword.toLowerCase()) ||
-                            item.phone.includes(searchKeyword) ||
-                            item.bookingId.toLowerCase().includes(searchKeyword.toLowerCase());
-        return matchDept && matchSearch;
-    });
-
-    // Buồng khám của Khoa đang được chọn trên bộ lọc để hiển thị Smart Load Balancing Dashboard
-    const activeDeptForGrid = selectedDepartment === "ALL" ? "1" : (
-        departments.find(d => d.departmentName.includes(selectedDepartment))?.departmentId || "1"
-    );
-    const roomStatsForSelectedDept = getDepartmentRoomStats(activeDeptForGrid);
-    const shortestRoomForSelectedDept = getShortestQueueRoom(activeDeptForGrid);
+    }, [queueList, selectedDepartment, searchKeyword]);
 
     return (
-        <Container maxWidth="xl" sx={{ py: 3 }}>
-            {/* Header Phân Hệ Điều Dưỡng (Apple HIG + Linear) */}
-            <Paper
-                elevation={0}
-                sx={{
-                    p: { xs: 2.5, md: 3 },
-                    mb: 3,
-                    borderRadius: 3.5,
-                    bgcolor: "#FFFFFF",
-                    border: "1px solid rgba(15, 23, 42, 0.08)",
-                    boxShadow: "0 4px 20px rgba(15, 23, 42, 0.03)",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    flexWrap: "wrap",
-                    gap: 2
-                }}
-            >
-                <Box display="flex" alignItems="center" gap={2}>
-                    <Box
-                        sx={{
-                            width: 48,
-                            height: 48,
-                            borderRadius: "14px",
-                            bgcolor: "rgba(0, 136, 214, 0.1)",
-                            color: "#0088D6",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            boxShadow: "0 4px 14px rgba(0, 136, 214, 0.2)"
-                        }}
-                    >
-                        <HowToRegIcon sx={{ fontSize: 28 }} />
-                    </Box>
-                    <Box>
-                        <Box display="flex" alignItems="center" gap={1}>
-                            <Typography variant="h6" fontWeight={800} color="#0F172A" letterSpacing="-0.02em">
-                                Tiếp Đón & Điều Phối Khám Bệnh
-                            </Typography>
-                            <Chip
-                                label="SmartHIS Nurse Pro"
-                                size="small"
-                                sx={{
-                                    height: 22,
-                                    fontSize: "0.72rem",
-                                    fontWeight: 700,
-                                    bgcolor: "rgba(0, 136, 214, 0.1)",
-                                    color: "#0088D6",
-                                    border: "1px solid rgba(0, 136, 214, 0.2)"
-                                }}
-                            />
-                        </Box>
-                        <Typography variant="body2" sx={{ color: "#64748B", mt: 0.2 }}>
-                            Tra cứu hồ sơ cũ tái khám, cân bằng tải buồng khám tự động & in phiếu nhiệt mã vạch check-in
-                        </Typography>
-                    </Box>
-                </Box>
-
-                <Box display="flex" gap={1.2} flexWrap="wrap" alignItems="center">
-                    {/* CỤM NÚT KHỞI CHẠY THIẾT BỊ SẢNH (KIOSK & TV) */}
-                    <Button
-                        variant="outlined"
-                        component="a"
-                        href="/kiosk"
-                        target="_blank"
-                        startIcon={<QrCodeScannerIcon sx={{ color: "#D97706" }} />}
-                        sx={{
-                            borderRadius: 2.2,
-                            fontWeight: 700,
-                            textTransform: "none",
-                            fontSize: "0.82rem",
-                            color: "#B45309",
-                            borderColor: "#FDE68A",
-                            bgcolor: "#FFFBEB",
-                            "&:hover": { bgcolor: "#FEF3C7", borderColor: "#F59E0B" }
-                        }}
-                    >
-                        Mở Kiosk Sảnh
-                    </Button>
-                    <Button
-                        variant="outlined"
-                        component="a"
-                        href="/queue-display"
-                        target="_blank"
-                        startIcon={<TvIcon sx={{ color: "#6366F1" }} />}
-                        sx={{
-                            borderRadius: 2.2,
-                            fontWeight: 700,
-                            textTransform: "none",
-                            fontSize: "0.82rem",
-                            color: "#4338CA",
-                            borderColor: "#C7D2FE",
-                            bgcolor: "#EEF2FF",
-                            "&:hover": { bgcolor: "#E0E7FF", borderColor: "#6366F1" }
-                        }}
-                    >
-                        Mở LED TV Gọi Số
-                    </Button>
-                    <Divider orientation="vertical" flexItem sx={{ height: 28, my: "auto" }} />
-                    <Button
-                        variant="outlined"
-                        startIcon={<RefreshIcon />}
-                        onClick={loadData}
-                        sx={{
-                            borderRadius: 2.2,
-                            fontWeight: 700,
-                            textTransform: "none",
-                            fontSize: "0.82rem",
-                            color: "#475569",
-                            borderColor: "rgba(15, 23, 42, 0.15)"
-                        }}
-                    >
-                        Làm mới
-                    </Button>
-                    <Button
-                        variant="contained"
-                        startIcon={<PersonAddIcon />}
-                        onClick={() => {
-                            setOpenCreateProfileModal(true);
-                            const best = getShortestQueueRoom("1");
-                            if (best) {
-                                setNewProfile(prev => ({ ...prev, roomName: best.roomName, doctorName: best.doctorName }));
-                            }
-                        }}
-                        sx={{
-                            borderRadius: 2.2,
-                            fontWeight: 700,
-                            textTransform: "none",
-                            fontSize: "0.85rem",
-                            bgcolor: "#0088D6",
-                            boxShadow: "0 4px 14px rgba(0, 136, 214, 0.25)",
-                            "&:hover": { bgcolor: "#0073B7" }
-                        }}
-                    >
-                        Tiếp Nhận & Cấp STT
-                    </Button>
-
-                    {/* NÚT QUÉT QR TIẾP ĐÓN TRONG 5S */}
-                    <Button
-                        variant="contained"
-                        startIcon={<QrCodeScannerIcon />}
-                        onClick={() => setOpenQrCheckInDialog(true)}
-                        sx={{
-                            borderRadius: 2.2,
-                            fontWeight: 700,
-                            textTransform: "none",
-                            fontSize: "0.85rem",
-                            bgcolor: "#059669",
-                            boxShadow: "0 4px 14px rgba(5, 150, 105, 0.25)",
-                            "&:hover": { bgcolor: "#047857" }
-                        }}
-                    >
-                        Quét QR Tiếp Đón
-                    </Button>
-
-                    {/* NÚT THU VIỆN PHÍ TẠI QUẦY */}
-                    <Button
-                        variant="contained"
-                        startIcon={<ReceiptLongIcon />}
-                        onClick={() => {
-                            setPayFormData({
-                                bookingId: "",
-                                bookingCode: "",
-                                patientName: "",
-                                amount: 200000,
-                                paymentMethod: "CASH",
-                                cashierNotes: ""
-                            });
-                            setOpenPayDialog(true);
-                        }}
-                        sx={{
-                            borderRadius: 2.2,
-                            fontWeight: 700,
-                            textTransform: "none",
-                            fontSize: "0.85rem",
-                            bgcolor: "#7C3AED",
-                            boxShadow: "0 4px 14px rgba(124, 58, 237, 0.25)",
-                            "&:hover": { bgcolor: "#6D28D9" }
-                        }}
-                    >
-                        Thu Viện Phí
-                    </Button>
-                </Box>
-            </Paper>
-
-            {feedback.message && (
-                <Alert severity={feedback.type || "info"} sx={{ mb: 2.5, borderRadius: 2 }} onClose={() => setFeedback({ type: "", message: "" })}>
-                    {feedback.message}
-                </Alert>
-            )}
-
+        <Container maxWidth="xl" sx={{ mt: 2, mb: 4 }}>
             {/* ========================================================================= */}
-            {/* QUẢN LÝ QUẦY TIẾP ĐÓN COUNTER & ĐIỀU PHỐI BỐC SỐ KIOSK TẠI SẢNH */}
-            {/* ========================================================================= */}
-            <CounterManagementPanel onPatientDispatched={fetchQueueOnly} />
-
-            {/* ========================================================================= */}
-            {/* MỤC 4: KHU VỰC TRA CỨU NHANH BỆNH NHÂN CŨ (TÁI KHÁM / ĐÃ TỪNG ĐẾN VIỆN) */}
+            {/* COCKPIT HEADER TIẾP ĐÓN: ĐỒNG BỘ MÀU TRẮNG Y TẾ #FFFFFF & KPI TỔNG QUAN */}
             {/* ========================================================================= */}
             <Paper
                 elevation={0}
                 sx={{
                     p: 2.5,
-                    mb: 3,
+                    mb: 2.5,
                     borderRadius: 3,
+                    bgcolor: "#FFFFFF",
                     border: "1px solid #E2E8F0",
-                    bgcolor: "#F8FAFC",
-                    boxShadow: "0 2px 12px rgba(0, 0, 0, 0.03)"
+                    boxShadow: "0 2px 10px rgba(0,0,0,0.03)"
                 }}
             >
-                <Box display="flex" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1} mb={2}>
-                    <Box display="flex" alignItems="center" gap={1}>
-                        <HistoryIcon sx={{ color: "#0088D6", fontSize: 26 }} />
-                        <Typography variant="subtitle1" fontWeight="800" color="#0F172A">
-                            Tra Cứu Nhanh Lịch Sử Bệnh Nhân Cũ (Tái Khám Trong 5 Giây)
-                        </Typography>
-                        <Chip
-                            label="⚡ Không cần nhập lại từ đầu"
-                            size="small"
-                            sx={{ bgcolor: "#EBF6FE", color: "#0088D6", fontWeight: 800, fontSize: "0.75rem" }}
-                        />
+                <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2}>
+                    <Box display="flex" alignItems="center" gap={1.8}>
+                        <Box sx={{ p: 1.2, borderRadius: 2.5, bgcolor: "#F0FDFA", border: "1px solid #CCFBF1" }}>
+                            <LocalHospitalIcon sx={{ fontSize: 32, color: "#0D9488" }} />
+                        </Box>
+                        <Box>
+                            <Box display="flex" alignItems="center" gap={1}>
+                                <Typography variant="h5" fontWeight="900" color="#0F172A">
+                                    Bàn Tiếp Đón & Quầy Dịch Vụ Viện Phí
+                                </Typography>
+                                <Chip label="SmartHIS Station" size="small" sx={{ fontWeight: 800, bgcolor: "#F0FDFA", color: "#0D9488", border: "1px solid #99F6E4" }} />
+                            </Box>
+                            <Typography variant="body2" color="#64748B">
+                                Hệ thống tiếp đón một chạm • Bốc số Kiosk • Phát loa gọi nộp viện phí • Cân bằng tải buồng khám
+                            </Typography>
+                        </Box>
                     </Box>
-                    <Typography variant="caption" color="textSecondary">
-                        Tự động hiển thị tóm tắt thông tin cũ + lịch sử chẩn đoán gần nhất
-                    </Typography>
+
+                    {/* HÀNG NÚT THAO TÁC NHANH TRỰC QUAN */}
+                    <Stack direction="row" spacing={1.2} flexWrap="wrap">
+                        <Button
+                            variant="outlined"
+                            startIcon={<SearchIcon />}
+                            onClick={() => { setOpenLookupModal(true); setFoundPatient(null); setLookupSearched(false); }}
+                            sx={{
+                                borderRadius: 2.2,
+                                fontWeight: 700,
+                                textTransform: "none",
+                                fontSize: "0.85rem",
+                                color: "#0369A1",
+                                borderColor: "#BAE6FD",
+                                bgcolor: "#FFFFFF",
+                                "&:hover": { bgcolor: "#F0F9FF", borderColor: "#7DD3FC" }
+                            }}
+                        >
+                            Tra Cứu Hồ Sơ Cũ
+                        </Button>
+
+                        <Button
+                            variant="contained"
+                            startIcon={<QrCodeScannerIcon />}
+                            onClick={() => setOpenQrCheckInDialog(true)}
+                            sx={{
+                                borderRadius: 2.2,
+                                fontWeight: 700,
+                                textTransform: "none",
+                                fontSize: "0.85rem",
+                                bgcolor: "#059669",
+                                boxShadow: "0 2px 8px rgba(5, 150, 105, 0.25)",
+                                "&:hover": { bgcolor: "#047857" }
+                            }}
+                        >
+                            Quét QR (5s)
+                        </Button>
+
+                        <Button
+                            variant="contained"
+                            startIcon={<PersonAddIcon />}
+                            onClick={() => setOpenCreateProfileModal(true)}
+                            sx={{
+                                borderRadius: 2.2,
+                                fontWeight: 700,
+                                textTransform: "none",
+                                fontSize: "0.85rem",
+                                bgcolor: "#0D9488",
+                                boxShadow: "0 2px 8px rgba(13, 148, 136, 0.25)",
+                                "&:hover": { bgcolor: "#0F766E" }
+                            }}
+                        >
+                            + Tiếp Nhận & Cấp STT
+                        </Button>
+
+                        <Tooltip title="Mở cây lấy số Kiosk tự phục vụ cho bệnh nhân ngoài sảnh">
+                            <Button
+                                variant="outlined"
+                                color="warning"
+                                startIcon={<DevicesIcon />}
+                                onClick={() => window.open("/kiosk", "_blank")}
+                                sx={{ borderRadius: 2.2, fontWeight: 700, textTransform: "none", fontSize: "0.85rem", bgcolor: "#FFFFFF" }}
+                            >
+                                Kiosk Sảnh
+                            </Button>
+                        </Tooltip>
+
+                        <Tooltip title="Mở màn hình TV gọi số phòng khám">
+                            <Button
+                                variant="outlined"
+                                color="secondary"
+                                startIcon={<TvIcon />}
+                                onClick={() => window.open("/queue-display", "_blank")}
+                                sx={{ borderRadius: 2.2, fontWeight: 700, textTransform: "none", fontSize: "0.85rem", bgcolor: "#FFFFFF" }}
+                            >
+                                LED TV Gọi Số
+                            </Button>
+                        </Tooltip>
+
+                        <Tooltip title="Tải lại toàn bộ dữ liệu hàng đợi">
+                            <IconButton
+                                onClick={() => { loadData(); setCounterRefreshKey(k => k + 1); }}
+                                sx={{ borderRadius: 2.2, border: "1px solid #E2E8F0", bgcolor: "#FFFFFF" }}
+                            >
+                                <RefreshIcon sx={{ color: "#64748B" }} />
+                            </IconButton>
+                        </Tooltip>
+                    </Stack>
                 </Box>
 
-                {/* Thanh tìm kiếm SĐT / CCCD */}
-                <Grid container spacing={1.5} alignItems="center">
-                    <Grid item xs={12} sm={8} md={6}>
+                {/* DÃY KPI TRỰC QUAN GỌN GÀNG */}
+                <Divider sx={{ my: 2 }} />
+                <Grid container spacing={2}>
+                    <Grid item xs={6} sm={3}>
+                        <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: "#FFFBEB", border: "1px solid #FDE68A", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <Box>
+                                <Typography variant="caption" fontWeight="800" color="#B45309">CHỜ THU TIỀN VIỆN PHÍ</Typography>
+                                <Typography variant="h5" fontWeight="900" color="#D97706">{kpiStats.unpaid}</Typography>
+                            </Box>
+                            <PointOfSaleIcon sx={{ fontSize: 32, color: "#D97706", opacity: 0.8 }} />
+                        </Box>
+                    </Grid>
+                    <Grid item xs={6} sm={3}>
+                        <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: "#F0F9FF", border: "1px solid #BAE6FD", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <Box>
+                                <Typography variant="caption" fontWeight="800" color="#0369A1">CHỜ GỌI KHÁM</Typography>
+                                <Typography variant="h5" fontWeight="900" color="#0284C7">{kpiStats.waiting}</Typography>
+                            </Box>
+                            <HowToRegIcon sx={{ fontSize: 32, color: "#0284C7", opacity: 0.8 }} />
+                        </Box>
+                    </Grid>
+                    <Grid item xs={6} sm={3}>
+                        <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: "#F0FDFA", border: "1px solid #99F6E4", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <Box>
+                                <Typography variant="caption" fontWeight="800" color="#0F766E">ĐANG KHÁM</Typography>
+                                <Typography variant="h5" fontWeight="900" color="#0D9488">{kpiStats.examining}</Typography>
+                            </Box>
+                            <MeetingRoomIcon sx={{ fontSize: 32, color: "#0D9488", opacity: 0.8 }} />
+                        </Box>
+                    </Grid>
+                    <Grid item xs={6} sm={3}>
+                        <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: "#F8FAFC", border: "1px solid #E2E8F0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <Box>
+                                <Typography variant="caption" fontWeight="800" color="#475569">ĐÃ KHÁM XONG</Typography>
+                                <Typography variant="h5" fontWeight="900" color="#1E293B">{kpiStats.completed}</Typography>
+                            </Box>
+                            <CheckCircleIcon sx={{ fontSize: 32, color: "#16A34A", opacity: 0.8 }} />
+                        </Box>
+                    </Grid>
+                </Grid>
+            </Paper>
+
+            {/* THÔNG BÁO PHẢN HỒI */}
+            {feedback.message && (
+                <Alert
+                    severity={feedback.type || "info"}
+                    sx={{ mb: 2.5, borderRadius: 2.5 }}
+                    onClose={() => setFeedback({ type: "", message: "" })}
+                >
+                    {feedback.message}
+                </Alert>
+            )}
+
+            {/* ========================================================================= */}
+            {/* THANH TABS ĐIỀU HƯỚNG CHỨC NĂNG CHÍNH (ĐƠN GIẢN HÓA - KHÔNG CUỘN DÀI) */}
+            {/* ========================================================================= */}
+            <Paper elevation={0} sx={{ mb: 2.5, borderRadius: 3, bgcolor: "#FFFFFF", border: "1px solid #E2E8F0" }}>
+                <Tabs
+                    value={activeMainTab}
+                    onChange={(e, val) => setActiveMainTab(val)}
+                    textColor="primary"
+                    indicatorColor="primary"
+                    variant="scrollable"
+                    scrollButtons="auto"
+                    sx={{
+                        px: 2,
+                        "& .MuiTab-root": {
+                            py: 1.8,
+                            fontWeight: 800,
+                            fontSize: "0.95rem",
+                            textTransform: "none",
+                            gap: 1
+                        }
+                    }}
+                >
+                    <Tab
+                        icon={<PointOfSaleIcon sx={{ fontSize: 20 }} />}
+                        iconPosition="start"
+                        label={
+                            <Box display="flex" alignItems="center" gap={1}>
+                                <span>Quầy Dịch Vụ & Thu Viện Phí PayOS</span>
+                                {kpiStats.unpaid > 0 && (
+                                    <Chip label={kpiStats.unpaid} color="warning" size="small" sx={{ fontWeight: 800, height: 20 }} />
+                                )}
+                            </Box>
+                        }
+                    />
+                    <Tab
+                        icon={<HowToRegIcon sx={{ fontSize: 20 }} />}
+                        iconPosition="start"
+                        label={
+                            <Box display="flex" alignItems="center" gap={1}>
+                                <span>Danh Sách Tiếp Đón & Phân Luồng</span>
+                                <Chip label={kpiStats.total} size="small" sx={{ fontWeight: 800, height: 20 }} />
+                            </Box>
+                        }
+                    />
+                    <Tab
+                        icon={<SpeedIcon sx={{ fontSize: 20 }} />}
+                        iconPosition="start"
+                        label="Giám Sát Tải Buồng Khám (Smart Clinic Load)"
+                    />
+                </Tabs>
+            </Paper>
+
+            {/* ========================================================================= */}
+            {/* TAB 0: QUẦY DỊCH VỤ & GỌI SỐ THU VIỆN PHÍ (COUNTER MANAGEMENT) */}
+            {/* ========================================================================= */}
+            <Box id="counter-management-panel" sx={{ display: activeMainTab === 0 ? "block" : "none" }}>
+                <CounterManagementPanel
+                    onPatientDispatched={fetchQueueOnly}
+                    refreshTrigger={counterRefreshKey}
+                    rooms={allRooms}
+                    queueList={queueList}
+                    callPatientTrigger={patientToCall}
+                    onClearCallTrigger={() => setPatientToCall(null)}
+                />
+            </Box>
+
+            {/* ========================================================================= */}
+            {/* TAB 1: DANH SÁCH BỆNH NHÂN TIẾP ĐÓN & PHÒNG KHÁM */}
+            {/* ========================================================================= */}
+            <Box sx={{ display: activeMainTab === 1 ? "block" : "none" }}>
+                <Paper
+                    elevation={0}
+                    sx={{
+                        p: 2.5,
+                        borderRadius: 3,
+                        bgcolor: "#FFFFFF",
+                        border: "1px solid #E2E8F0",
+                        boxShadow: "0 2px 10px rgba(0,0,0,0.03)"
+                    }}
+                >
+                    {/* BỘ LỌC TÌM KIẾM & KHOA */}
+                    <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2} mb={2.5}>
+                        <Box display="flex" alignItems="center" gap={1.5} flex={1} minWidth={280}>
+                            <TextField
+                                fullWidth
+                                size="small"
+                                placeholder="Tìm theo tên bệnh nhân, SĐT, mã phiếu..."
+                                value={searchKeyword}
+                                onChange={(e) => setSearchKeyword(e.target.value)}
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <SearchIcon sx={{ color: "#94A3B8" }} />
+                                        </InputAdornment>
+                                    )
+                                }}
+                                sx={{ bgcolor: "#F8FAFC", borderRadius: 2 }}
+                            />
+                        </Box>
+
+                        <Box display="flex" alignItems="center" gap={1.5}>
+                            <TextField
+                                select
+                                size="small"
+                                label="Lọc Khoa Khám"
+                                value={selectedDepartment}
+                                onChange={(e) => setSelectedDepartment(e.target.value)}
+                                sx={{ minWidth: 220, bgcolor: "#F8FAFC", borderRadius: 2 }}
+                            >
+                                <MenuItem value="ALL">Tất cả các khoa</MenuItem>
+                                {departments.map((dept) => (
+                                    <MenuItem key={dept.departmentId} value={dept.departmentId.toString()}>
+                                        {dept.departmentName}
+                                    </MenuItem>
+                                ))}
+                            </TextField>
+
+                            <Button
+                                variant="contained"
+                                startIcon={<PersonAddIcon />}
+                                onClick={() => setOpenCreateProfileModal(true)}
+                                sx={{
+                                    borderRadius: 2,
+                                    fontWeight: 700,
+                                    textTransform: "none",
+                                    bgcolor: "#0D9488",
+                                    "&:hover": { bgcolor: "#0F766E" }
+                                }}
+                            >
+                                Tiếp Nhận
+                            </Button>
+                        </Box>
+                    </Box>
+
+                    {/* BẢNG DANH SÁCH BỆNH NHÂN TIẾP ĐÓN */}
+                    <TableContainer sx={{ borderRadius: 2.5, border: "1px solid #E2E8F0" }}>
+                        <Table size="medium">
+                            <TableHead sx={{ bgcolor: "#F8FAFC" }}>
+                                <TableRow>
+                                    <TableCell align="center" sx={{ fontWeight: 800, width: 70 }}>STT</TableCell>
+                                    <TableCell sx={{ fontWeight: 800 }}>Mã Phiếu</TableCell>
+                                    <TableCell sx={{ fontWeight: 800 }}>Họ Tên Bệnh Nhân</TableCell>
+                                    <TableCell sx={{ fontWeight: 800 }}>Số Điện Thoại</TableCell>
+                                    <TableCell sx={{ fontWeight: 800 }}>Chuyên Khoa & Phòng</TableCell>
+                                    <TableCell sx={{ fontWeight: 800 }}>Triệu Chứng / Khám</TableCell>
+                                    <TableCell sx={{ fontWeight: 800 }}>Viện Phí & Check-in</TableCell>
+                                    <TableCell align="center" sx={{ fontWeight: 800 }}>Trạng Thái</TableCell>
+                                    <TableCell align="center" sx={{ fontWeight: 800 }}>Thao Tác Điều Phối</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {filteredQueue.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={9} align="center" sx={{ py: 4, color: "#94A3B8" }}>
+                                            Không tìm thấy lượt khám nào phù hợp.
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    filteredQueue.map((item) => (
+                                        <TableRow
+                                            key={item.bookingId}
+                                            hover
+                                            sx={{
+                                                bgcolor: item.status === "EXAMINING" ? "rgba(13, 148, 136, 0.04)" : "inherit"
+                                            }}
+                                        >
+                                            <TableCell align="center">
+                                                <Chip
+                                                    label={item.queueCode || `#${item.queueNumber}`}
+                                                    size="small"
+                                                    sx={{
+                                                        fontWeight: 900,
+                                                        fontSize: "0.8rem",
+                                                        bgcolor: item.status === "EXAMINING" ? "#0D9488" : "#E2E8F0",
+                                                        color: item.status === "EXAMINING" ? "#FFFFFF" : "#1E293B"
+                                                    }}
+                                                />
+                                            </TableCell>
+                                            <TableCell sx={{ fontWeight: 700, color: "#0284C7" }}>
+                                                <Box display="flex" flexDirection="column" gap={0.5}>
+                                                    <span>{item.bookingCode || item.bookingId}</span>
+                                                    {renderReceptionSourceBadge(item.receptionSource)}
+                                                </Box>
+                                            </TableCell>
+                                            <TableCell sx={{ fontWeight: 700 }}>
+                                                <Box display="flex" alignItems="center" gap={0.5}>
+                                                    {item.isPriority && <StarsIcon sx={{ fontSize: 16, color: "#DC2626" }} />}
+                                                    <span>{item.patientName}</span>
+                                                </Box>
+                                            </TableCell>
+                                            <TableCell>{item.phone}</TableCell>
+                                            <TableCell>
+                                                <Typography variant="body2" fontWeight="700">{item.departmentName}</Typography>
+                                                <Typography variant="caption" color="primary" fontWeight="600">
+                                                    {item.roomName} {item.doctorName ? `(${item.doctorName})` : ''}
+                                                </Typography>
+                                            </TableCell>
+                                            <TableCell sx={{ maxWidth: 200, fontSize: "0.85rem", color: "#475569" }}>
+                                                {item.symptoms}
+                                            </TableCell>
+                                            <TableCell>
+                                                <Stack spacing={0.5} alignItems="flex-start">
+                                                    <Typography variant="caption" color="#64748B">{item.checkInTime}</Typography>
+                                                    <Chip
+                                                        label={item.checkedInAt ? "Đã check-in" : "Chưa check-in"}
+                                                        size="small"
+                                                        color={item.checkedInAt ? "success" : "default"}
+                                                        sx={{ height: 20, fontSize: "0.68rem" }}
+                                                    />
+                                                    <Chip
+                                                        label={item.isPaid ? "Đã đóng tiền" : (item.price != null && Number(item.price) > 0 ? `Chưa nộp (${formatCurrency(item.price)})` : "Chưa có biểu phí")}
+                                                        size="small"
+                                                        color={item.isPaid ? "success" : "warning"}
+                                                        sx={{ height: 20, fontSize: "0.68rem", fontWeight: 700 }}
+                                                    />
+                                                </Stack>
+                                            </TableCell>
+                                            <TableCell align="center">
+                                                {(!item.isPaid || item.status === "PENDING_PAYMENT") && (
+                                                    <Chip
+                                                        label="Chờ thu tiền"
+                                                        size="small"
+                                                        sx={{ fontWeight: 800, bgcolor: "#FEF3C7", color: "#92400E", border: "1px solid #FCD34D", height: 22 }}
+                                                    />
+                                                )}
+                                                {item.isPaid && item.status === "WAITING" && <Chip label="Đang chờ gọi" color="info" size="small" sx={{ fontWeight: 700, height: 22 }} />}
+                                                {item.status === "EXAMINING" && <Chip label="Đang khám" color="primary" size="small" sx={{ fontWeight: 700, height: 22 }} />}
+                                                {item.status === "COMPLETED" && <Chip label="Đã khám xong" color="success" size="small" sx={{ fontWeight: 700, height: 22 }} />}
+                                                {item.status === "CANCELLED" && <Chip label="Vắng mặt" color="error" size="small" sx={{ fontWeight: 600, height: 22 }} />}
+                                            </TableCell>
+                                            <TableCell align="center">
+                                                <Box display="flex" justifyContent="center" gap={0.8}>
+                                                    {!item.isPaid ? (
+                                                        <Box display="flex" gap={0.8}>
+                                                            <Tooltip title="Phát chuông Ding-dong & Đọc loa gọi bệnh nhân này vào Quầy nộp tiền">
+                                                                <Button
+                                                                    size="small"
+                                                                    variant="contained"
+                                                                    startIcon={<CampaignIcon sx={{ fontSize: 16 }} />}
+                                                                    onClick={() => handleCallPatientToPay(item)}
+                                                                    sx={{
+                                                                        borderRadius: 2,
+                                                                        fontWeight: 800,
+                                                                        fontSize: "0.72rem",
+                                                                        py: 0.4,
+                                                                        px: 1.2,
+                                                                        bgcolor: "#D97706",
+                                                                        "&:hover": { bgcolor: "#B45309" },
+                                                                        color: "#FFFFFF",
+                                                                        textTransform: "none"
+                                                                    }}
+                                                                >
+                                                                    Gọi Nộp Tiền
+                                                                </Button>
+                                                            </Tooltip>
+                                                        </Box>
+                                                    ) : (
+                                                        item.status === "WAITING" && (
+                                                            <Tooltip title="Mời vào phòng bác sĩ khám">
+                                                                <Button
+                                                                    size="small"
+                                                                    variant="contained"
+                                                                    color="success"
+                                                                    startIcon={<PlayArrowIcon />}
+                                                                    onClick={() => handleUpdateStatus(item.bookingId, "EXAMINING")}
+                                                                    sx={{ borderRadius: 2, fontWeight: 700, fontSize: "0.72rem", py: 0.4, textTransform: "none" }}
+                                                                >
+                                                                    Vào Khám
+                                                                </Button>
+                                                            </Tooltip>
+                                                        )
+                                                    )}
+
+                                                    {item.status === "EXAMINING" && (
+                                                        <Tooltip title="Xác nhận hoàn tất ca khám">
+                                                            <Button
+                                                                size="small"
+                                                                variant="outlined"
+                                                                color="primary"
+                                                                startIcon={<CheckCircleIcon />}
+                                                                onClick={() => handleUpdateStatus(item.bookingId, "COMPLETED")}
+                                                                sx={{ borderRadius: 2, fontWeight: 700, fontSize: "0.72rem", py: 0.4, textTransform: "none" }}
+                                                            >
+                                                                Đã Xong
+                                                            </Button>
+                                                        </Tooltip>
+                                                    )}
+
+                                                    {/* In lại phiếu nhiệt */}
+                                                    <Tooltip title="In lại phiếu số thứ tự">
+                                                        <IconButton
+                                                            size="small"
+                                                            color="info"
+                                                            onClick={() => setPrintTicket(item)}
+                                                        >
+                                                            <PrintIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </Tooltip>
+
+                                                    {/* Xem chi tiết */}
+                                                    <Tooltip title="Xem chi tiết ca khám">
+                                                        <IconButton
+                                                            size="small"
+                                                            color="secondary"
+                                                            onClick={() => setSelectedBookingDetail(item)}
+                                                        >
+                                                            <VisibilityIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                </Box>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                </Paper>
+            </Box>
+
+            {/* ========================================================================= */}
+            {/* TAB 2: GIÁM SÁT TẢI BUỒNG KHÁM (SMART CLINIC LOAD BALANCING) */}
+            {/* ========================================================================= */}
+            <Box sx={{ display: activeMainTab === 2 ? "block" : "none" }}>
+                <Paper
+                    elevation={0}
+                    sx={{
+                        p: 2.5,
+                        borderRadius: 3,
+                        bgcolor: "#FFFFFF",
+                        border: "1px solid #E2E8F0",
+                        boxShadow: "0 2px 10px rgba(0,0,0,0.03)"
+                    }}
+                >
+                    <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2} mb={2.5}>
+                        <Box>
+                            <Typography variant="h6" fontWeight="900" color="#0F172A">
+                                Bảng Giám Sát Tải Buồng Khám Thời Gian Thực
+                            </Typography>
+                            <Typography variant="body2" color="#64748B">
+                                Tự động gợi ý buồng khám ít người nhất để điều dưỡng phân bổ bệnh nhân tránh ùn tắc
+                            </Typography>
+                        </Box>
+
+                        <TextField
+                            select
+                            size="small"
+                            label="Chọn Khoa Khám"
+                            value={selectedDepartment}
+                            onChange={(e) => setSelectedDepartment(e.target.value)}
+                            sx={{ minWidth: 240, bgcolor: "#F8FAFC", borderRadius: 2 }}
+                        >
+                            <MenuItem value="ALL">Tất cả các khoa</MenuItem>
+                            {departments.map((dept) => (
+                                <MenuItem key={dept.departmentId} value={dept.departmentId.toString()}>
+                                    {dept.departmentName}
+                                </MenuItem>
+                            ))}
+                        </TextField>
+                    </Box>
+
+                    <Grid container spacing={2}>
+                        {getDepartmentRoomStats(selectedDepartment === "ALL" ? null : selectedDepartment).map((room) => {
+                            const isShortest = shortestRoomForSelectedDept && shortestRoomForSelectedDept.roomId === room.roomId;
+                            const isHeavy = room.loadLevel === "HEAVY";
+                            const isMedium = room.loadLevel === "MEDIUM";
+
+                            return (
+                                <Grid item xs={12} sm={6} md={4} key={room.roomId}>
+                                    <Card
+                                        elevation={0}
+                                        sx={{
+                                            borderRadius: 3,
+                                            border: isShortest ? "2px solid #0D9488" : "1px solid #E2E8F0",
+                                            bgcolor: isShortest ? "#F0FDFA" : "#FFFFFF",
+                                            position: "relative",
+                                            boxShadow: "0 2px 8px rgba(0,0,0,0.03)"
+                                        }}
+                                    >
+                                        {isShortest && (
+                                            <Chip
+                                                label="⭐ Buồng Rảnh Nhất"
+                                                size="small"
+                                                sx={{
+                                                    position: "absolute",
+                                                    top: 10,
+                                                    right: 10,
+                                                    bgcolor: "#0D9488",
+                                                    color: "#FFFFFF",
+                                                    fontWeight: 800,
+                                                    fontSize: "0.7rem"
+                                                }}
+                                            />
+                                        )}
+                                        <CardContent sx={{ p: 2 }}>
+                                            <Typography variant="subtitle1" fontWeight="800" color="#0F172A">
+                                                {room.roomName}
+                                            </Typography>
+                                            <Typography variant="caption" color="#0284C7" fontWeight="700" display="block">
+                                                {room.departmentName}
+                                            </Typography>
+                                            <Typography variant="body2" color="#64748B" sx={{ mb: 1.5 }}>
+                                                Bác sĩ: <b>{room.doctorName}</b>
+                                            </Typography>
+
+                                            <Divider sx={{ my: 1 }} />
+
+                                            <Box display="flex" justifyContent="space-between" alignItems="center">
+                                                <Box>
+                                                    <Typography variant="caption" color="#64748B" display="block">Đang chờ</Typography>
+                                                    <Typography variant="h6" fontWeight="900" color={isHeavy ? "#DC2626" : isMedium ? "#D97706" : "#16A34A"}>
+                                                        {room.waitingCount} người
+                                                    </Typography>
+                                                </Box>
+                                                <Box>
+                                                    <Typography variant="caption" color="#64748B" display="block">Đang khám</Typography>
+                                                    <Typography variant="h6" fontWeight="900" color="#0284C7">
+                                                        {room.examiningCount} người
+                                                    </Typography>
+                                                </Box>
+                                                <Chip
+                                                    label={isHeavy ? "🔴 Quá tải" : isMedium ? "🟡 Bình thường" : "🟢 Rất rảnh"}
+                                                    size="small"
+                                                    sx={{
+                                                        fontWeight: 800,
+                                                        fontSize: "0.72rem",
+                                                        bgcolor: isHeavy ? "#FEE2E2" : isMedium ? "#FEF3C7" : "#DCFCE7",
+                                                        color: isHeavy ? "#991B1B" : isMedium ? "#92400E" : "#166534"
+                                                    }}
+                                                />
+                                            </Box>
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+                            );
+                        })}
+                    </Grid>
+                </Paper>
+            </Box>
+
+            {/* ========================================================================= */}
+            {/* MODAL 1: TRA CỨU HỒ SƠ BỆNH NHÂN CŨ (TÁI KHÁM) */}
+            {/* ========================================================================= */}
+            <Dialog open={openLookupModal} onClose={() => setOpenLookupModal(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+                <DialogTitle sx={{ fontWeight: 800, borderBottom: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span>Tra Cứu Hồ Sơ Bệnh Nhân Cũ (Tái Khám)</span>
+                    <IconButton size="small" onClick={() => setOpenLookupModal(false)}><CloseIcon /></IconButton>
+                </DialogTitle>
+                <DialogContent sx={{ pt: 2.5 }}>
+                    <Box display="flex" gap={1} mb={2}>
                         <TextField
                             fullWidth
                             size="small"
-                            placeholder="Nhập SĐT hoặc Số CCCD để tìm hồ sơ cũ (VD: 0987654321 hoặc 001090012345)..."
+                            placeholder="Nhập SĐT, Số CCCD hoặc Họ Tên bệnh nhân..."
                             value={patientLookupQuery}
                             onChange={(e) => setPatientLookupQuery(e.target.value)}
                             onKeyDown={(e) => { if (e.key === "Enter") handleSearchOldPatient(); }}
                             InputProps={{
                                 startAdornment: (
                                     <InputAdornment position="start">
-                                        <SearchIcon sx={{ color: "#0088D6" }} />
-                                    </InputAdornment>
-                                ),
-                                sx: { bgcolor: "#FFFFFF", borderRadius: 2 }
-                            }}
-                        />
-                    </Grid>
-                    <Grid item xs={6} sm={2} md={2}>
-                        <Button
-                            fullWidth
-                            variant="contained"
-                            disabled={lookupLoading}
-                            onClick={() => handleSearchOldPatient()}
-                            startIcon={lookupLoading ? <CircularProgress size={18} color="inherit" /> : <SearchIcon />}
-                            sx={{
-                                bgcolor: "#0088D6",
-                                "&:hover": { bgcolor: "#0077BC" },
-                                fontWeight: 700,
-                                borderRadius: 2,
-                                height: 40
-                            }}
-                        >
-                            Tìm Hồ Sơ
-                        </Button>
-                    </Grid>
-                    <Grid item xs={12} sm={12} md={4}>
-                        <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
-                            <Typography variant="caption" color="textSecondary" fontWeight="bold">Gợi ý mẫu:</Typography>
-                            {MOCK_RETURNING_PATIENTS.map(p => (
-                                <Chip
-                                    key={p.phoneNumber}
-                                    label={`${p.fullName.split(' ').pop()} (${p.phoneNumber.slice(-4)})`}
-                                    size="small"
-                                    onClick={() => {
-                                        setPatientLookupQuery(p.phoneNumber);
-                                        handleSearchOldPatient(p.phoneNumber);
-                                    }}
-                                    sx={{
-                                        cursor: "pointer",
-                                        fontSize: "0.75rem",
-                                        fontWeight: 600,
-                                        bgcolor: "#FFFFFF",
-                                        border: "1px solid #E2E8F0",
-                                        "&:hover": { bgcolor: "#EBF6FE", color: "#0088D6", borderColor: "#BAE6FD" }
-                                    }}
-                                />
-                            ))}
-                        </Box>
-                    </Grid>
-                </Grid>
-
-                {/* Card hiển thị chi tiết hồ sơ bệnh nhân cũ khi tìm thấy */}
-                {foundPatient && (
-                    <Card
-                        elevation={0}
-                        sx={{
-                            mt: 2.5,
-                            p: 2,
-                            borderRadius: 2.5,
-                            border: "1px solid #BAE6FD",
-                            bgcolor: "#FFFFFF"
-                        }}
-                    >
-                        <Grid container spacing={2} alignItems="center">
-                            <Grid item xs={12} md={4}>
-                                <Box display="flex" alignItems="center" gap={1.5}>
-                                    <AccountCircleIcon sx={{ fontSize: 48, color: "#0088D6" }} />
-                                    <Box>
-                                        <Box display="flex" alignItems="center" gap={1}>
-                                            <Typography variant="subtitle1" fontWeight="900" color="#0F172A">
-                                                {foundPatient.fullName}
-                                            </Typography>
-                                            <Chip
-                                                label={foundPatient.gender === "MALE" ? "Nam" : "Nữ"}
-                                                size="small"
-                                                color={foundPatient.gender === "MALE" ? "primary" : "secondary"}
-                                                sx={{ height: 20, fontSize: "0.7rem", fontWeight: 700 }}
-                                            />
-                                        </Box>
-                                        <Typography variant="body2" color="textSecondary" sx={{ mt: 0.2 }}>
-                                            SĐT: <b>{foundPatient.phoneNumber}</b> | CCCD: <b>{foundPatient.identityNumber || "---"}</b>
-                                        </Typography>
-                                        <Typography variant="caption" color="textSecondary" display="block">
-                                            Địa chỉ: {foundPatient.streetAddress ? `${foundPatient.streetAddress}, ${foundPatient.district || ""}, ${foundPatient.province || ""}` : "Hà Nội"}
-                                        </Typography>
-                                    </Box>
-                                </Box>
-                            </Grid>
-
-                            {/* Lịch sử khám gần nhất */}
-                            <Grid item xs={12} md={5}>
-                                <Box
-                                    sx={{
-                                        p: 1.5,
-                                        borderRadius: 2,
-                                        bgcolor: "#F8FAFC",
-                                        border: "1px dashed #CBD5E1"
-                                    }}
-                                >
-                                    <Typography variant="caption" fontWeight="800" color="#0369A1" sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                                        <EventRepeatIcon fontSize="small" />
-                                        LỊCH SỬ KHÁM GẦN NHẤT ({foundPatient.lastVisitDate || "15/09/2026"})
-                                    </Typography>
-                                    <Typography variant="body2" fontWeight="700" color="#1E293B" sx={{ mt: 0.3 }}>
-                                        {foundPatient.lastDepartmentName || "Khoa Nội Tổng Quát"} - {foundPatient.lastDoctorName || "BS. Phụ trách"}
-                                    </Typography>
-                                    <Typography variant="caption" color="#475569" sx={{ display: "block", fontStyle: "italic" }}>
-                                        Chẩn đoán: {foundPatient.lastDiagnosis || "Khám sức khỏe tổng quát định kỳ"}
-                                    </Typography>
-                                    <Typography variant="caption" color="#059669" fontWeight="bold">
-                                        Đã từng đến viện: {foundPatient.totalVisits || 1} lần
-                                    </Typography>
-                                </Box>
-                            </Grid>
-
-                            {/* Nút Tiếp nhận tức thì */}
-                            <Grid item xs={12} md={3} sx={{ textAlign: { xs: "left", md: "right" } }}>
-                                <Button
-                                    variant="contained"
-                                    size="large"
-                                    startIcon={<FlashOnIcon />}
-                                    onClick={() => handleQuickAdmitOldPatient(foundPatient)}
-                                    sx={{
-                                        py: 1.2,
-                                        px: 2.5,
-                                        bgcolor: "#0088D6",
-                                        "&:hover": { bgcolor: "#0077BC" },
-                                        fontWeight: 800,
-                                        borderRadius: 2.5,
-                                        boxShadow: "0 6px 16px rgba(0, 136, 214, 0.3)",
-                                        textTransform: "none"
-                                    }}
-                                >
-                                    Tiếp Nhận Lượt Khám Mới
-                                </Button>
-                                <Typography variant="caption" color="textSecondary" display="block" sx={{ mt: 0.5, fontStyle: "italic" }}>
-                                    ⚡ Chỉ cần chọn Khoa, hoàn tất 5 giây
-                                </Typography>
-                            </Grid>
-                        </Grid>
-                    </Card>
-                )}
-            </Paper>
-
-            {/* ========================================================================= */}
-            {/* MỤC 5: ĐIỀU PHỐI BUỒNG KHÁM THÔNG MINH (SMART LOAD BALANCING VISUAL GRID) */}
-            {/* ========================================================================= */}
-            <Paper
-                elevation={0}
-                sx={{
-                    p: 2.5,
-                    mb: 3,
-                    borderRadius: 3,
-                    border: "1px solid #E2E8F0",
-                    bgcolor: "#FFFFFF"
-                }}
-            >
-                <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1.5} mb={2}>
-                    <Box display="flex" alignItems="center" gap={1}>
-                        <MeetingRoomIcon sx={{ color: "#0284C7", fontSize: 26 }} />
-                        <Typography variant="subtitle1" fontWeight="800" color="#0F172A">
-                            5. Sơ Đồ Điều Phối Buồng Khám Thông Minh (Smart Load Balancing)
-                        </Typography>
-                        {shortestRoomForSelectedDept && (
-                            <Chip
-                                icon={<AutoAwesomeIcon sx={{ fontSize: "16px !important", color: "#15803D !important" }} />}
-                                label={`GỢI Ý TỰ ĐỘNG: ${shortestRoomForSelectedDept.roomName} (${shortestRoomForSelectedDept.waitingCount} người chờ)`}
-                                size="small"
-                                sx={{ bgcolor: "#DCFCE7", color: "#15803D", fontWeight: 800, fontSize: "0.75rem", border: "1px solid #86EFAC" }}
-                            />
-                        )}
-                    </Box>
-
-                    {/* Chọn nhanh khoa để theo dõi tải phòng */}
-                    <Box display="flex" alignItems="center" gap={1}>
-                        <Typography variant="caption" fontWeight="bold" color="textSecondary">Theo dõi khoa:</Typography>
-                        <TextField
-                            select
-                            size="small"
-                            value={selectedDepartment}
-                            onChange={(e) => setSelectedDepartment(e.target.value)}
-                            sx={{ minWidth: 200, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-                        >
-                            <MenuItem value="ALL">Khoa Nội Tổng Quát (Mặc định)</MenuItem>
-                            {departments.map(d => (
-                                <MenuItem key={d.departmentId} value={d.departmentName}>{d.departmentName}</MenuItem>
-                            ))}
-                        </TextField>
-                    </Box>
-                </Box>
-
-                {/* Lưới trực quan các buồng khám đang mở cửa cùng số lượng chờ thực tế */}
-                <Grid container spacing={2}>
-                    {roomStatsForSelectedDept.map((room) => {
-                        const isShortest = shortestRoomForSelectedDept && shortestRoomForSelectedDept.roomId === room.roomId;
-                        const isHeavy = room.loadLevel === "HEAVY";
-                        const isMedium = room.loadLevel === "MEDIUM";
-
-                        const borderColor = isShortest ? "#10B981" : isHeavy ? "#EF4444" : isMedium ? "#F59E0B" : "#CBD5E1";
-                        const badgeColor = isHeavy ? "error" : isMedium ? "warning" : "success";
-                        const statusText = isHeavy ? "Đông / Quá tải 🔴" : isMedium ? "Vừa phải 🟡" : "Rảnh / Chờ ít 🟢";
-
-                        return (
-                            <Grid item xs={12} sm={6} md={3} key={room.roomId}>
-                                <Card
-                                    elevation={0}
-                                    sx={{
-                                        p: 2,
-                                        borderRadius: 2.5,
-                                        border: `2px solid ${borderColor}`,
-                                        bgcolor: isShortest ? "#F0FDF4" : "#FFFFFF",
-                                        transition: "all 0.2s ease-in-out",
-                                        position: "relative",
-                                        "&:hover": {
-                                            transform: "translateY(-3px)",
-                                            boxShadow: "0 6px 16px rgba(0,0,0,0.08)"
-                                        }
-                                    }}
-                                >
-                                    {isShortest && (
-                                        <Chip
-                                            label="🟢 GỢI Ý: HÀNG ĐỢI NGẮN NHẤT"
-                                            size="small"
-                                            sx={{
-                                                position: "absolute",
-                                                top: 8,
-                                                right: 8,
-                                                bgcolor: "#10B981",
-                                                color: "#FFFFFF",
-                                                fontWeight: 800,
-                                                fontSize: "0.65rem",
-                                                height: 20
-                                            }}
-                                        />
-                                    )}
-
-                                    <Typography variant="h6" fontWeight="900" color="#1E293B">
-                                        {room.roomName}
-                                    </Typography>
-                                    <Typography variant="body2" color="#0369A1" fontWeight="700">
-                                        {room.doctorName}
-                                    </Typography>
-                                    <Typography variant="caption" color="textSecondary">
-                                        Vị trí: {room.floor || "Khu Khám Bệnh"}
-                                    </Typography>
-
-                                    <Divider sx={{ my: 1.2 }} />
-
-                                    <Box display="flex" justifyContent="space-between" alignItems="center">
-                                        <Box>
-                                            <Typography variant="caption" color="textSecondary" fontWeight="bold">ĐANG CHỜ:</Typography>
-                                            <Typography variant="h5" fontWeight="900" color={isHeavy ? "#DC2626" : isMedium ? "#D97706" : "#059669"}>
-                                                {room.waitingCount} người
-                                            </Typography>
-                                        </Box>
-
-                                        <Chip
-                                            label={statusText}
-                                            color={badgeColor}
-                                            size="small"
-                                            sx={{ fontWeight: 800, fontSize: "0.72rem" }}
-                                        />
-                                    </Box>
-
-                                    {/* Nút chỉ định vào buồng khám này */}
-                                    <Button
-                                        fullWidth
-                                        size="small"
-                                        variant={isShortest ? "contained" : "outlined"}
-                                        color={isShortest ? "success" : "inherit"}
-                                        onClick={() => {
-                                            setNewProfile(prev => ({
-                                                ...prev,
-                                                roomName: room.roomName,
-                                                doctorName: room.doctorName
-                                            }));
-                                            setOpenCreateProfileModal(true);
-                                        }}
-                                        sx={{ mt: 1.5, borderRadius: 2, fontWeight: 700, fontSize: "0.75rem" }}
-                                    >
-                                        Điều Phối Vào {room.roomName}
-                                    </Button>
-                                </Card>
-                            </Grid>
-                        );
-                    })}
-                </Grid>
-            </Paper>
-
-            {/* Quick KPI Overview Cards */}
-            <Grid container spacing={2.5} mb={3}>
-                <Grid item xs={12} sm={6} md={3}>
-                    <Card elevation={0} sx={{ p: 2, borderRadius: 3, border: "1px solid #E2E8F0", bgcolor: "#FFFFFF" }}>
-                        <Typography variant="caption" color="textSecondary" fontWeight="bold">TỔNG TIẾP NHẬN HÔM NAY</Typography>
-                        <Typography variant="h4" fontWeight="900" color="#0088D6" mt={0.5}>{queueList.length}</Typography>
-                        <Typography variant="caption" color="textSecondary">Bệnh nhân đã cấp số</Typography>
-                    </Card>
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                    <Card elevation={0} sx={{ p: 2, borderRadius: 3, border: "1px solid #E2E8F0", bgcolor: "#FFFFFF" }}>
-                        <Typography variant="caption" color="textSecondary" fontWeight="bold">ĐANG CHỜ GỌI KHÁM</Typography>
-                        <Typography variant="h4" fontWeight="900" color="#F59E0B" mt={0.5}>
-                            {queueList.filter(q => q.status === "WAITING").length}
-                        </Typography>
-                        <Typography variant="caption" color="textSecondary">Tại các sảnh buồng khám</Typography>
-                    </Card>
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                    <Card elevation={0} sx={{ p: 2, borderRadius: 3, border: "1px solid #E2E8F0", bgcolor: "#FFFFFF" }}>
-                        <Typography variant="caption" color="textSecondary" fontWeight="bold">ĐANG TRONG BÀN KHÁM</Typography>
-                        <Typography variant="h4" fontWeight="900" color="#00C292" mt={0.5}>
-                            {queueList.filter(q => q.status === "EXAMINING").length}
-                        </Typography>
-                        <Typography variant="caption" color="textSecondary">Bác sĩ đang chẩn đoán</Typography>
-                    </Card>
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                    <Card elevation={0} sx={{ p: 2, borderRadius: 3, border: "1px solid #E2E8F0", bgcolor: "#FFFFFF" }}>
-                        <Typography variant="caption" color="textSecondary" fontWeight="bold">ĐÃ HOÀN TẤT LƯỢT KHÁM</Typography>
-                        <Typography variant="h4" fontWeight="900" color="#6366F1" mt={0.5}>
-                            {queueList.filter(q => q.status === "COMPLETED").length}
-                        </Typography>
-                        <Typography variant="caption" color="textSecondary">Đã ra về hoặc chuyển viện</Typography>
-                    </Card>
-                </Grid>
-            </Grid>
-
-            {/* Bảng Danh Sách Hàng Đợi & Điều Phối STT */}
-            <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: "1px solid #E2E8F0", bgcolor: "#FFFFFF" }}>
-                {/* Bộ lọc & Tìm kiếm */}
-                <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2} mb={2.5}>
-                    <Box display="flex" gap={1.5} flexWrap="wrap" flexGrow={1}>
-                        <TextField
-                            size="small"
-                            placeholder="Tìm theo tên bệnh nhân, SĐT, mã phiếu..."
-                            value={searchKeyword}
-                            onChange={(e) => setSearchKeyword(e.target.value)}
-                            sx={{ minWidth: 280 }}
-                            InputProps={{
-                                startAdornment: (
-                                    <InputAdornment position="start">
                                         <SearchIcon sx={{ color: "#94A3B8" }} />
                                     </InputAdornment>
-                                ),
-                                sx: { borderRadius: 2 }
+                                )
                             }}
                         />
-
-                        <TextField
-                            select
-                            size="small"
-                            label="Lọc Khoa Khám"
-                            value={selectedDepartment}
-                            onChange={(e) => setSelectedDepartment(e.target.value)}
-                            sx={{ minWidth: 200, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+                        <Button
+                            variant="contained"
+                            onClick={handleSearchOldPatient}
+                            disabled={lookupLoading}
+                            sx={{ fontWeight: 700, borderRadius: 2, px: 2.5, bgcolor: "#0D9488", "&:hover": { bgcolor: "#0F766E" }, textTransform: "none" }}
                         >
-                            <MenuItem value="ALL">Tất cả các khoa</MenuItem>
-                            {departments.map(d => (
-                                <MenuItem key={d.departmentId} value={d.departmentName}>{d.departmentName}</MenuItem>
-                            ))}
-                        </TextField>
+                            {lookupLoading ? <CircularProgress size={20} color="inherit" /> : "Tra Cứu"}
+                        </Button>
                     </Box>
-                </Box>
 
-                {/* Bảng Hàng Đợi */}
-                <TableContainer>
-                    <Table>
-                        <TableHead sx={{ bgcolor: "#F8FAFC" }}>
-                            <TableRow>
-                                <TableCell sx={{ fontWeight: "bold", width: 80, textAlign: "center" }}>STT</TableCell>
-                                <TableCell sx={{ fontWeight: "bold" }}>Mã Phiếu</TableCell>
-                                <TableCell sx={{ fontWeight: "bold" }}>Họ Tên Bệnh Nhân</TableCell>
-                                <TableCell sx={{ fontWeight: "bold" }}>Số Điện Thoại</TableCell>
-                                <TableCell sx={{ fontWeight: "bold" }}>Chuyên Khoa & Phòng</TableCell>
-                                <TableCell sx={{ fontWeight: "bold" }}>Triệu Chứng Ban Đầu</TableCell>
-                                <TableCell sx={{ fontWeight: "bold" }}>Giờ Tiếp Nhận</TableCell>
-                                <TableCell sx={{ fontWeight: "bold", textAlign: "center" }}>Trạng Thái</TableCell>
-                                <TableCell sx={{ fontWeight: "bold", textAlign: "center" }}>Thao Tác Điều Phối</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {filteredQueue.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={9} align="center" sx={{ py: 4, color: "text.secondary" }}>
-                                        Không tìm thấy bệnh nhân nào trong danh sách chờ tiếp nhận.
-                                    </TableCell>
-                                </TableRow>
-                            ) : (
-                                filteredQueue.map((item) => (
-                                    <TableRow key={item.bookingId} hover sx={{ bgcolor: item.status === "EXAMINING" ? "rgba(0, 194, 146, 0.05)" : "inherit" }}>
-                                        <TableCell align="center">
-                                            <Chip
-                                                label={`#${item.queueNumber}`}
-                                                size="small"
-                                                sx={{
-                                                    fontWeight: "900",
-                                                    fontSize: "0.85rem",
-                                                    bgcolor: item.status === "EXAMINING" ? "#00C292" : "#E2E8F0",
-                                                    color: item.status === "EXAMINING" ? "#FFFFFF" : "#1E293B"
-                                                }}
-                                            />
-                                        </TableCell>
-                                        <TableCell sx={{ fontWeight: 700, color: "#0088D6" }}>
-                                            {item.bookingId}
-                                        </TableCell>
-                                        <TableCell sx={{ fontWeight: 700 }}>
-                                            {item.patientName}
-                                        </TableCell>
-                                        <TableCell>{item.phone}</TableCell>
-                                        <TableCell>
-                                            <Typography variant="body2" fontWeight="600">{item.departmentName}</Typography>
-                                            <Typography variant="caption" color="primary" fontWeight="bold">
-                                                {item.roomName} {item.doctorName ? `(${item.doctorName})` : ''}
-                                            </Typography>
-                                        </TableCell>
-                                        <TableCell sx={{ maxWidth: 220, fontSize: "0.85rem", color: "#475569" }}>
-                                            {item.symptoms}
-                                        </TableCell>
-                                        <TableCell sx={{ fontWeight: 600, color: "#64748B" }}>
-                                            <Stack spacing={0.5} alignItems="flex-start">
-                                                <Typography variant="body2">{item.checkInTime}</Typography>
-                                                <Chip
-                                                    label={item.checkedInAt ? "Đã check-in kiosk" : "Chưa check-in kiosk"}
-                                                    size="small"
-                                                    color={item.checkedInAt ? "success" : "default"}
-                                                    variant={item.checkedInAt ? "filled" : "outlined"}
-                                                />
-                                            </Stack>
-                                        </TableCell>
-                                        <TableCell align="center">
-                                            {item.status === "WAITING" && <Chip label="Đang chờ gọi" color="warning" size="small" sx={{ fontWeight: 700 }} />}
-                                            {item.status === "EXAMINING" && <Chip label="Đang khám" color="info" size="small" sx={{ fontWeight: 700 }} />}
-                                            {item.status === "COMPLETED" && <Chip label="Đã khám xong" color="success" size="small" sx={{ fontWeight: 700 }} />}
-                                            {item.status === "CANCELLED" && <Chip label="Vắng mặt" color="error" size="small" sx={{ fontWeight: 600 }} />}
-                                        </TableCell>
-                                        <TableCell align="center">
-                                            <Box display="flex" justifyContent="center" gap={0.8}>
-                                                {item.status === "WAITING" && (
-                                                    <Tooltip title="Mời vào phòng bác sĩ khám (Check-in)">
-                                                        <Button
-                                                            size="small"
-                                                            variant="contained"
-                                                            color="success"
-                                                            startIcon={<PlayArrowIcon />}
-                                                            onClick={() => handleUpdateStatus(item.bookingId, "EXAMINING")}
-                                                            sx={{ borderRadius: 2, fontWeight: 700, fontSize: "0.75rem", py: 0.4 }}
-                                                        >
-                                                            Vào Khám
-                                                        </Button>
-                                                    </Tooltip>
-                                                )}
-
-                                                {item.status === "EXAMINING" && (
-                                                    <Tooltip title="Xác nhận hoàn tất ca khám">
-                                                        <Button
-                                                            size="small"
-                                                            variant="outlined"
-                                                            color="primary"
-                                                            startIcon={<CheckCircleIcon />}
-                                                            onClick={() => handleUpdateStatus(item.bookingId, "COMPLETED")}
-                                                            sx={{ borderRadius: 2, fontWeight: 700, fontSize: "0.75rem", py: 0.4 }}
-                                                        >
-                                                            Đã Xong
-                                                        </Button>
-                                                    </Tooltip>
-                                                )}
-
-                                                {/* In lại phiếu nhiệt có Barcode/QR */}
-                                                <Tooltip title="In lại phiếu số thứ tự (Kèm Barcode Check-in)">
-                                                    <IconButton
-                                                        size="small"
-                                                        color="info"
-                                                        onClick={() => setPrintTicket(item)}
-                                                        sx={{ bgcolor: "#F1F5F9", borderRadius: 1.5 }}
-                                                    >
-                                                        <PrintIcon fontSize="small" />
-                                                    </IconButton>
-                                                </Tooltip>
-
-                                                {/* Nút Thu Viện Phí Tại Quầy (A5) */}
-                                                <Tooltip title="Thu viện phí tại quầy và xuất hóa đơn A5">
-                                                    <IconButton
-                                                        size="small"
-                                                        onClick={() => {
-                                                            setPayFormData({
-                                                                bookingId: item.bookingId,
-                                                                bookingCode: item.queueCode || item.bookingId,
-                                                                patientName: item.patientName,
-                                                                amount: 200000,
-                                                                paymentMethod: "CASH",
-                                                                cashierNotes: `Thu viện phí khám tại quầy cho ${item.patientName}`
-                                                            });
-                                                            setOpenPayDialog(true);
-                                                        }}
-                                                        sx={{ bgcolor: "#F5F3FF", color: "#7C3AED", borderRadius: 1.5, "&:hover": { bgcolor: "#EDE9FE" } }}
-                                                    >
-                                                        <ReceiptLongIcon fontSize="small" />
-                                                    </IconButton>
-                                                </Tooltip>
-
-                                                {item.status === "WAITING" && (
-                                                    <Tooltip title="Báo bệnh nhân vắng mặt">
-                                                        <IconButton
-                                                            size="small"
-                                                            color="error"
-                                                            onClick={() => handleUpdateStatus(item.bookingId, "CANCELLED")}
-                                                            sx={{ bgcolor: "#FEE2E2", borderRadius: 1.5 }}
-                                                        >
-                                                            <CancelIcon fontSize="small" />
-                                                        </IconButton>
-                                                    </Tooltip>
-                                                )}
+                    {/* Danh sách ứng viên khi có nhiều kết quả */}
+                    {candidateProfiles.length > 1 && (
+                        <Box mb={2}>
+                            <Typography variant="caption" fontWeight="800" color="#0F766E" sx={{ display: "block", mb: 1, textTransform: "uppercase" }}>
+                                Tìm thấy {candidateProfiles.length} hồ sơ khả dụng (Chọn 1 hồ sơ bên dưới):
+                            </Typography>
+                            <Stack spacing={1} sx={{ maxHeight: 220, overflowY: "auto", pr: 0.5 }}>
+                                {candidateProfiles.map(p => {
+                                    const isSelected = foundPatient?.patientProfileId === p.patientProfileId || (foundPatient && foundPatient.phoneNumber === p.phoneNumber && foundPatient.fullName === p.fullName);
+                                    return (
+                                        <Card
+                                            key={p.patientProfileId || (p.phoneNumber + p.fullName)}
+                                            elevation={0}
+                                            onClick={() => {
+                                                setFoundPatient(p);
+                                                setFeedback({ type: "success", message: `Đã chọn: ${p.fullName}` });
+                                            }}
+                                            sx={{
+                                                p: 1.5,
+                                                borderRadius: 2,
+                                                cursor: "pointer",
+                                                border: isSelected ? "2px solid #0D9488" : "1px solid #E2E8F0",
+                                                bgcolor: isSelected ? "#F0FDFA" : "#FFFFFF",
+                                                transition: "all 0.15s ease",
+                                                "&:hover": { borderColor: "#0D9488", bgcolor: "#F8FAFC" }
+                                            }}
+                                        >
+                                            <Box display="flex" justifyContent="space-between" alignItems="center">
+                                                <Typography variant="body2" fontWeight="800" color="#0F172A">{p.fullName}</Typography>
+                                                <Chip label={p.gender === "MALE" ? "Nam" : "Nữ"} size="small" sx={{ height: 18, fontSize: "0.65rem" }} />
                                             </Box>
-                                        </TableCell>
-                                    </TableRow>
-                                ))
+                                            <Typography variant="caption" color="#475569" display="block">
+                                                SĐT: <b>{p.phoneNumber || "---"}</b> • CCCD: <b>{p.identityCard || "---"}</b> • NS: <b>{p.dateOfBirth ? formatDate(p.dateOfBirth) : "Chưa có dữ liệu"}</b>
+                                            </Typography>
+                                            {p.address && (
+                                                <Typography variant="caption" color="#64748B" display="block" noWrap>
+                                                    Đ/C: {p.address}
+                                                </Typography>
+                                            )}
+                                        </Card>
+                                    );
+                                })}
+                            </Stack>
+                        </Box>
+                    )}
+
+                    {/* Thẻ bệnh nhân được chọn để xác nhận */}
+                    {foundPatient && (
+                        <Card elevation={0} sx={{ p: 2, border: "1.5px solid #0D9488", bgcolor: "#F0FDFA", borderRadius: 2.5 }}>
+                            <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                                <Box>
+                                    <Typography variant="caption" fontWeight="800" color="#0D9488" display="block">HỒ SƠ ĐÃ XÁC NHẬN:</Typography>
+                                    <Typography variant="subtitle1" fontWeight="800" color="#0F172A">
+                                        {foundPatient.fullName}
+                                    </Typography>
+                                </Box>
+                                <Chip label={foundPatient.gender === "MALE" ? "Nam" : "Nữ"} color="primary" size="small" sx={{ fontWeight: 700 }} />
+                            </Box>
+                            <Typography variant="body2" color="#475569">SĐT: <b>{foundPatient.phoneNumber}</b> • CCCD: <b>{foundPatient.identityCard || "---"}</b></Typography>
+                            <Typography variant="body2" color="#475569">Ngày sinh: <b>{foundPatient.dateOfBirth ? formatDate(foundPatient.dateOfBirth) : "Chưa có dữ liệu"}</b></Typography>
+                            <Typography variant="body2" color="#475569">Địa chỉ: <b>{foundPatient.address || "---"}</b></Typography>
+                            {foundPatient.medicalHistory && (
+                                <Typography variant="caption" color="#B45309" fontWeight="700" display="block" sx={{ mt: 1 }}>
+                                    Tiền sử bệnh: {foundPatient.medicalHistory}
+                                </Typography>
                             )}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
-            </Paper>
+                            <Button
+                                fullWidth
+                                variant="contained"
+                                startIcon={<PersonAddIcon />}
+                                onClick={() => handleUseFoundPatient(foundPatient)}
+                                sx={{ mt: 2, fontWeight: 800, borderRadius: 2, bgcolor: "#0D9488", "&:hover": { bgcolor: "#0F766E" }, textTransform: "none" }}
+                            >
+                                Tiếp Nhận Bệnh Nhân Này Vào Lượt Khám
+                            </Button>
+                        </Card>
+                    )}
+
+                    {!foundPatient && candidateProfiles.length === 0 && lookupSearched && !lookupLoading && (
+                        <Box textAlign="center" py={3} color="#94A3B8">
+                            <Typography variant="body2">Không tìm thấy bệnh nhân cũ với thông tin trên.</Typography>
+                        </Box>
+                    )}
+                </DialogContent>
+            </Dialog>
 
             {/* ========================================================================= */}
-            {/* MODAL TIẾP NHẬN BỆNH NHÂN & ĐIỀU PHỐI BUỒNG KHÁM CẤP STT TẠI QUẦY */}
+            {/* MODAL 2: TIẾP NHẬN BỆNH NHÂN MỚI & CẤP SỐ THỨ TỰ */}
             {/* ========================================================================= */}
             <Dialog open={openCreateProfileModal} onClose={() => setOpenCreateProfileModal(false)} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
-                <DialogTitle sx={{ fontWeight: "bold", borderBottom: "1px solid #E2E8F0", color: "#00C292", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span>📋 Tiếp Nhận Bệnh Nhân & Điều Phối Buồng Khám Thông Minh</span>
-                    <Chip label="Cân Bằng Tải Tự Động" color="success" size="small" sx={{ fontWeight: 700 }} />
+                <DialogTitle sx={{ fontWeight: 800, borderBottom: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span>Phiếu Tiếp Nhận & Cấp Số Thứ Tự Khám</span>
+                    <IconButton size="small" onClick={() => setOpenCreateProfileModal(false)}><CloseIcon /></IconButton>
                 </DialogTitle>
-                <form onSubmit={handleCreateAndCheckIn}>
-                    <DialogContent sx={{ pt: 2.5 }}>
-                        {/* Thanh tìm kiếm nhanh hồ sơ cũ bên trong Modal */}
-                        <Box sx={{ p: 1.5, mb: 2, bgcolor: "#F0FDF4", borderRadius: 2, border: "1px dashed #86EFAC" }}>
-                            <Typography variant="caption" fontWeight="bold" color="#166534" display="block" mb={0.5}>
-                                🔍 Bệnh nhân tái khám? Nhập SĐT hoặc CCCD để tự động điền thông tin cũ:
-                            </Typography>
-                            <Box display="flex" gap={1}>
-                                <TextField
-                                    size="small"
-                                    fullWidth
-                                    placeholder="Nhập SĐT hoặc Số CCCD cũ..."
-                                    value={patientLookupQuery}
-                                    onChange={(e) => setPatientLookupQuery(e.target.value)}
-                                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleSearchOldPatient(); } }}
-                                    sx={{ bgcolor: "#FFFFFF", borderRadius: 1 }}
-                                />
-                                <Button
-                                    variant="contained"
-                                    onClick={() => handleSearchOldPatient()}
-                                    sx={{ bgcolor: "#00C292", "&:hover": { bgcolor: "#00A77D" }, fontWeight: 700, minWidth: 100 }}
-                                >
-                                    Tự Điền
-                                </Button>
-                            </Box>
-                        </Box>
-
+                <DialogContent sx={{ pt: 2.5 }}>
+                    <form onSubmit={handleCreateProfileSubmit}>
                         <Grid container spacing={2}>
                             <Grid item xs={12} sm={6}>
                                 <TextField
                                     fullWidth
-                                    label="Họ và tên bệnh nhân"
                                     required
+                                    size="small"
+                                    label="Họ và tên bệnh nhân"
                                     value={newProfile.fullName}
                                     onChange={(e) => setNewProfile({ ...newProfile, fullName: e.target.value })}
-                                    placeholder="VÍ DỤ: TRẦN VĂN A"
-                                    InputProps={{ sx: { borderRadius: 2 } }}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={6}>
                                 <TextField
                                     fullWidth
-                                    label="Số điện thoại liên hệ"
                                     required
+                                    size="small"
+                                    label="Số điện thoại"
                                     value={newProfile.phoneNumber}
                                     onChange={(e) => setNewProfile({ ...newProfile, phoneNumber: e.target.value })}
-                                    placeholder="0987654321"
-                                    InputProps={{ sx: { borderRadius: 2 } }}
                                 />
                             </Grid>
-
-                            <Grid item xs={12} sm={6}>
+                            <Grid item xs={12} sm={4}>
                                 <TextField
                                     fullWidth
-                                    label="Số CCCD / CMND"
+                                    size="small"
+                                    label="Số CCCD / Định danh"
                                     value={newProfile.identityCard}
                                     onChange={(e) => setNewProfile({ ...newProfile, identityCard: e.target.value })}
-                                    placeholder="12 chữ số"
-                                    InputProps={{ sx: { borderRadius: 2 } }}
                                 />
                             </Grid>
-                            <Grid item xs={12} sm={6}>
+                            <Grid item xs={12} sm={4}>
                                 <TextField
                                     fullWidth
+                                    size="small"
                                     type="date"
                                     label="Ngày sinh"
-                                    InputLabelProps={{ shrink: true }}
-                                    value={newProfile.dateOfBirth}
+                                    value={newProfile.dateOfBirth || ""}
                                     onChange={(e) => setNewProfile({ ...newProfile, dateOfBirth: e.target.value })}
-                                    InputProps={{ sx: { borderRadius: 2 } }}
+                                    InputLabelProps={{ shrink: true }}
+                                    helperText={!newProfile.dateOfBirth ? "Để trống nếu chưa có ngày sinh" : ""}
                                 />
                             </Grid>
-
-                            <Grid item xs={12} sm={6}>
+                            <Grid item xs={12} sm={4}>
                                 <TextField
                                     select
                                     fullWidth
+                                    size="small"
                                     label="Giới tính"
                                     value={newProfile.gender}
                                     onChange={(e) => setNewProfile({ ...newProfile, gender: e.target.value })}
-                                    InputProps={{ sx: { borderRadius: 2 } }}
                                 >
                                     <MenuItem value="MALE">Nam</MenuItem>
                                     <MenuItem value="FEMALE">Nữ</MenuItem>
                                 </TextField>
                             </Grid>
+                            <Grid item xs={12}>
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    label="Địa chỉ thường trú"
+                                    value={newProfile.address}
+                                    onChange={(e) => setNewProfile({ ...newProfile, address: e.target.value })}
+                                />
+                            </Grid>
 
+                            <Grid item xs={12}><Divider sx={{ my: 1 }} /></Grid>
+
+                            {/* CHỌN KHOA & BUỒNG KHÁM */}
                             <Grid item xs={12} sm={6}>
                                 <TextField
                                     select
-                                    fullWidth
                                     required
-                                    label="Khoa khám chỉ định"
-                                    value={newProfile.departmentId}
-                                    onChange={(e) => {
-                                        const deptId = e.target.value;
-                                        const best = getShortestQueueRoom(deptId);
-                                        setNewProfile({
-                                            ...newProfile,
-                                            departmentId: deptId,
-                                            roomName: best ? best.roomName : "Phòng 101",
-                                            doctorName: best ? best.doctorName : "BS. Phụ trách"
-                                        });
-                                    }}
-                                    InputProps={{ sx: { borderRadius: 2 } }}
+                                    fullWidth
+                                    size="small"
+                                    label="Khoa Khám Bệnh *"
+                                    value={newProfile.departmentId || ""}
+                                    onChange={(e) => setNewProfile({ ...newProfile, departmentId: e.target.value })}
+                                    error={!newProfile.departmentId}
+                                    helperText={!newProfile.departmentId ? "Bắt buộc chọn chuyên khoa khám" : ""}
                                 >
-                                    {departments.map(d => (
-                                        <MenuItem key={d.departmentId} value={d.departmentId}>{d.departmentName}</MenuItem>
+                                    <MenuItem value="" disabled>-- Vui lòng chọn khoa khám --</MenuItem>
+                                    {departments.map((d) => (
+                                        <MenuItem key={d.departmentId} value={d.departmentId.toString()}>
+                                            {d.departmentName}
+                                        </MenuItem>
                                     ))}
                                 </TextField>
                             </Grid>
 
-                            {/* LỰA CHỌN BUỒNG KHÁM VÀ GỢI Ý HÀNG ĐỢI NGẮN NHẤT */}
-                            <Grid item xs={12}>
-                                <Box sx={{ p: 1.5, border: "1px solid #CBD5E1", borderRadius: 2, bgcolor: "#F8FAFC" }}>
-                                    <Typography variant="caption" fontWeight="800" color="#0F172A" display="block" mb={1}>
-                                        🎯 GỢI Ý BUỒNG KHÁM CÂN BẰNG TẢI (Chọn buồng khám cho bệnh nhân):
-                                    </Typography>
-                                    <Grid container spacing={1}>
-                                        {getDepartmentRoomStats(newProfile.departmentId).map(room => {
-                                            const isSelected = newProfile.roomName === room.roomName;
-                                            const isShortest = getShortestQueueRoom(newProfile.departmentId)?.roomId === room.roomId;
-                                            return (
-                                                <Grid item xs={12} sm={6} md={3} key={room.roomId}>
-                                                    <Box
-                                                        onClick={() => setNewProfile({
-                                                            ...newProfile,
-                                                            roomName: room.roomName,
-                                                            doctorName: room.doctorName
-                                                        })}
-                                                        sx={{
-                                                            p: 1.2,
-                                                            borderRadius: 2,
-                                                            cursor: "pointer",
-                                                            border: isSelected ? "2px solid #00C292" : "1px solid #E2E8F0",
-                                                            bgcolor: isSelected ? "#F0FDF4" : "#FFFFFF",
-                                                            textAlign: "center"
-                                                        }}
-                                                    >
-                                                        <Typography variant="body2" fontWeight="800" color={isSelected ? "#00A77D" : "#1E293B"}>
-                                                            {room.roomName} {isSelected && "✓"}
-                                                        </Typography>
-                                                        <Typography variant="caption" color="textSecondary" display="block">
-                                                            {room.doctorName}
-                                                        </Typography>
-                                                        <Chip
-                                                            label={`Chờ: ${room.waitingCount} người`}
-                                                            size="small"
-                                                            color={room.loadLevel === "HEAVY" ? "error" : room.loadLevel === "MEDIUM" ? "warning" : "success"}
-                                                            sx={{ height: 18, fontSize: "0.65rem", fontWeight: 700, mt: 0.5 }}
-                                                        />
-                                                    </Box>
-                                                </Grid>
-                                            );
-                                        })}
-                                    </Grid>
-                                </Box>
-                            </Grid>
-
-                            {/* KHỐI SƠ CHẨN SINH HIỆU & THỂ TRẠNG (TRIAGE) */}
-                            <Grid item xs={12}>
-                                <Paper
-                                    elevation={0}
-                                    sx={{
-                                        p: 2,
-                                        borderRadius: 2.5,
-                                        border: "1.5px solid #00C292",
-                                        bgcolor: "#F0FDF4"
-                                    }}
-                                >
-                                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={1.5} flexWrap="wrap" gap={1}>
-                                        <Box display="flex" alignItems="center" gap={1}>
-                                            <LocalHospitalIcon sx={{ color: "#00A77D", fontSize: 22 }} />
-                                            <Typography variant="subtitle2" fontWeight="800" color="#0F5132" textTransform="uppercase">
-                                                🩺 Bàn Sơ Chẩn: Đo Chỉ Số Sinh Hiệu & Thể Trạng (Triage)
-                                            </Typography>
-                                        </Box>
-                                        <Chip
-                                            label={`BMI: ${calculateNurseBMI(newProfile.weight, newProfile.height).bmi} (${calculateNurseBMI(newProfile.weight, newProfile.height).classification})`}
-                                            size="small"
-                                            sx={{
-                                                bgcolor: "#DCFCE7",
-                                                color: calculateNurseBMI(newProfile.weight, newProfile.height).color,
-                                                fontWeight: 800,
-                                                fontSize: "0.75rem"
-                                            }}
-                                        />
-                                    </Box>
-
-                                    <Grid container spacing={1.5}>
-                                        <Grid item xs={6} sm={4} md={2}>
-                                            <TextField
-                                                fullWidth
-                                                size="small"
-                                                label="Huyết áp"
-                                                placeholder="120/80"
-                                                value={newProfile.bloodPressure}
-                                                onChange={(e) => setNewProfile({ ...newProfile, bloodPressure: e.target.value })}
-                                                InputProps={{
-                                                    endAdornment: <InputAdornment position="end"><Typography variant="caption" color="textSecondary">mmHg</Typography></InputAdornment>,
-                                                    sx: { bgcolor: "#fff", borderRadius: 1.5, fontWeight: 700 }
-                                                }}
-                                            />
-                                        </Grid>
-                                        <Grid item xs={6} sm={4} md={2}>
-                                            <TextField
-                                                fullWidth
-                                                size="small"
-                                                type="number"
-                                                label="Nhịp tim"
-                                                placeholder="76"
-                                                value={newProfile.heartRate}
-                                                onChange={(e) => setNewProfile({ ...newProfile, heartRate: e.target.value })}
-                                                InputProps={{
-                                                    endAdornment: <InputAdornment position="end"><Typography variant="caption" color="textSecondary">bpm</Typography></InputAdornment>,
-                                                    sx: { bgcolor: "#fff", borderRadius: 1.5, fontWeight: 700 }
-                                                }}
-                                            />
-                                        </Grid>
-                                        <Grid item xs={6} sm={4} md={2}>
-                                            <TextField
-                                                fullWidth
-                                                size="small"
-                                                type="number"
-                                                inputProps={{ step: "0.1" }}
-                                                label="Thân nhiệt"
-                                                placeholder="36.8"
-                                                value={newProfile.temperature}
-                                                onChange={(e) => setNewProfile({ ...newProfile, temperature: e.target.value })}
-                                                InputProps={{
-                                                    endAdornment: <InputAdornment position="end"><Typography variant="caption" color="textSecondary">°C</Typography></InputAdornment>,
-                                                    sx: { bgcolor: "#fff", borderRadius: 1.5, fontWeight: 700 }
-                                                }}
-                                            />
-                                        </Grid>
-                                        <Grid item xs={6} sm={4} md={2}>
-                                            <TextField
-                                                fullWidth
-                                                size="small"
-                                                type="number"
-                                                label="SpO2"
-                                                placeholder="98"
-                                                value={newProfile.spO2}
-                                                onChange={(e) => setNewProfile({ ...newProfile, spO2: e.target.value })}
-                                                InputProps={{
-                                                    endAdornment: <InputAdornment position="end"><Typography variant="caption" color="textSecondary">%</Typography></InputAdornment>,
-                                                    sx: { bgcolor: "#fff", borderRadius: 1.5, fontWeight: 700 }
-                                                }}
-                                            />
-                                        </Grid>
-                                        <Grid item xs={6} sm={4} md={2}>
-                                            <TextField
-                                                fullWidth
-                                                size="small"
-                                                type="number"
-                                                label="Chiều cao"
-                                                placeholder="168"
-                                                value={newProfile.height}
-                                                onChange={(e) => setNewProfile({ ...newProfile, height: e.target.value })}
-                                                InputProps={{
-                                                    endAdornment: <InputAdornment position="end"><Typography variant="caption" color="textSecondary">cm</Typography></InputAdornment>,
-                                                    sx: { bgcolor: "#fff", borderRadius: 1.5, fontWeight: 700 }
-                                                }}
-                                            />
-                                        </Grid>
-                                        <Grid item xs={6} sm={4} md={2}>
-                                            <TextField
-                                                fullWidth
-                                                size="small"
-                                                type="number"
-                                                label="Cân nặng"
-                                                placeholder="62"
-                                                value={newProfile.weight}
-                                                onChange={(e) => setNewProfile({ ...newProfile, weight: e.target.value })}
-                                                InputProps={{
-                                                    endAdornment: <InputAdornment position="end"><Typography variant="caption" color="textSecondary">kg</Typography></InputAdornment>,
-                                                    sx: { bgcolor: "#fff", borderRadius: 1.5, fontWeight: 700 }
-                                                }}
-                                            />
-                                        </Grid>
-
-                                        {/* Cảnh báo Dị ứng & Bệnh mạn tính */}
-                                        <Grid item xs={12} sm={6}>
-                                            <TextField
-                                                fullWidth
-                                                size="small"
-                                                label="⚠️ Cảnh báo tiền sử dị ứng thuốc"
-                                                placeholder="VD: Dị ứng Penicillin, Amoxicillin (Sốc phản vệ độ 1)..."
-                                                value={newProfile.allergies}
-                                                onChange={(e) => setNewProfile({ ...newProfile, allergies: e.target.value })}
-                                                InputProps={{ sx: { bgcolor: "#fff", borderRadius: 1.5 } }}
-                                                helperText="Bác sĩ sẽ nhận cảnh báo đỏ CHỐNG CHỈ ĐỊNH DỊ ỨNG khi kê đơn"
-                                            />
-                                        </Grid>
-                                        <Grid item xs={12} sm={6}>
-                                            <TextField
-                                                fullWidth
-                                                size="small"
-                                                label="🩺 Tiền sử bệnh lý mạn tính"
-                                                placeholder="VD: Tăng huyết áp 5 năm, Viêm loét dạ dày tá tràng..."
-                                                value={newProfile.medicalHistory}
-                                                onChange={(e) => setNewProfile({ ...newProfile, medicalHistory: e.target.value })}
-                                                InputProps={{ sx: { bgcolor: "#fff", borderRadius: 1.5 } }}
-                                                helperText="Hiển thị ngay tại banner tiền sử bệnh của Bác sĩ"
-                                            />
-                                        </Grid>
-                                    </Grid>
-                                </Paper>
+                            <Grid item xs={12} sm={6}>
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    label="Phòng khám chỉ định"
+                                    value={newProfile.roomName || (shortestRoomForSelectedDept?.roomName || "")}
+                                    onChange={(e) => setNewProfile({ ...newProfile, roomName: e.target.value })}
+                                    placeholder="Hệ thống tự động phân buồng rảnh nhất"
+                                    helperText={shortestRoomForSelectedDept ? `Gợi ý buồng rảnh: ${shortestRoomForSelectedDept.roomName}` : "Hệ thống sẽ tự phân buồng khám rảnh nhất"}
+                                />
                             </Grid>
 
                             <Grid item xs={12}>
                                 <TextField
                                     fullWidth
-                                    multiline
-                                    rows={2}
-                                    label="Lý do khám / Triệu chứng ban đầu"
-                                    placeholder="Ví dụ: Đau tức ngực, ho kéo dài kèm sốt..."
+                                    size="small"
+                                    label="Triệu chứng ban đầu / Lý do đến khám"
                                     value={newProfile.symptoms}
                                     onChange={(e) => setNewProfile({ ...newProfile, symptoms: e.target.value })}
-                                    InputProps={{ sx: { borderRadius: 2 } }}
                                 />
                             </Grid>
-                        </Grid>
-                    </DialogContent>
-                    <DialogActions sx={{ p: 2, borderTop: "1px solid #E2E8F0" }}>
-                        <Button onClick={() => setOpenCreateProfileModal(false)} color="inherit" sx={{ fontWeight: 600 }}>
-                            Hủy bỏ
-                        </Button>
-                        <Button type="submit" variant="contained" sx={{ bgcolor: "#00C292", "&:hover": { bgcolor: "#00A77D" }, fontWeight: 700, borderRadius: 2 }}>
-                            Cấp Số Thứ Tự & In Phiếu
-                        </Button>
-                    </DialogActions>
-                </form>
-            </Dialog>
 
-            {/* ========================================================================= */}
-            {/* MỤC 6: MODAL IN PHIẾU NHIỆT K80 CÓ MÃ VẠCH (BARCODE) & QR CODE CHECK-IN */}
-            {/* ========================================================================= */}
-            <Dialog open={Boolean(printTicket)} onClose={() => setPrintTicket(null)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
-                <DialogTitle sx={{ textAlign: "center", pb: 0 }}>
-                    <Typography variant="h6" fontWeight="bold">PHIẾU TIẾP NHẬN KHÁM BỆNH</Typography>
-                    <Typography variant="caption" color="textSecondary">Bệnh Viện Đa Khoa Quốc Tế TNT</Typography>
-                </DialogTitle>
-                <DialogContent sx={{ textAlign: "center", py: 2 }}>
-                    {printTicket && (
-                        <Box sx={{ border: "2px solid #333", p: 2, borderRadius: 2, bgcolor: "#FFFFFF", color: "#000" }}>
-                            <Typography variant="caption" color="textSecondary" fontWeight="bold">SỐ THỨ TỰ CỦA BẠN</Typography>
-                            <Typography variant="h2" fontWeight="900" color="#00C292" my={0.5}>
-                                {printTicket.queueNumber}
-                            </Typography>
-                            <Divider sx={{ my: 1 }} />
-                            <Typography variant="subtitle1" fontWeight="bold">{printTicket.patientName}</Typography>
-                            <Typography variant="body2" color="textSecondary">SĐT: {printTicket.phone}</Typography>
-                            <Typography variant="body2" fontWeight="800" color="#0088D6" mt={0.5}>
-                                {printTicket.departmentName} - {printTicket.roomName}
-                            </Typography>
-                            <Typography variant="caption" color="textSecondary" display="block">
-                                Bác sĩ phụ trách: <b>{printTicket.doctorName || "BS. Theo buồng khám"}</b>
-                            </Typography>
-                            <Typography variant="caption" color="textSecondary" display="block" mt={0.5}>
-                                Giờ cấp: {printTicket.checkInTime} | Mã: {printTicket.bookingId}
-                            </Typography>
+                            {/* CHỈ SỐ SINH TỒN TIẾP ĐÓN BAN ĐẦU */}
+                            <Grid item xs={12}><Divider sx={{ my: 1 }}><Chip label="Chỉ số sinh tồn ban đầu" size="small" /></Divider></Grid>
 
-                            {/* THÔNG TIN SINH HIỆU SƠ CHẨN TRÊN PHIẾU KHÁM */}
-                            {printTicket.vitals && (
-                                <Box sx={{ mt: 1, p: 0.8, bgcolor: "#F8FAFC", borderRadius: 1.5, border: "1px dashed #94A3B8", textAlign: "left" }}>
-                                    <Typography variant="caption" fontWeight="bold" color="#0F172A" display="block">
-                                        🩺 SINH HIỆU BÀN SƠ CHẨN:
-                                    </Typography>
-                                    <Typography sx={{ fontSize: "0.72rem", color: "#334155" }}>
-                                        • HA: <b>{printTicket.vitals.bloodPressure} mmHg</b> | Mạch: <b>{printTicket.vitals.heartRate} bpm</b>
-                                    </Typography>
-                                    <Typography sx={{ fontSize: "0.72rem", color: "#334155" }}>
-                                        • Nhiệt độ: <b>{printTicket.vitals.temperature}°C</b> | SpO2: <b>{printTicket.vitals.spO2}%</b>
-                                    </Typography>
-                                    <Typography sx={{ fontSize: "0.72rem", color: "#334155" }}>
-                                        • Thể trạng: <b>{printTicket.vitals.weight}kg / {printTicket.vitals.height}cm</b> (BMI: {((printTicket.vitals.weight / Math.pow(printTicket.vitals.height / 100, 2)) || 22).toFixed(1)})
-                                    </Typography>
-                                    {printTicket.vitals.allergies && printTicket.vitals.allergies !== "Chưa ghi nhận dị ứng thuốc" && (
-                                        <Typography sx={{ fontSize: "0.7rem", color: "#DC2626", fontWeight: "bold", mt: 0.3 }}>
-                                            ⚠️ Dị ứng: {printTicket.vitals.allergies}
-                                        </Typography>
-                                    )}
+                            <Grid item xs={6} sm={3}>
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    label="Huyết áp"
+                                    value={newProfile.bloodPressure}
+                                    onChange={(e) => setNewProfile({ ...newProfile, bloodPressure: e.target.value })}
+                                    placeholder="120/80"
+                                />
+                            </Grid>
+                            <Grid item xs={6} sm={3}>
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    label="Nhịp tim (bpm)"
+                                    value={newProfile.heartRate}
+                                    onChange={(e) => setNewProfile({ ...newProfile, heartRate: e.target.value })}
+                                    placeholder="76"
+                                />
+                            </Grid>
+                            <Grid item xs={6} sm={3}>
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    label="Nhiệt độ (°C)"
+                                    value={newProfile.temperature}
+                                    onChange={(e) => setNewProfile({ ...newProfile, temperature: e.target.value })}
+                                    placeholder="36.8"
+                                />
+                            </Grid>
+                            <Grid item xs={6} sm={3}>
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    label="SpO2 (%)"
+                                    value={newProfile.spO2}
+                                    onChange={(e) => setNewProfile({ ...newProfile, spO2: e.target.value })}
+                                    placeholder="98"
+                                />
+                            </Grid>
+                            <Grid item xs={6} sm={3}>
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    label="Chiều cao (cm)"
+                                    value={newProfile.height}
+                                    onChange={(e) => setNewProfile({ ...newProfile, height: e.target.value })}
+                                />
+                            </Grid>
+                            <Grid item xs={6} sm={3}>
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    label="Cân nặng (kg)"
+                                    value={newProfile.weight}
+                                    onChange={(e) => setNewProfile({ ...newProfile, weight: e.target.value })}
+                                />
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                                <Box sx={{ p: 1, bgcolor: "#F8FAFC", borderRadius: 2, border: "1px solid #E2E8F0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                    <Typography variant="body2" color="#64748B">Thể trạng BMI:</Typography>
+                                    <Chip
+                                        label={`${calculateNurseBMI(newProfile.weight, newProfile.height).bmi} - ${calculateNurseBMI(newProfile.weight, newProfile.height).classification}`}
+                                        size="small"
+                                        sx={{ fontWeight: 800, bgcolor: calculateNurseBMI(newProfile.weight, newProfile.height).color, color: "#FFFFFF" }}
+                                    />
                                 </Box>
-                            )}
+                            </Grid>
+                        </Grid>
 
-                            <Divider sx={{ my: 1.5, borderStyle: "dashed" }} />
-
-                            {/* MÃ VẠCH CHECK-IN TỰ ĐỘNG CHUẨN CODE 128 */}
-                            <Box sx={{ my: 1, textAlign: "center" }}>
-                                <Typography sx={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", color: "#111", mb: 0.5, letterSpacing: 0.5 }}>
-                                    MÃ VẠCH CHECK-IN TỰ ĐỘNG
-                                </Typography>
-                                <BarcodeView value={printTicket.bookingId || `BK-${printTicket.queueNumber}`} height={42} moduleWidth={1.8} showText={true} />
-                                <Typography sx={{ fontSize: "0.7rem", color: "#555", mt: 0.5, fontStyle: "italic" }}>
-                                    Quét mã vạch tại đầu đọc trước cửa phòng để ghi nhận có mặt
-                                </Typography>
-                            </Box>
-                        </Box>
-                    )}
-                </DialogContent>
-                <DialogActions sx={{ p: 2, justifyContent: "space-between", borderTop: "1px solid #E2E8F0" }}>
-                    <Button onClick={() => setPrintTicket(null)} color="inherit">
-                        Đóng
-                    </Button>
-                    <Box display="flex" gap={1}>
-                        {/* Nút mô phỏng quét mã vạch đầu đọc */}
-                        <Tooltip title="Mô phỏng máy quét mã vạch tại cửa phòng bác sĩ đọc mã và ghi nhận có mặt">
+                        <DialogActions sx={{ px: 0, pt: 3 }}>
+                            <Button onClick={() => setOpenCreateProfileModal(false)} sx={{ fontWeight: 700 }}>Hủy</Button>
                             <Button
-                                variant="outlined"
-                                color="secondary"
-                                startIcon={<QrCodeScannerIcon />}
-                                onClick={() => handleSimulateScanCheckIn(printTicket)}
-                                sx={{ fontWeight: 700, fontSize: "0.75rem" }}
+                                type="submit"
+                                variant="contained"
+                                startIcon={<PrintIcon />}
+                                sx={{ fontWeight: 800, borderRadius: 2, bgcolor: "#0D9488", "&:hover": { bgcolor: "#0F766E" }, px: 3 }}
                             >
-                                Test Quét Mã
+                                Tiếp Nhận & In Phiếu STT
                             </Button>
-                        </Tooltip>
-                        <Button
-                            variant="contained"
-                            startIcon={<PrintIcon />}
-                            onClick={() => {
-                                printThermalTicket(printTicket);
-                                setPrintTicket(null);
-                            }}
-                            sx={{ fontWeight: 700, bgcolor: "#00C292", "&:hover": { bgcolor: "#00A77D" } }}
-                        >
-                            In Phiếu K80
-                        </Button>
-                    </Box>
-                </DialogActions>
+                        </DialogActions>
+                    </form>
+                </DialogContent>
             </Dialog>
 
             {/* ========================================================================= */}
-            {/* 1. DIALOG QUÉT QR TIẾP ĐÓN TRONG 5S & ĐO SINH HIỆU TỰ ĐỘNG TÍNH BMI */}
+            {/* MODAL 3: CHECK-IN QR 5 GIÂY */}
             {/* ========================================================================= */}
             <Dialog open={openQrCheckInDialog} onClose={() => setOpenQrCheckInDialog(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
-                <DialogTitle sx={{ fontWeight: 800, bgcolor: "#ECFDF5", color: "#065F46", borderBottom: "1px solid #A7F3D0", display: "flex", alignItems: "center", gap: 1 }}>
-                    <QrCodeScannerIcon sx={{ color: "#059669" }} />
-                    <span>Quét QR Check-in Tiếp Đón Trong 5 Giây (TT 46/2018)</span>
+                <DialogTitle sx={{ fontWeight: 800, borderBottom: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span>Quét Mã QR Tiếp Đón Nhanh (5 Giây)</span>
+                    <IconButton size="small" onClick={() => setOpenQrCheckInDialog(false)}><CloseIcon /></IconButton>
                 </DialogTitle>
-                <form onSubmit={handleQrCheckInSubmit}>
-                    <DialogContent sx={{ pt: 2.5 }}>
-                        <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>
-                            Dùng súng quét mã vạch / camera quét mã QR trên phiếu hẹn hoặc ứng dụng của bệnh nhân. Hệ thống tự động tính chỉ số BMI và điều phối buồng khám tức thì!
-                        </Alert>
-
+                <DialogContent sx={{ pt: 2.5 }}>
+                    <form onSubmit={handleQrCheckInSubmit}>
                         <TextField
                             fullWidth
-                            autoFocus
-                            label="Mã QR / Mã đặt khám (VD: BK2026... hoặc quét súng mã vạch)"
-                            value={qrFormData.qrData}
-                            onChange={(e) => setQrFormData(prev => ({ ...prev, qrData: e.target.value }))}
-                            placeholder="Quét mã QR hoặc dán mã vào đây..."
-                            sx={{ mb: 2 }}
                             required
-                            InputProps={{
-                                startAdornment: (
-                                    <InputAdornment position="start">
-                                        <QrCodeScannerIcon sx={{ color: "#059669" }} />
-                                    </InputAdornment>
-                                )
-                            }}
+                            autoFocus
+                            size="medium"
+                            label="Mã QR Check-in / Mã Phiếu Đặt Hẹn"
+                            value={qrFormData.qrData}
+                            onChange={(e) => setQrFormData({ ...qrFormData, qrData: e.target.value })}
+                            placeholder="Quét mã vạch từ máy đọc hoặc dán mã tại đây..."
+                            sx={{ mb: 2.5 }}
                         />
 
-                        <Typography variant="subtitle2" fontWeight="bold" color="#0F172A" sx={{ mb: 1 }}>
-                            Đo Sinh Hiệu Ban Đầu & Chỉ Số Thể Trạng (Triage Vitals):
+                        <Typography variant="subtitle2" fontWeight="800" color="#0369A1" mb={1.5}>
+                            Chỉ Số Sinh Hiệu Nhanh (Sơ Tuyển Điều Dưỡng):
                         </Typography>
 
                         <Grid container spacing={1.5}>
@@ -1989,61 +1548,9 @@ export default function NurseReceptionPage() {
                                 <TextField
                                     fullWidth
                                     size="small"
-                                    type="number"
-                                    label="Chiều cao (cm)"
-                                    value={qrFormData.height}
-                                    onChange={(e) => setQrFormData(prev => ({ ...prev, height: e.target.value }))}
-                                />
-                            </Grid>
-                            <Grid item xs={6}>
-                                <TextField
-                                    fullWidth
-                                    size="small"
-                                    type="number"
-                                    label="Cân nặng (kg)"
-                                    value={qrFormData.weight}
-                                    onChange={(e) => setQrFormData(prev => ({ ...prev, weight: e.target.value }))}
-                                />
-                            </Grid>
-
-                            {/* HIỂN THỊ TỰ ĐỘNG TÍNH CHỈ SỐ BMI */}
-                            <Grid item xs={12}>
-                                {(() => {
-                                    const bmiInfo = calculateNurseBMI(qrFormData.weight, qrFormData.height);
-                                    return (
-                                        <Box sx={{ p: 1.5, bgcolor: "#F8FAFC", borderRadius: 2, border: "1px dashed #CBD5E1", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                                            <Typography variant="body2" color="#334155">
-                                                Chỉ số BMI tự động: <b style={{ fontSize: "1.05rem", color: bmiInfo.color }}>{bmiInfo.bmi}</b>
-                                            </Typography>
-                                            <Chip
-                                                label={bmiInfo.classification}
-                                                size="small"
-                                                sx={{ bgcolor: bmiInfo.color + "20", color: bmiInfo.color, fontWeight: "bold" }}
-                                            />
-                                        </Box>
-                                    );
-                                })()}
-                            </Grid>
-
-                            <Grid item xs={6}>
-                                <TextField
-                                    fullWidth
-                                    size="small"
-                                    label="Huyết áp (mmHg)"
+                                    label="Huyết áp"
                                     value={qrFormData.bloodPressure}
-                                    onChange={(e) => setQrFormData(prev => ({ ...prev, bloodPressure: e.target.value }))}
-                                    placeholder="120/80"
-                                />
-                            </Grid>
-                            <Grid item xs={6}>
-                                <TextField
-                                    fullWidth
-                                    size="small"
-                                    type="number"
-                                    label="Mạch (bpm)"
-                                    value={qrFormData.heartRate}
-                                    onChange={(e) => setQrFormData(prev => ({ ...prev, heartRate: e.target.value }))}
-                                    placeholder="76"
+                                    onChange={(e) => setQrFormData({ ...qrFormData, bloodPressure: e.target.value })}
                                 />
                             </Grid>
                             <Grid item xs={6}>
@@ -2052,210 +1559,136 @@ export default function NurseReceptionPage() {
                                     size="small"
                                     label="Nhiệt độ (°C)"
                                     value={qrFormData.temperature}
-                                    onChange={(e) => setQrFormData(prev => ({ ...prev, temperature: e.target.value }))}
-                                    placeholder="36.8"
+                                    onChange={(e) => setQrFormData({ ...qrFormData, temperature: e.target.value })}
                                 />
                             </Grid>
                             <Grid item xs={6}>
                                 <TextField
                                     fullWidth
                                     size="small"
-                                    label="Nồng độ SpO2 (%)"
-                                    value={qrFormData.spo2}
-                                    onChange={(e) => setQrFormData(prev => ({ ...prev, spo2: e.target.value }))}
-                                    placeholder="98"
+                                    label="Chiều cao (cm)"
+                                    value={qrFormData.height}
+                                    onChange={(e) => setQrFormData({ ...qrFormData, height: e.target.value })}
                                 />
                             </Grid>
-                            <Grid item xs={12}>
+                            <Grid item xs={6}>
                                 <TextField
                                     fullWidth
                                     size="small"
-                                    label="Ghi chú điều dưỡng tiếp đón"
-                                    value={qrFormData.nurseNotes}
-                                    onChange={(e) => setQrFormData(prev => ({ ...prev, nurseNotes: e.target.value }))}
-                                    placeholder="Bệnh nhân tỉnh táo, tiếp xúc tốt..."
+                                    label="Cân nặng (kg)"
+                                    value={qrFormData.weight}
+                                    onChange={(e) => setQrFormData({ ...qrFormData, weight: e.target.value })}
                                 />
                             </Grid>
                         </Grid>
-                    </DialogContent>
-                    <DialogActions sx={{ p: 2, borderTop: "1px solid #E2E8F0" }}>
-                        <Button onClick={() => setOpenQrCheckInDialog(false)} color="inherit">
-                            Hủy Bỏ
-                        </Button>
-                        <Button
-                            type="submit"
-                            variant="contained"
-                            disabled={qrLoading}
-                            startIcon={qrLoading ? <CircularProgress size={18} color="inherit" /> : <FlashOnIcon />}
-                            sx={{ fontWeight: 800, bgcolor: "#059669", "&:hover": { bgcolor: "#047857" }, borderRadius: 2 }}
-                        >
-                            {qrLoading ? "Đang Tiếp Đón..." : "Check-in QR Tiếp Đón (5s)"}
-                        </Button>
-                    </DialogActions>
-                </form>
+
+                        <DialogActions sx={{ px: 0, pt: 3 }}>
+                            <Button onClick={() => setOpenQrCheckInDialog(false)} sx={{ fontWeight: 700 }}>Hủy</Button>
+                            <Button
+                                type="submit"
+                                variant="contained"
+                                disabled={qrSubmitting}
+                                sx={{ fontWeight: 800, borderRadius: 2, bgcolor: "#059669", "&:hover": { bgcolor: "#047857" }, px: 3 }}
+                            >
+                                {qrSubmitting ? <CircularProgress size={20} color="inherit" /> : "Xác Nhận Check-in"}
+                            </Button>
+                        </DialogActions>
+                    </form>
+                </DialogContent>
             </Dialog>
 
             {/* ========================================================================= */}
-            {/* 2. DIALOG THU VIỆN PHÍ TẠI QUẦY (PAY_AT_CLINIC) XUẤT HÓA ĐƠN A5 */}
+            {/* MODAL 4: IN PHIẾU NHIỆT STT CÓ MÃ VẠCH CHECK-IN */}
             {/* ========================================================================= */}
-            <Dialog open={openPayDialog} onClose={() => setOpenPayDialog(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
-                <DialogTitle sx={{ fontWeight: 800, bgcolor: "#F5F3FF", color: "#5B21B6", borderBottom: "1px solid #DDD6FE", display: "flex", alignItems: "center", gap: 1 }}>
-                    <ReceiptLongIcon sx={{ color: "#7C3AED" }} />
-                    <span>Thu Viện Phí Tại Quầy Tiếp Đón (PAY_AT_CLINIC)</span>
+            <Dialog open={Boolean(printTicket)} onClose={() => setPrintTicket(null)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+                <DialogTitle sx={{ fontWeight: 800, textAlign: "center", borderBottom: "1px solid #E2E8F0" }}>
+                    Phiếu Tiếp Nhận Số Thứ Tự
                 </DialogTitle>
-                <form onSubmit={handlePayAtClinicSubmit}>
-                    <DialogContent sx={{ pt: 2.5 }}>
-                        <Box sx={{ mb: 2, p: 2, bgcolor: "#F8FAFC", borderRadius: 2, border: "1px solid #E2E8F0" }}>
-                            <Typography variant="body2" color="textSecondary">Mã lượt khám:</Typography>
-                            <Typography variant="subtitle1" fontWeight="bold" color="#0F172A">
-                                {payFormData.bookingCode || payFormData.bookingId || "Chưa chọn lượt khám"}
+                <DialogContent sx={{ pt: 2.5, textAlign: "center" }}>
+                    {printTicket && (
+                        <Box sx={{ p: 2, border: "1px dashed #CBD5E1", borderRadius: 2, bgcolor: "#F8FAFC" }}>
+                            <Typography variant="subtitle2" fontWeight="900" color="#0F172A">
+                                BỆNH VIỆN ĐA KHOA QUỐC TẾ TNT
                             </Typography>
-                            {payFormData.patientName && (
-                                <Typography variant="body2" color="#475569">
-                                    Bệnh nhân: <b>{payFormData.patientName}</b>
-                                </Typography>
-                            )}
-                        </Box>
+                            <Typography variant="caption" color="#64748B" display="block">
+                                Phiếu Khám Bệnh & Cấp Số Thứ Tự
+                            </Typography>
 
-                        <TextField
-                            fullWidth
-                            type="number"
-                            label="Số tiền thu viện phí (VNĐ)"
-                            value={payFormData.amount}
-                            onChange={(e) => setPayFormData(prev => ({ ...prev, amount: e.target.value }))}
-                            sx={{ mb: 2 }}
-                            required
-                            InputProps={{
-                                endAdornment: <InputAdornment position="end">đ</InputAdornment>
-                            }}
-                        />
+                            <Typography variant="h2" fontWeight="900" color="#0D9488" sx={{ my: 1.5, letterSpacing: 2 }}>
+                                {printTicket.queueCode || `#${printTicket.queueNumber}`}
+                            </Typography>
 
-                        <TextField
-                            select
-                            fullWidth
-                            label="Hình thức thanh toán"
-                            value={payFormData.paymentMethod}
-                            onChange={(e) => setPayFormData(prev => ({ ...prev, paymentMethod: e.target.value }))}
-                            sx={{ mb: 2 }}
-                        >
-                            <MenuItem value="CASH">💵 Tiền mặt tại quầy (Cash)</MenuItem>
-                            <MenuItem value="VIETQR">📱 Cổng PayOS (VietQR Napas 247)</MenuItem>
-                        </TextField>
+                            <Typography variant="h6" fontWeight="900" color="#0F172A">
+                                {printTicket.patientName?.toUpperCase()}
+                            </Typography>
+                            <Typography variant="body2" color="#64748B">SĐT: {printTicket.phone}</Typography>
 
-                        <TextField
-                            fullWidth
-                            label="Ghi chú thu ngân / người tiếp đón"
-                            value={payFormData.cashierNotes}
-                            onChange={(e) => setPayFormData(prev => ({ ...prev, cashierNotes: e.target.value }))}
-                            placeholder="Thu viện phí ban đầu / Khám chuyên khoa..."
-                        />
-                    </DialogContent>
-                    <DialogActions sx={{ p: 2, borderTop: "1px solid #E2E8F0" }}>
-                        <Button onClick={() => setOpenPayDialog(false)} color="inherit">
-                            Hủy Bỏ
-                        </Button>
-                        <Button
-                            type="submit"
-                            variant="contained"
-                            disabled={payLoading}
-                            startIcon={payLoading ? <CircularProgress size={18} color="inherit" /> : <PaymentIcon />}
-                            sx={{ fontWeight: 800, bgcolor: "#7C3AED", "&:hover": { bgcolor: "#6D28D9" }, borderRadius: 2 }}
-                        >
-                            {payLoading ? "Đang Ghi Nhận..." : "Xác Nhận Thu Viện Phí & In Hóa Đơn A5"}
-                        </Button>
-                    </DialogActions>
-                </form>
-            </Dialog>
-
-            {/* ========================================================================= */}
-            {/* 3. DIALOG XEM & IN BIÊN LAI / HÓA ĐƠN VIỆN PHÍ A5 CHUẨN BỘ Y TẾ */}
-            {/* ========================================================================= */}
-            <Dialog open={openReceiptPreviewDialog} onClose={() => setOpenReceiptPreviewDialog(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
-                <DialogTitle sx={{ fontWeight: 800, borderBottom: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span>🧾 Biên Lai Thu Viện Phí Khổ A5 (Mã: {recentReceipt?.receiptCode})</span>
-                    <Chip label="Đã Xác Thực" color="success" size="small" sx={{ fontWeight: 800 }} />
-                </DialogTitle>
-                <DialogContent sx={{ pt: 2.5 }}>
-                    {recentReceipt && (
-                        <Box sx={{ p: 2.5, border: "1px solid #CBD5E1", borderRadius: 2, bgcolor: "#FFFFFF", fontFamily: "'Times New Roman', serif" }}>
-                            <Box textAlign="center" mb={2}>
-                                <Typography variant="subtitle1" fontWeight="bold" textTransform="uppercase">
-                                    BỆNH VIỆN ĐA KHOA QUỐC TẾ TNT
+                            <Box sx={{ my: 1.5, p: 1, bgcolor: "#FFFFFF", borderRadius: 1.5, border: "1px solid #E2E8F0" }}>
+                                <Typography variant="body2" fontWeight="700" color="#0284C7">
+                                    {printTicket.departmentName}
                                 </Typography>
-                                <Typography variant="caption" color="textSecondary" display="block">
-                                    Lô đất CC2, Khu đô thị mới Văn Quán, số 114 Nguyễn Khuyến, phường Văn Quán, quận Hà Đông, Hà Nội • Hotline: 1900 8888
-                                </Typography>
-                                <Typography variant="h6" fontWeight="bold" sx={{ mt: 1, textTransform: "uppercase", color: "#1E293B" }}>
-                                    HÓA ĐƠN / BIÊN LAI THU VIỆN PHÍ
-                                </Typography>
-                                <Typography variant="caption" fontStyle="italic" color="#64748B">
-                                    (Bản thể hiện điện tử phục vụ lưu trữ bệnh nhân)
+                                <Typography variant="caption" fontWeight="800" color="#0D9488">
+                                    {printTicket.roomName} • {printTicket.doctorName}
                                 </Typography>
                             </Box>
 
-                            <Divider sx={{ my: 1.5 }} />
+                            <BarcodeView value={printTicket.bookingCode || printTicket.bookingId} />
 
-                            <Grid container spacing={1} sx={{ fontSize: "0.95rem" }}>
-                                <Grid item xs={6}>
-                                    Số biên lai: <b>{recentReceipt.receiptCode}</b>
-                                </Grid>
-                                <Grid item xs={6} textAlign="right">
-                                    Mã phiếu: <b>{recentReceipt.bookingCode}</b>
-                                </Grid>
-                                <Grid item xs={12}>
-                                    Họ tên người bệnh: <b style={{ textTransform: "uppercase" }}>{recentReceipt.patientName}</b>
-                                </Grid>
-                                <Grid item xs={12}>
-                                    Khoa khám: <b>{recentReceipt.departmentName}</b> ({recentReceipt.doctorName})
-                                </Grid>
-                                <Grid item xs={6}>
-                                    Hình thức: <b>{recentReceipt.paymentMethod}</b>
-                                </Grid>
-                                <Grid item xs={6} textAlign="right">
-                                    Thời gian: <b>{recentReceipt.paidAt}</b>
-                                </Grid>
-                                <Grid item xs={12} sx={{ mt: 1.5, p: 1.5, bgcolor: "#F8FAFC", borderRadius: 1.5, textAlign: "right" }}>
-                                    <Typography variant="body1">
-                                        Tổng tiền đã thu: <b style={{ fontSize: "1.2rem", color: "#059669" }}>{formatCurrency(recentReceipt.paidAmount)}</b>
-                                    </Typography>
-                                </Grid>
-                                <Grid item xs={12} textAlign="right" sx={{ mt: 2 }}>
-                                    <Typography variant="body2" fontStyle="italic">Người thu tiền (Ký & ghi rõ họ tên)</Typography>
-                                    <Typography variant="subtitle2" fontWeight="bold" sx={{ mt: 3 }}>
-                                        {recentReceipt.cashierName}
-                                    </Typography>
-                                </Grid>
-                            </Grid>
+                            <Typography variant="caption" color="#94A3B8" display="block" sx={{ mt: 1 }}>
+                                Vui lòng theo dõi màn hình TV và loa phát thanh tại sảnh.
+                            </Typography>
                         </Box>
                     )}
                 </DialogContent>
-                <DialogActions sx={{ p: 2, borderTop: "1px solid #E2E8F0", justifyContent: "space-between" }}>
-                    <Button onClick={() => setOpenReceiptPreviewDialog(false)} color="inherit">
-                        Đóng
-                    </Button>
+                <DialogActions sx={{ p: 2, justifyContent: "space-between" }}>
+                    <Button onClick={() => setPrintTicket(null)} sx={{ fontWeight: 700 }}>Đóng</Button>
                     <Button
                         variant="contained"
                         startIcon={<PrintIcon />}
                         onClick={() => {
-                            if (recentReceipt) {
-                                printReceipt({
-                                    receiptCode: recentReceipt.receiptCode,
-                                    patientName: recentReceipt.patientName,
-                                    phoneNumber: recentReceipt.patientPhone,
-                                    departmentName: recentReceipt.departmentName,
-                                    doctorName: recentReceipt.doctorName,
-                                    totalAmount: recentReceipt.paidAmount,
-                                    paymentMethod: recentReceipt.paymentMethod,
-                                    cashierName: recentReceipt.cashierName,
-                                    paidAt: recentReceipt.paidAt,
-                                    description: "Thu viện phí tại quầy khám"
+                            if (printTicket) {
+                                printThermalTicket({
+                                    queueNumber: printTicket.queueNumber,
+                                    queueCode: printTicket.queueCode,
+                                    patientName: printTicket.patientName,
+                                    roomName: printTicket.roomName,
+                                    departmentName: printTicket.departmentName,
+                                    bookingCode: printTicket.bookingCode
                                 });
                             }
                         }}
-                        sx={{ fontWeight: 800, bgcolor: "#0088D6", "&:hover": { bgcolor: "#0077BC" } }}
+                        sx={{ fontWeight: 800, borderRadius: 2, bgcolor: "#0284C7", "&:hover": { bgcolor: "#0369A1" } }}
                     >
-                        In Hóa Đơn A5 Ngay
+                        In Phiếu Nhiệt
                     </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* ========================================================================= */}
+            {/* MODAL 5: XEM CHI TIẾT LƯỢT KHÁM */}
+            {/* ========================================================================= */}
+            <Dialog open={Boolean(selectedBookingDetail)} onClose={() => setSelectedBookingDetail(null)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+                <DialogTitle sx={{ fontWeight: 800, borderBottom: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span>Chi Tiết Lượt Khám ({selectedBookingDetail?.queueCode})</span>
+                    <IconButton size="small" onClick={() => setSelectedBookingDetail(null)}><CloseIcon /></IconButton>
+                </DialogTitle>
+                <DialogContent sx={{ pt: 2.5 }}>
+                    {selectedBookingDetail && (
+                        <Stack spacing={1.5}>
+                            <Box display="flex" justifyContent="space-between" alignItems="center">
+                                <Typography variant="h6" fontWeight="900" color="#0F172A">{selectedBookingDetail.patientName}</Typography>
+                                <Chip label={selectedBookingDetail.isPaid ? "Đã Đóng Tiền" : "Chưa Nộp Tiền"} color={selectedBookingDetail.isPaid ? "success" : "warning"} size="small" sx={{ fontWeight: 800 }} />
+                            </Box>
+                            <Typography variant="body2">SĐT: <b>{selectedBookingDetail.phone}</b> • Mã phiếu: <b>{selectedBookingDetail.bookingCode}</b></Typography>
+                            <Typography variant="body2">Khoa: <b>{selectedBookingDetail.departmentName}</b> • Phòng: <b>{selectedBookingDetail.roomName}</b></Typography>
+                            <Typography variant="body2">Bác sĩ: <b>{selectedBookingDetail.doctorName}</b></Typography>
+                            <Typography variant="body2">Lý do khám / Triệu chứng: <b>{selectedBookingDetail.symptoms}</b></Typography>
+                            <Typography variant="body2">Tiền khám: <b>{selectedBookingDetail.price != null && Number(selectedBookingDetail.price) > 0 ? formatCurrency(selectedBookingDetail.price) : "Chưa có biểu phí (0 đ)"}</b></Typography>
+                        </Stack>
+                    )}
+                </DialogContent>
+                <DialogActions sx={{ p: 2 }}>
+                    <Button onClick={() => setSelectedBookingDetail(null)} sx={{ fontWeight: 700 }}>Đóng</Button>
                 </DialogActions>
             </Dialog>
         </Container>

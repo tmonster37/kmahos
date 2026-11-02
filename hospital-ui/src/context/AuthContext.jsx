@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import axiosInstance from "../services/AxiosInstance";
 
 const AuthContext = createContext();
 
@@ -25,22 +26,33 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         clearLegacyVitals();
         const storedUser = localStorage.getItem("user");
-        const token = localStorage.getItem("accessToken");
-        if (storedUser && token) {
-            setUser(JSON.parse(storedUser));
+        if (storedUser) {
+            try {
+                setUser(JSON.parse(storedUser));
+            } catch {
+                localStorage.removeItem("user");
+            }
         }
         setLoading(false);
     }, []);
 
     const login = (authData) => {
-        // authData chứa: accessToken, userId, fullName, role, phoneNumber
-        localStorage.setItem("accessToken", authData.accessToken);
+        // authData chứa: userId, fullName, role, phoneNumber, (accessToken)
+        // Token được quản lý qua HttpOnly cookie bởi trình duyệt; lưu user info cho UI rendering
         localStorage.setItem("user", JSON.stringify(authData));
+        if (authData.accessToken) {
+            localStorage.setItem("accessToken", authData.accessToken);
+        }
         setUser(authData);
     };
 
-    const logout = () => {
+    const logout = async () => {
         clearLegacyVitals();
+        try {
+            await axiosInstance.post("/api/auth/logout");
+        } catch {
+            // Tiếp tục dọn dẹp client dù request logout gặp lỗi mạng
+        }
         localStorage.removeItem("accessToken");
         localStorage.removeItem("user");
         setUser(null);

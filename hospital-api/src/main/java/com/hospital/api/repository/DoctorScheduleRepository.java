@@ -13,11 +13,15 @@ import java.util.UUID;
 public interface DoctorScheduleRepository extends JpaRepository<DoctorSchedule, UUID> {
     List<DoctorSchedule> findAllByDoctor_DoctorIdAndScheduleDateAfterAndDeletedFalse(UUID doctorId, LocalDate date);
     List<DoctorSchedule> findAllByDoctor_Department_DepartmentIdAndScheduleDateAndDeletedFalse(Integer departmentId, LocalDate scheduleDate);
+    List<DoctorSchedule> findAllByDoctor_Department_DepartmentIdAndScheduleDateBetweenAndDeletedFalse(Integer departmentId, LocalDate startDate, LocalDate endDate);
+    List<DoctorSchedule> findAllByDoctor_Department_DepartmentIdAndDeletedFalse(Integer departmentId);
     List<DoctorSchedule> findAllByScheduleDateAndDeletedFalse(LocalDate scheduleDate);
     List<DoctorSchedule> findAllByDeletedFalse();
     List<DoctorSchedule> findAllByScheduleDateBetweenAndDeletedFalse(LocalDate startDate, LocalDate endDate);
     List<DoctorSchedule> findAllByDoctor_DoctorIdAndScheduleDateBetweenAndDeletedFalse(UUID doctorId, LocalDate startDate, LocalDate endDate);
     boolean existsByDoctor_DoctorIdAndScheduleDateAndSessionAndDeletedFalse(UUID doctorId, LocalDate date, ScheduleSession session);
     boolean existsByRoom_RoomIdAndScheduleDateAndSessionAndDeletedFalse(Integer roomId, LocalDate date, ScheduleSession session);
+    boolean existsByDoctor_DoctorIdAndScheduleDateAndSessionAndDoctorScheduleIdNotAndDeletedFalse(UUID doctorId, LocalDate date, ScheduleSession session, UUID doctorScheduleId);
+    boolean existsByRoom_RoomIdAndScheduleDateAndSessionAndDoctorScheduleIdNotAndDeletedFalse(Integer roomId, LocalDate date, ScheduleSession session, UUID doctorScheduleId);
 }
 

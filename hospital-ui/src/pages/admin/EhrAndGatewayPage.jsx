@@ -661,7 +661,7 @@ export default function EhrAndGatewayPage() {
                                 4. <strong>Tự động ánh xạ sang EHR</strong>: Cổng Gateway tự động phân tích chỉ số, so sánh khoảng tham chiếu và đồng bộ ngay thành một <code>MedicalObservation</code> trong hồ sơ bệnh án điện tử của người bệnh.
                             </Typography>
 
-                            <Box p={2.5} sx={{ bgcolor: "#0F172A", borderRadius: 2.5, color: "#38BDF8", fontFamily: "monospace", fontSize: "0.825rem", overflowX: "auto", border: "1px solid rgba(255,255,255,0.08)" }}>
+                            <Box p={2.5} sx={{ bgcolor: "#002B49", borderRadius: 2.5, color: "#38BDF8", fontFamily: "monospace", fontSize: "0.825rem", overflowX: "auto", border: "1px solid rgba(0, 136, 214, 0.3)" }}>
                                 {`// Chuẩn Webhook JSON từ máy xét nghiệm máu:
 POST /api/gateway/lis/results
 {

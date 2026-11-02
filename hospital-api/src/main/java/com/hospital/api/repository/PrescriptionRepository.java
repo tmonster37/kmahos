@@ -11,5 +11,9 @@ import java.util.UUID;
 public interface PrescriptionRepository extends JpaRepository<Prescription, UUID> {
     Optional<Prescription> findByPrescriptionCode(String prescriptionCode);
     Optional<Prescription> findByMedicalRecordBookingBookingCode(String bookingCode);
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("SELECT p FROM Prescription p WHERE p.prescriptionId = :id")
+    Optional<Prescription> findByIdWithLock(@org.springframework.data.repository.query.Param("id") UUID id);
 }
 

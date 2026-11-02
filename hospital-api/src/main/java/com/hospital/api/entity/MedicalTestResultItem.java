@@ -48,8 +48,7 @@ public class MedicalTestResultItem extends BaseEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "flag", length = 20)
-    @Builder.Default
-    private TestResultFlag flag = TestResultFlag.NORMAL; // NORMAL, HIGH, LOW, CRITICAL, ABNORMAL
+    private TestResultFlag flag; // NORMAL, HIGH, LOW, CRITICAL, ABNORMAL hoặc null nếu chưa đánh giá
 
     @Column(name = "notes", length = 255)
     private String notes; // Ghi chú riêng cho chỉ số

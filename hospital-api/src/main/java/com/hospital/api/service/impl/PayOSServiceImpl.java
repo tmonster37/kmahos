@@ -1,5 +1,7 @@
 package com.hospital.api.service.impl;
 
+import org.springframework.beans.factory.annotation.Autowired;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hospital.api.config.PayOSConfig;
@@ -19,15 +21,26 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class PayOSServiceImpl implements PayOSService {
 
     private final PayOSConfig payOSConfig;
     private final ObjectMapper objectMapper;
+    private final org.springframework.core.env.Environment environment;
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .build();
+
+    @Autowired
+    public PayOSServiceImpl(PayOSConfig payOSConfig, ObjectMapper objectMapper, org.springframework.core.env.Environment environment) {
+        this.payOSConfig = payOSConfig;
+        this.objectMapper = objectMapper;
+        this.environment = environment;
+    }
+
+    public PayOSServiceImpl(PayOSConfig payOSConfig, ObjectMapper objectMapper) {
+        this(payOSConfig, objectMapper, null);
+    }
 
     private static final String PAYOS_API_URL = "https://api-merchant.payos.vn/v2/payment-requests";
 
@@ -40,11 +53,9 @@ public class PayOSServiceImpl implements PayOSService {
     public PayOSLinkResponse createPaymentLink(Long orderCode, BigDecimal amount, String description, String buyerName, String buyerPhone, java.util.List<com.hospital.api.dto.request.PayOSItemRequest> items) {
         long amountLong = amount.longValue();
 
-        // Chuẩn hóa description theo quy định của PayOS: tối đa 25 ký tự, không dấu
-        String cleanDesc = description != null ? description.trim() : "TNT " + orderCode;
-        if (cleanDesc.length() > 25) {
-            cleanDesc = cleanDesc.substring(0, 25);
-        }
+        // Use the same compact reference for every bank and the fallback QR.
+        // Full booking/invoice text remains in the local Transaction description.
+        String cleanDesc = PayOSConfig.paymentReference(orderCode);
 
         if (payOSConfig.isRealPayOSConfigured()) {
             try {
@@ -107,22 +118,44 @@ public class PayOSServiceImpl implements PayOSService {
                                 data.path("bin").asText(payOSConfig.bankBin)
                         );
                     } else {
-                        log.warn("PayOS API trả mã lỗi: {} - {}. Chuyển sang chế độ Fallback VietQR.",
-                                code, root.path("desc").asText());
+                        log.warn("PayOS API trả mã lỗi: {} - {}", code, root.path("desc").asText());
+                        if (isProductionEnvironment()) {
+                            throw new com.hospital.api.exception.AppException(
+                                    "Cổng thanh toán PayOS trả về lỗi: " + root.path("desc").asText("Không xác định"),
+                                    org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE
+                            );
+                        }
                     }
                 } else {
-                    log.warn("PayOS API trả HTTP status {} - {}. Kích hoạt chế độ Fallback.",
-                            response.statusCode(), response.body());
+                    log.warn("PayOS API trả HTTP status {}", response.statusCode());
+                    if (isProductionEnvironment()) {
+                        throw new com.hospital.api.exception.AppException(
+                                "Không thể kết nối cổng thanh toán PayOS (HTTP " + response.statusCode() + "). Vui lòng thanh toán trực tiếp tại quầy.",
+                                org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE
+                        );
+                    }
                 }
+            } catch (com.hospital.api.exception.AppException appEx) {
+                throw appEx;
             } catch (Exception ex) {
-                log.error("Lỗi khi kết nối tới PayOS API: {}. Tự động fallback sang VietQR QuickLink.", ex.getMessage());
+                log.error("Lỗi khi kết nối tới PayOS API: {}", ex.getMessage());
+                if (isProductionEnvironment()) {
+                    throw new com.hospital.api.exception.AppException(
+                            "Lỗi kết nối cổng thanh toán PayOS: " + ex.getMessage(),
+                            org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE
+                    );
+                }
             }
+        } else if (isProductionEnvironment()) {
+            throw new com.hospital.api.exception.AppException(
+                    "Cổng thanh toán điện tử PayOS chưa được cấu hình khóa hợp lệ cho môi trường Production.",
+                    org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE
+            );
         }
 
-        // Chế độ Graceful Fallback (Khi chưa điền key thật hoặc lỗi mạng PayOS)
-        log.info("[PayOS Fallback] Sinh VietQR QuickLink mô phỏng thanh toán Open Banking cho orderCode: {}", orderCode);
-        String txnRef = "TNT" + orderCode;
-        String vietQrUrl = payOSConfig.generateVietQRUrl(amountLong, txnRef);
+        // Chế độ Giả lập an toàn DÀNH RIÊNG cho môi trường Development / Test cục bộ
+        log.warn("[PayOS DEV-SIMULATION] Sinh VietQR mô phỏng thanh toán cho orderCode: {}. Tuyệt đối không dùng cho Production!", orderCode);
+        String vietQrUrl = payOSConfig.generateVietQRUrl(amountLong, cleanDesc);
         String fallbackCheckoutUrl = String.format("%s?orderCode=%d&status=PENDING&method=VIETQR", payOSConfig.returnUrl, orderCode);
 
         return new PayOSLinkResponse(
@@ -137,6 +170,14 @@ public class PayOSServiceImpl implements PayOSService {
                 payOSConfig.accountHolder,
                 payOSConfig.bankBin
         );
+    }
+
+    private boolean isProductionEnvironment() {
+        if (environment == null) return false;
+        return java.util.Arrays.asList(environment.getActiveProfiles()).contains("prod")
+                || java.util.Arrays.asList(environment.getActiveProfiles()).contains("production")
+                || "production".equalsIgnoreCase(environment.getProperty("ENVIRONMENT"))
+                || "prod".equalsIgnoreCase(environment.getProperty("ENVIRONMENT"));
     }
 
     @Override
@@ -161,7 +202,7 @@ public class PayOSServiceImpl implements PayOSService {
                 if ("00".equals(root.path("code").asText())) {
                     JsonNode data = root.path("data");
                     return new PayOSLinkResponse(
-                            orderCode,
+                            data.path("orderCode").canConvertToLong() ? data.path("orderCode").asLong() : null,
                             data.path("id").asText(),
                             null,
                             null,

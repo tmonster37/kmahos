@@ -38,6 +38,8 @@ import {
     ToggleButtonGroup
 } from "@mui/material";
 import PointOfSaleIcon from "@mui/icons-material/PointOfSale";
+import ReconciliationModal from "./ReconciliationModal";
+import designTokens from "../../theme/designTokens";
 import SearchIcon from "@mui/icons-material/Search";
 import PrintIcon from "@mui/icons-material/Print";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
@@ -203,7 +205,7 @@ export default function CashierPage() {
             const targetBookingCode = bill.billId || bill.bookingCode;
             const res = await axiosInstance.post("/api/payment/payos/create-link", {
                 amount: bill.totalAmount,
-                type: "PAY_BOOKING",
+                type: targetBookingCode?.startsWith('BILL-INPATIENT-') ? "PAY_INPATIENT_FEE" : "PAY_BOOKING",
                 description: `VP ${targetBookingCode}`
             });
 
@@ -215,17 +217,9 @@ export default function CashierPage() {
             }
         } catch (err) {
             console.error("Lỗi khởi tạo link PayOS:", err);
-            // Fallback: Nếu lỗi kết nối, sinh dữ liệu giả lập VietQR an toàn
-            setPayosData({
-                orderCode: Date.now() % 1000000000,
-                txnRef: `TNT${Date.now() % 1000000}`,
-                bankName: "MBBank (Quân Đội)",
-                accountNumber: "0987654321",
-                accountHolder: "BENH VIEN DA KHOA QUOC TE TNT",
-                amount: bill.totalAmount,
-                transferContent: `VP ${bill.billId || bill.bookingCode}`,
-                qrImageUrl: `https://img.vietqr.io/image/MB-0987654321-compact2.png?amount=${bill.totalAmount}&addInfo=VP ${bill.billId || bill.bookingCode}&accountName=BENH VIEN DA KHOA QUOC TE TNT`
-            });
+            setPayosData(null);
+            const msg = err.response?.data?.message || err.message || "Không thể khởi tạo cổng PayOS. Vui lòng thử lại hoặc chọn Tiền mặt / POS.";
+            setErrorMessage(msg);
         } finally {
             setPayosLoading(false);
         }
@@ -240,6 +234,7 @@ export default function CashierPage() {
         if (!txnRef) return;
 
         pollingTimerRef.current = setInterval(async () => {
+            if (typeof document !== "undefined" && document.hidden) return;
             try {
                 const statusRes = await axiosInstance.get(`/api/payment/status/${txnRef}`);
                 const statusData = statusRes.data?.data || statusRes.data;
@@ -389,9 +384,25 @@ export default function CashierPage() {
 
     const handleCopy = (text, fieldName) => {
         if (!text) return;
-        navigator.clipboard?.writeText(String(text));
-        setCopiedField(fieldName);
-        setTimeout(() => setCopiedField(null), 2000);
+        if (navigator?.clipboard?.writeText) {
+            navigator.clipboard.writeText(String(text)).then(() => {
+                setCopiedField(fieldName);
+                setTimeout(() => setCopiedField(null), 2000);
+            }).catch(() => {});
+        } else {
+            try {
+                const ta = document.createElement("textarea");
+                ta.value = String(text);
+                ta.style.position = "fixed";
+                ta.style.opacity = "0";
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand("copy");
+                document.body.removeChild(ta);
+                setCopiedField(fieldName);
+                setTimeout(() => setCopiedField(null), 2000);
+            } catch {}
+        }
     };
 
     const handlePrintReceipt = (receipt) => {
@@ -1491,6 +1502,21 @@ export default function CashierPage() {
                                                             Đang kết nối cổng PayOS tạo mã thanh toán VietQR...
                                                         </Typography>
                                                     </Box>
+                                                ) : !payosData ? (
+                                                    <Box textAlign="center" py={3}>
+                                                        <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
+                                                            {errorMessage || "Không thể khởi tạo mã thanh toán PayOS VietQR. Vui lòng thử lại hoặc chọn hình thức Tiền mặt / Thẻ POS."}
+                                                        </Alert>
+                                                        <Button
+                                                            variant="contained"
+                                                            color="primary"
+                                                            size="small"
+                                                            onClick={() => initPayOSPayment(selectedBill)}
+                                                            sx={{ textTransform: "none", fontWeight: 700 }}
+                                                        >
+                                                            Thử lại tạo mã PayOS
+                                                        </Button>
+                                                    </Box>
                                                 ) : (
                                                     <Box>
                                                         <Box display="flex" justifyContent="space-between" alignItems="center" mb={1.5}>
@@ -1673,139 +1699,15 @@ export default function CashierPage() {
             </Dialog>
 
             {/* MODAL ĐỐI SOÁT & BÀN GIAO CA TRỰC */}
-            <Dialog
+            <ReconciliationModal
                 open={openReconciliationModal}
                 onClose={() => setOpenReconciliationModal(false)}
-                maxWidth="md"
-                fullWidth
-                PaperProps={{ sx: { borderRadius: 3 } }}
-            >
-                <DialogTitle sx={{ fontWeight: "bold", bgcolor: "#F8FAFC", borderBottom: "1px solid #E2E8F0", display: "flex", alignItems: "center", gap: 1 }}>
-                    <AssessmentIcon color="primary" /> Bảng Đối Soát & Bàn Giao Ca Trực Thu Ngân
-                </DialogTitle>
-                <DialogContent sx={{ pt: 2.5 }}>
-                    <Box mb={2.5}>
-                        <Typography variant="subtitle2" color="text.secondary">
-                            Phạm vi ca đối soát: <b>{
-                                shiftFilter === "MORNING" ? "Ca Sáng (06:00 - 12:00)" :
-                                shiftFilter === "AFTERNOON" ? "Ca Chiều (12:00 - 18:00)" :
-                                shiftFilter === "EVENING" ? "Ca Tối (18:00 - 23:59)" : "Toàn bộ ca làm việc trong ngày"
-                            }</b>
-                        </Typography>
-                    </Box>
-
-                    <Grid container spacing={2} mb={3}>
-                        <Grid item xs={12} sm={6} md={3}>
-                            <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: "#F0F9FF", borderColor: "#BAE6FD" }}>
-                                <Typography variant="caption" color="text.secondary" fontWeight="bold">TỔNG THU CA TRỰC</Typography>
-                                <Typography variant="h6" fontWeight="bold" color="#0369A1" mt={0.5}>
-                                    {formatCurrency(shiftReconData.totalCollected)}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">{shiftReconData.transactionCount} lượt thu</Typography>
-                            </Paper>
-                        </Grid>
-                        <Grid item xs={12} sm={6} md={3}>
-                            <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: "#F0FDF4", borderColor: "#BBF7D0" }}>
-                                <Typography variant="caption" color="text.secondary" fontWeight="bold">TIỀN MẶT (TẠI KÉT)</Typography>
-                                <Typography variant="h6" fontWeight="bold" color="#15803D" mt={0.5}>
-                                    {formatCurrency(shiftReconData.cashTotal)}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">{shiftReconData.cashCount} lượt tiền mặt</Typography>
-                            </Paper>
-                        </Grid>
-                        <Grid item xs={12} sm={6} md={3}>
-                            <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: "#FAF5FF", borderColor: "#E9D5FF" }}>
-                                <Typography variant="caption" color="text.secondary" fontWeight="bold">CỔNG VIETQR / PAYOS</Typography>
-                                <Typography variant="h6" fontWeight="bold" color="#7E22CE" mt={0.5}>
-                                    {formatCurrency(shiftReconData.digitalTotal)}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">{shiftReconData.digitalCount} lượt chuyển khoản</Typography>
-                            </Paper>
-                        </Grid>
-                        <Grid item xs={12} sm={6} md={3}>
-                            <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: "#FFF7ED", borderColor: "#FED7AA" }}>
-                                <Typography variant="caption" color="text.secondary" fontWeight="bold">QUẸT THẺ POS</Typography>
-                                <Typography variant="h6" fontWeight="bold" color="#C2410C" mt={0.5}>
-                                    {formatCurrency(shiftReconData.posTotal)}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">{shiftReconData.posCount} lượt quẹt thẻ</Typography>
-                            </Paper>
-                        </Grid>
-                    </Grid>
-
-                    <Typography variant="subtitle2" fontWeight="bold" mb={1}>
-                        Danh sách các biên lai thu tiền ({shiftReconData.transactions.length}):
-                    </Typography>
-                    <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 320, borderRadius: 2 }}>
-                        <Table size="small" stickyHeader>
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell><b>Mã biên lai</b></TableCell>
-                                    <TableCell><b>Bệnh nhân</b></TableCell>
-                                    <TableCell><b>Phương thức</b></TableCell>
-                                    <TableCell align="right"><b>Số tiền</b></TableCell>
-                                    <TableCell><b>Thời gian</b></TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {shiftReconData.transactions.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={5} align="center" sx={{ py: 3, color: "text.secondary" }}>
-                                            Không có biên lai thu tiền nào trong ca trực này.
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    shiftReconData.transactions.map((t, i) => (
-                                        <TableRow key={i} hover>
-                                            <TableCell sx={{ fontWeight: "bold", color: "primary.main" }}>{t.receiptCode || t.billId}</TableCell>
-                                            <TableCell>{t.patientName}</TableCell>
-                                            <TableCell>
-                                                <Chip
-                                                    label={
-                                                        t.paymentMethod === "CASH" || t.paymentMethod === "COUNTER_CASH"
-                                                            ? "Tiền mặt"
-                                                            : t.paymentMethod === "POS"
-                                                            ? "Quẹt thẻ POS"
-                                                            : "VietQR (PayOS)"
-                                                    }
-                                                    size="small"
-                                                    color={
-                                                        t.paymentMethod === "CASH" || t.paymentMethod === "COUNTER_CASH"
-                                                            ? "default"
-                                                            : t.paymentMethod === "POS"
-                                                            ? "secondary"
-                                                            : "primary"
-                                                    }
-                                                />
-                                            </TableCell>
-                                            <TableCell align="right" sx={{ fontWeight: "bold", color: "success.main" }}>
-                                                {formatCurrency(t.totalAmount)}
-                                            </TableCell>
-                                            <TableCell sx={{ fontSize: "0.8rem", color: "text.secondary" }}>
-                                                {formatDateTime(t.paidAt)}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
-                </DialogContent>
-                <DialogActions sx={{ p: 2, bgcolor: "#F8FAFC", borderTop: "1px solid #E2E8F0" }}>
-                    <Button onClick={() => setOpenReconciliationModal(false)}>
-                        Đóng
-                    </Button>
-                    <Button
-                        variant="contained"
-                        color="warning"
-                        startIcon={<PrintIcon />}
-                        onClick={handlePrintShiftRecon}
-                        sx={{ fontWeight: "bold", borderRadius: 2 }}
-                    >
-                        In Biên Bản Bàn Giao Ca (A4)
-                    </Button>
-                </DialogActions>
-            </Dialog>
+                shiftFilter={shiftFilter}
+                shiftReconData={shiftReconData}
+                formatCurrency={formatCurrency}
+                formatDateTime={formatDateTime}
+                handlePrintShiftRecon={handlePrintShiftRecon}
+            />
         </Container>
     );
 }

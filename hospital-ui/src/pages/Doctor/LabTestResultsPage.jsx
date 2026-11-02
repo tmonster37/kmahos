@@ -739,8 +739,8 @@ export default function LabTestResultsPage() {
                                             <TableCell sx={{ whiteSpace: "nowrap" }}>
                                                 <Stack spacing={0.6}>
                                                     <Chip
-                                                        label={t.state === "COMPLETED" ? "ĐÃ CÓ KẾT QUẢ" : "CHỜ THỰC HIỆN"}
-                                                        color={t.state === "COMPLETED" ? "success" : "warning"}
+                                                        label={t.state === "COMPLETED" ? "ĐÃ CÓ KẾT QUẢ" : (t.state === "CANCELLED" ? "ĐÃ HỦY CHỈ ĐỊNH" : "CHỜ THỰC HIỆN")}
+                                                        color={t.state === "COMPLETED" ? "success" : (t.state === "CANCELLED" ? "default" : "warning")}
                                                         size="small"
                                                         sx={{ fontWeight: "bold", whiteSpace: "nowrap" }}
                                                     />
@@ -824,7 +824,9 @@ export default function LabTestResultsPage() {
                                                 )}
                                             </TableCell>
                                             <TableCell align="center" sx={{ whiteSpace: "nowrap" }}>
-                                                {!t.isPaid ? (
+                                                {t.state === "CANCELLED" ? (
+                                                    <Chip label="Đã hủy" size="small" variant="outlined" sx={{ color: "#64748B", borderColor: "#CBD5E1" }} />
+                                                ) : !t.isPaid ? (
                                                     <Tooltip title="Chưa nộp viện phí tại quầy thu ngân. Chốt chặn phòng xét nghiệm: không thể lấy mẫu / trả kết quả!">
                                                         <span>
                                                             <Button
@@ -1279,9 +1281,10 @@ export default function LabTestResultsPage() {
                                     elevation={0}
                                     sx={{
                                         p: 2.5,
-                                        bgcolor: "#0F172A",
+                                        background: "linear-gradient(135deg, #0088D6 0%, #0062A3 100%)",
                                         color: "white",
                                         borderRadius: 2.5,
+                                        boxShadow: "0 4px 15px rgba(0, 136, 214, 0.2)",
                                         textAlign: "center"
                                     }}
                                 >

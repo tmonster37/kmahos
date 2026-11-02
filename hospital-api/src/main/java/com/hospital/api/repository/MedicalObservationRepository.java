@@ -12,6 +12,8 @@ public interface MedicalObservationRepository extends JpaRepository<MedicalObser
 
     List<MedicalObservation> findAllByMedicalRecord_RecordIdOrderByRecordedAtAsc(UUID recordId);
 
+    java.util.Optional<MedicalObservation> findByMedicalRecord_RecordIdAndConcept_ConceptCode(UUID recordId, String conceptCode);
+
     @Query("SELECT o FROM MedicalObservation o WHERE o.medicalRecord.patientProfile.patientProfileId = :profileId AND o.concept.conceptCode = :conceptCode ORDER BY o.recordedAt ASC")
     List<MedicalObservation> findPatientTrendData(
             @Param("profileId") UUID profileId,

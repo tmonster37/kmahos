@@ -94,4 +94,10 @@ public class HospitalAdmission extends BaseEntity {
     @OneToOne(mappedBy = "hospitalAdmission", cascade = CascadeType.ALL)
     @JsonIgnoreProperties({"hospitalAdmission", "hibernateLazyInitializer", "handler"})
     private Discharge discharge;
+
+    public Department getDepartment() {
+        if (room != null && room.getDepartment() != null) return room.getDepartment();
+        if (treatingDoctor != null && treatingDoctor.getDepartment() != null) return treatingDoctor.getDepartment();
+        return null;
+    }
 }

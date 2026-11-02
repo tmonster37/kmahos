@@ -60,6 +60,7 @@ export default function PaymentPage() {
     const payosStatus = queryParams.get("status");
     const payosOrderCode = queryParams.get("orderCode");
     const [syncingReturn, setSyncingReturn] = useState(false);
+    const [returnVerifiedStatus, setReturnVerifiedStatus] = useState(null);
 
     useEffect(() => {
         loadWalletData();
@@ -72,10 +73,19 @@ export default function PaymentPage() {
         if (!orderCode) return;
         setSyncingReturn(true);
         try {
-            await axiosInstance.post(`/api/payment/payos/sync/${orderCode}`);
+            const res = await axiosInstance.post(`/api/payment/payos/sync/${orderCode}`);
+            const data = res?.data?.data || res?.data || res;
+            if (data?.status === "SUCCESS" && data?.isVerified) {
+                setReturnVerifiedStatus("SUCCESS");
+            } else if (data?.status === "PENDING") {
+                setReturnVerifiedStatus("PENDING");
+            } else {
+                setReturnVerifiedStatus("FAILED");
+            }
             await loadWalletData();
         } catch (e) {
             console.warn("PayOS sync error:", e);
+            setReturnVerifiedStatus("FAILED");
         } finally {
             setSyncingReturn(false);
         }
@@ -110,23 +120,30 @@ export default function PaymentPage() {
 
     const handleDeposit = async () => {
         if (depositChannel === "CASH") {
-            alert("Quý khách vui lòng đến trực tiếp Quầy Thu Ngân tầng 1 để nộp tiền mặt vào ví.");
+            setWalletError("Quý khách vui lòng đến trực tiếp Quầy Thu Ngân tầng 1 để nộp tiền mặt vào ví.");
             return;
         }
 
-        if (amount < 10000) {
-            alert("Số tiền nạp tối thiểu là 10.000 VNĐ");
+        const numAmount = Number(amount);
+        if (!numAmount || numAmount < 10000) {
+            setWalletError("Số tiền nạp tối thiểu là 10.000 VNĐ!");
             return;
         }
 
+        if (numAmount > 50000000) {
+            setWalletError("Số tiền nạp tối đa là 50.000.000 VNĐ / giao dịch!");
+            return;
+        }
+
+        setWalletError("");
         setLoading(true);
         try {
-            const res = await axiosInstance.post(`/api/payment/vietqr/create?amount=${amount}&type=DEPOSIT_WALLET`);
+            const res = await axiosInstance.post(`/api/payment/vietqr/create?amount=${numAmount}&type=DEPOSIT_WALLET`);
             const data = res?.data?.data || res?.data || res;
             setPaymentModalData(data);
             setOpenQRModal(true);
         } catch (err) {
-            alert(err.message || "Lỗi khởi tạo thanh toán PayOS!");
+            setWalletError(err.message || "Lỗi khởi tạo thanh toán PayOS!");
         } finally {
             setLoading(false);
         }
@@ -151,7 +168,24 @@ export default function PaymentPage() {
                 {/* PayOS Return URL Notification */}
                 {payosOrderCode && (
                     <Box mb={3}>
-                        {payosCancel === "true" || payosStatus === "CANCELLED" ? (
+                        {syncingReturn ? (
+                            <Alert
+                                severity="info"
+                                icon={<CircularProgress size={20} />}
+                                sx={{
+                                    borderRadius: 3,
+                                    border: "1px solid #BAE6FD",
+                                    bgcolor: "#F0F9FF"
+                                }}
+                            >
+                                <Typography variant="subtitle2" fontWeight={800} color="#0369A1">
+                                    Đang xác thực kết quả thanh toán từ cổng PayOS...
+                                </Typography>
+                                <Typography variant="body2" color="#64748B">
+                                    Hệ thống đang đối soát đơn hàng <b>#{payosOrderCode}</b> với ngân hàng. Quý khách vui lòng không đóng trình duyệt.
+                                </Typography>
+                            </Alert>
+                        ) : (payosCancel === "true" || payosStatus === "CANCELLED") ? (
                             <Alert
                                 severity="info"
                                 icon={<ErrorIcon fontSize="medium" />}
@@ -173,7 +207,7 @@ export default function PaymentPage() {
                                     Bạn đã hủy giao dịch cho đơn hàng <b>#{payosOrderCode}</b> {payosId ? `(Mã link: ${payosId})` : ""}. Tài khoản ngân hàng của quý khách không bị trừ tiền.
                                 </Typography>
                             </Alert>
-                        ) : (payosCode === "00" || payosStatus === "PAID" || payosStatus === "SUCCESS") ? (
+                        ) : returnVerifiedStatus === "SUCCESS" ? (
                             <Alert
                                 severity="success"
                                 icon={<CheckCircleIcon fontSize="medium" />}
@@ -192,7 +226,7 @@ export default function PaymentPage() {
                                     Thanh toán thành công qua Cổng PayOS Open Banking!
                                 </Typography>
                                 <Typography variant="body2" color="#166534">
-                                    Đơn hàng <b>#{payosOrderCode}</b> {payosId ? `(Mã: ${payosId})` : ""} đã ghi nhận thanh toán thành công. Số dư ví viện phí đã được cộng tự động.
+                                    Đơn hàng <b>#{payosOrderCode}</b> đã được hệ thống và ngân hàng xác thực thành công. Số dư ví viện phí đã được cộng tự động.
                                 </Typography>
                             </Alert>
                         ) : (
@@ -223,10 +257,10 @@ export default function PaymentPage() {
                                 }
                             >
                                 <Typography variant="subtitle2" fontWeight={800} color="#B45309">
-                                    Giao dịch đang chờ đối soát với Cổng PayOS
+                                    Giao dịch đang chờ xác nhận hoặc đối soát với Cổng PayOS
                                 </Typography>
                                 <Typography variant="body2" color="#92400E">
-                                    Đơn hàng <b>#{payosOrderCode}</b> - Trạng thái: <b>{payosStatus || "PENDING"}</b>. Nếu bạn đã chuyển khoản thành công, vui lòng bấm nút "Đồng bộ lại" bên cạnh.
+                                    Đơn hàng <b>#{payosOrderCode}</b> chưa ghi nhận thanh toán thành công trên hệ thống. Nếu quý khách đã chuyển khoản thành công từ ngân hàng, vui lòng bấm nút "Đồng bộ lại" để đối soát ngay.
                                 </Typography>
                             </Alert>
                         )}
@@ -255,7 +289,7 @@ export default function PaymentPage() {
                         </Typography>
                     </Box>
                     <Typography variant="body2" color="#64748B">
-                        Hỗ trợ Cổng PayOS (Chuyển khoản Open Banking / VietQR Napas 247 tức thì) và nộp Tiền mặt tại Quầy Thu ngân Bệnh viện TNT.
+                        Hỗ trợ Cổng PayOS (Chuyển khoản Open Banking / VietQR Napas 247 tức thì) và nộp Tiền mặt tại Quầy Thu ngân TNT HOSPITAL.
                     </Typography>
                 </Box>
 
@@ -282,7 +316,7 @@ export default function PaymentPage() {
                             sx={{
                                 p: 3.5,
                                 borderRadius: 4,
-                                bgcolor: "#0F172A",
+                                background: "linear-gradient(135deg, #0088D6 0%, #00558F 100%)",
                                 color: "#FFFFFF",
                                 height: "100%",
                                 display: "flex",
@@ -290,8 +324,8 @@ export default function PaymentPage() {
                                 justifyContent: "space-between",
                                 position: "relative",
                                 overflow: "hidden",
-                                boxShadow: "0 10px 30px rgba(15, 23, 42, 0.15)",
-                                border: "1px solid rgba(255, 255, 255, 0.08)"
+                                boxShadow: "0 10px 30px rgba(0, 136, 214, 0.25)",
+                                border: "1px solid rgba(255, 255, 255, 0.15)"
                             }}
                         >
                             {/* Ambient Glow */}
@@ -476,11 +510,11 @@ export default function PaymentPage() {
                                                         fontWeight: 800,
                                                         fontSize: "0.82rem",
                                                         fontFamily: "monospace",
-                                                        bgcolor: amount === val ? "#0F172A" : "transparent",
+                                                        bgcolor: amount === val ? "#0088D6" : "transparent",
                                                         color: amount === val ? "white" : "#334155",
-                                                        borderColor: amount === val ? "#0F172A" : "rgba(15, 23, 42, 0.12)",
+                                                        borderColor: amount === val ? "#0088D6" : "rgba(15, 23, 42, 0.12)",
                                                         "&:hover": {
-                                                            bgcolor: amount === val ? "#1E293B" : "rgba(15, 23, 42, 0.04)"
+                                                            bgcolor: amount === val ? "#0062A3" : "rgba(0, 136, 214, 0.06)"
                                                         }
                                                     }}
                                                 >
@@ -494,9 +528,23 @@ export default function PaymentPage() {
                                         fullWidth
                                         type="number"
                                         label="Số tiền nạp tùy chỉnh (VNĐ)"
-                                        value={amount}
-                                        onChange={(e) => setAmount(Number(e.target.value))}
-                                        helperText={`Số tiền quy đổi: ${formatCurrency(amount)}`}
+                                        value={amount === "" ? "" : amount}
+                                        onChange={(e) => {
+                                            const val = e.target.value === "" ? "" : parseInt(e.target.value, 10);
+                                            setAmount(val === "" ? "" : Math.max(0, val));
+                                            if (walletError) setWalletError("");
+                                        }}
+                                        error={Boolean((amount !== "" && Number(amount) < 10000) || Number(amount) > 50000000)}
+                                        helperText={
+                                            amount !== "" && Number(amount) < 10000
+                                                ? "Số tiền nạp tối thiểu là 10.000 VNĐ"
+                                                : Number(amount) > 50000000
+                                                ? "Số tiền nạp tối đa là 50.000.000 VNĐ / giao dịch"
+                                                : `Số tiền quy đổi: ${formatCurrency(Number(amount) || 0)}`
+                                        }
+                                        InputProps={{
+                                            inputProps: { min: 10000, max: 50000000, step: 10000 }
+                                        }}
                                         sx={{
                                             mb: 2.5,
                                             "& .MuiOutlinedInput-root": {
@@ -513,7 +561,7 @@ export default function PaymentPage() {
                                         variant="contained"
                                         size="large"
                                         startIcon={<QrCodeScannerIcon />}
-                                        disabled={loading}
+                                        disabled={loading || amount === "" || Number(amount) < 10000 || Number(amount) > 50000000}
                                         onClick={handleDeposit}
                                         sx={{
                                             py: 1.4,

@@ -18,7 +18,11 @@ import {
   Tabs,
   Tab,
   Stack,
-  Divider
+  Divider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from '@mui/material';
 import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
 import TouchAppIcon from '@mui/icons-material/TouchApp';
@@ -36,14 +40,20 @@ import ElderlyIcon from '@mui/icons-material/Elderly';
 import AccessibleIcon from '@mui/icons-material/Accessible';
 import ConfirmationNumberIcon from '@mui/icons-material/ConfirmationNumber';
 import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
+import QrCode2Icon from '@mui/icons-material/QrCode2';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import ScheduleIcon from '@mui/icons-material/Schedule';
+import { QRCodeSVG } from 'qrcode.react';
 import MeetingRoomIcon from '@mui/icons-material/MeetingRoom';
 import VerifiedIcon from '@mui/icons-material/Verified';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import PaymentIcon from '@mui/icons-material/Payment';
+import FlashOnIcon from '@mui/icons-material/FlashOn';
+import CloseIcon from '@mui/icons-material/Close';
 
 import axiosInstance from '../services/AxiosInstance';
 import ThermalTicketModal from '../components/kiosk/ThermalTicketModal';
+import { createBookingPayment, getVerifiedPayment } from '../services/bookingPayment';
 import designTokens from '../theme/designTokens';
 
 const PRIORITY_OPTIONS = [
@@ -65,6 +75,7 @@ const SYMPTOM_QUICK_PICKS = [
 
 export default function KioskPage() {
   const submissionAttemptRef = useRef({ fingerprint: null, key: null });
+  const paymentSessionRef = useRef(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [departments, setDepartments] = useState([]);
   const [loadingDepts, setLoadingDepts] = useState(true);
@@ -83,6 +94,16 @@ export default function KioskPage() {
   // Ticket Modal state
   const [ticketResult, setTicketResult] = useState(null);
   const [openTicketModal, setOpenTicketModal] = useState(false);
+
+  // Payment states for Kiosk Walk-in (Tab 0)
+  const [payNow, setPayNow] = useState(true);
+  const [openQrModal, setOpenQrModal] = useState(false);
+
+  // Payment states for Check-in Tab (Tab 1)
+  const [openCheckInPayModal, setOpenCheckInPayModal] = useState(false);
+  const [unpaidCheckInData, setUnpaidCheckInData] = useState(null);
+  const [payingKiosk, setPayingKiosk] = useState(false);
+  const [kioskPayment, setKioskPayment] = useState(null);
 
   // Kiosk Tab & Check-in state
   const [kioskTab, setKioskTab] = useState(0); // 0: Lấy số vãng lai, 1: Check-in đặt trước
@@ -156,30 +177,44 @@ export default function KioskPage() {
     setErrorMsg('');
   };
 
-  const handleSubmitTicket = async () => {
+  const handleSubmitTicket = () => {
     if (!selectedDept) {
-      setErrorMsg('Vui l\u00f2ng ch\u1ecdn Khoa kh\u00e1m b\u1ec7nh tr\u00ean m\u00e0n h\u00ecnh c\u1ea3m \u1ee9ng!');
+      setErrorMsg('Vui lòng chọn Khoa khám bệnh trên màn hình cảm ứng!');
       return;
     }
-    if (!fullName.trim()) {
-      setErrorMsg('Vui l\u00f2ng nh\u1eadp H\u1ecd v\u00e0 t\u00ean b\u1ec7nh nh\u00e2n!');
+    const cleanName = fullName.trim();
+    if (!cleanName || cleanName.length < 2) {
+      setErrorMsg('Vui lòng nhập đầy đủ Họ và tên bệnh nhân (tối thiểu 2 ký tự)!');
       return;
     }
     if (!phoneNumber || phoneNumber.length < 10) {
-      setErrorMsg('Vui l\u00f2ng nh\u1eadp S\u1ed1 \u0111i\u1ec7n tho\u1ea1i h\u1ee3p l\u1ec7 (t\u1ed1i thi\u1ec3u 10 s\u1ed1)!');
+      setErrorMsg('Vui lòng nhập Số điện thoại hợp lệ (tối thiểu 10 số)!');
       return;
     }
+    if (birthYear) {
+      const year = parseInt(birthYear, 10);
+      const curYear = new Date().getFullYear();
+      if (isNaN(year) || year < 1900 || year > curYear) {
+        setErrorMsg(`Năm sinh không hợp lệ! Vui lòng nhập từ 1900 đến ${curYear}.`);
+        return;
+      }
+    }
 
+    executeTicketDispatch(payNow);
+  };
+
+  const executeTicketDispatch = async (requestPayment) => {
     const selectedPrio = PRIORITY_OPTIONS.find(p => p.id === priorityType);
     const isPriority = priorityType !== 'STANDARD';
     const requestFields = {
-      fullName: fullName.trim(),
+      fullName: fullName.trim().toUpperCase(),
       phoneNumber: phoneNumber.trim(),
       departmentId: selectedDept.departmentId,
       isPriority,
       priorityReason: selectedPrio?.reason || null,
       hasInsurance,
-      birthYear: birthYear ? parseInt(birthYear, 10) : undefined
+      birthYear: birthYear ? parseInt(birthYear, 10) : undefined,
+      payNow: false
     };
     const fingerprint = JSON.stringify(requestFields);
     if (submissionAttemptRef.current.fingerprint !== fingerprint || !submissionAttemptRef.current.key) {
@@ -194,16 +229,30 @@ export default function KioskPage() {
       const response = await axiosInstance.post('/api/counters/kiosk/dispatch', dispatchPayload);
       const data = response?.data || response;
       if (!data) {
-        throw new Error('The API did not return a ticket. Please retry.');
+        throw new Error('Hệ thống chưa cấp được phiếu. Vui lòng thử lại.');
       }
       data.departmentName = selectedDept.name || selectedDept.departmentName;
       data.patientPhone = phoneNumber;
       setTicketResult(data);
-      setOpenTicketModal(true);
-      handleResetForm();
+      if (data.dispatchedAt && data.bookingQueueNumber != null) {
+        data.queueNumber = data.bookingQueueNumber;
+        data.queueCode = data.bookingQueueCode;
+      }
+      if (requestPayment && !data.isPaid && Number(data.price) > 0) {
+        // Allocate the unpaid booking/ticket first, then create its real payment order.
+        const bookingRes = await axiosInstance.get('/api/bookings/code/' + encodeURIComponent(data.bookingCode));
+        const booking = bookingRes?.data?.data || bookingRes?.data || bookingRes;
+        setKioskPayment(await createBookingPayment(axiosInstance, booking));
+        setOpenQrModal(true);
+      } else {
+        setOpenTicketModal(true);
+        setOpenQrModal(false);
+        handleResetForm();
+      }
     } catch (err) {
       console.error("Kiosk ticket dispatch failed:", err);
-      setErrorMsg(err.message || 'Kh\u00f4ng th\u1ec3 c\u1ea5p phi\u1ebfu l\u00fac n\u00e0y. Vui l\u00f2ng th\u1eed l\u1ea1i sau; m\u00e3 g\u1eedi hi\u1ec7n t\u1ea1i s\u1ebd gi\u00fap tr\u00e1nh t\u1ea1o phi\u1ebfu tr\u00f9ng.');
+      const msg = err.response?.data?.message || err.message || 'Không thể cấp phiếu lúc này. Vui lòng thử lại sau.';
+      setErrorMsg(msg);
     } finally {
       setSubmitting(false);
     }
@@ -241,10 +290,19 @@ export default function KioskPage() {
 
       if (res.data) {
         const data = res.data;
-        setTicketResult(data);
-        setOpenTicketModal(true);
-        setCheckInCodeOrPhone('');
-        setSuccessMsg(data.message || `Check-in thành công: Bệnh nhân ${data.patientName || ''} - STT: ${data.formattedQueueNumber || data.queueNumber}`);
+        if (data.dispatchedAt && (data.isPaid || Number(data.price) === 0)) {
+          // Đã thanh toán trước: vào thẳng phòng khám Bác sĩ
+          setTicketResult(data);
+          setOpenTicketModal(true);
+          setCheckInCodeOrPhone('');
+          setSuccessMsg(data.message || `Check-in thành công: Bệnh nhân ${data.patientName || ''} đã thanh toán, mời vào thẳng buồng khám!`);
+        } else {
+          // Chưa thanh toán: mở Modal nhắc thanh toán VietQR để vào thẳng Bác sĩ
+          setUnpaidCheckInData(data);
+          setKioskPayment(null);
+          setOpenCheckInPayModal(true);
+          setKioskPayment(await createBookingPayment(axiosInstance, data));
+        }
       }
     } catch (err) {
       console.error("Lỗi check-in kiosk:", err);
@@ -253,6 +311,61 @@ export default function KioskPage() {
     } finally {
       setCheckInSubmitting(false);
     }
+  };
+
+  const handlePayUnpaidCheckIn = async () => {
+    const session = paymentSessionRef.current;
+    const pendingBooking = openQrModal ? ticketResult : unpaidCheckInData;
+    if (!session || session.cancelled || session.checking || !pendingBooking?.bookingCode || !kioskPayment) return;
+    session.checking = true;
+    try {
+      setPayingKiosk(true);
+      const verified = await getVerifiedPayment(axiosInstance, kioskPayment);
+      if (session.cancelled) return;
+      if (!verified) {
+        setSuccessMsg('Đang chờ ngân hàng xác nhận. Phiếu vẫn ở hàng đợi quầy.');
+        return;
+      }
+      const res = await axiosInstance.post('/api/bookings/kiosk/pay', {
+        bookingCode: pendingBooking.bookingCode,
+        paymentMethod: 'VIETQR'
+      });
+      if (session.cancelled) return;
+      const data = res?.data?.data || res?.data || res;
+      setOpenCheckInPayModal(false);
+      setOpenQrModal(false);
+      setTicketResult(data);
+      setOpenTicketModal(true);
+      setCheckInCodeOrPhone('');
+      setSuccessMsg(data.dispatchedAt
+        ? 'Đã xác nhận thanh toán và phân phòng khám.'
+        : 'Đã ghi nhận thanh toán. Vui lòng chờ tiếp đón xác nhận phân phòng khám.');
+      if (openQrModal) handleResetForm();
+    } catch (err) {
+      if (!session.cancelled) setErrorMsg(err.response?.data?.message || 'Chưa thể xác minh thanh toán. Vui lòng liên hệ quầy tiếp đón.');
+    } finally {
+      session.checking = false;
+      if (!session.cancelled) setPayingKiosk(false);
+    }
+  };
+
+  useEffect(() => {
+    if ((!openQrModal && !openCheckInPayModal) || !kioskPayment?.orderCode) return;
+    const session = { cancelled: false, checking: false };
+    paymentSessionRef.current = session;
+    setPayingKiosk(false);
+    const timer = setInterval(() => handlePayUnpaidCheckIn(), 5000);
+    return () => {
+      session.cancelled = true;
+      clearInterval(timer);
+    };
+  }, [openQrModal, openCheckInPayModal, kioskPayment, ticketResult, unpaidCheckInData]);
+
+  const handleSkipPayAndPrintUnpaid = () => {
+    setOpenCheckInPayModal(false);
+    setTicketResult(unpaidCheckInData);
+    setOpenTicketModal(true);
+    setCheckInCodeOrPhone('');
   };
 
   return (
@@ -273,34 +386,34 @@ export default function KioskPage() {
         sx={{
           py: 2,
           px: { xs: 2.5, md: 5 },
-          background: 'linear-gradient(90deg, #071E3D 0%, #004D8C 60%, #0062A3 100%)',
-          color: '#FFFFFF',
+          bgcolor: '#FFFFFF',
+          color: '#0F172A',
           borderRadius: 0,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.12)',
-          boxShadow: '0 4px 20px rgba(7, 30, 61, 0.3)'
+          borderBottom: '1px solid #E2E8F0',
+          boxShadow: '0 2px 12px rgba(0, 0, 0, 0.03)'
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Box
             sx={{
               p: 1.2,
-              bgcolor: 'rgba(255,255,255,0.14)',
-              backdropFilter: 'blur(10px)',
+              bgcolor: '#F0FDFA',
               borderRadius: '14px',
-              border: '1px solid rgba(255,255,255,0.2)',
+              border: '1px solid #99F6E4',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center'
+              justifyContent: 'center',
+              boxShadow: '0 2px 8px rgba(13, 148, 136, 0.15)'
             }}
           >
-            <LocalHospitalIcon sx={{ fontSize: 36, color: '#38BDF8' }} />
+            <LocalHospitalIcon sx={{ fontSize: 36, color: '#0D9488' }} />
           </Box>
           <Box>
             <Box display="flex" alignItems="center" gap={1.2}>
-              <Typography variant="h5" sx={{ fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: { xs: '1.25rem', md: '1.5rem' } }}>
+              <Typography variant="h5" sx={{ fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: { xs: '1.25rem', md: '1.5rem' }, color: '#0F172A' }}>
                 Kiosk Lấy Số Khám Tự Phục Vụ
               </Typography>
               <Box
@@ -308,20 +421,20 @@ export default function KioskPage() {
                   display: { xs: 'none', sm: 'inline-flex' },
                   alignItems: 'center',
                   gap: 0.6,
-                  bgcolor: 'rgba(16, 185, 129, 0.2)',
-                  border: '1px solid #10B981',
+                  bgcolor: '#DCFCE7',
+                  border: '1px solid #86EFAC',
                   borderRadius: '9999px',
                   px: 1.2,
                   py: 0.2
                 }}
               >
-                <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#10B981' }} />
-                <Typography sx={{ fontSize: '0.68rem', fontWeight: 800, color: '#A7F3D0' }}>
+                <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#16A34A' }} />
+                <Typography sx={{ fontSize: '0.68rem', fontWeight: 800, color: '#15803D' }}>
                   ONLINE
                 </Typography>
               </Box>
             </Box>
-            <Typography variant="body2" sx={{ opacity: 0.88, fontSize: '0.85rem' }}>
+            <Typography variant="body2" sx={{ color: '#64748B', fontSize: '0.85rem' }}>
               Hệ thống Tiếp nhận & Cấp Số Thứ Tự Thông Minh · YouMed TNT Hospital
             </Typography>
           </Box>
@@ -329,10 +442,10 @@ export default function KioskPage() {
 
         {/* Real-time Monospace Clock */}
         <Box sx={{ textAlign: 'right', display: { xs: 'none', sm: 'block' } }}>
-          <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: 'monospace', letterSpacing: '0.05em', color: '#67E8F9' }}>
+          <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: 'monospace', letterSpacing: '0.05em', color: '#0D9488' }}>
             {currentTime.toLocaleTimeString('vi-VN')}
           </Typography>
-          <Typography variant="caption" sx={{ opacity: 0.8, fontSize: '0.82rem' }}>
+          <Typography variant="caption" sx={{ color: '#64748B', fontSize: '0.82rem' }}>
             {currentTime.toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </Typography>
         </Box>
@@ -683,6 +796,84 @@ export default function KioskPage() {
                   />
                 </Box>
 
+                {/* LỰA CHỌN THANH TOÁN VIỆN PHÍ & VÀO THẲNG BÁC SĨ */}
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 2,
+                    borderRadius: '16px',
+                    border: `2px solid ${payNow ? '#059669' : '#E2E8F0'}`,
+                    bgcolor: payNow ? '#F0FDF4' : '#F8FAFC',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.2 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 800, color: payNow ? '#065F46' : '#1E293B', display: 'flex', alignItems: 'center', gap: 0.8, fontSize: '0.88rem' }}>
+                      <PaymentIcon sx={{ color: payNow ? '#059669' : '#64748B', fontSize: 20 }} />
+                      HÌNH THỨC THANH TOÁN VIỆN PHÍ:
+                    </Typography>
+                    <Chip
+                      size="small"
+                      label={payNow ? "VÀO THẲNG BÁC SĨ" : "CHỜ TẠI QUẦY"}
+                      sx={{
+                        fontWeight: 800,
+                        bgcolor: payNow ? '#10B981' : '#94A3B8',
+                        color: '#FFFFFF',
+                        fontSize: '0.72rem'
+                      }}
+                    />
+                  </Box>
+                  <Grid container spacing={1.2}>
+                    <Grid item xs={6}>
+                      <Button
+                        fullWidth
+                        variant={payNow ? 'contained' : 'outlined'}
+                        onClick={() => setPayNow(true)}
+                        sx={{
+                          py: 1.2,
+                          borderRadius: '12px',
+                          fontWeight: 800,
+                          fontSize: '0.8rem',
+                          textAlign: 'center',
+                          bgcolor: payNow ? '#059669' : '#FFFFFF',
+                          color: payNow ? '#FFFFFF' : '#065F46',
+                          borderColor: '#059669',
+                          boxShadow: payNow ? '0 4px 12px rgba(5,150,105,0.25)' : 'none',
+                          '&:hover': { bgcolor: payNow ? '#047857' : '#F0FDF4', borderColor: '#059669' }
+                        }}
+                      >
+                        ⚡ Quét VietQR (150k)<br/>Vào thẳng Bác sĩ
+                      </Button>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Button
+                        fullWidth
+                        variant={!payNow ? 'contained' : 'outlined'}
+                        onClick={() => setPayNow(false)}
+                        sx={{
+                          py: 1.2,
+                          borderRadius: '12px',
+                          fontWeight: 800,
+                          fontSize: '0.8rem',
+                          textAlign: 'center',
+                          bgcolor: !payNow ? '#0284C7' : '#FFFFFF',
+                          color: !payNow ? '#FFFFFF' : '#0284C7',
+                          borderColor: '#0284C7',
+                          boxShadow: !payNow ? '0 4px 12px rgba(2,132,199,0.25)' : 'none',
+                          '&:hover': { bgcolor: !payNow ? '#0369A1' : '#F0F9FF', borderColor: '#0284C7' }
+                        }}
+                      >
+                        🏢 Nộp tại Quầy<br/>Lấy số chờ tiếp đón
+                      </Button>
+                    </Grid>
+                  </Grid>
+                  <Typography variant="caption" sx={{ display: 'block', mt: 1, color: payNow ? '#047857' : '#64748B', fontWeight: 600, fontSize: '0.78rem' }}>
+                    {payNow
+                      ? '✅ Quét mã VietQR tức thì. Hệ thống sẽ in phiếu kèm phòng khám & điều phối thẳng vào hàng đợi Bác sĩ!'
+                      : 'ℹ️ Bạn sẽ nhận phiếu số thứ tự và chờ gọi tại Quầy Tiếp Đón để đóng viện phí trước khi gặp Bác sĩ.'}
+                  </Typography>
+                </Paper>
+
                 {/* Nút bấm LẤY SỐ KHÁM */}
                 <Button
                   fullWidth
@@ -694,16 +885,20 @@ export default function KioskPage() {
                   sx={{
                     mt: 'auto',
                     py: 1.8,
-                    fontSize: '1.2rem',
+                    fontSize: '1.15rem',
                     fontWeight: 900,
                     letterSpacing: '0.04em',
                     borderRadius: '14px',
-                    bgcolor: '#059669',
-                    boxShadow: '0 8px 24px rgba(5, 150, 105, 0.35)',
-                    '&:hover': { bgcolor: '#047857' }
+                    bgcolor: payNow ? '#059669' : '#0284C7',
+                    boxShadow: payNow ? '0 8px 24px rgba(5, 150, 105, 0.35)' : '0 8px 24px rgba(2, 132, 199, 0.35)',
+                    '&:hover': { bgcolor: payNow ? '#047857' : '#0369A1' }
                   }}
                 >
-                  {submitting ? 'ĐANG CẤP SỐ...' : 'XÁC NHẬN IN PHIẾU KHÁM'}
+                  {submitting
+                    ? 'ĐANG XỬ LÝ...'
+                    : payNow
+                    ? '⚡ THANH TOÁN VIETQR & IN PHIẾU VÀO PHÒNG'
+                    : 'IN PHIẾU CHỜ TẠI QUẦY TIẾP ĐÓN'}
                 </Button>
               </Paper>
             </Grid>
@@ -735,7 +930,7 @@ export default function KioskPage() {
                       QUY ĐỊNH TIẾP NHẬN CHECK-IN TỰ ĐỘNG
                     </Typography>
                     <Typography variant="caption" sx={{ color: '#64748B' }}>
-                      Dành cho bệnh nhân đã đăng ký trước qua ứng dụng hoặc website YouMed TNT
+                      Dành cho bệnh nhân đã đăng ký trước qua ứng dụng hoặc cổng trực tuyến TNT HOSPITAL
                     </Typography>
                   </Box>
                 </Box>
@@ -941,6 +1136,218 @@ export default function KioskPage() {
         ticketData={ticketResult}
         autoResetSeconds={8}
       />
+
+      {/* MODAL 1: QUÉT VIETQR THANH TOÁN VIỆN PHÍ CHO KHÁCH LẤY SỐ MỚI (TAB 0) */}
+      <Dialog
+        open={openQrModal}
+        onClose={() => setOpenQrModal(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: '24px', p: 1.5, textAlign: 'center' }
+        }}
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, color: '#059669' }}>
+            <FlashOnIcon sx={{ fontSize: 28 }} />
+            <Typography variant="h6" sx={{ fontWeight: 900, textTransform: 'uppercase', fontSize: '1.15rem' }}>
+              THANH TOÁN VIETQR THEO MÃ LỊCH KHÁM
+            </Typography>
+          </Box>
+          <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mt: 0.5 }}>
+            Bệnh nhân: <b>{fullName}</b> · SĐT: <b>{phoneNumber}</b>
+          </Typography>
+        </DialogTitle>
+        <DialogContent sx={{ px: 2, py: 1 }}>
+          <Alert severity="success" sx={{ mb: 2, borderRadius: '12px', fontSize: '0.85rem', fontWeight: 600 }}>
+            Chỉ khi ngân hàng xác nhận, hệ thống mới ghi nhận thanh toán. Trong khi chờ, phiếu của bạn vẫn ở hàng đợi quầy.
+          </Alert>
+          <Box
+            sx={{
+              p: 2,
+              bgcolor: '#FFFFFF',
+              borderRadius: '16px',
+              border: '2px dashed #059669',
+              display: 'inline-block',
+              boxShadow: '0 8px 24px rgba(5,150,105,0.12)'
+            }}
+          >
+            <Box sx={{ p: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+              {kioskPayment?.qrImageUrl
+                ? <img src={kioskPayment.qrImageUrl} alt="Mã thanh toán lịch khám" width={200} height={200} />
+                : <QRCodeSVG value={kioskPayment?.qrCode || ''} size={200} level="M" />}
+            </Box>
+          </Box>
+          <Box sx={{ mt: 1.5, p: 1.5, bgcolor: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0', textAlign: 'left' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+              <Typography variant="body2" color="text.secondary">Khoa tiếp nhận:</Typography>
+              <Typography variant="body2" fontWeight={800} color="#0F172A">{selectedDept?.name}</Typography>
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+              <Typography variant="body2" color="text.secondary">Tiền khám ban đầu:</Typography>
+              <Typography variant="body2" fontWeight={900} color="#059669" fontSize="1.05rem">{Number(kioskPayment?.amount || 0).toLocaleString('vi-VN')} VNĐ</Typography>
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+              <Typography variant="body2" color="text.secondary">Nội dung CK:</Typography>
+              <Typography variant="body2" fontWeight={700} fontFamily="monospace">{kioskPayment?.transferContent || kioskPayment?.txnRef}</Typography>
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, flexDirection: 'column', gap: 1 }}>
+          <Button
+            fullWidth
+            variant="contained"
+            size="large"
+            disabled={submitting || payingKiosk || !kioskPayment}
+            onClick={handlePayUnpaidCheckIn}
+            startIcon={payingKiosk ? <CircularProgress size={20} color="inherit" /> : <CheckCircleIcon />}
+            sx={{
+              py: 1.5,
+              borderRadius: '12px',
+              fontWeight: 900,
+              fontSize: '1rem',
+              bgcolor: '#059669',
+              boxShadow: '0 6px 16px rgba(5,150,105,0.3)',
+              '&:hover': { bgcolor: '#047857' }
+            }}
+          >
+            {payingKiosk ? 'ĐANG KIỂM TRA...' : 'KIỂM TRA XÁC NHẬN TỪ NGÂN HÀNG'}
+          </Button>
+          <Button
+            fullWidth
+            variant="outlined"
+            color="primary"
+            disabled={submitting}
+            onClick={() => { setOpenQrModal(false); setOpenTicketModal(true); handleResetForm(); }}
+            sx={{ borderRadius: '12px', fontWeight: 700 }}
+          >
+            Đổi ý: Nộp tại Quầy Tiếp Đón
+          </Button>
+          <Button
+            fullWidth
+            variant="text"
+            color="inherit"
+            disabled={submitting}
+            onClick={() => setOpenQrModal(false)}
+            sx={{ fontWeight: 600, fontSize: '0.85rem' }}
+          >
+            Quay lại
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* MODAL 2: NHẮC THANH TOÁN VIETQR CHO LỊCH ĐẶT TRƯỚC CHƯA NỘP VIỆN PHÍ (TAB 1) */}
+      <Dialog
+        open={openCheckInPayModal}
+        onClose={() => setOpenCheckInPayModal(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: '24px', p: 1.5, textAlign: 'center' }
+        }}
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, color: '#0284C7' }}>
+            <PaymentIcon sx={{ fontSize: 28 }} />
+            <Typography variant="h6" sx={{ fontWeight: 900, textTransform: 'uppercase', fontSize: '1.15rem' }}>
+              THANH TOÁN VIỆN PHÍ THEO LỊCH KHÁM
+            </Typography>
+          </Box>
+          <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mt: 0.5 }}>
+            Bệnh nhân: <b>{unpaidCheckInData?.patientName}</b> · Mã hẹn: <b>{unpaidCheckInData?.bookingCode}</b>
+          </Typography>
+        </DialogTitle>
+        <DialogContent sx={{ px: 2, py: 1 }}>
+          <Alert severity="info" sx={{ mb: 2, borderRadius: '12px', fontSize: '0.85rem', fontWeight: 600 }}>
+            Quét mã thanh toán cho lịch khám này và chờ ngân hàng xác nhận. Khi chưa được xác nhận, phiếu vẫn ở hàng đợi quầy.
+          </Alert>
+          <Box
+            sx={{
+              p: 2,
+              bgcolor: '#FFFFFF',
+              borderRadius: '16px',
+              border: '2px dashed #0284C7',
+              display: 'inline-block',
+              boxShadow: '0 8px 24px rgba(2,132,199,0.12)'
+            }}
+          >
+            <Box sx={{ p: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+              {kioskPayment?.qrImageUrl ? (
+                <img
+                  src={kioskPayment.qrImageUrl}
+                  alt="Mã QR Check-in"
+                  style={{ width: '200px', height: '200px', objectFit: 'contain' }}
+                />
+              ) : (
+                <QRCodeSVG
+                  value={kioskPayment?.qrCode || kioskPayment?.checkoutUrl || ''}
+                  size={200}
+                  level="M"
+                />
+              )}
+            </Box>
+          </Box>
+          <Box sx={{ mt: 1.5, p: 1.5, bgcolor: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0', textAlign: 'left' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+              <Typography variant="body2" color="text.secondary">Phòng khám:</Typography>
+              <Typography variant="body2" fontWeight={800} color="#D97706">{unpaidCheckInData?.roomName || 'Phòng khám chuyên khoa'}</Typography>
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+              <Typography variant="body2" color="text.secondary">Bác sĩ phụ trách:</Typography>
+              <Typography variant="body2" fontWeight={700} color="#0F172A">{unpaidCheckInData?.doctorName || 'Bác sĩ trực khám'}</Typography>
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+              <Typography variant="body2" color="text.secondary">Tiền khám:</Typography>
+              <Typography variant="body2" fontWeight={900} color="#059669" fontSize="1.05rem">{Number(kioskPayment?.amount || unpaidCheckInData?.price || 0).toLocaleString('vi-VN')} VNĐ</Typography>
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+              <Typography variant="body2" color="text.secondary">Nội dung CK:</Typography>
+              <Typography variant="body2" fontWeight={700} fontFamily="monospace">{kioskPayment?.transferContent || kioskPayment?.txnRef}</Typography>
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, flexDirection: 'column', gap: 1 }}>
+          <Button
+            fullWidth
+            variant="contained"
+            size="large"
+            disabled={payingKiosk || !kioskPayment}
+            onClick={handlePayUnpaidCheckIn}
+            startIcon={payingKiosk ? <CircularProgress size={20} color="inherit" /> : <FlashOnIcon />}
+            sx={{
+              py: 1.5,
+              borderRadius: '12px',
+              fontWeight: 900,
+              fontSize: '1rem',
+              bgcolor: '#0284C7',
+              boxShadow: '0 6px 16px rgba(2,132,199,0.3)',
+              '&:hover': { bgcolor: '#0369A1' }
+            }}
+          >
+            {payingKiosk ? 'ĐANG KIỂM TRA...' : 'KIỂM TRA XÁC NHẬN TỪ NGÂN HÀNG'}
+          </Button>
+          <Button
+            fullWidth
+            variant="outlined"
+            color="primary"
+            disabled={payingKiosk}
+            onClick={handleSkipPayAndPrintUnpaid}
+            sx={{ borderRadius: '12px', fontWeight: 700 }}
+          >
+            Nộp tiền sau tại Quầy Tiếp Đón
+          </Button>
+          <Button
+            fullWidth
+            variant="text"
+            color="inherit"
+            disabled={payingKiosk}
+            onClick={() => setOpenCheckInPayModal(false)}
+            sx={{ fontWeight: 600, fontSize: '0.85rem' }}
+          >
+            Đóng
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

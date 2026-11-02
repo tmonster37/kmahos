@@ -68,13 +68,16 @@ export default function QueueDisplayPage() {
 
         // Tải danh sách chuyên khoa
         axiosInstance.get("/api/departments").then(res => {
-            const list = res.data && Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []);
+            const list = Array.isArray(res.data?.data) ? res.data.data : (Array.isArray(res.data) ? res.data : []);
             setDepartments(list);
         }).catch(() => {});
 
         // Thăm dò hàng đợi định kỳ mỗi 3 giây (Realtime Sync)
         fetchPublicQueue();
-        const queueInterval = setInterval(fetchPublicQueue, 3000);
+        const queueInterval = setInterval(() => {
+            if (typeof document !== "undefined" && document.hidden) return;
+            fetchPublicQueue();
+        }, 3000);
 
         return () => {
             clearInterval(clockInterval);
@@ -86,12 +89,12 @@ export default function QueueDisplayPage() {
         try {
             fetchMyTicket();
             const res = await axiosInstance.get("/api/clinical/queue/public");
-            const list = (res.data && Array.isArray(res.data)) ? res.data : (Array.isArray(res) ? res : []);
+            const list = Array.isArray(res.data?.data) ? res.data.data : (Array.isArray(res.data) ? res.data : []);
             setQueue(list);
 
             // Tải trạng thái quầy tiếp đón thời gian thực
             axiosInstance.get("/api/counters").then(counterRes => {
-                const cList = (counterRes.data && Array.isArray(counterRes.data)) ? counterRes.data : [];
+                const cList = Array.isArray(counterRes.data?.data) ? counterRes.data.data : (Array.isArray(counterRes.data) ? counterRes.data : []);
                 setCounters(cList);
             }).catch(() => {});
 
@@ -132,6 +135,7 @@ export default function QueueDisplayPage() {
     // Nhóm theo từng buồng phòng khám
     const roomsMap = {};
     filteredQueue.forEach(item => {
+        if (item.status === "COMPLETED" || item.status === "CANCELLED") return;
         const rName = item.roomName || "Phòng Khám 101";
         if (!roomsMap[rName]) {
             roomsMap[rName] = {
@@ -141,7 +145,7 @@ export default function QueueDisplayPage() {
                 waiting: []
             };
         }
-        if (item.status === "IN_PROGRESS" && !roomsMap[rName].current) {
+        if ((item.status === "IN_PROGRESS" || item.recordState === "CALLING") && !roomsMap[rName].current) {
             roomsMap[rName].current = item;
         } else {
             roomsMap[rName].waiting.push(item);
@@ -151,8 +155,9 @@ export default function QueueDisplayPage() {
     const roomList = Object.values(roomsMap);
 
     // Bệnh nhân đang gọi đầu tiên
-    const currentCalling = filteredQueue.find((p) => p.status === "IN_PROGRESS") || (filteredQueue.length > 0 ? filteredQueue[0] : null);
-    const upcomingQueue = filteredQueue.filter((p) => p !== currentCalling);
+    const activeValidQueue = filteredQueue.filter((p) => p.status !== "COMPLETED" && p.status !== "CANCELLED");
+    const currentCalling = activeValidQueue.find((p) => p.recordState === "CALLING") || activeValidQueue.find((p) => p.status === "IN_PROGRESS") || (activeValidQueue.length > 0 ? activeValidQueue[0] : null);
+    const upcomingQueue = filteredQueue.filter((p) => p !== currentCalling && p.status !== "COMPLETED" && p.status !== "CANCELLED");
 
     // Tính toán số người đang chờ phía trước cho phiếu cá nhân
     const myTicketQueueCode = myTicket?.queueCode || (myTicket?.queueNumber ? `KB-${String(myTicket.queueNumber).padStart(2, '0')}` : null);
@@ -218,7 +223,7 @@ export default function QueueDisplayPage() {
                                 fontSize: { xs: "1.05rem", sm: "1.2rem" }
                             }}
                         >
-                            BỆNH VIỆN ĐA KHOA QUỐC TẾ TNT
+                            TNT HOSPITAL
                         </Typography>
                         <Typography variant="caption" sx={{ color: "#94A3B8", fontWeight: 600, letterSpacing: "0.04em" }}>
                             HỆ THỐNG ĐIỀU PHỐI HÀNG ĐỢI & GỌI SỐ THỜI GIAN THỰC (REALTIME LED DISPLAY)

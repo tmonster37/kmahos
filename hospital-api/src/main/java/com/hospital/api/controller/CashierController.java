@@ -20,13 +20,13 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/cashier")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('ADMIN', 'CASHIER')")
 public class CashierController {
 
     private final CashierService cashierService;
     private final AccountRepository accountRepository;
 
     @GetMapping("/pending-bills")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CASHIER', 'NURSE')")
     public ResponseEntity<ApiResponse<List<CashierPendingBillResponse>>> getPendingBills(
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size
@@ -36,6 +36,7 @@ public class CashierController {
     }
 
     @PostMapping("/pay")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CASHIER', 'NURSE')")
     public ResponseEntity<ApiResponse<CashierReceiptResponse>> processPayment(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @Valid @RequestBody CashierPaymentRequest request
@@ -53,6 +54,7 @@ public class CashierController {
     }
 
     @GetMapping("/history")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CASHIER')")
     public ResponseEntity<ApiResponse<List<CashierReceiptResponse>>> getPaymentHistory(
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size
