@@ -19,6 +19,16 @@ public class DatabaseSequenceSyncRunner implements CommandLineRunner {
     public void run(String... args) {
         syncSequence("departments", "department_id");
         syncSequence("rooms", "room_id");
+        ensureSchemaHardening();
+    }
+
+    private void ensureSchemaHardening() {
+        try {
+            jdbcTemplate.execute("ALTER TABLE accounts ALTER COLUMN phone_number DROP NOT NULL");
+            log.info("Successfully ensured accounts.phone_number is nullable for Google SSO");
+        } catch (Exception e) {
+            log.warn("Could not alter accounts.phone_number: {}", e.getMessage());
+        }
     }
 
     private void syncSequence(String tableName, String idColumn) {
