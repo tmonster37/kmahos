@@ -29,6 +29,13 @@ public class DatabaseSequenceSyncRunner implements CommandLineRunner {
         } catch (Exception e) {
             log.warn("Could not alter accounts.phone_number: {}", e.getMessage());
         }
+
+        try {
+            jdbcTemplate.execute("ALTER TABLE medical_examination_records DROP CONSTRAINT IF EXISTS medical_examination_records_state_check");
+            log.info("Successfully dropped legacy medical_examination_records_state_check constraint");
+        } catch (Exception e) {
+            log.warn("Could not drop medical_examination_records_state_check: {}", e.getMessage());
+        }
     }
 
     private void syncSequence(String tableName, String idColumn) {

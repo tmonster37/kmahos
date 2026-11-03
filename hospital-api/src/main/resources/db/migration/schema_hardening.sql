@@ -8,6 +8,9 @@ ALTER TABLE accounts ADD COLUMN IF NOT EXISTS google_sub VARCHAR(100);
 ALTER TABLE accounts ALTER COLUMN phone_number DROP NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_account_google_sub ON accounts(google_sub);
 
+-- 1.1 Medical Examination Records: Bỏ check constraint cũ của state để hỗ trợ CALLING, IN_PROGRESS, SKIPPED
+ALTER TABLE medical_examination_records DROP CONSTRAINT IF EXISTS medical_examination_records_state_check;
+
 -- 2. OTP Tokens: Bảng lưu trữ mã xác thực OTP bảo mật
 CREATE TABLE IF NOT EXISTS otp_tokens (
     token_id UUID PRIMARY KEY,

@@ -206,6 +206,7 @@ export default function PrescriptionModal({ open, onClose, recordId, onPrescribe
     const [allergyAlerts, setAllergyAlerts] = useState([]);
     const [selectedTemplateId, setSelectedTemplateId] = useState("");
     const [templateNotice, setTemplateNotice] = useState("");
+    const [overrideReason, setOverrideReason] = useState("");
 
     useEffect(() => {
         if (open) {
@@ -224,6 +225,7 @@ export default function PrescriptionModal({ open, onClose, recordId, onPrescribe
             setError("");
             setSelectedTemplateId("");
             setTemplateNotice("");
+            setOverrideReason("");
         }
     }, [open]);
 
@@ -389,17 +391,26 @@ export default function PrescriptionModal({ open, onClose, recordId, onPrescribe
     };
 
     const handleSubmit = async () => {
+        if (!recordId || String(recordId).startsWith("temp-")) {
+            setError("Hồ sơ bệnh án chưa được lưu trên hệ thống. Vui lòng bấm 'Lưu Chẩn Đoán' trên màn hình trước khi kê đơn!");
+            return;
+        }
+
         if (items.length === 0) {
             setError("Đơn thuốc phải có ít nhất 1 loại thuốc!");
             return;
         }
 
         // Cảnh báo nếu đang kê thuốc dị ứng
+        let effectiveOverrideReason = overrideReason ? overrideReason.trim() : null;
         if (allergyAlerts.length > 0) {
             const confirmAllergy = window.confirm(
                 `🚨 CẢNH BÁO NGUY HIỂM:\nĐơn thuốc đang có ${allergyAlerts.length} thuốc có nguy cơ gây DỊ ỨNG với bệnh nhân (${patientAllergies})!\n\nBạn có CHẮC CHẮN vẫn muốn xuất đơn thuốc này không?`
             );
             if (!confirmAllergy) return;
+            if (!effectiveOverrideReason) {
+                effectiveOverrideReason = "Bác sĩ lâm sàng xác nhận ghi đè cảnh báo dị ứng";
+            }
         }
 
         // Validate tồn kho thuốc
@@ -427,7 +438,7 @@ export default function PrescriptionModal({ open, onClose, recordId, onPrescribe
             await axiosInstance.post(`/api/clinical/records/${recordId}/prescriptions`, {
                 doctorNotes,
                 overrideAllergyWarning: allergyAlerts.length > 0,
-                overrideReason: overrideReason || null,
+                overrideReason: effectiveOverrideReason,
                 items: items.map((it) => ({
                     medicineId: Number(it.medicineId),
                     quantity: Number(it.quantity),

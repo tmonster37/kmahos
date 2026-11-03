@@ -88,6 +88,11 @@ export default function AssignTestsModal({ open, onClose, recordId, onAssigned }
     );
 
     const handleSave = async () => {
+        if (!recordId || String(recordId).startsWith("temp-")) {
+            setError("Hồ sơ bệnh án chưa được lưu trên hệ thống. Vui lòng bấm 'Lưu Chẩn Đoán' trên màn hình trước khi chỉ định cận lâm sàng!");
+            return;
+        }
+
         if (selectedIds.length === 0) {
             setError("Vui lòng chọn ít nhất 1 dịch vụ xét nghiệm cận lâm sàng!");
             return;
