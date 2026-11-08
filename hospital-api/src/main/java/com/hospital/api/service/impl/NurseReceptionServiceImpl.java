@@ -65,6 +65,9 @@ public class NurseReceptionServiceImpl implements NurseReceptionService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private CounterTicketRepository counterTicketRepository;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.hospital.api.service.CashierService cashierService;
+
     @Override
     @Transactional
     public NurseCheckInResponse checkInByQr(NurseCheckInRequest request, UUID nurseUserId) {
@@ -249,7 +252,12 @@ public class NurseReceptionServiceImpl implements NurseReceptionService {
             booking = bookingRepository.findByIdWithLock(request.bookingId()).orElse(null);
         }
         if (booking == null && request.bookingCode() != null && !request.bookingCode().isBlank()) {
-            booking = bookingRepository.findByBookingCode(request.bookingCode().trim()).orElse(null);
+            String lookupCode = request.bookingCode().trim();
+            if (lookupCode.startsWith("BILL-")) {
+                lookupCode = lookupCode.substring("BILL-".length())
+                        .replaceAll("-(EXAM|TEST|PRESCRIPTION|TREATMENT|ALL)$", "");
+            }
+            booking = bookingRepository.findByBookingCode(lookupCode).orElse(null);
             if (booking != null) {
                 booking = bookingRepository.findByIdWithLock(booking.getBookingId()).orElse(booking);
             }
@@ -322,17 +330,6 @@ public class NurseReceptionServiceImpl implements NurseReceptionService {
             throw new AppException("Không tìm thấy lượt khám hoặc hồ sơ nội trú để thu viện phí", HttpStatus.NOT_FOUND);
         }
 
-        if (booking.getPrice() == null) {
-            BigDecimal derivedPrice = request.amount() != null ? request.amount() : BigDecimal.ZERO;
-            booking.setPrice(derivedPrice);
-        }
-        BigDecimal amount = request.amount() != null ? request.amount() : booking.getPrice();
-        if (amount == null) {
-            amount = booking.getPrice();
-        }
-        if (amount.compareTo(booking.getPrice()) != 0 || amount.signum() < 0) {
-            throw new AppException("Số tiền không khớp tiền khám (hệ thống yêu cầu: " + booking.getPrice() + "đ)", HttpStatus.BAD_REQUEST);
-        }
         PaymentMethod method;
         try { method = request.paymentMethod() == null ? PaymentMethod.CASH : PaymentMethod.valueOf(request.paymentMethod()); }
         catch (IllegalArgumentException ex) { throw new AppException("Phương thức thanh toán không hợp lệ", HttpStatus.BAD_REQUEST); }
@@ -342,6 +339,53 @@ public class NurseReceptionServiceImpl implements NurseReceptionService {
         }
         Account staff = accountRepository.findById(staffUserId).orElse(null);
         String staffName = staff == null ? "Thu ngân tiếp đón" : staff.getFullName();
+
+        if (booking.getPrice() == null) {
+            BigDecimal derivedPrice = request.amount() != null ? request.amount() : BigDecimal.ZERO;
+            booking.setPrice(derivedPrice);
+        }
+        BigDecimal amount = request.amount() != null ? request.amount() : booking.getPrice();
+        if (amount == null) {
+            amount = booking.getPrice();
+        }
+        boolean isExplicitTreatmentBill = request.bookingCode() != null
+                && request.bookingCode().trim().matches("(?i)^BILL-.*-(TEST|PRESCRIPTION|TREATMENT)$");
+        if ((Boolean.TRUE.equals(booking.getIsPaid()) || isExplicitTreatmentBill)
+                && amount.signum() > 0
+                && amount.compareTo(booking.getPrice()) != 0
+                && cashierService != null) {
+            String targetBillCode = isExplicitTreatmentBill
+                    ? request.bookingCode().trim()
+                    : "BILL-" + booking.getBookingCode() + "-TREATMENT";
+            var cashierReceipt = cashierService.processPayment(
+                    staffName,
+                    new com.hospital.api.dto.request.CashierPaymentRequest(
+                            targetBillCode,
+                            method,
+                            amount,
+                            request.cashierNotes()
+                    )
+            );
+            String paidAtStr = LocalDateTime.now(hospitalClock).format(DateTimeFormatter.ofPattern("HH:mm:ss dd/MM/yyyy"));
+            return new ClinicReceiptResponse(
+                    cashierReceipt.receiptCode(),
+                    booking.getBookingCode(),
+                    cashierReceipt.patientName(),
+                    cashierReceipt.phoneNumber(),
+                    cashierReceipt.departmentName(),
+                    cashierReceipt.doctorName(),
+                    cashierReceipt.totalAmount(),
+                    cashierReceipt.amountGiven(),
+                    method.name(),
+                    staffName,
+                    paidAtStr,
+                    "Thu phí cận lâm sàng / điều trị tại quầy tiếp đón thành công.",
+                    "PENDING_BILLS"
+            );
+        }
+        if (amount.compareTo(booking.getPrice()) != 0 || amount.signum() < 0) {
+            throw new AppException("Số tiền không khớp tiền khám (hệ thống yêu cầu: " + booking.getPrice() + "đ)", HttpStatus.BAD_REQUEST);
+        }
         if (amount.signum() > 0 && !Boolean.TRUE.equals(booking.getIsPaid())) {
             Transaction txn = Transaction.builder()
                     .account(booking.getPatientProfile() != null ? booking.getPatientProfile().getAccount() : null)

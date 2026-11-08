@@ -122,6 +122,9 @@ public class SecurityConfig {
         config.setAllowedOrigins(origins);
         config.addAllowedOriginPattern("http://localhost:[*]");
         config.addAllowedOriginPattern("http://127.0.0.1:[*]");
+        config.addAllowedOriginPattern("http://192.168.*:[*]");
+        config.addAllowedOriginPattern("http://10.*:[*]");
+        config.addAllowedOriginPattern("http://172.*:[*]");
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "X-Requested-With", "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers"));
         config.setExposedHeaders(List.of("Authorization", "Content-Disposition"));

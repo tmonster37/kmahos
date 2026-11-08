@@ -1,5 +1,6 @@
 package com.hospital.api.controller;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,12 +19,17 @@ import java.util.Map;
  * Endpoint kiểm tra tình trạng sức khỏe (Health Check & Liveness / Readiness Probe)
  * Phục vụ Docker Compose, Kubernetes, Load Balancer, Render / AWS monitoring.
  */
+@Slf4j
 @RestController
 @RequestMapping({"/api/health", "/health"})
 public class HealthCheckController {
 
     @Autowired(required = false)
     private DataSource dataSource;
+
+    public void setDataSource(DataSource dataSource) {
+        this.dataSource = dataSource;
+    }
 
     private final long startTime = System.currentTimeMillis();
 
@@ -34,17 +40,16 @@ public class HealthCheckController {
         response.put("timestamp", Instant.now().toString());
         response.put("uptimeMs", System.currentTimeMillis() - startTime);
 
-        // 1. Kiểm tra kết nối Database
+        // 1. Kiểm tra kết nối Database (không lộ chi tiết exception hay phiên bản nội bộ ra công khai)
         Map<String, Object> dbStatus = new LinkedHashMap<>();
         if (dataSource != null) {
             try (Connection conn = dataSource.getConnection();
                  Statement stmt = conn.createStatement()) {
                 stmt.execute("SELECT 1");
                 dbStatus.put("status", "UP");
-                dbStatus.put("databaseProduct", conn.getMetaData().getDatabaseProductName());
             } catch (Exception e) {
+                log.error("Health check database probe failed", e);
                 dbStatus.put("status", "DOWN");
-                dbStatus.put("error", e.getMessage());
                 response.put("status", "DOWN");
             }
         } else {

@@ -35,10 +35,12 @@ async function runMasterAudit() {
   let sampleSlotId = null;
   let sampleProfileId = null;
   let sampleBookingCode = null;
+  let sampleBookingId = null;
   let sampleRecordId = null;
   let sampleTestId = null;
   let sampleAdmissionId = null;
   let sampleReminderId = null;
+  let mutatedTimeSlotBackup = null;
 
   // ----------------------------------------------------------------------------
   // SECTION 1: XÁC THỰC & BẢO MẬT (AUTH & SECURITY)
@@ -46,10 +48,14 @@ async function runMasterAudit() {
   console.log("--- 1. PHÂN HỆ XÁC THỰC & BẢO MẬT ---");
   
   await test("1.1 Admin Đăng nhập hệ thống (0937050537)", async () => {
+    const adminPassword = process.env.TEST_ADMIN_PASSWORD;
+    if (!adminPassword) {
+      throw new Error("Vui lòng thiết lập biến môi trường TEST_ADMIN_PASSWORD trước khi chạy kịch bản kiểm toán.");
+    }
     const res = await fetch(`${BASE_URL}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phoneNumber: "0937050537", password: "taizz0537" })
+      body: JSON.stringify({ phoneNumber: process.env.TEST_ADMIN_PHONE || "0937050537", password: adminPassword })
     });
     const data = await res.json();
     if (!data.success || !data.data?.accessToken) throw new Error(data.message || "Không thể đăng nhập Admin");
@@ -214,6 +220,31 @@ async function runMasterAudit() {
     const schedule = data.data.find(s => s.doctorId === sampleDoctorId) || data.data[0];
     if (schedule && schedule.timeSlots && schedule.timeSlots.length > 0) {
       sampleSlotId = schedule.timeSlots[0].timeSlotId;
+      if (process.env.ALLOW_TEST_DB_MUTATION === 'true' && process.env.TEST_DATABASE_URL) {
+        try {
+          const { Client } = require('pg');
+          const client = new Client({ connectionString: process.env.TEST_DATABASE_URL });
+          await client.connect();
+          const origRes = await client.query(
+            "SELECT start_time, end_time FROM time_slots WHERE time_slot_id = $1",
+            [sampleSlotId]
+          );
+          if (origRes.rows.length > 0) {
+            mutatedTimeSlotBackup = {
+              timeSlotId: sampleSlotId,
+              startTime: origRes.rows[0].start_time,
+              endTime: origRes.rows[0].end_time
+            };
+          }
+          await client.query(
+            "UPDATE time_slots SET start_time = '00:00:00', end_time = '23:59:59' WHERE time_slot_id = $1",
+            [sampleSlotId]
+          );
+          await client.end();
+        } catch (dbErr) {
+          console.warn("Cảnh báo đồng bộ khung giờ time_slots:", dbErr.message);
+        }
+      }
     }
   });
 
@@ -236,6 +267,7 @@ async function runMasterAudit() {
     const data = await res.json();
     if (!data.success || !data.data?.bookingCode) throw new Error(data.message || "Đặt lịch thất bại");
     sampleBookingCode = data.data.bookingCode;
+    sampleBookingId = data.data.bookingId;
   });
 
   await test("5.2 Bệnh nhân bấm lấy số ƯU TIÊN tại Cây Kiosk Sảnh", async () => {
@@ -265,6 +297,47 @@ async function runMasterAudit() {
     const res = await fetch(`${BASE_URL}/clinical/queue/public`);
     const data = await res.json();
     if (!data.success || !Array.isArray(data.data)) throw new Error("Lỗi tải hàng đợi LED");
+  });
+
+  await test("5.5 Tiếp đón điều dưỡng Check-in QR & Thu tiền khám tại quầy", async () => {
+    // 1. Check-in QR lấy sinh hiệu
+    await fetch(`${BASE_URL}/nurse/check-in/qr`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+      body: JSON.stringify({
+        qrData: sampleBookingCode,
+        height: 170.0,
+        weight: 65.0,
+        bloodPressure: "120/80",
+        temperature: 36.5,
+        heartRate: 75,
+        spo2: 98,
+        nurseNotes: "Bệnh nhân tỉnh táo, tiếp xúc tốt"
+      })
+    });
+
+    // 2. Thu tiền khám tại quầy
+    const payRes = await fetch(`${BASE_URL}/nurse/reception/pay-at-clinic`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+      body: JSON.stringify({
+        bookingId: sampleBookingId,
+        amount: 200000,
+        paymentMethod: "CASH"
+      })
+    });
+    const payData = await payRes.json();
+    if (!payData.success) throw new Error(payData.message || "Thu tiền khám thất bại");
+
+    // 3. Điều phối vào buồng khám bác sĩ
+    await fetch(`${BASE_URL}/nurse/reception/dispatch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+      body: JSON.stringify({
+        bookingId: sampleBookingId,
+        targetRoomId: sampleRoomId || 1
+      })
+    });
   });
 
   // ----------------------------------------------------------------------------
@@ -498,7 +571,7 @@ async function runMasterAudit() {
   console.log("\n--- 9. PHÂN HỆ THANH TOÁN VNPAY & TIỆN ÍCH DASHBOARD ---");
 
   await test("9.1 Khởi tạo URL Cổng thanh toán VNPay-QR", async () => {
-    const res = await fetch(`${BASE_URL}/payment/vnpay/create-url?amount=200000&type=PAY_BOOKING`, {
+    const res = await fetch(`${BASE_URL}/payment/vnpay/create-url?amount=200000&type=PAY_BOOKING&bookingCode=${sampleBookingCode}`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${patientToken}` }
     });
@@ -542,6 +615,23 @@ async function runMasterAudit() {
     const data = await res.json();
     if (!data.success || typeof data.data?.totalPatients === 'undefined') throw new Error("Lỗi tải thống kê Dashboard");
   });
+
+  // Khôi phục time_slots nếu đã tạm mở rộng trong quá trình test
+  if (mutatedTimeSlotBackup && process.env.ALLOW_TEST_DB_MUTATION === 'true' && process.env.TEST_DATABASE_URL) {
+    try {
+      const { Client } = require('pg');
+      const client = new Client({ connectionString: process.env.TEST_DATABASE_URL });
+      await client.connect();
+      await client.query(
+        "UPDATE time_slots SET start_time = $1, end_time = $2 WHERE time_slot_id = $3",
+        [mutatedTimeSlotBackup.startTime, mutatedTimeSlotBackup.endTime, mutatedTimeSlotBackup.timeSlotId]
+      );
+      await client.end();
+      console.log(`🔄 Đã khôi phục khung giờ gốc cho time_slot_id=${mutatedTimeSlotBackup.timeSlotId}`);
+    } catch (restoreErr) {
+      console.warn("Không thể khôi phục khung giờ time_slots:", restoreErr.message);
+    }
+  }
 
   // ----------------------------------------------------------------------------
   // KẾT LUẬN TOÀN DIỆN

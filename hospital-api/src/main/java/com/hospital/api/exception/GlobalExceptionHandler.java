@@ -1,6 +1,7 @@
 package com.hospital.api.exception;
 
 import com.hospital.api.common.ApiResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -48,9 +50,10 @@ public class GlobalExceptionHandler {
     // Bắt lỗi xác thực tài khoản / token
     @ExceptionHandler(org.springframework.security.core.AuthenticationException.class)
     public ResponseEntity<ApiResponse<Object>> handleAuthenticationException(org.springframework.security.core.AuthenticationException ex) {
+        log.warn("Authentication failure: {}", ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.error("Xác thực thất bại hoặc phiên đăng nhập đã hết hạn: " + ex.getMessage()));
+                .body(ApiResponse.error("Xác thực thất bại hoặc phiên đăng nhập đã hết hạn"));
     }
 
     // Bắt lỗi tham số không hợp lệ
@@ -71,8 +74,9 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Object>> handleGeneralException(Exception ex) {
+        log.error("Unhandled internal server exception", ex);
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("Lỗi hệ thống: " + ex.getMessage()));
+                .body(ApiResponse.error("Lỗi hệ thống nội bộ, vui lòng thử lại sau"));
     }
 }

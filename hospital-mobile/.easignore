@@ -1,0 +1,20 @@
+# Exclude local environment secrets and build/test artifacts from EAS uploads
+.env
+.env.*
+!.env.example
+node_modules/
+.expo/
+dist/
+web-build/
+coverage/
+*.log
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+../hospital-api/
+../hospital-ui/
+../process/
+../docs/
+

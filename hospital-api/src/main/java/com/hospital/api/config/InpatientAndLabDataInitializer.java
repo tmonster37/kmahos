@@ -9,7 +9,9 @@ import com.hospital.api.entity.*;
 import com.hospital.api.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +21,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Component
+@Profile("!prod & !production")
 @Order(3)
 @RequiredArgsConstructor
 @Slf4j
@@ -34,9 +37,21 @@ public class InpatientAndLabDataInitializer implements CommandLineRunner {
     private final DoctorRepository doctorRepository;
     private final StaffRepository staffRepository;
 
+    @Value("${app.seed-demo-data:false}")
+    private boolean seedDemoData;
+
+    public void setSeedDemoData(boolean seedDemoData) {
+        this.seedDemoData = seedDemoData;
+    }
+
     @Override
     @Transactional
     public void run(String... args) {
+        if (!seedDemoData) {
+            log.info("Skipping Inpatient (IPD) and Laboratory (LIS) demo data seeding (app.seed-demo-data=false).");
+            return;
+        }
+
         log.info("Starting Inpatient (IPD) and Laboratory (LIS) data initialization...");
 
         // 1. Khởi tạo giường bệnh cho các buồng bệnh

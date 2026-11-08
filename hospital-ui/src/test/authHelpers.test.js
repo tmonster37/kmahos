@@ -46,5 +46,17 @@ describe("Authentication & RBAC Helper Functions", () => {
         expect(nurseAllowedRoles.includes(userNurse.role)).toBe(true);
         expect(cashierAllowedRoles.includes(userAdmin.role)).toBe(true);
     });
+
+    it("enforces Cookie-Only token transport by stripping accessToken from user localStorage and AxiosInstance", async () => {
+        const { default: axiosInstance } = await import("../services/AxiosInstance");
+        localStorage.setItem("accessToken", "SHOULD_NOT_BE_ATTACHED");
+
+        const handler = axiosInstance.interceptors.request.handlers[0];
+        const config = await handler.fulfilled({ headers: {} });
+
+        expect(config.withCredentials).toBe(true);
+        expect(config.headers["X-Requested-With"]).toBe("XMLHttpRequest");
+        expect(config.headers.Authorization).toBeUndefined();
+    });
 });
 

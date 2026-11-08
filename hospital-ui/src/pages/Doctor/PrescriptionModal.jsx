@@ -391,8 +391,9 @@ export default function PrescriptionModal({ open, onClose, recordId, onPrescribe
     };
 
     const handleSubmit = async () => {
-        if (!recordId || String(recordId).startsWith("temp-")) {
-            setError("Hồ sơ bệnh án chưa được lưu trên hệ thống. Vui lòng bấm 'Lưu Chẩn Đoán' trên màn hình trước khi kê đơn!");
+        const isValidUuid = recordId && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(String(recordId));
+        if (!isValidUuid) {
+            setError("Hồ sơ bệnh án chưa được lưu hoặc mã hồ sơ không hợp lệ trên hệ thống. Vui lòng bấm 'Lưu Chẩn Đoán' trên màn hình trước khi kê đơn!");
             return;
         }
 
@@ -404,13 +405,14 @@ export default function PrescriptionModal({ open, onClose, recordId, onPrescribe
         // Cảnh báo nếu đang kê thuốc dị ứng
         let effectiveOverrideReason = overrideReason ? overrideReason.trim() : null;
         if (allergyAlerts.length > 0) {
+            if (!effectiveOverrideReason || effectiveOverrideReason.length < 5) {
+                setError(`🚨 Phát hiện ${allergyAlerts.length} thuốc có nguy cơ DỊ ỨNG với bệnh nhân! Bác sĩ bắt buộc phải nhập lý do lâm sàng xác thực (tối thiểu 5 ký tự) vào ô ghi đè cảnh báo trước khi xuất đơn!`);
+                return;
+            }
             const confirmAllergy = window.confirm(
-                `🚨 CẢNH BÁO NGUY HIỂM:\nĐơn thuốc đang có ${allergyAlerts.length} thuốc có nguy cơ gây DỊ ỨNG với bệnh nhân (${patientAllergies})!\n\nBạn có CHẮC CHẮN vẫn muốn xuất đơn thuốc này không?`
+                `🚨 CẢNH BÁO NGUY HIỂM:\nĐơn thuốc đang có ${allergyAlerts.length} thuốc có nguy cơ gây DỊ ỨNG với bệnh nhân (${patientAllergies})!\n\nLý do ghi đè: "${effectiveOverrideReason}"\n\nBạn có CHẮC CHẮN xác nhận ghi đè lâm sàng và xuất đơn thuốc này không?`
             );
             if (!confirmAllergy) return;
-            if (!effectiveOverrideReason) {
-                effectiveOverrideReason = "Bác sĩ lâm sàng xác nhận ghi đè cảnh báo dị ứng";
-            }
         }
 
         // Validate tồn kho thuốc
@@ -563,6 +565,24 @@ export default function PrescriptionModal({ open, onClose, recordId, onPrescribe
                                     </Typography>
                                 </Box>
                             ))}
+                            <Box sx={{ mt: 1.5, p: 1.5, bgcolor: "#fff", borderRadius: 2, border: "1px solid #f87171" }}>
+                                <Typography variant="caption" fontWeight={800} color="#b91c1c" sx={{ display: "block", mb: 0.5 }}>
+                                    LÝ DO GHI ĐÈ LÂM SÀNG (BẮT BUỘC NẾU VẪN KÊ ĐƠN THUỐC CÓ NGUY CƠ DỊ ỨNG):
+                                </Typography>
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    placeholder="Nhập lý do chuyên môn xác thực (tối thiểu 5 ký tự)..."
+                                    value={overrideReason}
+                                    onChange={(e) => setOverrideReason(e.target.value)}
+                                    error={allergyAlerts.length > 0 && (!overrideReason || overrideReason.trim().length < 5)}
+                                    helperText={
+                                        allergyAlerts.length > 0 && (!overrideReason || overrideReason.trim().length < 5)
+                                            ? "Bác sĩ phải cung cấp lý do lâm sàng hợp lệ để lưu vào hồ sơ và nhật ký audit."
+                                            : ""
+                                    }
+                                />
+                            </Box>
                             <Typography variant="caption" sx={{ color: "#991b1b", fontStyle: "italic", mt: 1, display: "block" }}>
                                 * Khuyến nghị Bác sĩ đổi sang nhóm thuốc khác hoặc xóa thuốc bị dị ứng khỏi danh sách kê đơn!
                             </Typography>

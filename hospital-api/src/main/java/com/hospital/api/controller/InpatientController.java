@@ -46,7 +46,7 @@ public class InpatientController {
     }
 
     @PostMapping("/{admissionId}/discharge")
-    @PreAuthorize("hasAnyRole('DOCTOR', 'HEAD_OF_DEPARTMENT')")
+    @PreAuthorize("hasAnyRole('DOCTOR', 'HEAD_OF_DEPARTMENT', 'ADMIN')")
     public ResponseEntity<ApiResponse<Discharge>> dischargePatient(
             @PathVariable UUID admissionId,
             @Valid @RequestBody DischargeRequest request) {
@@ -90,8 +90,14 @@ public class InpatientController {
 
     @GetMapping("/active")
     @PreAuthorize("hasAnyRole('DOCTOR', 'HEAD_OF_DEPARTMENT', 'NURSE', 'ADMIN')")
-    public ResponseEntity<ApiResponse<List<HospitalAdmission>>> getActiveAdmissions() {
-        List<HospitalAdmission> admissions = inpatientService.getActiveAdmissions();
+    public ResponseEntity<ApiResponse<List<HospitalAdmission>>> getActiveAdmissions(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @RequestParam(required = false) Integer departmentId
+    ) {
+        boolean isAdmin = userPrincipal != null && userPrincipal.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().contains("ADMIN"));
+        UUID currentUserId = userPrincipal != null ? userPrincipal.getId() : null;
+        List<HospitalAdmission> admissions = inpatientService.getActiveAdmissions(currentUserId, departmentId, isAdmin);
         return ResponseEntity.ok(ApiResponse.ok(admissions, "Lấy danh sách bệnh nhân đang nội trú thành công"));
     }
 
@@ -165,7 +171,7 @@ public class InpatientController {
     }
 
     @PostMapping("/{admissionId}/doctor-orders")
-    @PreAuthorize("hasAnyRole('DOCTOR', 'HEAD_OF_DEPARTMENT')")
+    @PreAuthorize("hasAnyRole('DOCTOR', 'HEAD_OF_DEPARTMENT', 'ADMIN')")
     public ResponseEntity<ApiResponse<com.hospital.api.dto.response.DoctorOrderResponse>> createDoctorOrder(
             @PathVariable UUID admissionId,
             @org.springframework.security.core.annotation.AuthenticationPrincipal com.hospital.api.security.UserPrincipal userPrincipal,

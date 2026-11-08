@@ -31,6 +31,27 @@ public class Transaction extends BaseEntity {
     @JoinColumn(name = "account_id", nullable = true)
     private Account account;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "booking_id", nullable = true)
+    private Booking booking;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "medical_test_id", nullable = true)
+    private MedicalTest medicalTest;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "prescription_id", nullable = true)
+    private Prescription prescription;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "admission_id", nullable = true)
+    private HospitalAdmission hospitalAdmission;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "discharge_id", nullable = true)
+    private Discharge discharge;
+
+
     @Column(name = "amount", precision = 12, scale = 2, nullable = false)
     private BigDecimal amount;
 

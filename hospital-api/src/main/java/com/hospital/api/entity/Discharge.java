@@ -17,7 +17,6 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Discharge extends BaseEntity {
 
     @Id
@@ -47,5 +46,12 @@ public class Discharge extends BaseEntity {
 
     @Column(name = "total_inpatient_cost", precision = 12, scale = 2, nullable = false)
     private BigDecimal totalInpatientCost; // Tổng viện phí tiền giường
-}
 
+    @Column(name = "is_paid")
+    @Builder.Default
+    private Boolean isPaid = false;
+
+    @Column(name = "settlement_status", length = 30)
+    @Builder.Default
+    private String settlementStatus = "PENDING_PAYMENT";
+}

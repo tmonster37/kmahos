@@ -21,6 +21,7 @@ import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { useAuth } from "../../context/AuthContext";
 import axiosInstance from "../../services/AxiosInstance";
+import designTokens from "../../theme/designTokens";
 
 export default function RegisterPage() {
     const [formData, setFormData] = useState({
@@ -138,20 +139,16 @@ export default function RegisterPage() {
                     <Box textAlign="center" mb={3.5}>
                         <Box display="flex" justifyContent="center" mb={2}>
                             <Box
+                                component="img"
+                                src="/images/logo.png"
+                                alt="Logo Bệnh Viện TNT"
                                 sx={{
                                     width: 52,
                                     height: 52,
-                                    borderRadius: "15px",
-                                    background: "linear-gradient(135deg, #0088D6 0%, #00C292 100%)",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    color: "white",
-                                    boxShadow: "0 8px 20px rgba(0, 136, 214, 0.28)"
+                                    objectFit: "contain",
+                                    filter: "drop-shadow(0 4px 12px rgba(15, 118, 110, 0.2))"
                                 }}
-                            >
-                                <LocalHospitalIcon sx={{ fontSize: 30 }} />
-                            </Box>
+                            />
                         </Box>
                         <Typography variant="h5" fontWeight={900} sx={{ letterSpacing: "-0.03em", color: "#0F172A", mb: 0.5 }}>
                             Đăng Ký Tài Khoản Bệnh Nhân
@@ -298,9 +295,9 @@ export default function RegisterPage() {
                                 fontWeight: 800,
                                 fontSize: "0.95rem",
                                 textTransform: "none",
-                                bgcolor: "#0088D6",
-                                boxShadow: "0 6px 20px rgba(0, 136, 214, 0.3)",
-                                "&:hover": { bgcolor: "#0073B7" }
+                                bgcolor: designTokens.brand.primary,
+                                boxShadow: "0 6px 20px rgba(15, 118, 110, 0.3)",
+                                "&:hover": { bgcolor: designTokens.brand.primaryHover }
                             }}
                         >
                             {loading ? <CircularProgress size={24} color="inherit" /> : "Đăng Ký Thành Viên"}
@@ -314,7 +311,7 @@ export default function RegisterPage() {
                                     to="/login"
                                     variant="body2"
                                     sx={{
-                                        color: "#0088D6",
+                                        color: designTokens.brand.primary,
                                         fontWeight: 800,
                                         textDecoration: "none",
                                         "&:hover": { textDecoration: "underline" }

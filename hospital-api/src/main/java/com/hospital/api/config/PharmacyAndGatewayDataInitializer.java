@@ -6,7 +6,9 @@ import com.hospital.api.entity.*;
 import com.hospital.api.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +19,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Component
+@Profile("!prod & !production")
 @Order(4)
 @RequiredArgsConstructor
 @Slf4j
@@ -30,9 +33,21 @@ public class PharmacyAndGatewayDataInitializer implements CommandLineRunner {
     private final DepartmentRepository departmentRepository;
     private final StaffRepository staffRepository;
 
+    @Value("${app.seed-demo-data:false}")
+    private boolean seedDemoData;
+
+    public void setSeedDemoData(boolean seedDemoData) {
+        this.seedDemoData = seedDemoData;
+    }
+
     @Override
     @Transactional
     public void run(String... args) {
+        if (!seedDemoData) {
+            log.info("Skipping Pharmacy Inventory and Clinical Gateway demo data seeding (app.seed-demo-data=false).");
+            return;
+        }
+
         log.info("Starting Pharmacy Multi-tier Inventory & Clinical Gateway (Bahmni) data initialization...");
 
         // 1. Khởi tạo 4 Kho Dược đa cấp chuẩn

@@ -102,6 +102,19 @@ public class SlotReservationServiceImpl implements SlotReservationService {
 
     @Override
     @Transactional
+    public void releaseSlot(UUID reservationId, UUID accountId) {
+        ReservationEntry entry = activeReservations.get(reservationId);
+        if (entry == null) {
+            return;
+        }
+        if (entry.accountId() != null && !entry.accountId().equals(accountId)) {
+            throw new AppException("Bạn không có quyền giải phóng phiếu giữ chỗ của tài khoản khác", HttpStatus.FORBIDDEN);
+        }
+        releaseSlot(reservationId);
+    }
+
+    @Override
+    @Transactional
     public void confirmSlotReservation(UUID reservationId) {
         ReservationEntry entry = activeReservations.remove(reservationId);
         if (entry == null) {

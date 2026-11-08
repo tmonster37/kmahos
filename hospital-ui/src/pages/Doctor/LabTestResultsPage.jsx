@@ -199,14 +199,27 @@ export default function LabTestResultsPage() {
         }
     };
 
-    // Evaluate an indicator value against Min-Max
+    // Evaluate an indicator value against Min-Max (Tuân thủ nguyên tắc không mặc định cờ NORMAL khi chưa đánh giá)
     const evaluateIndicator = (val, min, max) => {
+        if (val === undefined || val === null || String(val).trim() === "") return "PENDING";
+        const strVal = String(val).trim().toLowerCase();
         const num = parseFloat(val);
         const minNum = parseFloat(min);
         const maxNum = parseFloat(max);
-        if (isNaN(num)) return "NORMAL";
-        if (!isNaN(minNum) && num < minNum) return "LOW";
-        if (!isNaN(maxNum) && num > maxNum) return "HIGH";
+
+        // Định tính (Text results)
+        if (isNaN(num)) {
+            if (strVal.includes("dương tính") || strVal.includes("positive") || strVal.includes("bất thường")) return "HIGH";
+            if (strVal.includes("âm tính") || strVal.includes("negative")) return "NORMAL";
+            return "UNRATED";
+        }
+
+        // Định lượng (Numeric results)
+        const hasMin = !isNaN(minNum);
+        const hasMax = !isNaN(maxNum);
+        if (!hasMin && !hasMax) return "UNRATED";
+        if (hasMin && num < minNum) return "LOW";
+        if (hasMax && num > maxNum) return "HIGH";
         return "NORMAL";
     };
 
@@ -215,13 +228,17 @@ export default function LabTestResultsPage() {
         let high = 0;
         let low = 0;
         let normal = 0;
+        let unrated = 0;
+        let pending = 0;
         items.forEach((item) => {
             const status = evaluateIndicator(item.value, item.min, item.max);
             if (status === "HIGH") high++;
             else if (status === "LOW") low++;
-            else normal++;
+            else if (status === "NORMAL") normal++;
+            else if (status === "PENDING") pending++;
+            else unrated++;
         });
-        return { high, low, normal, abnormal: high + low, total: items.length };
+        return { high, low, normal, unrated, pending, abnormal: high + low, total: items.length };
     };
 
     const handleOpenModal = (test) => {
@@ -1161,7 +1178,7 @@ export default function LabTestResultsPage() {
                                                             />
                                                         </TableCell>
                                                         <TableCell>
-                                                            {isHigh && (
+                                                            {status === "HIGH" && (
                                                                 <Chip
                                                                     icon={<TrendingUpIcon sx={{ fontSize: "14px !important" }} />}
                                                                     label="⬆️ CAO"
@@ -1174,7 +1191,7 @@ export default function LabTestResultsPage() {
                                                                     }}
                                                                 />
                                                             )}
-                                                            {isLow && (
+                                                            {status === "LOW" && (
                                                                 <Chip
                                                                     icon={<TrendingDownIcon sx={{ fontSize: "14px !important" }} />}
                                                                     label="⬇️ THẤP"
@@ -1187,7 +1204,7 @@ export default function LabTestResultsPage() {
                                                                     }}
                                                                 />
                                                             )}
-                                                            {!isHigh && !isLow && (
+                                                            {status === "NORMAL" && (
                                                                 <Chip
                                                                     icon={<CheckCircleIcon sx={{ fontSize: "14px !important" }} />}
                                                                     label="Bình thường"
@@ -1196,6 +1213,30 @@ export default function LabTestResultsPage() {
                                                                         bgcolor: "#DCFCE7",
                                                                         color: "#15803D",
                                                                         fontWeight: 700
+                                                                    }}
+                                                                />
+                                                            )}
+                                                            {status === "UNRATED" && (
+                                                                <Chip
+                                                                    label="Định tính / Tham chiếu"
+                                                                    size="small"
+                                                                    sx={{
+                                                                        bgcolor: "#F1F5F9",
+                                                                        color: "#475569",
+                                                                        fontWeight: 600,
+                                                                        border: "1px solid #CBD5E1"
+                                                                    }}
+                                                                />
+                                                            )}
+                                                            {status === "PENDING" && (
+                                                                <Chip
+                                                                    label="Chờ kết quả"
+                                                                    size="small"
+                                                                    sx={{
+                                                                        bgcolor: "#F8FAFC",
+                                                                        color: "#94A3B8",
+                                                                        fontStyle: "italic",
+                                                                        border: "1px dashed #CBD5E1"
                                                                     }}
                                                                 />
                                                             )}

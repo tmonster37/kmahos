@@ -38,6 +38,7 @@ class ClinicalTestCancellationSecurityTest {
     static class Config {
         @Bean ClinicalExaminationService clinicalService() { return mock(ClinicalExaminationService.class); }
         @Bean FhirExportService fhirExportService() { return mock(FhirExportService.class); }
+        @Bean com.hospital.api.repository.DoctorRepository doctorRepository() { return mock(com.hospital.api.repository.DoctorRepository.class); }
         @Bean SecurityFilterChain security(HttpSecurity http) throws Exception {
             return http.csrf(c -> c.disable()).authorizeHttpRequests(a -> a.anyRequest().authenticated())
                     .httpBasic(b -> {}).build();

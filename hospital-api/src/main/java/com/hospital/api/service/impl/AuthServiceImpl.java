@@ -2,6 +2,7 @@ package com.hospital.api.service.impl;
 
 import com.hospital.api.constant.OtpPurpose;
 import com.hospital.api.constant.Role;
+import com.hospital.api.dto.request.ForgotPasswordRequest;
 import com.hospital.api.dto.request.GoogleLoginRequest;
 import com.hospital.api.dto.request.LoginRequest;
 import com.hospital.api.dto.request.RegisterRequest;
@@ -188,5 +189,35 @@ public class AuthServiceImpl implements AuthService {
         UserPrincipal userPrincipal = new UserPrincipal(saved);
         String token = tokenProvider.generateToken(userPrincipal);
         return AuthResponse.of(token, saved.getUserId(), saved.getFullName(), saved.getPhoneNumber(), saved.getRole());
+    }
+
+    @Override
+    @Transactional
+    public void forgotPassword(ForgotPasswordRequest request) {
+        String identifier = request.email() != null && !request.email().isBlank()
+                ? request.email().trim().toLowerCase()
+                : (request.phoneNumber() != null ? request.phoneNumber().trim() : null);
+
+        if (identifier == null) {
+            throw new AppException("Vui lòng cung cấp email hoặc số điện thoại", HttpStatus.BAD_REQUEST);
+        }
+
+        Account account = accountRepository.findByEmail(identifier)
+                .or(() -> accountRepository.findByPhoneNumber(identifier))
+                .orElse(null);
+
+        if (account == null || account.getEmail() == null || account.getEmail().isBlank()) {
+            // Chống Phone/Email Enumeration: Trả về lỗi chung bảo mật
+            throw new AppException("Mã xác thực OTP không hợp lệ hoặc đã hết hạn", HttpStatus.BAD_REQUEST);
+        }
+
+        // Xác thực mã OTP qua OtpService với purpose ACCOUNT_RECOVERY
+        otpService.verifyEmailOtp(account.getEmail(), request.otpCode().trim(), OtpPurpose.ACCOUNT_RECOVERY);
+
+        // Cập nhật mật khẩu mới đã băm qua BCrypt
+        account.setPassword(passwordEncoder.encode(request.newPassword()));
+        accountRepository.save(account);
+
+        log.info("[AUTH-FORGOT-PASSWORD] Đổi mật khẩu thành công cho tài khoản: {}", account.getPhoneNumber());
     }
 }

@@ -32,6 +32,12 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
     boolean existsByVnpayTxnRef(String vnpayTxnRef);
     boolean existsByVnpayTxnRefStartingWithAndStatus(String prefix, String status);
     boolean existsByDescriptionContainingAndStatus(String description, String status);
+    boolean existsByMedicalTest_MedicalTestIdAndStatus(UUID medicalTestId, String status);
+    boolean existsByPrescription_PrescriptionIdAndStatus(UUID prescriptionId, String status);
+    boolean existsByHospitalAdmission_AdmissionIdAndStatus(UUID admissionId, String status);
+    boolean existsByDischarge_DischargeIdAndStatus(UUID dischargeId, String status);
+    List<Transaction> findAllByBooking_BookingIdAndStatus(UUID bookingId, String status);
+    List<Transaction> findAllByHospitalAdmission_AdmissionIdAndStatus(UUID admissionId, String status);
     List<Transaction> findAllByDescriptionContainingAndStatus(String description, String status);
     List<Transaction> findAllByAccount_UserIdOrderByCreatedAtDesc(UUID accountId);
     Page<Transaction> findAllByAccount_UserIdOrderByCreatedAtDesc(UUID accountId, Pageable pageable);

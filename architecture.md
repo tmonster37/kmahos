@@ -277,3 +277,28 @@ graph TD
 3. **Frontend Interceptor:** `axios` đính kèm header `Authorization: Bearer <token>` trong mọi request đến API được bảo vệ.
 4. **Backend Filter:** `JwtAuthFilter` giải mã token, kiểm tra hạn dùng, nạp `UsernamePasswordAuthenticationToken` vào `SecurityContextHolder`.
 5. **RBAC:** `@PreAuthorize("hasAnyRole('ADMIN', 'DOCTOR')")` bảo vệ tầng Controller và Service.
+
+---
+
+## 📱 6. KIẾN TRÚC ỨNG DỤNG MOBILE BỆNH NHÂN (PLANNED)
+
+Ứng dụng bệnh nhân được lên kế hoạch là một client riêng `hospital-mobile/` dùng Expo, React Native và TypeScript. Thư mục app chưa được tạo; đây là kiến trúc mục tiêu theo tài liệu thiết kế đã duyệt.
+
+```mermaid
+flowchart LR
+    Patient["Bệnh nhân"] --> Mobile["hospital-mobile\nExpo / React Native"]
+    Mobile -->|HTTPS / JSON\nBearer token| Backend["hospital-api\nSpring Security + REST APIs"]
+    Backend --> Services["Services + ownership checks"]
+    Services --> DB[("PostgreSQL")]
+    Services -->|Payment link / status| PayOS["PayOS / VietQR"]
+    PayOS -->|App return link| Mobile
+    Mobile -->|Status / sync| Backend
+```
+
+- Mobile dùng Bearer token được lưu bằng secure storage của hệ điều hành. Cơ chế Cookie-Only của trình duyệt web được giữ nguyên.
+- App chỉ gọi API patient-safe. Không dùng `/api/doctors` hoặc route quản trị cho luồng đặt lịch.
+- Backend giữ thẩm quyền với quyền sở hữu hồ sơ, lịch khám, bill ID, số dư và trạng thái thanh toán.
+- Bill lịch sử không xác định được loại phí sẽ ở trạng thái `UNRECONCILED`; không hiển thị số phải trả hoặc mở checkout cho bill bị ảnh hưởng.
+- Phạm vi MVP: hồ sơ gia đình, đặt lịch, bệnh án, viện phí, thanh toán PayOS/VietQR và thông báo trong app. Push notification được để sau MVP.
+
+Chi tiết cấu trúc package, API boundaries, token flow và payment return: [Kiến trúc chi tiết `hospital-mobile`](process/features/patient-mobile-app/references/architecture.md). Kế hoạch từng pha ở [feature folder](process/features/patient-mobile-app/active/patient-mobile-app_UMBRELLA_PLAN_07-11-26.md).

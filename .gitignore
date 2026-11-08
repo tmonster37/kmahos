@@ -10,6 +10,9 @@
 .env.*.local
 *.env
 !.env.example
+**/application-local.yml
+**/application-local.yaml
+**/application-local.properties
 *.key
 *.pem
 *.pfx
@@ -115,6 +118,14 @@ sections_summary.csv
 temp_doc_extracted.xml
 temp_doc_text.txt
 temp_rels.xml
+BC_34*
+*.docx
+docx_extracted/
+check_*.ps1
+dump_*.ps1
+chapter*.txt
+bc34*.txt
+captions_extracted.csv
 
 # ------------------------------------------------------------------------------
 # 10. Visual Test Screenshots
@@ -123,3 +134,4 @@ temp_rels.xml
 *.jpg
 *.jpeg
 !hospital-ui/public/**
+!hospital-mobile/assets/**

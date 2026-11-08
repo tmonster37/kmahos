@@ -528,20 +528,19 @@ export default function ExaminationPage() {
                 fetchDoctorQueue();
             } catch (err) {
                 console.error("Lỗi tự động mở hồ sơ:", err);
-                setRecord({
-                    recordId: "temp-" + (patientItem.bookingId || Date.now()),
-                    bookingCode: patientItem.bookingCode,
-                    patientProfileId: patientItem.patientProfileId,
-                    patientName: patientItem.patientName,
-                    state: "IN_PROGRESS",
-                    tests: []
-                });
+                setRecord(null);
+                const errMsg = err?.response?.data?.message || err?.message || "Không thể khởi tạo hoặc mở hồ sơ khám bệnh từ hệ thống!";
+                setErrorMessage(`Lỗi tiếp nhận hồ sơ: ${errMsg}. Vui lòng bấm 'Tiếp Nhận Khám' để thử lại.`);
             }
         }
     };
 
     const isWaitingPatient = (p) =>
-        (p.status === "CONFIRMED" || p.status === "PENDING_PAYMENT" || p.status === "WAITING") && !p.isReturnAfterResult && p.recordState !== "SKIPPED";
+        (p.status === "CONFIRMED" || p.status === "WAITING") &&
+        p.isPaid !== false &&
+        p.status !== "PENDING_PAYMENT" &&
+        !p.isReturnAfterResult &&
+        p.recordState !== "SKIPPED";
 
     const handleCallNext = async () => {
         const nextPatient = queue.find(p => p.recordState === "CALLING") || queue.find(isWaitingPatient);
@@ -554,6 +553,10 @@ export default function ExaminationPage() {
 
     const handleCallPatient = async (patientItem) => {
         if (!patientItem) return;
+        if (patientItem.isPaid === false || patientItem.status === "PENDING_PAYMENT") {
+            alert(`Bệnh nhân [${patientItem.patientName}] chưa hoàn tất thanh toán tiền khám. Vui lòng thanh toán tại Quầy thu ngân/Kiosk trước khi gọi vào buồng khám!`);
+            return;
+        }
         try {
             await axiosInstance.post(`/api/clinical/call-patient?bookingCode=${patientItem.bookingCode}`);
             playCallChime();
@@ -643,7 +646,7 @@ export default function ExaminationPage() {
 
             const res = await axiosInstance.put(`/api/clinical/records/${targetRecordId}/diagnosis`, {
                 finalDiagnosis,
-                treatmentPlan: treatmentPlan || "Theo dõi và điều trị theo phác đồ",
+                treatmentPlan: treatmentPlan ? treatmentPlan.trim() : "",
                 reExaminationDate: cleanDate,
             });
             const data = res?.data?.recordId ? res.data : (res?.recordId ? res : (res?.data || res));
@@ -721,7 +724,7 @@ export default function ExaminationPage() {
 
             const res = await axiosInstance.post(`/api/clinical/records/${targetRecordId}/complete`, {
                 finalDiagnosis: finalDiagnosis.trim(),
-                treatmentPlan: treatmentPlan?.trim() || "Theo dõi sức khỏe định kỳ, tái khám khi có dấu hiệu bất thường",
+                treatmentPlan: treatmentPlan ? treatmentPlan.trim() : "",
                 reExaminationDate: cleanDate,
             });
             const data = res?.data?.data || res?.data || res;
@@ -1668,13 +1671,16 @@ export default function ExaminationPage() {
                                             <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                                                 <Button
                                                     variant="outlined"
-                                                    color="warning"
+                                                    color={selectedPatient?.isPaid === false || selectedPatient?.status === "PENDING_PAYMENT" ? "inherit" : "warning"}
                                                     size="small"
+                                                    disabled={selectedPatient?.isPaid === false || selectedPatient?.status === "PENDING_PAYMENT"}
                                                     startIcon={<VolumeUpIcon sx={{ fontSize: 16 }} />}
                                                     onClick={() => handleCallPatient(selectedPatient)}
                                                     sx={{ borderRadius: 2, fontWeight: 800, textTransform: "none", fontSize: "0.8rem", py: 0.6, px: 1.5, whiteSpace: "nowrap" }}
                                                 >
-                                                    {selectedPatient?.recordState === "CALLING" ? "Mời Lại Loa" : "Gọi Vào Phòng"}
+                                                    {selectedPatient?.isPaid === false || selectedPatient?.status === "PENDING_PAYMENT"
+                                                        ? "Chưa Đóng Phí Khám"
+                                                        : (selectedPatient?.recordState === "CALLING" ? "Mời Lại Loa" : "Gọi Vào Phòng")}
                                                 </Button>
 
                                                 {selectedPatient?.recordState === "CALLING" && (
@@ -2615,9 +2621,9 @@ export default function ExaminationPage() {
                                                                     variant="contained"
                                                                     startIcon={completingExam ? <CircularProgress size={18} color="inherit" /> : <CheckCircleIcon />}
                                                                     onClick={handleCompleteExamWithoutPrescription}
-                                                                    disabled={completingExam || record?.state === "DONE"}
+                                                                    disabled={completingExam || record?.state === "DONE" || ((record?.medicalTests || record?.tests || []).some(t => t.state !== "COMPLETED" && t.state !== "CANCELLED"))}
                                                                     sx={{
-                                                                        bgcolor: record?.state === "DONE" ? "#94a3b8" : "#0284c7",
+                                                                        bgcolor: (record?.state === "DONE" || ((record?.medicalTests || record?.tests || []).some(t => t.state !== "COMPLETED" && t.state !== "CANCELLED"))) ? "#94a3b8" : "#0284c7",
                                                                         borderRadius: 2,
                                                                         fontWeight: 800,
                                                                         textTransform: "none",
@@ -2627,6 +2633,11 @@ export default function ExaminationPage() {
                                                                 >
                                                                     {record?.state === "DONE" ? "Ca Khám Đã Hoàn Tất" : (completingExam ? "Đang xử lý..." : "Hoàn Tất Ca Khám (Không Dùng Thuốc)")}
                                                                 </Button>
+                                                                {((record?.medicalTests || record?.tests || []).some(t => t.state !== "COMPLETED" && t.state !== "CANCELLED")) && (
+                                                                    <Typography variant="caption" color="error" sx={{ display: "block", mt: 0.5, textAlign: "center", fontWeight: 700 }}>
+                                                                        ⚠️ Còn xét nghiệm chưa có kết quả hoặc chưa hủy.
+                                                                    </Typography>
+                                                                )}
                                                                 {record && record.state !== "DONE" && (record.medicalTests?.length > 0 || record.tests?.length > 0) && (
                                                                     <Button
                                                                         fullWidth
@@ -3051,7 +3062,7 @@ export default function ExaminationPage() {
                                                                 size="medium"
                                                                 startIcon={completingExam ? <CircularProgress size={18} /> : <CheckCircleIcon />}
                                                                 onClick={handleCompleteExamWithoutPrescription}
-                                                                disabled={completingExam || record?.state === "DONE"}
+                                                                disabled={completingExam || record?.state === "DONE" || ((record?.medicalTests || record?.tests || []).some(t => t.state !== "COMPLETED" && t.state !== "CANCELLED"))}
                                                                 sx={{
                                                                     borderRadius: 2,
                                                                     fontWeight: 700,

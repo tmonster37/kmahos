@@ -62,13 +62,13 @@ import { useAuth } from "../../context/AuthContext";
  */
 const getDepartmentIcon = (name = "") => {
     const n = name.toLowerCase();
-    if (n.includes("tim")) return <MonitorHeartIcon sx={{ fontSize: 24, color: "#F43F5E" }} />; // Heart Red từ logo
-    if (n.includes("nhi")) return <ChildCareIcon sx={{ fontSize: 24, color: "#0D9488" }} />; // Teal từ logo
+    if (n.includes("tim")) return <MonitorHeartIcon sx={{ fontSize: 24, color: designTokens.brand.accent }} />; // Heart Red từ logo
+    if (n.includes("nhi")) return <ChildCareIcon sx={{ fontSize: 24, color: designTokens.brand.primary }} />; // Teal từ logo
     if (n.includes("ngoại") || n.includes("chấn thương") || n.includes("xương")) return <HealingIcon sx={{ fontSize: 24, color: "#8B5CF6" }} />;
     if (n.includes("xét nghiệm") || n.includes("hình ảnh") || n.includes("lab")) return <ScienceIcon sx={{ fontSize: 24, color: "#0284C7" }} />;
     if (n.includes("thần kinh") || n.includes("tâm thần")) return <PsychologyIcon sx={{ fontSize: 24, color: "#F59E0B" }} />;
     if (n.includes("nhiễm") || n.includes("dịch")) return <CoronavirusIcon sx={{ fontSize: 24, color: "#EC4899" }} />;
-    return <LocalHospitalIcon sx={{ fontSize: 24, color: "#0D9488" }} />;
+    return <LocalHospitalIcon sx={{ fontSize: 24, color: designTokens.brand.primary }} />;
 };
 
 /**
@@ -427,7 +427,7 @@ export default function HomePage() {
                                 <Box
                                     component="img"
                                     src="/images/logo.png"
-                                    alt="Logo YouMed TNT"
+                                    alt="Logo Bệnh Viện TNT"
                                     sx={{
                                         width: 24,
                                         height: 24,
@@ -840,7 +840,7 @@ export default function HomePage() {
                                         <Box display="flex" alignItems="center" gap={1.2}>
                                             <Avatar
                                                 src="/images/logo.png"
-                                                alt="YouMed TNT"
+                                                alt="TNT Hospital"
                                                 sx={{
                                                     width: 40,
                                                     height: 40,

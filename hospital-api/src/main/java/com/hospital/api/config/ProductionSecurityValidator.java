@@ -43,14 +43,54 @@ public class ProductionSecurityValidator {
     @Value("${spring.datasource.password:}")
     private String dbPassword;
 
+    @Value("${spring.jpa.hibernate.ddl-auto:}")
+    private String ddlAuto;
+
     private static final String DEFAULT_DEV_JWT = "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970";
     private static final String DEFAULT_DEV_VNPAY = "BRYEEDJIJFAGUSDLEPIOPDMDYEMLDCAX";
     private static final String DEFAULT_DEV_PAYOS_CLIENT = "demo-client-id";
     private static final String DEFAULT_DEV_PAYOS_API_KEY = "demo-api-key";
     private static final String DEFAULT_DEV_PAYOS = "demo-checksum-key";
+    private static final String LEGACY_DEV_DB_PASS = "taizz0537";
 
     public ProductionSecurityValidator(Environment environment) {
         this.environment = environment;
+    }
+
+    public void setJwtSecret(String jwtSecret) {
+        this.jwtSecret = jwtSecret;
+    }
+
+    public void setVnpayHashSecret(String vnpayHashSecret) {
+        this.vnpayHashSecret = vnpayHashSecret;
+    }
+
+    public void setPayosClientId(String payosClientId) {
+        this.payosClientId = payosClientId;
+    }
+
+    public void setPayosApiKey(String payosApiKey) {
+        this.payosApiKey = payosApiKey;
+    }
+
+    public void setPayosChecksumKey(String payosChecksumKey) {
+        this.payosChecksumKey = payosChecksumKey;
+    }
+
+    public void setPayosReturnUrl(String payosReturnUrl) {
+        this.payosReturnUrl = payosReturnUrl;
+    }
+
+    public void setPayosCancelUrl(String payosCancelUrl) {
+        this.payosCancelUrl = payosCancelUrl;
+    }
+
+    public void setDbPassword(String dbPassword) {
+        this.dbPassword = dbPassword;
+    }
+
+    public void setDdlAuto(String ddlAuto) {
+        this.ddlAuto = ddlAuto;
     }
 
     @PostConstruct
@@ -113,9 +153,23 @@ public class ProductionSecurityValidator {
         }
 
         // 4. Kiểm tra Database Password
-        if (dbPassword == null || dbPassword.isBlank() || "postgres".equalsIgnoreCase(dbPassword.trim())) {
+        if (dbPassword == null || dbPassword.isBlank()
+                || "postgres".equalsIgnoreCase(dbPassword.trim())
+                || "password".equalsIgnoreCase(dbPassword.trim())
+                || "admin".equalsIgnoreCase(dbPassword.trim())
+                || "123456".equalsIgnoreCase(dbPassword.trim())
+                || LEGACY_DEV_DB_PASS.equals(dbPassword.trim())) {
             throw new IllegalStateException(
-                    "CRITICAL SECURITY CONFIGURATION ERROR: Mật khẩu cơ sở dữ liệu trên Production không được để trống hoặc dùng mật khẩu mặc định 'postgres'.");
+                    "CRITICAL SECURITY CONFIGURATION ERROR: Mật khẩu cơ sở dữ liệu trên Production không được để trống hoặc dùng mật khẩu mặc định/dev.");
+        }
+
+        // 5. Kiểm tra Hibernate DDL-Auto trên Production
+        if (ddlAuto != null && ("update".equalsIgnoreCase(ddlAuto.trim())
+                || "create".equalsIgnoreCase(ddlAuto.trim())
+                || "create-drop".equalsIgnoreCase(ddlAuto.trim()))) {
+            throw new IllegalStateException(
+                    "CRITICAL SECURITY CONFIGURATION ERROR: spring.jpa.hibernate.ddl-auto trên Production không được phép là '"
+                            + ddlAuto.trim() + "'. Vui lòng sử dụng 'validate' hoặc 'none' kết hợp công cụ migration có phiên bản.");
         }
 
         log.info("Cấu hình bảo mật Production hợp lệ. Tiếp tục khởi động hệ thống.");

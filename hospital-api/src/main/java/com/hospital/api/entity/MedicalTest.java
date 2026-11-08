@@ -44,6 +44,11 @@ public class MedicalTest extends BaseEntity {
     @Column(name = "price", precision = 12, scale = 2, nullable = false)
     private BigDecimal price;
 
+    @Column(name = "is_paid", nullable = false)
+    @Builder.Default
+    private Boolean isPaid = false;
+
+
     @Column(name = "test_result", columnDefinition = "TEXT")
     private String testResult; // Kết luận / Mô tả kết quả của KTV
 

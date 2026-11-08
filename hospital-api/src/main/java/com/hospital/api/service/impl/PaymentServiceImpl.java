@@ -26,10 +26,15 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.hospital.api.dto.request.PayOSItemRequest;
 import com.hospital.api.entity.Booking;
+import com.hospital.api.entity.Discharge;
 import com.hospital.api.entity.MedicalTest;
+import com.hospital.api.entity.Prescription;
 import com.hospital.api.entity.PrescriptionItem;
 import com.hospital.api.repository.BookingRepository;
+import com.hospital.api.repository.DischargeRepository;
 import com.hospital.api.repository.MedicalExaminationRecordRepository;
+import com.hospital.api.repository.MedicalTestRepository;
+import com.hospital.api.repository.PrescriptionRepository;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -40,8 +45,10 @@ import java.util.*;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class PaymentServiceImpl implements PaymentService {
+
+    private static final Pattern PATIENT_BILL_ID_PATTERN = Pattern.compile(
+            "^BILL-((?:BK|KIOSK)\\d{8}[A-Za-z0-9]{4,10})-(EXAM|TEST|PRESCRIPTION)$");
 
     private final VNPayConfig vnPayConfig;
     private final PayOSConfig payOSConfig;
@@ -50,7 +57,69 @@ public class PaymentServiceImpl implements PaymentService {
     private final AccountRepository accountRepository;
     private final BookingRepository bookingRepository;
     private final MedicalExaminationRecordRepository recordRepository;
+    private final MedicalTestRepository testRepository;
+    private final PrescriptionRepository prescriptionRepository;
+    private final DischargeRepository dischargeRepository;
     private final BookingReceptionTransition reception;
+    private final com.hospital.api.service.CashierService cashierService;
+
+    public PaymentServiceImpl(
+            VNPayConfig vnPayConfig,
+            PayOSConfig payOSConfig,
+            com.hospital.api.service.PayOSService payOSService,
+            TransactionRepository transactionRepository,
+            AccountRepository accountRepository,
+            BookingRepository bookingRepository,
+            MedicalExaminationRecordRepository recordRepository,
+            MedicalTestRepository testRepository,
+            PrescriptionRepository prescriptionRepository,
+            DischargeRepository dischargeRepository,
+            BookingReceptionTransition reception
+    ) {
+        this(
+                vnPayConfig,
+                payOSConfig,
+                payOSService,
+                transactionRepository,
+                accountRepository,
+                bookingRepository,
+                recordRepository,
+                testRepository,
+                prescriptionRepository,
+                dischargeRepository,
+                reception,
+                null
+        );
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public PaymentServiceImpl(
+            VNPayConfig vnPayConfig,
+            PayOSConfig payOSConfig,
+            com.hospital.api.service.PayOSService payOSService,
+            TransactionRepository transactionRepository,
+            AccountRepository accountRepository,
+            BookingRepository bookingRepository,
+            MedicalExaminationRecordRepository recordRepository,
+            MedicalTestRepository testRepository,
+            PrescriptionRepository prescriptionRepository,
+            DischargeRepository dischargeRepository,
+            BookingReceptionTransition reception,
+            com.hospital.api.service.CashierService cashierService
+    ) {
+        this.vnPayConfig = vnPayConfig;
+        this.payOSConfig = payOSConfig;
+        this.payOSService = payOSService;
+        this.transactionRepository = transactionRepository;
+        this.accountRepository = accountRepository;
+        this.bookingRepository = bookingRepository;
+        this.recordRepository = recordRepository;
+        this.testRepository = testRepository;
+        this.prescriptionRepository = prescriptionRepository;
+        this.dischargeRepository = dischargeRepository;
+        this.reception = reception;
+        this.cashierService = cashierService;
+    }
 
     private void validatePaymentAmount(BigDecimal amount) {
         if (amount == null) {
@@ -527,8 +596,9 @@ public class PaymentServiceImpl implements PaymentService {
         Transaction txn = transactionRepository.findByVnpayTxnRef(txnRef)
                 .orElseThrow(() -> new AppException("Không tìm thấy giao dịch: " + txnRef, HttpStatus.NOT_FOUND));
 
-        if (!isPrivileged && txn.getAccount() != null) {
-            if (requestingAccountId == null || !txn.getAccount().getUserId().equals(requestingAccountId)) {
+        if (!isPrivileged) {
+            UUID txnAccountId = txn.getAccount() != null ? txn.getAccount().getUserId() : null;
+            if (requestingAccountId == null || txnAccountId == null || !txnAccountId.equals(requestingAccountId)) {
                 throw new AppException("Bạn không có quyền xem thông tin giao dịch này", HttpStatus.FORBIDDEN);
             }
         }
@@ -624,8 +694,9 @@ public class PaymentServiceImpl implements PaymentService {
         if (currentUser != null) {
             boolean isStaff = currentUser.getAuthorities().stream()
                     .anyMatch(a -> a.getAuthority().contains("ADMIN") || a.getAuthority().contains("CASHIER") || a.getAuthority().contains("NURSE"));
-            if (!isStaff && transaction.getAccount() != null) {
-                if (!transaction.getAccount().getUserId().equals(currentUser.getId())) {
+            if (!isStaff) {
+                UUID txnAccountId = transaction.getAccount() != null ? transaction.getAccount().getUserId() : null;
+                if (currentUser.getId() == null || txnAccountId == null || !txnAccountId.equals(currentUser.getId())) {
                     throw new AppException("Bạn không có quyền truy cập hoặc đồng bộ giao dịch này", HttpStatus.FORBIDDEN);
                 }
             }
@@ -684,7 +755,7 @@ public class PaymentServiceImpl implements PaymentService {
         String providerReference = PayOSConfig.paymentReference(orderCode);
         String desc = (description != null && !description.isBlank()) ? description.trim() : ("TNT " + orderCode);
 
-        validateBookingOrder(type, amount, desc);
+        validateBookingOrder(accountId, account, type, amount, desc);
 
         Transaction transaction = Transaction.builder()
                 .account(account)
@@ -736,6 +807,154 @@ public class PaymentServiceImpl implements PaymentService {
                 PaymentMethod.VIETQR,
                 type,
                 amount,
+                "PENDING",
+                qrImageUrl,
+                rawQrCode,
+                checkoutUrl,
+                null,
+                payOSConfig.bankName,
+                accountNumber,
+                accountHolder,
+                providerReference,
+                "Mở Cổng PayOS để thanh toán Open Banking hoặc quét mã VietQR Napas 247",
+                orderCode
+        );
+    }
+
+    @Override
+    @Transactional
+    public PaymentGatewayResponse createPatientPayOSPaymentLink(UUID accountId, String billId) {
+        if (accountId == null) {
+            throw new AppException("Vui lòng đăng nhập để thanh toán hóa đơn", HttpStatus.UNAUTHORIZED);
+        }
+        if (billId == null || billId.isBlank()) {
+            throw new AppException("Mã hóa đơn (billId) không được để trống", HttpStatus.BAD_REQUEST);
+        }
+
+        String normalizedBillId = billId.trim();
+        Matcher matcher = PATIENT_BILL_ID_PATTERN.matcher(normalizedBillId);
+        if (!matcher.matches()) {
+            throw new AppException("Mã hóa đơn không hợp lệ: " + normalizedBillId, HttpStatus.BAD_REQUEST);
+        }
+
+        String bookingCode = matcher.group(1);
+        String category = matcher.group(2);
+
+        Booking booking = bookingRepository.findByBookingCodeForUpdate(bookingCode)
+                .or(() -> bookingRepository.findByBookingCode(bookingCode))
+                .orElseThrow(() -> new AppException("Không tìm thấy thông tin lịch khám của hóa đơn: " + normalizedBillId, HttpStatus.NOT_FOUND));
+
+        UUID ownerAccountId = (booking.getPatientProfile() != null && booking.getPatientProfile().getAccount() != null)
+                ? booking.getPatientProfile().getAccount().getUserId()
+                : null;
+        if (ownerAccountId == null || !ownerAccountId.equals(accountId)) {
+            throw new AppException("Bạn không có quyền thanh toán hóa đơn của tài khoản khác", HttpStatus.FORBIDDEN);
+        }
+        if (booking.isDeleted() || booking.getStatus() == BookingStatus.CANCELLED) {
+            throw new AppException("Lịch khám của hóa đơn này đã bị hủy hoặc không còn hiệu lực", HttpStatus.BAD_REQUEST);
+        }
+
+        if (transactionRepository.findFirstByDescriptionContainingAndStatusOrderByCreatedAtDesc(normalizedBillId, "SUCCESS").isPresent()) {
+            throw new AppException("Hóa đơn này đã được thanh toán hoàn tất", HttpStatus.CONFLICT);
+        }
+        if (transactionRepository.findFirstByDescriptionContainingAndStatusOrderByCreatedAtDesc(normalizedBillId, "PENDING").isPresent()) {
+            throw new AppException("Hóa đơn này đang có giao dịch chờ thanh toán, không thể tạo trùng", HttpStatus.CONFLICT);
+        }
+
+        com.hospital.api.service.CashierService effectiveCashierService = cashierService != null
+                ? cashierService
+                : new CashierServiceImpl(
+                        bookingRepository,
+                        recordRepository,
+                        transactionRepository,
+                        null,
+                        dischargeRepository,
+                        null,
+                        testRepository,
+                        prescriptionRepository,
+                        new com.fasterxml.jackson.databind.ObjectMapper(),
+                        null,
+                        reception
+                );
+        List<com.hospital.api.dto.response.PatientPendingBillResponse> pendingBills = effectiveCashierService.getPatientPendingBills(accountId);
+        com.hospital.api.dto.response.PatientPendingBillResponse targetBill = pendingBills.stream()
+                .filter(b -> normalizedBillId.equals(b.billId()))
+                .findFirst()
+                .orElseThrow(() -> new AppException("Hóa đơn đã được tất toán hoặc không còn khoản phải thu: " + normalizedBillId, HttpStatus.CONFLICT));
+
+        if ("UNRECONCILED".equalsIgnoreCase(targetBill.reconciliationStatus())
+                || "UNRECONCILED".equalsIgnoreCase(targetBill.status())
+                || targetBill.totalAmount() == null) {
+            throw new AppException("Hóa đơn đang ở trạng thái chưa đối soát (UNRECONCILED), không thể tạo giao dịch trực tuyến", HttpStatus.CONFLICT);
+        }
+
+        BigDecimal serverAmount = targetBill.totalAmount();
+        validatePaymentAmount(serverAmount);
+
+        TransactionType txType = switch (category) {
+            case "EXAM" -> TransactionType.PAY_BOOKING;
+            case "TEST" -> TransactionType.PAY_MEDICAL_TEST;
+            case "PRESCRIPTION" -> TransactionType.PAY_PRESCRIPTION;
+            default -> throw new AppException("Danh mục hóa đơn không hợp lệ: " + category, HttpStatus.BAD_REQUEST);
+        };
+
+        Account account = accountRepository.findById(accountId)
+                .orElseGet(() -> booking.getPatientProfile() != null ? booking.getPatientProfile().getAccount() : null);
+
+        long orderCode = generateUniqueOrderCode();
+        String txnRef = "TNT" + orderCode;
+        String providerReference = PayOSConfig.paymentReference(orderCode);
+        String desc = "Thanh toán PayOS: " + normalizedBillId;
+
+        Transaction transaction = Transaction.builder()
+                .account(account)
+                .amount(serverAmount)
+                .transactionType(txType)
+                .paymentMethod(PaymentMethod.VIETQR)
+                .status("PENDING")
+                .vnpayTxnRef(txnRef)
+                .orderCode(orderCode)
+                .isVerified(false)
+                .description(desc)
+                .build();
+
+        transaction = transactionRepository.save(transaction);
+
+        String buyerName = (account != null && account.getFullName() != null) ? account.getFullName() : "Benh Nhan TNT";
+        String buyerPhone = (account != null && account.getPhoneNumber() != null) ? account.getPhoneNumber() : "";
+
+        List<PayOSItemRequest> payOSItems = buildPayOSItems(normalizedBillId, serverAmount);
+        com.hospital.api.dto.response.PayOSLinkResponse payOSLink = payOSService.createPaymentLink(
+                orderCode,
+                serverAmount,
+                providerReference,
+                buyerName,
+                buyerPhone,
+                payOSItems
+        );
+
+        String rawQrCode = (payOSLink != null && payOSLink.qrCode() != null && !payOSLink.qrCode().isBlank())
+                ? payOSLink.qrCode()
+                : null;
+        String bin = (payOSLink != null && payOSLink.bin() != null && !payOSLink.bin().isBlank())
+                ? payOSLink.bin()
+                : payOSConfig.bankBin;
+        String accountNumber = (payOSLink != null && payOSLink.accountNumber() != null && !payOSLink.accountNumber().isBlank())
+                ? payOSLink.accountNumber()
+                : payOSConfig.bankAccount;
+        String accountHolder = (payOSLink != null && payOSLink.accountName() != null && !payOSLink.accountName().isBlank())
+                ? payOSLink.accountName()
+                : payOSConfig.accountHolder;
+
+        String qrImageUrl = payOSConfig.generateVietQRUrl(bin, accountNumber, accountHolder, serverAmount.longValue(), providerReference);
+        String checkoutUrl = (payOSLink != null) ? payOSLink.checkoutUrl() : null;
+
+        return new PaymentGatewayResponse(
+                transaction.getTransactionId(),
+                txnRef,
+                PaymentMethod.VIETQR,
+                txType,
+                serverAmount,
                 "PENDING",
                 qrImageUrl,
                 rawQrCode,
@@ -904,17 +1123,38 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     private void validateBookingOrder(TransactionType type, BigDecimal amount, String description) {
+        validateBookingOrder(null, null, type, amount, description);
+    }
+
+    private void validateBookingOrder(UUID accountId, Account account, TransactionType type, BigDecimal amount, String description) {
         Transaction order = Transaction.builder().transactionType(type).amount(amount).description(description).build();
         Booking booking = resolvePaymentBooking(order);
-        if (booking != null && Boolean.TRUE.equals(booking.getIsPaid())) {
-            throw new AppException("Lịch khám này đã được thanh toán hoàn tất trước đó", HttpStatus.BAD_REQUEST);
+        if (booking != null) {
+            if (accountId != null) {
+                boolean isStaff = account != null && account.getRole() != null
+                        && (com.hospital.api.constant.Role.ROLE_ADMIN == account.getRole()
+                            || com.hospital.api.constant.Role.ROLE_CASHIER == account.getRole()
+                            || com.hospital.api.constant.Role.ROLE_NURSE == account.getRole());
+                UUID bookingOwnerId = (booking.getPatientProfile() != null && booking.getPatientProfile().getAccount() != null)
+                        ? booking.getPatientProfile().getAccount().getUserId()
+                        : null;
+                if (!isStaff && (bookingOwnerId == null || !bookingOwnerId.equals(accountId))) {
+                    throw new AppException("Bạn không có quyền khởi tạo thanh toán cho lịch khám của tài khoản khác", HttpStatus.FORBIDDEN);
+                }
+            }
+            if (Boolean.TRUE.equals(booking.getIsPaid())) {
+                throw new AppException("Lịch khám này đã được thanh toán hoàn tất trước đó", HttpStatus.BAD_REQUEST);
+            }
         }
         validateBookingPrice(order, booking);
     }
 
     private boolean consultationPayment(Transaction transaction) {
         String description = transaction.getDescription();
-        return description == null || (!description.contains("-TREATMENT") && !description.contains("-CLS"));
+        return description == null || (!description.contains("-TREATMENT")
+                && !description.contains("-CLS")
+                && !description.contains("-TEST")
+                && !description.contains("-PRESCRIPTION"));
     }
 
     private boolean matchesBookingPrice(Transaction transaction, Booking booking) {
@@ -931,10 +1171,30 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     private void recordBookingPayment(Transaction transaction, Booking booking) {
-        if (booking == null || !consultationPayment(transaction)) return;
-        if (booking.getPrice() != null && booking.getPrice().signum() > 0) booking.setIsPaid(true);
-        if (booking.getStatus() == BookingStatus.PENDING_PAYMENT) booking.setStatus(BookingStatus.CONFIRMED);
-        bookingRepository.save(booking);
-        reception.afterVerifiedPayment(booking);
+        if (booking != null && consultationPayment(transaction)) {
+            if (booking.getPrice() != null && booking.getPrice().signum() > 0) booking.setIsPaid(true);
+            if (booking.getStatus() == BookingStatus.PENDING_PAYMENT) booking.setStatus(BookingStatus.CONFIRMED);
+            bookingRepository.save(booking);
+            reception.afterVerifiedPayment(booking);
+        }
+
+        if (transaction != null) {
+            if (transaction.getMedicalTest() != null) {
+                MedicalTest test = transaction.getMedicalTest();
+                test.setIsPaid(true);
+                testRepository.save(test);
+            }
+            if (transaction.getPrescription() != null) {
+                Prescription presc = transaction.getPrescription();
+                presc.setIsPaid(true);
+                prescriptionRepository.save(presc);
+            }
+            if (transaction.getDischarge() != null) {
+                Discharge discharge = transaction.getDischarge();
+                discharge.setIsPaid(true);
+                discharge.setSettlementStatus("SETTLED");
+                dischargeRepository.save(discharge);
+            }
+        }
     }
 }

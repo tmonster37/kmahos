@@ -37,6 +37,9 @@ public class Prescription extends BaseEntity {
     @Column(name = "doctor_notes", columnDefinition = "TEXT")
     private String doctorNotes;
 
+    @Column(name = "override_reason", columnDefinition = "TEXT")
+    private String overrideReason;
+
     @Column(name = "is_paid")
     @Builder.Default
     private Boolean isPaid = false;
@@ -45,4 +48,3 @@ public class Prescription extends BaseEntity {
     @Builder.Default
     private List<PrescriptionItem> prescriptionItems = new ArrayList<>();
 }
-

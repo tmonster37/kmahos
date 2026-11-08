@@ -278,10 +278,41 @@ export default function NurseReceptionPage() {
         return { unpaid, waiting, examining, completed, total: queueList.length };
     }, [queueList]);
 
+    // Bộ lọc chỉ giữ các buồng khám lâm sàng ngoại trú (loại bỏ phòng CLS, X-Quang, Nội trú, phòng Test/Audit)
+    const isClinicalConsultationRoom = (r) => {
+        if (!r || r.isActive === false) return false;
+        const name = (r.roomName || "").trim();
+        const lower = name.toLowerCase();
+        if (!name || /^\d+$/.test(name)) return false;
+        if (
+            lower.startsWith("p-test") ||
+            lower.startsWith("p-audit") ||
+            lower.startsWith("p-load") ||
+            lower.startsWith("p-mod") ||
+            lower.includes("phòng test") ||
+            lower.includes("phong test")
+        ) {
+            return false;
+        }
+        const nonConsultKeywords = [
+            "x-quang", "xquang", "siêu âm", "sieu am", "xét nghiệm", "xet nghiem",
+            "huyết học", "huyet hoc", "sinh hóa", "sinh hoa", "vi sinh",
+            "chẩn đoán hình ảnh", "chan doan hinh anh", "cđha", "nội soi", "noi soi",
+            "điện tim", "dien tim", "điện não", "dien nao", "ct scan", "mri",
+            "cộng hưởng từ", "cong huong tu", "cắt lớp", "cat lop",
+            "nội trú", "noi tru", "buồng nội trú", "buong noi tru", "buồng bệnh", "buong benh",
+            "nhà thuốc", "nha thuoc", "dược", "duoc", "thu ngân", "thu ngan",
+            "hành chính", "hanh chinh", "kho ", "phẫu thuật", "phau thuat", "phòng mổ", "phong mo",
+            "hồi sức", "hoi suc", "icu"
+        ];
+        if (nonConsultKeywords.some(kw => lower.includes(kw))) return false;
+        return true;
+    };
+
     // Thống kê tải thực tế của từng phòng theo DepartmentId (Smart Load Balancing)
     const getDepartmentRoomStats = (deptId) => {
         const idStr = String(deptId || "");
-        const deptRooms = allRooms.filter(r => (!deptId || String(r.departmentId) === idStr) && r.isActive !== false);
+        const deptRooms = allRooms.filter(r => (!deptId || String(r.departmentId) === idStr) && isClinicalConsultationRoom(r));
         const defaultRooms = deptRooms.map(r => ({
             roomId: String(r.roomId),
             roomName: r.roomName,

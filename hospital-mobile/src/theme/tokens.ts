@@ -1,0 +1,63 @@
+import { brandTokens } from './brandTokens.generated';
+
+export const tokens = {
+  colors: {
+    logo: brandTokens.brand.logo,
+    primary: brandTokens.brand.primary,
+    primaryHover: brandTokens.brand.primaryHover,
+    primaryDark: brandTokens.brand.primaryDark,
+    primaryLight: brandTokens.brand.primaryLight,
+    primaryBorder: brandTokens.brand.primaryBorder,
+    accent: brandTokens.brand.accent,
+    accentHover: brandTokens.brand.accentHover,
+    accentLight: brandTokens.brand.accentLight,
+    background: brandTokens.neutral.background,
+    surface: brandTokens.neutral.surface,
+    textPrimary: brandTokens.neutral.textPrimary,
+    textSecondary: brandTokens.neutral.textSecondary,
+    textMuted: brandTokens.neutral.textMuted,
+    border: brandTokens.neutral.border,
+    borderLight: brandTokens.neutral.borderLight,
+    hoverBg: brandTokens.neutral.hoverBg,
+    danger: brandTokens.status.danger,
+    dangerBg: brandTokens.status.dangerBg,
+    dangerBorder: brandTokens.status.dangerBorder,
+    warning: brandTokens.status.warning,
+    warningBg: brandTokens.status.warningBg,
+    warningBorder: brandTokens.status.warningBorder,
+    success: brandTokens.status.success,
+    successBg: brandTokens.status.successBg,
+    successBorder: brandTokens.status.successBorder,
+    info: brandTokens.status.info,
+    infoBg: brandTokens.status.infoBg,
+    infoBorder: brandTokens.status.infoBorder,
+  },
+  spacing: {
+    xs: brandTokens.spacing.xs,
+    sm: brandTokens.spacing.sm,
+    md: brandTokens.spacing.md,
+    lg: brandTokens.spacing.lg,
+    xl: brandTokens.spacing.xl,
+    xxl: brandTokens.spacing.xxl,
+  },
+  radius: {
+    sm: brandTokens.radius.sm,
+    input: brandTokens.radius.input,
+    button: brandTokens.radius.button,
+    md: brandTokens.radius.md,
+    lg: brandTokens.radius.lg,
+    card: brandTokens.radius.card,
+    pill: brandTokens.radius.pill,
+  },
+  typography: {
+    fontFamily: brandTokens.typography.fontFamily,
+    title: brandTokens.typography.title,
+    subtitle: brandTokens.typography.subtitle,
+    body: brandTokens.typography.body,
+    caption: brandTokens.typography.caption,
+    small: brandTokens.typography.small,
+  },
+} as const;
+
+export type AppTokens = typeof tokens;
+export default tokens;

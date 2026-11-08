@@ -46,6 +46,8 @@ public class CashierServiceImpl implements CashierService {
     private final NotificationRepository notificationRepository;
     private final com.hospital.api.repository.DischargeRepository dischargeRepository;
     private final com.hospital.api.repository.HospitalAdmissionRepository admissionRepository;
+    private final com.hospital.api.repository.MedicalTestRepository testRepository;
+    private final com.hospital.api.repository.PrescriptionRepository prescriptionRepository;
     private final ObjectMapper objectMapper;
     private final com.hospital.api.service.AuditLogService auditLogService;
     private final BookingReceptionTransition reception;
@@ -76,6 +78,193 @@ public class CashierServiceImpl implements CashierService {
         return buildBillsFromBookings(patientBookings);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<com.hospital.api.dto.response.PatientPendingBillResponse> getPatientPendingBills(UUID accountId) {
+        if (accountId == null) return Collections.emptyList();
+        List<Booking> patientBookings = bookingRepository.findAllByPatientProfile_Account_UserIdAndDeletedFalseOrderByCreatedAtDesc(accountId);
+        return buildPatientPendingBills(patientBookings);
+    }
+
+    private record CategorySettlementSummary(
+            BigDecimal examPaid,
+            BigDecimal testPaid,
+            BigDecimal prescriptionPaid,
+            boolean hasUnreconciled
+    ) {}
+
+    private CategorySettlementSummary evaluateBookingSettlements(String bookingCode, List<Transaction> rawTxns) {
+        BigDecimal examPaid = BigDecimal.ZERO;
+        BigDecimal testPaid = BigDecimal.ZERO;
+        BigDecimal prescriptionPaid = BigDecimal.ZERO;
+        boolean hasUnreconciled = false;
+
+        if (rawTxns == null) {
+            return new CategorySettlementSummary(examPaid, testPaid, prescriptionPaid, false);
+        }
+
+        for (Transaction txn : rawTxns) {
+            if (txn == null || !"SUCCESS".equalsIgnoreCase(txn.getStatus())) {
+                continue;
+            }
+            if (txn.getTransactionType() == TransactionType.REFUND || txn.getTransactionType() == TransactionType.DEPOSIT_WALLET) {
+                continue;
+            }
+            String desc = txn.getDescription() != null ? txn.getDescription() : "";
+            if (!desc.isBlank() && !exactBookingReference(desc, bookingCode)) {
+                continue;
+            }
+            BigDecimal amount = txn.getAmount();
+            if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+                continue;
+            }
+
+            String category = resolveSourceBackedCategory(txn, bookingCode);
+            if ("EXAM".equals(category)) {
+                examPaid = examPaid.add(amount);
+            } else if ("TEST".equals(category)) {
+                testPaid = testPaid.add(amount);
+            } else if ("PRESCRIPTION".equals(category)) {
+                prescriptionPaid = prescriptionPaid.add(amount);
+            } else {
+                hasUnreconciled = true;
+            }
+        }
+
+        return new CategorySettlementSummary(examPaid, testPaid, prescriptionPaid, hasUnreconciled);
+    }
+
+    private String resolveSourceBackedCategory(Transaction txn, String bookingCode) {
+        if (txn.getMedicalTest() != null || txn.getTransactionType() == TransactionType.PAY_MEDICAL_TEST) {
+            return "TEST";
+        }
+        if (txn.getPrescription() != null || txn.getTransactionType() == TransactionType.PAY_PRESCRIPTION) {
+            return "PRESCRIPTION";
+        }
+
+        String desc = txn.getDescription() != null ? txn.getDescription() : "";
+        String ref = txn.getVnpayTxnRef() != null ? txn.getVnpayTxnRef() : "";
+
+        List<CashierBillItemDto> snapshot = extractSnapshotItems(desc);
+        if (snapshot != null && !snapshot.isEmpty()) {
+            java.util.Set<String> cats = new java.util.HashSet<>();
+            for (CashierBillItemDto item : snapshot) {
+                if ("EXAM".equalsIgnoreCase(item.category())) {
+                    cats.add("EXAM");
+                } else if ("TEST".equalsIgnoreCase(item.category())) {
+                    cats.add("TEST");
+                } else if ("MEDICINE".equalsIgnoreCase(item.category()) || "PRESCRIPTION".equalsIgnoreCase(item.category())) {
+                    cats.add("PRESCRIPTION");
+                } else {
+                    cats.add("OTHER");
+                }
+            }
+            if (cats.size() == 1 && !cats.contains("OTHER")) {
+                return cats.iterator().next();
+            }
+            return null;
+        }
+
+        boolean hasMultiMarker = desc.contains("-TREATMENT") || desc.contains("-CLS") || desc.contains("-ALL")
+                || ref.contains("-TREATMENT") || ref.contains("-CLS") || ref.contains("-ALL");
+        if (hasMultiMarker) {
+            return null;
+        }
+
+        boolean hasExam = desc.contains("BILL-" + bookingCode + "-EXAM") || desc.contains("-EXAM") || ref.contains("-EXAM");
+        boolean hasTest = desc.contains("BILL-" + bookingCode + "-TEST") || desc.contains("-TEST") || ref.contains("-TEST");
+        boolean hasPresc = desc.contains("BILL-" + bookingCode + "-PRESCRIPTION") || desc.contains("-PRESCRIPTION") || ref.contains("-PRESCRIPTION");
+
+        int count = (hasExam ? 1 : 0) + (hasTest ? 1 : 0) + (hasPresc ? 1 : 0);
+        if (count != 1) {
+            return null;
+        }
+        if (hasExam) return "EXAM";
+        if (hasTest) return "TEST";
+        return "PRESCRIPTION";
+    }
+
+    private List<com.hospital.api.dto.response.PatientPendingBillResponse> buildPatientPendingBills(List<Booking> bookings) {
+        List<com.hospital.api.dto.response.PatientPendingBillResponse> pendingBills = new ArrayList<>();
+        if (bookings == null) return pendingBills;
+
+        for (Booking booking : bookings) {
+            if (booking == null || booking.getStatus() == BookingStatus.CANCELLED) {
+                continue;
+            }
+            String code = booking.getBookingCode();
+            List<Transaction> txns = transactionRepository.findAllByDescriptionContainingAndStatus(code, "SUCCESS");
+            CategorySettlementSummary settlement = evaluateBookingSettlements(code, txns);
+
+            List<CashierBillItemDto> examItems = buildExamItems(booking);
+            BigDecimal examCharge = examItems.stream()
+                    .map(CashierBillItemDto::totalPrice)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            List<CashierBillItemDto> treatmentItems = buildTreatmentItems(booking);
+            List<CashierBillItemDto> testItems = treatmentItems.stream().filter(i -> "TEST".equals(i.category())).toList();
+            List<CashierBillItemDto> medItems = treatmentItems.stream().filter(i -> "MEDICINE".equals(i.category())).toList();
+
+            BigDecimal testCharge = testItems.stream().map(CashierBillItemDto::totalPrice).reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal medCharge = medItems.stream().map(CashierBillItemDto::totalPrice).reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            BigDecimal remainingExam = examCharge.subtract(settlement.examPaid());
+            BigDecimal remainingTest = testCharge.subtract(settlement.testPaid());
+            BigDecimal remainingMed = medCharge.subtract(settlement.prescriptionPaid());
+
+            LocalDateTime createdTime = booking.getCreatedAt() != null
+                    ? LocalDateTime.ofInstant(booking.getCreatedAt(), ZoneId.systemDefault())
+                    : LocalDateTime.now();
+
+            boolean unreconciled = settlement.hasUnreconciled();
+            String recStatus = unreconciled ? "UNRECONCILED" : "RECONCILED";
+            String billStatus = unreconciled ? "UNRECONCILED" : "UNPAID";
+
+            if ((!Boolean.TRUE.equals(booking.getIsPaid()) || unreconciled) && remainingExam.compareTo(BigDecimal.ZERO) > 0) {
+                pendingBills.add(new com.hospital.api.dto.response.PatientPendingBillResponse(
+                        "BILL-" + code + "-EXAM",
+                        code,
+                        booking.getBookingId(),
+                        "EXAM",
+                        examItems,
+                        unreconciled ? null : remainingExam,
+                        recStatus,
+                        billStatus,
+                        createdTime
+                ));
+            }
+
+            if (remainingTest.compareTo(BigDecimal.ZERO) > 0) {
+                pendingBills.add(new com.hospital.api.dto.response.PatientPendingBillResponse(
+                        "BILL-" + code + "-TEST",
+                        code,
+                        booking.getBookingId(),
+                        "TEST",
+                        testItems,
+                        unreconciled ? null : remainingTest,
+                        recStatus,
+                        billStatus,
+                        createdTime
+                ));
+            }
+
+            if (remainingMed.compareTo(BigDecimal.ZERO) > 0) {
+                pendingBills.add(new com.hospital.api.dto.response.PatientPendingBillResponse(
+                        "BILL-" + code + "-PRESCRIPTION",
+                        code,
+                        booking.getBookingId(),
+                        "PRESCRIPTION",
+                        medItems,
+                        unreconciled ? null : remainingMed,
+                        recStatus,
+                        billStatus,
+                        createdTime
+                ));
+            }
+        }
+        return pendingBills;
+    }
+
     private List<CashierPendingBillResponse> buildBillsFromBookings(List<Booking> bookings) {
         List<CashierPendingBillResponse> pendingBills = new ArrayList<>();
         if (bookings == null) return pendingBills;
@@ -87,10 +276,7 @@ public class CashierServiceImpl implements CashierService {
 
             String code = booking.getBookingCode();
             List<Transaction> txns = transactionRepository.findAllByDescriptionContainingAndStatus(code, "SUCCESS");
-            BigDecimal totalPaid = txns.stream()
-                    .map(Transaction::getAmount)
-                    .filter(java.util.Objects::nonNull)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            CategorySettlementSummary settlement = evaluateBookingSettlements(code, txns);
 
             List<CashierBillItemDto> examItems = buildExamItems(booking);
             BigDecimal examPrice = examItems.stream()
@@ -98,16 +284,18 @@ public class CashierServiceImpl implements CashierService {
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
             List<CashierBillItemDto> treatmentItems = buildTreatmentItems(booking);
-            BigDecimal treatmentPrice = treatmentItems.stream()
-                    .map(CashierBillItemDto::totalPrice)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            List<CashierBillItemDto> testItems = treatmentItems.stream().filter(i -> "TEST".equals(i.category())).toList();
+            List<CashierBillItemDto> medItems = treatmentItems.stream().filter(i -> "MEDICINE".equals(i.category())).toList();
 
-            BigDecimal totalBill = examPrice.add(treatmentPrice);
+            BigDecimal testCharge = testItems.stream().map(CashierBillItemDto::totalPrice).reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal medCharge = medItems.stream().map(CashierBillItemDto::totalPrice).reduce(BigDecimal.ZERO, BigDecimal::add);
 
-            // Nếu toàn bộ viện phí đã được đóng đủ (hoặc thừa) -> không còn nợ
-            if (totalPaid.compareTo(totalBill) >= 0) {
-                continue;
-            }
+            BigDecimal remainingExam = examPrice.subtract(settlement.examPaid());
+            BigDecimal remainingTest = testCharge.subtract(settlement.testPaid());
+            BigDecimal remainingMed = medCharge.subtract(settlement.prescriptionPaid());
+
+            boolean unreconciled = settlement.hasUnreconciled();
+            String billStatus = unreconciled ? "UNRECONCILED" : "UNPAID";
 
             PatientProfile p = booking.getPatientProfile();
             Doctor doc = booking.getDoctor();
@@ -122,9 +310,8 @@ public class CashierServiceImpl implements CashierService {
                     ? LocalDateTime.ofInstant(booking.getCreatedAt(), ZoneId.systemDefault())
                     : LocalDateTime.now();
 
-            // 1. Hóa đơn 01: Tiền công khám ban đầu (nếu chưa đóng đủ tiền khám)
-            if (examPrice.compareTo(BigDecimal.ZERO) > 0 && totalPaid.compareTo(examPrice) < 0) {
-                BigDecimal remainingExam = examPrice.subtract(totalPaid);
+            // 1. Hóa đơn 01: Tiền công khám ban đầu
+            if ((!Boolean.TRUE.equals(booking.getIsPaid()) || unreconciled) && remainingExam.compareTo(BigDecimal.ZERO) > 0) {
                 pendingBills.add(new CashierPendingBillResponse(
                         "BILL-" + code + "-EXAM",
                         code,
@@ -138,44 +325,52 @@ public class CashierServiceImpl implements CashierService {
                         doctorName,
                         "EXAM",
                         examItems,
-                        remainingExam,
-                        "UNPAID",
+                        unreconciled ? null : remainingExam,
+                        billStatus,
                         createdTime
                 ));
             }
 
-            // 2. Hóa đơn 02: Tiền cận lâm sàng & Đơn thuốc phát sinh trong quá trình khám
-            if (treatmentPrice.compareTo(BigDecimal.ZERO) > 0) {
-                BigDecimal remainingTreatment;
-                if (totalPaid.compareTo(examPrice) <= 0) {
-                    remainingTreatment = treatmentPrice;
-                } else {
-                    remainingTreatment = totalBill.subtract(totalPaid);
-                }
+            // 2. Hóa đơn 02: Tiền cận lâm sàng (TEST)
+            if (remainingTest.compareTo(BigDecimal.ZERO) > 0) {
+                pendingBills.add(new CashierPendingBillResponse(
+                        "BILL-" + code + "-TEST",
+                        code,
+                        booking.getBookingId(),
+                        p != null ? p.getFullName() : "Khách hàng",
+                        p != null ? p.getPhoneNumber() : "",
+                        p != null && p.getIdentityNumber() != null ? p.getIdentityNumber() : "",
+                        p != null && p.getGender() != null ? p.getGender().name() : "",
+                        p != null && p.getStreetAddress() != null ? p.getStreetAddress() : "",
+                        deptName,
+                        doctorName,
+                        "TEST",
+                        testItems,
+                        unreconciled ? null : remainingTest,
+                        billStatus,
+                        createdTime
+                ));
+            }
 
-                if (remainingTreatment.compareTo(BigDecimal.ZERO) > 0) {
-                    boolean hasTest = treatmentItems.stream().anyMatch(i -> "TEST".equals(i.category()));
-                    boolean hasMed = treatmentItems.stream().anyMatch(i -> "MEDICINE".equals(i.category()));
-                    String treatmentBillType = (hasTest && hasMed) ? "ALL" : (hasMed ? "PRESCRIPTION" : "TEST");
-
-                    pendingBills.add(new CashierPendingBillResponse(
-                            "BILL-" + code + "-TREATMENT",
-                            code,
-                            booking.getBookingId(),
-                            p != null ? p.getFullName() : "Khách hàng",
-                            p != null ? p.getPhoneNumber() : "",
-                            p != null && p.getIdentityNumber() != null ? p.getIdentityNumber() : "",
-                            p != null && p.getGender() != null ? p.getGender().name() : "",
-                            p != null && p.getStreetAddress() != null ? p.getStreetAddress() : "",
-                            deptName,
-                            doctorName,
-                            treatmentBillType,
-                            treatmentItems,
-                            remainingTreatment,
-                            "UNPAID",
-                            createdTime
-                    ));
-                }
+            // 3. Hóa đơn 03: Tiền đơn thuốc (PRESCRIPTION)
+            if (remainingMed.compareTo(BigDecimal.ZERO) > 0) {
+                pendingBills.add(new CashierPendingBillResponse(
+                        "BILL-" + code + "-PRESCRIPTION",
+                        code,
+                        booking.getBookingId(),
+                        p != null ? p.getFullName() : "Khách hàng",
+                        p != null ? p.getPhoneNumber() : "",
+                        p != null && p.getIdentityNumber() != null ? p.getIdentityNumber() : "",
+                        p != null && p.getGender() != null ? p.getGender().name() : "",
+                        p != null && p.getStreetAddress() != null ? p.getStreetAddress() : "",
+                        deptName,
+                        doctorName,
+                        "PRESCRIPTION",
+                        medItems,
+                        unreconciled ? null : remainingMed,
+                        billStatus,
+                        createdTime
+                ));
             }
         }
         return pendingBills;
@@ -359,6 +554,12 @@ public class CashierServiceImpl implements CashierService {
             if (sub.endsWith("-EXAM")) {
                 rawBookingCode = sub.substring(0, sub.length() - "-EXAM".length());
                 invoiceTarget = "EXAM";
+            } else if (sub.endsWith("-TEST")) {
+                rawBookingCode = sub.substring(0, sub.length() - "-TEST".length());
+                invoiceTarget = "TEST";
+            } else if (sub.endsWith("-PRESCRIPTION")) {
+                rawBookingCode = sub.substring(0, sub.length() - "-PRESCRIPTION".length());
+                invoiceTarget = "PRESCRIPTION";
             } else if (sub.endsWith("-TREATMENT")) {
                 rawBookingCode = sub.substring(0, sub.length() - "-TREATMENT".length());
                 invoiceTarget = "TREATMENT";
@@ -425,6 +626,24 @@ public class CashierServiceImpl implements CashierService {
                 return buildExistingReceipt(booking, cashierUsername, billId, bookingCode, examPrice, method, itemsToBill, request.notes(), txns);
             }
             billAmount = examPrice.subtract(totalPaid);
+        } else if ("TEST".equalsIgnoreCase(invoiceTarget)) {
+            List<CashierBillItemDto> testItems = treatmentItems.stream().filter(i -> "TEST".equals(i.category())).toList();
+            if (testItems.isEmpty()) {
+                throw new AppException("Ca khám [" + bookingCode + "] không có chỉ định cận lâm sàng nào cần thanh toán!", HttpStatus.BAD_REQUEST);
+            }
+            itemsToBill = testItems;
+            billId = "BILL-" + bookingCode + "-TEST";
+            invoiceTitle = "cận lâm sàng & xét nghiệm";
+            billAmount = testItems.stream().map(CashierBillItemDto::totalPrice).reduce(BigDecimal.ZERO, BigDecimal::add);
+        } else if ("PRESCRIPTION".equalsIgnoreCase(invoiceTarget)) {
+            List<CashierBillItemDto> medItems = treatmentItems.stream().filter(i -> "MEDICINE".equals(i.category())).toList();
+            if (medItems.isEmpty()) {
+                throw new AppException("Ca khám [" + bookingCode + "] không có đơn thuốc nào cần thanh toán!", HttpStatus.BAD_REQUEST);
+            }
+            itemsToBill = medItems;
+            billId = "BILL-" + bookingCode + "-PRESCRIPTION";
+            invoiceTitle = "đơn thuốc ngoại trú";
+            billAmount = medItems.stream().map(CashierBillItemDto::totalPrice).reduce(BigDecimal.ZERO, BigDecimal::add);
         } else if ("TREATMENT".equalsIgnoreCase(invoiceTarget)) {
             if (treatmentPrice.compareTo(BigDecimal.ZERO) <= 0) {
                 throw new AppException("Ca khám [" + bookingCode + "] chưa có chỉ định cận lâm sàng hoặc đơn thuốc phát sinh!", HttpStatus.BAD_REQUEST);
@@ -508,16 +727,51 @@ public class CashierServiceImpl implements CashierService {
             description += "\n" + SNAPSHOT_PREFIX + itemsSnapshotJson + SNAPSHOT_SUFFIX;
         }
 
+        TransactionType txnType = TransactionType.PAY_BOOKING;
+        if (billId.endsWith("-TEST")) {
+            txnType = TransactionType.PAY_MEDICAL_TEST;
+        } else if (billId.endsWith("-PRESCRIPTION")) {
+            txnType = TransactionType.PAY_PRESCRIPTION;
+        }
+
         Transaction transaction = Transaction.builder()
                 .account(account)
+                .booking(booking)
                 .amount(billAmount)
-                .transactionType(TransactionType.PAY_BOOKING)
+                .transactionType(txnType)
                 .paymentMethod(method)
                 .status("SUCCESS")
                 .vnpayTxnRef(receiptCode)
                 .isVerified(true)
                 .description(description)
                 .build();
+
+        // Đánh dấu đã thanh toán cho các thực thể cụ thể và liên kết vào transaction
+        recordRepository.findByBooking_BookingCode(bookingCode).ifPresent(record -> {
+            boolean isPayingTest = billId.endsWith("-TEST") || billId.endsWith("-TREATMENT") || billId.endsWith("-ALL");
+            boolean isPayingPrescription = billId.endsWith("-PRESCRIPTION") || billId.endsWith("-TREATMENT") || billId.endsWith("-ALL");
+
+            if (isPayingTest && record.getMedicalTests() != null) {
+                for (MedicalTest test : record.getMedicalTests()) {
+                    if (test.getState() != com.hospital.api.constant.MedicalTestState.CANCELLED) {
+                        test.setIsPaid(true);
+                        testRepository.save(test);
+                        if (transaction.getMedicalTest() == null) {
+                            transaction.setMedicalTest(test);
+                        }
+                    }
+                }
+            }
+
+            if (isPayingPrescription && record.getPrescription() != null) {
+                Prescription presc = record.getPrescription();
+                presc.setIsPaid(true);
+                prescriptionRepository.save(presc);
+                if (transaction.getPrescription() == null) {
+                    transaction.setPrescription(presc);
+                }
+            }
+        });
 
         Transaction savedTxn = transactionRepository.save(transaction);
 
@@ -533,8 +787,15 @@ public class CashierServiceImpl implements CashierService {
                 null
         );
 
-        if (!billId.endsWith("-TREATMENT") && booking.getPrice() != null && booking.getPrice().signum() > 0) booking.setIsPaid(true);
-        reception.checkIn(booking, com.hospital.api.constant.CounterType.APPOINTMENT, false);
+        boolean isExamBill = billId.endsWith("-EXAM") || billId.endsWith("-ALL");
+        if (isExamBill) {
+            if (booking.getPrice() != null && booking.getPrice().signum() > 0) {
+                booking.setIsPaid(true);
+            }
+            if (booking.getStatus() != BookingStatus.COMPLETED && booking.getStatus() != BookingStatus.CANCELLED) {
+                reception.checkIn(booking, com.hospital.api.constant.CounterType.APPOINTMENT, false);
+            }
+        }
 
         // 6. Gửi thông báo đến bệnh nhân nếu có tài khoản
         try {
@@ -739,6 +1000,15 @@ public class CashierServiceImpl implements CashierService {
         recordRepository.findByBooking_BookingCode(booking.getBookingCode()).ifPresent(record -> {
             if (record.getMedicalTests() != null) {
                 for (MedicalTest test : record.getMedicalTests()) {
+                    if (test.getState() == com.hospital.api.constant.MedicalTestState.CANCELLED) {
+                        continue;
+                    }
+                    if (Boolean.TRUE.equals(test.getIsPaid())) {
+                        continue;
+                    }
+                    if (test.getMedicalTestId() != null && transactionRepository.existsByMedicalTest_MedicalTestIdAndStatus(test.getMedicalTestId(), "SUCCESS")) {
+                        continue;
+                    }
                     BigDecimal testPrice = test.getPrice() != null ? test.getPrice() : BigDecimal.ZERO;
                     String testName = (test.getMedicalService() != null)
                             ? test.getMedicalService().getServiceName()
@@ -754,25 +1024,29 @@ public class CashierServiceImpl implements CashierService {
                 }
             }
 
-            if (record.getPrescription() != null && record.getPrescription().getPrescriptionItems() != null) {
-                for (PrescriptionItem pItem : record.getPrescription().getPrescriptionItems()) {
-                    String medName = (pItem.getMedicine() != null)
-                            ? pItem.getMedicine().getMedicineName()
-                            : "Thuốc";
-                    BigDecimal unitPrice = pItem.getUnitPrice() != null ? pItem.getUnitPrice() : BigDecimal.ZERO;
-                    Integer qty = pItem.getQuantity() != null ? pItem.getQuantity() : 1;
-                    BigDecimal itemTotal = pItem.getTotalPrice() != null
-                            ? pItem.getTotalPrice()
-                            : unitPrice.multiply(BigDecimal.valueOf(qty));
+            if (record.getPrescription() != null && !Boolean.TRUE.equals(record.getPrescription().getIsPaid()) && record.getPrescription().getPrescriptionItems() != null) {
+                if (record.getPrescription().getPrescriptionId() != null && transactionRepository.existsByPrescription_PrescriptionIdAndStatus(record.getPrescription().getPrescriptionId(), "SUCCESS")) {
+                    // Đã thanh toán đơn thuốc
+                } else {
+                    for (PrescriptionItem pItem : record.getPrescription().getPrescriptionItems()) {
+                        String medName = (pItem.getMedicine() != null)
+                                ? pItem.getMedicine().getMedicineName()
+                                : "Thuốc";
+                        BigDecimal unitPrice = pItem.getUnitPrice() != null ? pItem.getUnitPrice() : BigDecimal.ZERO;
+                        Integer qty = pItem.getQuantity() != null ? pItem.getQuantity() : 1;
+                        BigDecimal itemTotal = pItem.getTotalPrice() != null
+                                ? pItem.getTotalPrice()
+                                : unitPrice.multiply(BigDecimal.valueOf(qty));
 
-                    items.add(new CashierBillItemDto(
-                            "MED-" + pItem.getPrescriptionItemId(),
-                            medName,
-                            qty,
-                            unitPrice,
-                            itemTotal,
-                            "MEDICINE"
-                    ));
+                        items.add(new CashierBillItemDto(
+                                "MED-" + pItem.getPrescriptionItemId(),
+                                medName,
+                                qty,
+                                unitPrice,
+                                itemTotal,
+                                "MEDICINE"
+                        ));
+                    }
                 }
             }
         });
@@ -813,14 +1087,15 @@ public class CashierServiceImpl implements CashierService {
         if (admissionId != null) {
             discharge = dischargeRepository.findByHospitalAdmission_AdmissionId(admissionId).orElse(null);
             if (discharge != null) {
-                admission = discharge.getHospitalAdmission();
+                admission = admissionRepository.findByIdForUpdate(admissionId).orElse(discharge.getHospitalAdmission());
             } else {
-                admission = admissionRepository.findById(admissionId).orElse(null);
+                admission = admissionRepository.findByIdForUpdate(admissionId).orElse(null);
             }
         }
         if (discharge == null && admission == null) {
             admission = admissionRepository.findByAdmissionCode(key).orElse(null);
             if (admission != null) {
+                admission = admissionRepository.findByIdForUpdate(admission.getAdmissionId()).orElse(admission);
                 discharge = dischargeRepository.findByHospitalAdmission_AdmissionId(admission.getAdmissionId()).orElse(null);
             }
         }
@@ -924,15 +1199,24 @@ public class CashierServiceImpl implements CashierService {
 
         Transaction transaction = Transaction.builder()
                 .account(account)
+                .hospitalAdmission(admission)
+                .discharge(discharge)
                 .amount(billAmount)
                 .transactionType(TransactionType.PAY_INPATIENT_FEE)
                 .paymentMethod(method)
                 .status("SUCCESS")
+                .isVerified(true)
                 .vnpayTxnRef(receiptCode)
                 .description(description)
                 .build();
 
         Transaction savedTxn = transactionRepository.save(transaction);
+
+        if (discharge != null) {
+            discharge.setIsPaid(true);
+            discharge.setSettlementStatus("SETTLED");
+            dischargeRepository.save(discharge);
+        }
 
         auditLogService.log(
                 null,
@@ -1021,7 +1305,10 @@ public class CashierServiceImpl implements CashierService {
         BigDecimal consultationPaid = txns.stream().filter(t -> t.getDescription() != null && !t.getDescription().contains("-TREATMENT") && !t.getDescription().contains("-CLS"))
                 .map(Transaction::getAmount).filter(java.util.Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
         if (booking.getPrice() != null && booking.getPrice().signum() > 0 && consultationPaid.compareTo(booking.getPrice()) >= 0) booking.setIsPaid(true);
-        reception.checkIn(booking, com.hospital.api.constant.CounterType.APPOINTMENT, false);
+        boolean isExamBill = billId != null && (billId.endsWith("-EXAM") || billId.endsWith("-ALL"));
+        if (isExamBill && booking.getStatus() != BookingStatus.COMPLETED && booking.getStatus() != BookingStatus.CANCELLED) {
+            reception.checkIn(booking, com.hospital.api.constant.CounterType.APPOINTMENT, false);
+        }
 
         return new CashierReceiptResponse(
                 receiptCode,

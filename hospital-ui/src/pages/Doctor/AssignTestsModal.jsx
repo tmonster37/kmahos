@@ -43,28 +43,17 @@ export default function AssignTestsModal({ open, onClose, recordId, onAssigned }
         setFetchingServices(true);
         try {
             const res = await axiosInstance.get("/api/clinical/services");
-            if (res.data && res.data.length > 0) {
-                setServices(res.data);
+            const list = res?.data;
+            if (Array.isArray(list) && list.length > 0) {
+                setServices(list);
             } else {
-                // Fallback default sample services if none in DB
-                setServices([
-                    { serviceId: 1, serviceName: "Chụp X-Quang ngực thẳng kỹ thuật số", price: 150000, description: "Chẩn đoán hình ảnh phổi & tim mạch" },
-                    { serviceId: 2, serviceName: "Xét nghiệm công thức máu tổng quát 24 thông số", price: 120000, description: "Phân tích huyết học toàn phần" },
-                    { serviceId: 3, serviceName: "Siêu âm Doppler màu ổ bụng tổng quát", price: 200000, description: "Khảo sát gan, mật, tụy, lách, thận" },
-                    { serviceId: 4, serviceName: "Chụp cắt lớp vi tính (CT Scanner) sọ não", price: 950000, description: "Chẩn đoán bệnh lý thần kinh, sọ não" },
-                    { serviceId: 5, serviceName: "Nội soi dạ dày - thực quản không đau", price: 650000, description: "Nội soi chẩn đoán tiêu hóa" },
-                    { serviceId: 6, serviceName: "Xét nghiệm đường huyết lúc đói (Glucose)", price: 60000, description: "Tầm soát và theo dõi đái tháo đường" },
-                    { serviceId: 7, serviceName: "Điện tâm đồ (ECG) 12 chuyển đạo", price: 80000, description: "Đánh giá nhịp tim và rối loạn dẫn truyền" },
-                ]);
+                setServices([]);
+                setError("Chưa có danh mục dịch vụ cận lâm sàng khả dụng trên hệ thống.");
             }
         } catch (err) {
             console.error("Lỗi lấy danh mục dịch vụ:", err);
-            setServices([
-                { serviceId: 1, serviceName: "Chụp X-Quang ngực thẳng kỹ thuật số", price: 150000 },
-                { serviceId: 2, serviceName: "Xét nghiệm công thức máu tổng quát 24 thông số", price: 120000 },
-                { serviceId: 3, serviceName: "Siêu âm Doppler màu ổ bụng tổng quát", price: 200000 },
-                { serviceId: 4, serviceName: "Chụp cắt lớp vi tính (CT Scanner) sọ não", price: 950000 },
-            ]);
+            setServices([]);
+            setError("Không thể tải danh mục dịch vụ cận lâm sàng từ máy chủ. Vui lòng thử lại.");
         } finally {
             setFetchingServices(false);
         }
@@ -88,8 +77,9 @@ export default function AssignTestsModal({ open, onClose, recordId, onAssigned }
     );
 
     const handleSave = async () => {
-        if (!recordId || String(recordId).startsWith("temp-")) {
-            setError("Hồ sơ bệnh án chưa được lưu trên hệ thống. Vui lòng bấm 'Lưu Chẩn Đoán' trên màn hình trước khi chỉ định cận lâm sàng!");
+        const isValidUuid = recordId && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(String(recordId));
+        if (!isValidUuid) {
+            setError("Hồ sơ bệnh án chưa được lưu hoặc mã hồ sơ không hợp lệ trên hệ thống. Vui lòng bấm 'Lưu Chẩn Đoán' trên màn hình trước khi chỉ định cận lâm sàng!");
             return;
         }
 

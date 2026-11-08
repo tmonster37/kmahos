@@ -39,8 +39,12 @@ public class BookingController {
 
     // Tự động hoặc chủ động giải phóng slot giữ chỗ khi bệnh nhân đổi ý
     @PostMapping("/release-slot/{reservationId}")
-    public ResponseEntity<ApiResponse<Void>> releaseSlot(@PathVariable UUID reservationId) {
-        slotReservationService.releaseSlot(reservationId);
+    public ResponseEntity<ApiResponse<Void>> releaseSlot(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @PathVariable UUID reservationId
+    ) {
+        UUID accountId = userPrincipal != null ? userPrincipal.getId() : null;
+        slotReservationService.releaseSlot(reservationId, accountId);
         return ResponseEntity.ok(ApiResponse.ok(null, "Đã giải phóng slot giữ chỗ thành công"));
     }
 

@@ -162,6 +162,22 @@ public class PaymentController {
         return ResponseEntity.ok(ApiResponse.ok(response, "Khởi tạo link thanh toán PayOS thành công"));
     }
 
+    // 7.3. Khởi tạo link thanh toán PayOS theo hóa đơn chuẩn hóa cho bệnh nhân (Server tự tính số tiền & danh mục)
+    @PostMapping("/patient/payos/create-link")
+    public ResponseEntity<ApiResponse<PaymentGatewayResponse>> createPatientPayOSPaymentLink(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @jakarta.validation.Valid @RequestBody com.hospital.api.dto.request.CreatePatientPayOSLinkRequest requestBody
+    ) {
+        if (userPrincipal == null || userPrincipal.getId() == null) {
+            throw new com.hospital.api.exception.AppException("Vui lòng đăng nhập để thanh toán hóa đơn", org.springframework.http.HttpStatus.UNAUTHORIZED);
+        }
+        if (requestBody == null || requestBody.billId() == null || requestBody.billId().isBlank()) {
+            throw new com.hospital.api.exception.AppException("Mã hóa đơn (billId) không được để trống", org.springframework.http.HttpStatus.BAD_REQUEST);
+        }
+        PaymentGatewayResponse response = paymentService.createPatientPayOSPaymentLink(userPrincipal.getId(), requestBody.billId().trim());
+        return ResponseEntity.ok(ApiResponse.ok(response, "Khởi tạo link thanh toán PayOS cho hóa đơn thành công"));
+    }
+
     // 8. Callback xử lý kết quả từ VNPay (Return URL cho trình duyệt)
     @GetMapping("/vnpay/callback")
     public ResponseEntity<ApiResponse<com.hospital.api.dto.response.TransactionResponse>> vnpayCallback(
@@ -197,6 +213,18 @@ public class PaymentController {
             @AuthenticationPrincipal UserPrincipal userPrincipal
     ) {
         List<com.hospital.api.dto.response.CashierPendingBillResponse> bills = cashierService.getPendingBillsForPatient(userPrincipal.getId());
+        return ResponseEntity.ok(ApiResponse.ok(bills, "Lấy danh sách khoản viện phí cần nộp thành công"));
+    }
+
+    // 9.2. Danh sách khoản viện phí cần nộp chuẩn hóa cho ứng dụng bệnh nhân
+    @GetMapping("/patient/pending-bills")
+    public ResponseEntity<ApiResponse<List<com.hospital.api.dto.response.PatientPendingBillResponse>>> getPatientPendingBills(
+            @AuthenticationPrincipal UserPrincipal userPrincipal
+    ) {
+        if (userPrincipal == null || userPrincipal.getId() == null) {
+            throw new com.hospital.api.exception.AppException("Vui lòng đăng nhập để xem hóa đơn viện phí", org.springframework.http.HttpStatus.UNAUTHORIZED);
+        }
+        List<com.hospital.api.dto.response.PatientPendingBillResponse> bills = cashierService.getPatientPendingBills(userPrincipal.getId());
         return ResponseEntity.ok(ApiResponse.ok(bills, "Lấy danh sách khoản viện phí cần nộp thành công"));
     }
 

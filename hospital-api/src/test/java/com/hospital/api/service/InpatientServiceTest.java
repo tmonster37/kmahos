@@ -56,6 +56,8 @@ class InpatientServiceTest {
     @Mock
     private AccountRepository accountRepository;
     @Mock
+    private MedicalExaminationRecordRepository recordRepository;
+    @Mock
     private AuditLogService auditLogService;
 
     private InpatientServiceImpl inpatientService;
@@ -81,6 +83,7 @@ class InpatientServiceTest {
                 nursingCareRepository,
                 staffRepository,
                 accountRepository,
+                recordRepository,
                 auditLogService
         );
 

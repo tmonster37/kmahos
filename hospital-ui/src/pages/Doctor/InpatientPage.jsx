@@ -63,70 +63,7 @@ import axiosInstance from "../../services/AxiosInstance";
 import { formatCurrency, formatDate, formatDateTime, formatISODate } from "../../utils/formatters";
 import { printReceipt, printTreatmentSheet, printBedsideCard } from "../../utils/printHelper";
 
-// Mẫu diễn biến lâm sàng thường gặp nội trú
-const PROGRESSION_PRESETS = [
-    {
-        title: "Hậu phẫu ngày 1-3",
-        vitals: { temp: "37.0", bp: "120/80", hr: "80", resp: "19", spo2: "98" },
-        text: "Bệnh nhân tỉnh, tiếp xúc tốt. Đau nhẹ vết mổ, bụng mềm, không chướng. Dẫn lưu ra ít dịch hồng lượng khoảng 30ml. Vết mổ khô, chưa trung tiện, tiểu qua sonde nước tiểu vàng trong 1200ml/24h.",
-        orders: "Chăm sóc cấp II. Nhịn ăn uống, bù dịch và dinh dưỡng qua đường tĩnh mạch. Thay băng vết mổ 1 lần/ngày. Rút ống thông tiểu sau 24h nếu người bệnh tự đi lại được."
-    },
-    {
-        title: "Cơn đau thắt ngực ổn định",
-        vitals: { temp: "36.8", bp: "125/80", hr: "74", resp: "18", spo2: "99" },
-        text: "Bệnh nhân đỡ đau tức ngực, không khó thở khi nghỉ ngơi. Tim đều T1 T2 rõ, không nghe tiếng thổi bệnh lý. Phổi hai bên thông khí tốt, không rale. Bụng mềm, gan lách không to. Đại tiểu tiện bình thường.",
-        orders: "Chăm sóc cấp II. Chế độ ăn giảm muối, giảm chất béo động vật. Theo dõi điện tâm đồ và men tim Troponin-I. Nghỉ ngơi tại giường, tránh gắng sức."
-    },
-    {
-        title: "Viêm phế quản phổi thở oxy",
-        vitals: { temp: "37.8", bp: "115/75", hr: "88", resp: "22", spo2: "95" },
-        text: "Người bệnh còn ho từng cơn, khạc đờm vàng đục, sốt nhẹ về chiều. Thở êm khi có hỗ trợ oxy kính 2L/p. Phổi nghe rải rác ran ẩm và ran ngáy hai phế trường. Tim nhịp nhanh xoang.",
-        orders: "Chăm sóc cấp I. Thở oxy gọng mũi 2L/phút duy trì SpO2 > 95%. Khí dung thuốc giãn phế quản ngày 2 lần. Vỗ rung lồng ngực hỗ trợ tống xuất đờm. Chế độ ăn cháo súp dinh dưỡng nhiều bữa."
-    },
-    {
-        title: "Tăng huyết áp cấp cứu",
-        vitals: { temp: "36.7", bp: "155/95", hr: "82", resp: "19", spo2: "97" },
-        text: "Bệnh nhân giảm nhức đầu, không hoa mắt chóng mặt, không buồn nôn. Huyết áp kiểm soát hạ dần theo đích điều trị. Đồng tử hai bên đều 2mm, phản xạ ánh sáng tốt. Không yếu liệt khu trú.",
-        orders: "Chăm sóc cấp I. Theo dõi huyết áp mỗi 2 giờ. Bất động tại phòng, hạn chế tối đa kích thích ánh sáng và tiếng ồn. Chế độ ăn kiêng muối tuyệt đối (< 3g muối/ngày)."
-    },
-    {
-        title: "Nhiễm khuẩn tiêu hóa",
-        vitals: { temp: "37.2", bp: "110/70", hr: "84", resp: "18", spo2: "98" },
-        text: "Người bệnh bớt đau quặn bụng, số lần đi ngoài phân lỏng giảm còn 2 lần/ngày, không lẫn máu. Niêm mạc miệng hồng, dấu véo da mất nhanh, uống nước được, không nôn.",
-        orders: "Chăm sóc cấp II. Bù nước điện giải Oresol đường uống theo nhu cầu. Ăn cháo thịt nạc nấu nhừ, kiêng sữa và nước ngọt có gas. Uống men vi sinh cách xa kháng sinh 2 giờ."
-    }
-];
-
-// Bộ thuốc mẫu theo phác đồ y lệnh nội trú
-const DRUG_PROTOCOL_PRESETS = [
-    {
-        name: "Phác đồ Hậu Phẫu Chuẩn",
-        drugs: [
-            { name: "Ringer Lactat 500ml", unit: "Chai", morning: "1", noon: "", evening: "1", night: "", total: "2", route: "Truyền tĩnh mạch", note: "TTM 40 giọt/phút" },
-            { name: "Paracetamol Kabi 1g/100ml", unit: "Chai", morning: "1", noon: "", evening: "1", night: "", total: "2", route: "Truyền tĩnh mạch", note: "TTM trong 20 phút khi đau" },
-            { name: "Cefotaxim 1g", unit: "Lọ", morning: "1", noon: "", evening: "1", night: "", total: "2", route: "Tiêm tĩnh mạch", note: "Tiêm chậm 3-5 phút" },
-            { name: "Băng gạc tiệt trùng 10x10cm", unit: "Gói", morning: "1", noon: "", evening: "", night: "", total: "1", route: "Dùng ngoài", note: "Thay băng vết mổ buổi sáng" }
-        ]
-    },
-    {
-        name: "Phác đồ Tim Mạch - Cơn Đau Thắt Ngực",
-        drugs: [
-            { name: "Aspirin 81mg", unit: "Viên", morning: "1", noon: "", evening: "", night: "", total: "1", route: "Uống", note: "Uống sau ăn no" },
-            { name: "Clopidogrel 75mg", unit: "Viên", morning: "1", noon: "", evening: "", night: "", total: "1", route: "Uống", note: "Uống sau ăn" },
-            { name: "Atorvastatin 20mg", unit: "Viên", morning: "", noon: "", evening: "", night: "1", total: "1", route: "Uống", note: "Uống trước khi đi ngủ" },
-            { name: "Nitroglycerin xịt dưới lưỡi 0.4mg", unit: "Lọ", morning: "", noon: "", evening: "", night: "", total: "1", route: "Xịt dưới lưỡi", note: "Xịt 1 nhát khi đau ngực" }
-        ]
-    },
-    {
-        name: "Phác đồ Viêm Phổi - Hô Hấp",
-        drugs: [
-            { name: "Augmentin 1.2g", unit: "Lọ", morning: "1", noon: "", evening: "1", night: "", total: "2", route: "Tiêm tĩnh mạch", note: "Pha 20ml NaCl 0.9% tiêm chậm" },
-            { name: "Ventolin Nebules 2.5mg", unit: "Tép", morning: "1", noon: "", evening: "1", night: "", total: "2", route: "Khí dung", note: "Khí dung với 2ml NaCl 0.9%" },
-            { name: "Acetylcystein 200mg", unit: "Gói", morning: "1", noon: "1", evening: "1", night: "", total: "3", route: "Uống", note: "Hòa tan vào 50ml nước ấm" },
-            { name: "Natri Clorid 0.9% 500ml", unit: "Chai", morning: "1", noon: "", evening: "", night: "", total: "1", route: "Truyền tĩnh mạch", note: "TTM 30 giọt/phút" }
-        ]
-    }
-];
+// Dữ liệu lâm sàng nội trú thực tế theo chỉ định của Bác sĩ điều trị và Điều dưỡng viên
 
 export default function InpatientPage() {
     const { user } = useAuth();
@@ -207,8 +144,8 @@ export default function InpatientPage() {
     // Modal Discharge
     const [openDischargeModal, setOpenDischargeModal] = useState(false);
     const [dischargeData, setDischargeData] = useState({
-        dischargeSummary: "Bệnh nhân ổn định, các chỉ số sinh tồn và cận lâm sàng trở về bình thường.",
-        doctorRecommendation: "Uống thuốc đều theo đơn xuất viện, tái khám sau 14 ngày, hạn chế vận động gắng sức.",
+        dischargeSummary: "",
+        doctorRecommendation: "",
         reExaminationDate: formatISODate(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000))
     });
     const [submittingDischarge, setSubmittingDischarge] = useState(false);
@@ -220,7 +157,7 @@ export default function InpatientPage() {
         patientProfileId: "",
         doctorId: "",
         roomId: "",
-        initialDiagnosis: "Cần theo dõi và điều trị nội trú",
+        initialDiagnosis: "",
         selectedBedIndex: 1
     });
     const [submittingAdmit, setSubmittingAdmit] = useState(false);
@@ -235,23 +172,26 @@ export default function InpatientPage() {
     const loadData = async () => {
         setLoading(true);
         try {
-            const [deptRes, docRes, profRes, admitRes, roomRes] = await Promise.all([
+            const [deptRes, docRes, profRes, admitRes, roomRes, bedRes] = await Promise.all([
                 axiosInstance.get("/api/departments"),
                 axiosInstance.get("/api/doctors").catch(() => axiosInstance.get("/api/admin/doctors").catch(() => ({ data: [] }))),
                 axiosInstance.get("/api/patient-profiles/lookup?keyword=").catch(() => axiosInstance.get("/api/patient-profiles").catch(() => ({ data: [] }))),
                 axiosInstance.get("/api/inpatient/active").catch(() => ({ data: [] })),
-                axiosInstance.get("/api/departments/rooms/all?includeInactive=false").catch(() => ({ data: [] }))
+                axiosInstance.get("/api/departments/rooms/all?includeInactive=false").catch(() => ({ data: [] })),
+                axiosInstance.get("/api/inpatient/beds").catch(() => ({ data: [] }))
             ]);
 
             const deptList = Array.isArray(deptRes?.data) ? deptRes.data : (Array.isArray(deptRes) ? deptRes : []);
             const docList = Array.isArray(docRes?.data) ? docRes.data : (Array.isArray(docRes) ? docRes : []);
             const profList = Array.isArray(profRes?.data) ? profRes.data : (Array.isArray(profRes) ? profRes : []);
             const roomList = Array.isArray(roomRes?.data) ? roomRes.data : (Array.isArray(roomRes) ? roomRes : []);
+            const bedList = Array.isArray(bedRes?.data) ? bedRes.data : (Array.isArray(bedRes) ? bedRes : []);
 
             if (deptList.length > 0) setDepartments(deptList);
             if (docList.length > 0) setDoctors(docList);
             if (profList.length > 0) setProfiles(profList);
             if (roomList.length > 0) setRooms(roomList);
+            if (bedList.length > 0) setAllBeds(bedList);
 
             const activeList = (admitRes && Array.isArray(admitRes.data)) ? admitRes.data : (Array.isArray(admitRes) ? admitRes : []);
             if (activeList.length > 0) {
@@ -388,18 +328,37 @@ export default function InpatientPage() {
     };
 
     // Toggle trạng thái khử khuẩn phòng/giường
-    const handleToggleCleaning = (bedKey) => {
-        setCleaningBeds((prev) => {
-            const next = new Set(prev);
-            if (next.has(bedKey)) {
-                next.delete(bedKey);
-                setFeedback({ type: "success", message: `Giường ${bedKey} đã khử khuẩn xong và sẵn sàng tiếp nhận người bệnh!` });
-            } else {
-                next.add(bedKey);
-                setFeedback({ type: "info", message: `Đang đánh dấu khử khuẩn / dọn buồng giường ${bedKey}.` });
+    const handleToggleCleaning = async (bedKey) => {
+        const bedItem = allBeds.find(b => `${b.roomId}_${b.bedNumber}` === bedKey || b.bedNumber === bedKey);
+        const isCurrentlyCleaning = cleaningBeds.has(bedKey) || (bedItem && bedItem.status === "CLEANING");
+        const nextStatus = isCurrentlyCleaning ? "AVAILABLE" : "CLEANING";
+
+        try {
+            if (bedItem && bedItem.bedId) {
+                await axiosInstance.put(`/api/inpatient/beds/${bedItem.bedId}/status?status=${nextStatus}`);
             }
-            return next;
-        });
+            setCleaningBeds((prev) => {
+                const next = new Set(prev);
+                if (isCurrentlyCleaning) {
+                    next.delete(bedKey);
+                } else {
+                    next.add(bedKey);
+                }
+                return next;
+            });
+            if (bedItem) {
+                setAllBeds((prev) => prev.map(b => b.bedId === bedItem.bedId ? { ...b, status: nextStatus } : b));
+            }
+            setFeedback({
+                type: "success",
+                message: isCurrentlyCleaning
+                    ? `Giường ${bedKey} đã khử khuẩn xong và sẵn sàng tiếp nhận người bệnh!`
+                    : `Giường ${bedKey} đã chuyển sang chế độ khử khuẩn vệ sinh.`
+            });
+        } catch (err) {
+            console.error("Lỗi cập nhật trạng thái giường:", err);
+            setFeedback({ type: "error", message: err.message || "Lỗi cập nhật trạng thái giường trên máy chủ!" });
+        }
     };
 
     // ==========================================
@@ -411,20 +370,16 @@ export default function InpatientPage() {
             sheetNumber: "01",
             date: formatISODate(new Date()),
             time: new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }),
-            temperature: admission.latestVitals?.temperature || "36.8",
+            temperature: admission.latestVitals?.temperature || "",
             bloodPressure: admission.latestVitals?.bloodPressure || "",
-            heartRate: admission.latestVitals?.heartRate || "78",
-            respiratoryRate: admission.latestVitals?.respiratoryRate || "18",
-            spO2: admission.latestVitals?.spO2 || "98",
-            careLevel: admission.careLevel || "Mức 2",
-            diet: admission.diet || "Cơm mềm bệnh lý",
-            diseaseProgression: `Bệnh nhân tỉnh táo, tiếp xúc tốt. Diễn tiến điều trị ngày thứ ${Math.ceil((Date.now() - new Date(admission.admissionDate).getTime()) / (1000 * 3600 * 24))} ổn định.`,
-            doctorInstruction: `Chế độ chăm sóc: ${admission.careLevel || "Mức 2"}. Chế độ ăn: ${admission.diet || "Cơm mềm bệnh lý"}. Duy trì y lệnh thuốc và theo dõi mạch, HA mỗi 4 giờ.`,
-            drugs: [
-                { id: 1, name: "Cefotaxim 1g", unit: "Lọ", morning: "1", noon: "", evening: "1", night: "", total: "2", route: "Tiêm tĩnh mạch", note: "Tiêm chậm" },
-                { id: 2, name: "Paracetamol 500mg", unit: "Viên", morning: "1", noon: "", evening: "1", night: "", total: "2", route: "Uống", note: "Khi sốt ≥ 38.5°C" },
-                { id: 3, name: "Ringer Lactat 500ml", unit: "Chai", morning: "1", noon: "", evening: "", night: "", total: "1", route: "Truyền tĩnh mạch", note: "TTM 40 giọt/phút" }
-            ]
+            heartRate: admission.latestVitals?.heartRate || "",
+            respiratoryRate: admission.latestVitals?.respiratoryRate || "",
+            spO2: admission.latestVitals?.spO2 || "",
+            careLevel: admission.careLevel || "CAP_2",
+            diet: admission.diet || "",
+            diseaseProgression: "",
+            doctorInstruction: "",
+            drugs: []
         });
         setOpenTreatmentSheetModal(true);
         loadTreatmentHistory(admission.admissionId);
@@ -449,29 +404,6 @@ export default function InpatientPage() {
         } finally {
             setLoadingHistory(false);
         }
-    };
-
-    const handleApplyPreset = (preset) => {
-        setTreatmentSheetData((prev) => ({
-            ...prev,
-            temperature: preset.vitals.temp,
-            bloodPressure: preset.vitals.bp,
-            heartRate: preset.vitals.hr,
-            respiratoryRate: preset.vitals.resp,
-            spO2: preset.vitals.spo2,
-            diseaseProgression: preset.text,
-            doctorInstruction: preset.orders
-        }));
-        setFeedback({ type: "info", message: `Đã nạp mẫu diễn tiến: "${preset.title}"` });
-    };
-
-    // Áp dụng phác đồ thuốc nhanh
-    const handleApplyDrugProtocol = (proto) => {
-        setTreatmentSheetData((prev) => ({
-            ...prev,
-            drugs: proto.drugs.map((d, i) => ({ ...d, id: Date.now() + i }))
-        }));
-        setFeedback({ type: "success", message: `Đã áp dụng "${proto.name}" vào bảng y lệnh thuốc!` });
     };
 
     // Thêm dòng thuốc mới
@@ -525,13 +457,25 @@ export default function InpatientPage() {
                 .map((d, idx) => `${idx + 1}. ${d.name} (${d.unit}) x ${d.total} [${d.route}]: Sáng ${d.morning || 0}, Trưa ${d.noon || 0}, Chiều ${d.evening || 0}, Tối ${d.night || 0}. ${d.note ? `(${d.note})` : ""}`)
                 .join("\n");
 
-            const fullOrders = `[CHĂM SÓC]: ${treatmentSheetData.careLevel} | [CHẾ ĐỘ ĂN]: ${treatmentSheetData.diet}\n[THUỐC & DỊCH TRUYỀN]:\n${drugListText}\n[Y LỆNH KHÁC]:\n${treatmentSheetData.doctorInstruction}`;
+            const fullOrders = `[CHĂM SÓC]: ${treatmentSheetData.careLevel} | [CHẾ ĐỘ ĂN]: ${treatmentSheetData.diet || "Tiêu chuẩn"}\n${drugListText ? `[THUỐC & DỊCH TRUYỀN]:\n${drugListText}\n` : ""}[Y LỆNH KHÁC]:\n${treatmentSheetData.doctorInstruction}`;
+
+            try {
+                await axiosInstance.post(`/api/inpatient/${selectedAdmission.admissionId}/doctor-orders`, {
+                    orderDate: treatmentSheetData.date,
+                    diseaseProgression: treatmentSheetData.diseaseProgression || "Theo dõi điều trị thường quy",
+                    doctorInstruction: fullOrders,
+                    dietaryDiet: treatmentSheetData.diet || "Tiêu chuẩn",
+                    careLevel: treatmentSheetData.careLevel === "CAP_1" ? "CAP_1" : (treatmentSheetData.careLevel === "CAP_3" ? "CAP_3" : "CAP_2")
+                });
+            } catch (orderErr) {
+                console.warn("Lưu doctor-orders:", orderErr);
+            }
 
             await axiosInstance.post(`/api/inpatient/${selectedAdmission.admissionId}/daily-record`, {
-                temperature: treatmentSheetData.temperature,
-                bloodPressure: treatmentSheetData.bloodPressure,
-                heartRate: treatmentSheetData.heartRate,
-                diseaseProgression: `[SpO2: ${treatmentSheetData.spO2}% | Thở: ${treatmentSheetData.respiratoryRate} ck/p] ${treatmentSheetData.diseaseProgression}`,
+                temperature: treatmentSheetData.temperature || "",
+                bloodPressure: treatmentSheetData.bloodPressure || "",
+                heartRate: treatmentSheetData.heartRate || "",
+                diseaseProgression: `[SpO2: ${treatmentSheetData.spO2 || "--"}% | Thở: ${treatmentSheetData.respiratoryRate || "--"} ck/p] ${treatmentSheetData.diseaseProgression}`,
                 doctorInstruction: fullOrders
             });
 
@@ -689,39 +633,27 @@ export default function InpatientPage() {
         const targetRoom = allRooms.find((r) => String(r.roomId) === String(transferTarget.targetRoomId));
 
         try {
-            // Persist chuyển phòng trên backend nếu hồ sơ đã có trong DB
-            if (selectedAdmission.admissionId && !selectedAdmission.admissionId.startsWith("33333333") && !selectedAdmission.admissionId.startsWith("44444444") && !selectedAdmission.admissionId.startsWith("55555555")) {
+            if (transferTarget.targetBedId) {
+                await axiosInstance.post(`/api/inpatient/${selectedAdmission.admissionId}/transfer-bed`, {
+                    targetBedId: transferTarget.targetBedId,
+                    transferReason: transferTarget.transferReason || "Chuyển buồng điều trị theo chỉ định của Bác sĩ"
+                });
+            } else if (selectedAdmission.admissionId && !selectedAdmission.admissionId.startsWith("33333333") && !selectedAdmission.admissionId.startsWith("44444444") && !selectedAdmission.admissionId.startsWith("55555555")) {
                 await axiosInstance.put(`/api/inpatient/${selectedAdmission.admissionId}/transfer?newRoomId=${transferTarget.targetRoomId}`);
             }
 
-            setAdmissions((prev) =>
-                prev.map((a) => {
-                    if (a.admissionId === selectedAdmission.admissionId) {
-                        return {
-                            ...a,
-                            room: {
-                                ...a.room,
-                                roomId: targetRoom?.roomId || a.room.roomId,
-                                roomNumber: targetRoom?.roomNumber || a.room.roomNumber,
-                                department: { departmentId: targetRoom?.departmentId, departmentName: targetRoom?.departmentName }
-                            },
-                            bedNumber: transferTarget.targetBedIndex
-                        };
-                    }
-                    return a;
-                })
-            );
+            loadData();
 
             setFeedback({
                 type: "success",
-                message: `Đã chuyển người bệnh ${selectedAdmission.patientProfile?.fullName} sang ${targetRoom?.roomNumber || "Phòng mới"} - Giường ${transferTarget.targetBedIndex} thành công!`
+                message: `Đã chuyển người bệnh ${selectedAdmission.patientProfile?.fullName} sang ${targetRoom?.roomNumber || "Phòng mới"} - Giường ${transferTarget.targetBedIndex || 1} thành công!`
             });
             setOpenTransferModal(false);
         } catch (err) {
             console.error("Lỗi chuyển phòng:", err);
             setFeedback({
                 type: "error",
-                message: err.response?.data?.message || "Lỗi chuyển buồng bệnh!"
+                message: err.response?.data?.message || err.message || "Lỗi chuyển buồng bệnh!"
             });
         }
     };
@@ -1742,26 +1674,6 @@ export default function InpatientPage() {
                         </Grid>
                     </Paper>
 
-                    {/* Dải nút chèn nhanh mẫu diễn tiến lâm sàng */}
-                    <Box mb={2}>
-                        <Typography variant="caption" fontWeight="bold" color="text.secondary" mb={0.5} display="block">
-                            ⚡ Chèn nhanh mẫu Diễn tiến lâm sàng (Presets):
-                        </Typography>
-                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                            {PROGRESSION_PRESETS.map((p, idx) => (
-                                <Button
-                                    key={idx}
-                                    size="small"
-                                    variant="outlined"
-                                    onClick={() => handleApplyPreset(p)}
-                                    sx={{ borderRadius: 2, fontSize: "0.75rem", textTransform: "none" }}
-                                >
-                                    {p.title}
-                                </Button>
-                            ))}
-                        </Stack>
-                    </Box>
-
                     {/* BỐ CỤC 2 CỘT SONG SONG CHUẨN BỘ Y TẾ */}
                     <Grid container spacing={2.5}>
                         {/* CỘT TRÁI: DIỄN BIẾN BỆNH & TRIỆU CHỨNG LÂM SÀNG */}
@@ -1899,20 +1811,6 @@ export default function InpatientPage() {
                                     <Typography variant="subtitle1" fontWeight="bold" color="#16a34a">
                                         2. Y LỆNH ĐIỀU TRỊ, THUỐC & CHĂM SÓC
                                     </Typography>
-                                    <Stack direction="row" spacing={1}>
-                                        {DRUG_PROTOCOL_PRESETS.map((proto, idx) => (
-                                            <Button
-                                                key={idx}
-                                                size="small"
-                                                variant="outlined"
-                                                color="success"
-                                                onClick={() => handleApplyDrugProtocol(proto)}
-                                                sx={{ fontSize: "0.72rem", py: 0.3 }}
-                                            >
-                                                + {proto.name}
-                                            </Button>
-                                        ))}
-                                    </Stack>
                                 </Box>
 
                                 {/* Cài đặt Chăm sóc & Chế độ ăn */}
@@ -2152,13 +2050,39 @@ export default function InpatientPage() {
                             <TextField
                                 select
                                 fullWidth
-                                label="Chọn số giường mới"
-                                value={transferTarget.targetBedIndex}
-                                onChange={(e) => setTransferTarget({ ...transferTarget, targetBedIndex: Number(e.target.value) })}
+                                label="Chọn giường mới"
+                                value={transferTarget.targetBedId || transferTarget.targetBedIndex || ""}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    const matchedBed = allBeds.find(b => b.bedId === val);
+                                    if (matchedBed) {
+                                        setTransferTarget({
+                                            ...transferTarget,
+                                            targetBedId: matchedBed.bedId,
+                                            targetBedIndex: matchedBed.bedNumber
+                                        });
+                                    } else {
+                                        setTransferTarget({
+                                            ...transferTarget,
+                                            targetBedId: null,
+                                            targetBedIndex: Number(val)
+                                        });
+                                    }
+                                }}
                             >
-                                {[1, 2, 3, 4].map((n) => (
-                                    <MenuItem key={n} value={n}>Giường số {n}</MenuItem>
-                                ))}
+                                {allBeds.filter(b => String(b.roomId) === String(transferTarget.targetRoomId)).length > 0 ? (
+                                    allBeds
+                                        .filter(b => String(b.roomId) === String(transferTarget.targetRoomId))
+                                        .map((b) => (
+                                            <MenuItem key={b.bedId} value={b.bedId} disabled={b.status !== "AVAILABLE"}>
+                                                Giường {b.bedNumber} ({b.status === "AVAILABLE" ? "Còn trống" : b.status === "CLEANING" ? "Đang khử khuẩn" : "Có người nằm"})
+                                            </MenuItem>
+                                        ))
+                                ) : (
+                                    [1, 2, 3, 4].map((n) => (
+                                        <MenuItem key={n} value={n}>Giường số {n}</MenuItem>
+                                    ))
+                                )}
                             </TextField>
                         </Grid>
                         <Grid item xs={12}>

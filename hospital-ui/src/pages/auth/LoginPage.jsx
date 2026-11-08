@@ -34,6 +34,7 @@ import MarkEmailReadIcon from "@mui/icons-material/MarkEmailRead";
 import VpnKeyIcon from "@mui/icons-material/VpnKey";
 import { useAuth } from "../../context/AuthContext";
 import axiosInstance from "../../services/AxiosInstance";
+import designTokens from "../../theme/designTokens";
 
 const GOOGLE_CLIENT_ID = (import.meta.env && import.meta.env.VITE_GOOGLE_CLIENT_ID) || "1038814592004-8fua2p0vpn2988932qe6jnhef73drop2.apps.googleusercontent.com";
 
@@ -231,20 +232,16 @@ export default function LoginPage() {
                     {/* Brand Logo Header */}
                     <Box display="flex" justifyContent="center" mb={2}>
                         <Box
+                            component="img"
+                            src="/images/logo.png"
+                            alt="Logo Bệnh Viện TNT"
                             sx={{
                                 width: 56,
                                 height: 56,
-                                borderRadius: "16px",
-                                background: "linear-gradient(135deg, #0088D6 0%, #00C292 100%)",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                color: "white",
-                                boxShadow: "0 8px 24px rgba(0, 136, 214, 0.28)"
+                                objectFit: "contain",
+                                filter: "drop-shadow(0 4px 12px rgba(15, 118, 110, 0.2))"
                             }}
-                        >
-                            <LocalHospitalIcon sx={{ fontSize: 32 }} />
-                        </Box>
+                        />
                     </Box>
 
                     <Typography variant="h5" fontWeight={900} sx={{ letterSpacing: "-0.03em", color: "#0F172A", mb: 0.5 }}>
@@ -331,9 +328,9 @@ export default function LoginPage() {
                                 fontWeight: 800,
                                 fontSize: "0.95rem",
                                 textTransform: "none",
-                                bgcolor: "#0088D6",
-                                boxShadow: "0 6px 20px rgba(0, 136, 214, 0.3)",
-                                "&:hover": { bgcolor: "#0073B7" }
+                                bgcolor: designTokens.brand.primary,
+                                boxShadow: "0 6px 20px rgba(15, 118, 110, 0.3)",
+                                "&:hover": { bgcolor: designTokens.brand.primaryHover }
                             }}
                         >
                             {loading ? "Đang xác thực..." : "Đăng Nhập"}
@@ -390,7 +387,7 @@ export default function LoginPage() {
                                     to="/register"
                                     variant="body2"
                                     sx={{
-                                        color: "#0088D6",
+                                        color: designTokens.brand.primary,
                                         fontWeight: 800,
                                         textDecoration: "none",
                                         "&:hover": { textDecoration: "underline" }
@@ -511,8 +508,8 @@ export default function LoginPage() {
                                 width: 48,
                                 height: 48,
                                 borderRadius: "12px",
-                                bgcolor: "rgba(0, 136, 214, 0.1)",
-                                color: "#0088D6",
+                                bgcolor: designTokens.brand.primaryLight,
+                                color: designTokens.brand.primary,
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center"
@@ -568,8 +565,8 @@ export default function LoginPage() {
                         sx={{
                             textTransform: "none",
                             fontWeight: 700,
-                            bgcolor: "#0088D6",
-                            "&:hover": { bgcolor: "#0073B7" }
+                            bgcolor: designTokens.brand.primary,
+                            "&:hover": { bgcolor: designTokens.brand.primaryHover }
                         }}
                     >
                         {linkLoading ? "Đang xác minh..." : "Xác nhận liên kết"}

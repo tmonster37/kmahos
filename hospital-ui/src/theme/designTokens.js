@@ -1,20 +1,23 @@
 /**
- * DESIGN TOKENS - HỆ THỐNG MÀU SẮC VÀ ĐỒNG BỘ GIAO DIỆN BỆNH VIỆN
- * Chuẩn hóa màu sắc y tế, đạt tiêu chuẩn tương phản WCAG 2.2 AA (>= 4.5:1 với text thông thường)
+ * DESIGN TOKENS - HỆ THỐNG MÀU SẮC VÀ ĐỒNG BỘ GIAO DIỆN BỆNH VIỆN TNT
+ * Chuẩn hóa từ shared/brand/brand-tokens.json, đạt tiêu chuẩn tương phản WCAG 2.2 AA (>= 4.5:1)
  */
+
+import { brandTokens } from "./brandTokens.generated";
 
 export const designTokens = {
     // 1. Thương hiệu & màu chủ đạo (Medical Brand - Chuẩn hóa theo Logo Xanh mòng két & Trái tim đỏ)
     brand: {
-        primary: "#0D9488",       // Xanh mòng két / Modern Medical Teal (Đạt WCAG AA 4.58:1)
-        primaryHover: "#0F766E",  // Teal-700 đậm hơn khi hover
-        primaryDark: "#115E59",   // Teal-800: Tiêu đề & thanh điều hướng
-        primaryLight: "#F0FDFA",  // Teal-50: Nền thẻ, chip phân hệ
-        primaryBorder: "#99F6E4", // Teal-200
-        accent: "#F43F5E",        // Đỏ trái tim ấm áp từ logo (Rose-500)
-        accentHover: "#E11D48",   // Rose-600
-        accentLight: "#FFF1F2",   // Rose-50
-        accentBorder: "#FECDD3",  // Rose-200
+        logo: brandTokens.brand.logo,             // #00C4CC Logo mark
+        primary: brandTokens.brand.primary,       // #0F766E Teal-700 (Đạt WCAG AA 5.47:1)
+        primaryHover: brandTokens.brand.primaryHover, // #115E59 Teal-800
+        primaryDark: brandTokens.brand.primaryDark,   // #115E59 Teal-800: Tiêu đề & thanh điều hướng
+        primaryLight: brandTokens.brand.primaryLight, // #F0FDFA Teal-50: Nền thẻ, chip phân hệ
+        primaryBorder: brandTokens.brand.primaryBorder, // #99F6E4 Teal-200
+        accent: brandTokens.brand.accent,         // #FF5757 Đỏ trái tim ấm áp từ logo
+        accentHover: brandTokens.brand.accentHover, // #E04848
+        accentLight: brandTokens.brand.accentLight, // #FFF1F2 Rose-50
+        accentBorder: brandTokens.brand.accentBorder, // #FECDD3 Rose-200
     },
 
     // 2. Màu thứ cấp (Emerald Health Accent)
@@ -29,31 +32,31 @@ export const designTokens = {
     // 3. Màu trạng thái nghiệp vụ (Business Status Colors - All WCAG 2.2 AA Compliant)
     status: {
         success: {
-            main: "#15803D",      // Green-700 (Tương phản 4.57:1 trên trắng & trên nền nhạt)
-            bg: "#DCFCE7",        // Green-100
-            border: "#BBF7D0",
+            main: brandTokens.status.success,      // Green-700 (#15803D)
+            bg: brandTokens.status.successBg,      // Green-100 (#DCFCE7)
+            border: brandTokens.status.successBorder,
             contrastText: "#FFFFFF",
             label: "Thành công",
         },
         warning: {
-            main: "#B45309",      // Amber-700 (Tương phản 4.51:1 trên trắng & trên nền vàng nhạt)
-            bg: "#FEF3C7",        // Amber-100
-            border: "#FDE68A",
+            main: brandTokens.status.warning,      // Amber-700 (#B45309)
+            bg: brandTokens.status.warningBg,      // Amber-100 (#FEF3C7)
+            border: brandTokens.status.warningBorder,
             contrastText: "#FFFFFF",
             label: "Cảnh báo / Chờ",
         },
         danger: {
-            main: "#DC2626",      // Red-600 (Tương phản 4.53:1 trên trắng)
-            dark: "#B91C1C",      // Red-700
-            bg: "#FEE2E2",        // Red-100
-            border: "#FECACA",
+            main: brandTokens.status.danger,       // Red-600 (#DC2626)
+            dark: "#B91C1C",
+            bg: brandTokens.status.dangerBg,       // Red-100 (#FEE2E2)
+            border: brandTokens.status.dangerBorder,
             contrastText: "#FFFFFF",
             label: "Nguy hiểm / Đã hủy",
         },
         info: {
-            main: "#0284C7",      // Sky-600 (Tương phản 4.50:1 trên trắng)
-            bg: "#E0F2FE",        // Sky-100
-            border: "#BAE6FD",
+            main: brandTokens.status.info,         // Sky-600 (#0284C7)
+            bg: brandTokens.status.infoBg,         // Sky-100 (#E0F2FE)
+            border: brandTokens.status.infoBorder,
             contrastText: "#FFFFFF",
             label: "Thông tin / Đang xử lý",
         },
@@ -61,22 +64,27 @@ export const designTokens = {
 
     // 4. Màu trung tính & văn bản (Neutrals & Typography)
     neutral: {
-        textPrimary: "#0F172A",    // Slate-900: Đọc tối ưu (Tương phản 15.8:1 - AAA)
-        textSecondary: "#334155",  // Slate-700: Phụ đề, label (Tương phản 9.3:1 - AAA)
-        textMuted: "#64748B",      // Slate-500: Ghi chú, placeholder (Tương phản 4.76:1 - AA)
-        border: "#E2E8F0",         // Slate-200: Viền thẻ, bảng
-        borderLight: "#F1F5F9",    // Slate-100
-        bg: "#F4F7FB",             // Calm medical background
-        surface: "#FFFFFF",        // Card, paper surface
-        hoverBg: "#F8FAFC",        // Hover table row, list item
+        textPrimary: brandTokens.neutral.textPrimary,     // Slate-900: #0F172A (15.8:1 AAA)
+        textSecondary: brandTokens.neutral.textSecondary, // Slate-700: #334155 (9.3:1 AAA)
+        textMuted: brandTokens.neutral.textMuted,         // Slate-500: #64748B (4.76:1 AA)
+        border: brandTokens.neutral.border,               // Slate-200: #E2E8F0
+        borderLight: brandTokens.neutral.borderLight,     // Slate-100: #F1F5F9
+        bg: brandTokens.neutral.background,               // Calm medical background: #F4F7FB
+        surface: brandTokens.neutral.surface,             // Card, paper surface: #FFFFFF
+        hoverBg: brandTokens.neutral.hoverBg,             // Hover table row, list item: #F8FAFC
     },
 
-    // 5. Trạng thái tương tác (Interaction States)
+    // 5. Thang khoảng cách & bo góc (Spacing & Radius)
+    spacing: brandTokens.spacing,
+    radius: brandTokens.radius,
+    typography: brandTokens.typography,
+
+    // 6. Trạng thái tương tác (Interaction States)
     interaction: {
         disabledText: "#94A3B8",
         disabledBg: "#F1F5F9",
         disabledBorder: "#E2E8F0",
-        focusRing: "rgba(0, 136, 214, 0.4)",
+        focusRing: "rgba(15, 118, 110, 0.4)",
     },
 };
 

@@ -34,12 +34,10 @@ public class CustomUserDetailsService implements UserDetailsService {
         List<GrantedAuthority> authorities = new ArrayList<>();
         authorities.add(new SimpleGrantedAuthority(account.getRole().name()));
 
-        // Dynamic Role Synthesis: Nếu là Trưởng khoa VÀ có hồ sơ bác sĩ hợp lệ (có chứng chỉ) -> cấp thêm quyền ROLE_DOCTOR
-        if (account.getRole() == Role.ROLE_HEAD_OF_DEPARTMENT) {
+        // Dynamic Role Synthesis: Nếu là Trưởng khoa hoặc Quản trị viên VÀ có hồ sơ bác sĩ -> cấp thêm quyền ROLE_DOCTOR
+        if (account.getRole() == Role.ROLE_HEAD_OF_DEPARTMENT || account.getRole() == Role.ROLE_ADMIN) {
             doctorRepository.findByAccount_UserId(account.getUserId()).ifPresent(doctor -> {
-                if (doctor.getDoctorLicense() != null && !doctor.getDoctorLicense().isBlank()) {
-                    authorities.add(new SimpleGrantedAuthority(Role.ROLE_DOCTOR.name()));
-                }
+                authorities.add(new SimpleGrantedAuthority(Role.ROLE_DOCTOR.name()));
             });
         }
 

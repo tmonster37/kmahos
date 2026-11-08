@@ -1,0 +1,65 @@
+{
+  "expo": {
+    "name": "TNT Hospital",
+    "slug": "hospital-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/brand-logo.png",
+    "scheme": "hospitalmobile",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/images/brand-logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F4F7FB"
+    },
+    "ios": {
+      "bundleIdentifier": "com.hospital.patientmobile",
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "com.hospital.patientmobile",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "hospitalmobile",
+              "host": "payment",
+              "pathPrefix": "/return"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ],
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-web-browser",
+      "expo-notifications"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "8adc2793-e303-4277-ab8c-530a3581b46d"
+      }
+    },
+    "owner": "tmst37"
+  }
+}

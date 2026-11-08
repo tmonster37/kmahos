@@ -1,9 +1,25 @@
 import axios from "axios";
 
+const defaultApiBaseUrl =
+    typeof window !== "undefined" && window.location?.hostname === "127.0.0.1"
+        ? "http://127.0.0.1:8080"
+        : "http://localhost:8080";
+
 const API_BASE_URL =
     (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_API_BASE_URL) ||
     (typeof process !== "undefined" && process.env && process.env.REACT_APP_BASE_URL) ||
-    "http://localhost:8080";
+    defaultApiBaseUrl;
+
+// Lưu token trong bộ nhớ RAM (không lưu vào localStorage để chống XSS)
+let inMemoryAccessToken = null;
+
+export const setInMemoryAccessToken = (token) => {
+    inMemoryAccessToken = token || null;
+};
+
+export const clearInMemoryAccessToken = () => {
+    inMemoryAccessToken = null;
+};
 
 const axiosInstance = axios.create({
     baseURL: API_BASE_URL,
@@ -15,14 +31,13 @@ const axiosInstance = axios.create({
     },
 });
 
-// Request Interceptor: Tự động đính kèm cookie (withCredentials) và fallback Authorization header nếu có
+// Request Interceptor: Tự động đính kèm HttpOnly cookie (withCredentials), CSRF header X-Requested-With và in-memory token nếu có
 axiosInstance.interceptors.request.use(
     (config) => {
         config.withCredentials = true;
         config.headers["X-Requested-With"] = "XMLHttpRequest";
-        const token = localStorage.getItem("accessToken");
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
+        if (inMemoryAccessToken) {
+            config.headers.Authorization = `Bearer ${inMemoryAccessToken}`;
         }
         return config;
     },

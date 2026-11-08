@@ -30,6 +30,7 @@ public interface PaymentService {
     PaymentGatewayResponse createKioskPayment(String bookingCode);
     TransactionResponse syncKioskPayment(String bookingCode);
     PaymentGatewayResponse createPayOSPaymentLink(UUID accountId, BigDecimal amount, TransactionType type, String description);
+    PaymentGatewayResponse createPatientPayOSPaymentLink(UUID accountId, String billId);
     List<TransactionResponse> getTransactionHistory(UUID accountId, Integer page, Integer size);
     List<TransactionResponse> getAllTransactions(Integer page, Integer size);
 }

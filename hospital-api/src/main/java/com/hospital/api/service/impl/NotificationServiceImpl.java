@@ -1,16 +1,20 @@
 package com.hospital.api.service.impl;
 
+import com.hospital.api.dto.PushMessagePayload;
 import com.hospital.api.dto.request.QueueAlertBatchRequest;
 import com.hospital.api.dto.request.SendNotificationRequest;
 import com.hospital.api.entity.Account;
 import com.hospital.api.entity.Booking;
 import com.hospital.api.entity.Notification;
 import com.hospital.api.entity.PatientProfile;
+import com.hospital.api.entity.PushDevice;
 import com.hospital.api.repository.AccountRepository;
 import com.hospital.api.repository.BookingRepository;
 import com.hospital.api.repository.NotificationRepository;
 import com.hospital.api.repository.PatientProfileRepository;
 import com.hospital.api.service.NotificationService;
+import com.hospital.api.service.PushDeviceService;
+import com.hospital.api.service.PushNotificationProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -30,6 +34,8 @@ public class NotificationServiceImpl implements NotificationService {
     private final AccountRepository accountRepository;
     private final BookingRepository bookingRepository;
     private final PatientProfileRepository patientProfileRepository;
+    private final PushDeviceService pushDeviceService;
+    private final PushNotificationProvider pushNotificationProvider;
 
     @Override
     @Transactional
@@ -49,7 +55,12 @@ public class NotificationServiceImpl implements NotificationService {
                 .isRead(false)
                 .build();
 
-        return notificationRepository.save(notification);
+        Notification saved = notificationRepository.save(notification);
+
+        // Gửi thông báo đẩy an toàn (không chứa PII/lâm sàng nhạy cảm, lỗi push không làm rollback giao dịch)
+        dispatchPushSafely(targetAccount, saved.getType(), String.valueOf(saved.getNotificationId()), "/(patient)/notifications");
+
+        return saved;
     }
 
     @Override
@@ -78,10 +89,58 @@ public class NotificationServiceImpl implements NotificationService {
                         .isRead(false)
                         .build();
 
-                created.add(notificationRepository.save(notif));
+                Notification saved = notificationRepository.save(notif);
+                created.add(saved);
+
+                // Gửi push an toàn về hàng đợi
+                dispatchPushSafely(targetAccount, "QUEUE_ALERT", String.valueOf(saved.getNotificationId()), "/(patient)/appointments");
             }
         }
         return created;
+    }
+
+    private void dispatchPushSafely(Account account, String type, String referenceId, String deepLink) {
+        if (account == null || account.getUserId() == null) {
+            return;
+        }
+        try {
+            List<PushDevice> devices = pushDeviceService.getActiveDevicesForAccount(account.getUserId());
+            if (devices == null || devices.isEmpty()) {
+                return;
+            }
+
+            String title = "Cổng Bệnh Nhân";
+            String body = "Bạn có thông báo mới từ bệnh viện. Chạm để xem chi tiết.";
+
+            if ("QUEUE_ALERT".equalsIgnoreCase(type)) {
+                title = "Thông báo lượt khám";
+                body = "Lượt khám của bạn có cập nhật mới. Vui lòng kiểm tra.";
+            } else if ("BOOKING".equalsIgnoreCase(type) || "BOOKING_CONFIRMED".equalsIgnoreCase(type)) {
+                title = "Lịch khám bệnh";
+                body = "Lịch hẹn khám bệnh có cập nhật. Chạm để xem.";
+            } else if ("TEST_RESULT".equalsIgnoreCase(type)) {
+                title = "Kết quả xét nghiệm";
+                body = "Đã có kết quả cận lâm sàng mới. Chạm để xem.";
+            } else if ("PRESCRIPTION".equalsIgnoreCase(type)) {
+                title = "Đơn thuốc";
+                body = "Đơn thuốc đã hoàn tất. Chạm để xem chi tiết.";
+            } else if ("PAYMENT".equalsIgnoreCase(type)) {
+                title = "Viện phí";
+                body = "Giao dịch viện phí đã được xử lý thành công.";
+            }
+
+            PushMessagePayload payload = PushMessagePayload.generic(
+                    type != null ? type : "GENERAL",
+                    title,
+                    body,
+                    referenceId,
+                    deepLink != null ? deepLink : "/(patient)/notifications"
+            );
+
+            pushNotificationProvider.sendPush(devices, payload);
+        } catch (Exception e) {
+            log.warn("Lỗi gửi push notification (được bỏ qua để không gián đoạn luồng chính): {}", e.getMessage());
+        }
     }
 
     private Account resolveAccount(UUID accountId, String bookingCode, String phoneNumber) {

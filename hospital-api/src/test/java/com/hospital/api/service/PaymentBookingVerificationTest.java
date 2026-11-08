@@ -37,6 +37,9 @@ class PaymentBookingVerificationTest {
     @Mock AccountRepository accounts;
     @Mock BookingRepository bookings;
     @Mock MedicalExaminationRecordRepository records;
+    @Mock MedicalTestRepository testRepo;
+    @Mock PrescriptionRepository prescRepo;
+    @Mock DischargeRepository dischargeRepo;
     @Mock PayOSService payOS;
     PaymentServiceImpl service;
     VNPayConfig vnp = new VNPayConfig();
@@ -47,7 +50,7 @@ class PaymentBookingVerificationTest {
     @BeforeEach void setUp() {
         vnp.secretKey = "test-vnp-key";
         config.checksumKey = "test-payos-key";
-        service = new PaymentServiceImpl(vnp, config, payOS, transactions, accounts, bookings, records, mock(com.hospital.api.service.impl.BookingReceptionTransition.class));
+        service = new PaymentServiceImpl(vnp, config, payOS, transactions, accounts, bookings, records, testRepo, prescRepo, dischargeRepo, mock(com.hospital.api.service.impl.BookingReceptionTransition.class));
         booking = Booking.builder().bookingCode(BOOKING).price(AMOUNT)
                 .status(BookingStatus.PENDING_PAYMENT).isPaid(false).build();
         transaction = Transaction.builder().transactionId(UUID.randomUUID()).amount(AMOUNT)
@@ -126,7 +129,7 @@ class PaymentBookingVerificationTest {
         var reception = new com.hospital.api.service.impl.BookingReceptionTransition(bookings, tickets, mock(CounterRepository.class),
                 mock(DoctorRepository.class), mock(DoctorScheduleRepository.class), mock(TimeSlotRepository.class), mock(RoomRepository.class),
                 java.time.Clock.fixed(java.time.Instant.parse("2026-10-31T03:00:00Z"), java.time.ZoneId.of("Asia/Ho_Chi_Minh")));
-        service = new PaymentServiceImpl(vnp, config, payOS, transactions, accounts, bookings, records, reception);
+        service = new PaymentServiceImpl(vnp, config, payOS, transactions, accounts, bookings, records, testRepo, prescRepo, dischargeRepo, reception);
         return ticket;
     }
 

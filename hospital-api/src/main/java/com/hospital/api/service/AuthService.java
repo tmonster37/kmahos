@@ -1,5 +1,6 @@
 package com.hospital.api.service;
 
+import com.hospital.api.dto.request.ForgotPasswordRequest;
 import com.hospital.api.dto.request.GoogleLoginRequest;
 import com.hospital.api.dto.request.LoginRequest;
 import com.hospital.api.dto.request.RegisterRequest;
@@ -9,4 +10,5 @@ public interface AuthService {
     AuthResponse register(RegisterRequest request);
     AuthResponse login(LoginRequest request);
     AuthResponse loginWithGoogle(GoogleLoginRequest request);
+    void forgotPassword(ForgotPasswordRequest request);
 }

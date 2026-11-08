@@ -3,7 +3,9 @@ package com.hospital.api.service.impl;
 import com.hospital.api.constant.BookingStatus;
 import com.hospital.api.constant.MedicalExamState;
 import com.hospital.api.constant.MedicalTestState;
+import com.hospital.api.constant.PaymentMethod;
 import com.hospital.api.constant.Role;
+import com.hospital.api.constant.TransactionType;
 import com.hospital.api.dto.request.*;
 import com.hospital.api.dto.response.*;
 import com.hospital.api.entity.*;
@@ -71,36 +73,42 @@ public class ClinicalExaminationServiceImpl implements ClinicalExaminationServic
 
     private boolean isTestPaid(MedicalTest test) {
         if (test == null) return false;
+        if (test.getPrice() == null || test.getPrice().compareTo(BigDecimal.ZERO) == 0) {
+            return true;
+        }
+        if (Boolean.TRUE.equals(test.getIsPaid())) {
+            return true;
+        }
+        if (test.getMedicalTestId() != null && transactionRepository.existsByMedicalTest_MedicalTestIdAndStatus(test.getMedicalTestId(), "SUCCESS")) {
+            return true;
+        }
         if (test.getMedicalRecord() == null || test.getMedicalRecord().getBooking() == null) {
             return true;
         }
         Booking booking = test.getMedicalRecord().getBooking();
         String code = booking.getBookingCode();
-        List<Transaction> txns = transactionRepository.findAllByDescriptionContainingAndStatus(code, "SUCCESS");
+        if (test.getTestCode() != null && transactionRepository.existsByDescriptionContainingAndStatus(test.getTestCode(), "SUCCESS")) {
+            return true;
+        }
+
+        List<Transaction> txns = transactionRepository.findAllByBooking_BookingIdAndStatus(booking.getBookingId(), "SUCCESS");
+        if (txns.isEmpty()) {
+            txns = transactionRepository.findAllByDescriptionContainingAndStatus(code, "SUCCESS");
+        }
         if (txns.isEmpty()) {
             return false;
         }
 
-        BigDecimal totalPaid = txns.stream()
-                .map(Transaction::getAmount)
-                .filter(java.util.Objects::nonNull)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        BigDecimal examPrice = booking.getPrice() != null ? booking.getPrice() : BigDecimal.ZERO;
-        BigDecimal testPrice = test.getPrice() != null ? test.getPrice() : BigDecimal.ZERO;
-
-        // Nếu có giao dịch ghi rõ TREATMENT hoặc CLS hoặc TEST
-        boolean hasTreatmentTxn = txns.stream().anyMatch(t -> {
+        // Kiểm tra xem có giao dịch liên kết đích danh tới xét nghiệm này hay không
+        return txns.stream().anyMatch(t -> {
+            if (t.getMedicalTest() != null && t.getMedicalTest().getMedicalTestId().equals(test.getMedicalTestId())) {
+                return true;
+            }
             String desc = t.getDescription() != null ? t.getDescription() : "";
             String ref = t.getVnpayTxnRef() != null ? t.getVnpayTxnRef() : "";
-            return desc.contains("TREATMENT") || desc.contains("CLS") || desc.contains("TEST") || ref.contains("CLS");
+            return (test.getTestCode() != null && (desc.contains(test.getTestCode()) || ref.contains(test.getTestCode())))
+                    || desc.contains("CLS-" + test.getTestCode()) || ref.contains("CLS-" + test.getTestCode());
         });
-        if (hasTreatmentTxn) {
-            return true;
-        }
-
-        // Hoặc tổng số tiền thanh toán đủ bao phủ tiền khám + tiền xét nghiệm này
-        return totalPaid.compareTo(examPrice.add(testPrice)) >= 0;
     }
 
     private void sendNotificationToPatient(Booking booking, String title, String content, String type) {
@@ -137,12 +145,21 @@ public class ClinicalExaminationServiceImpl implements ClinicalExaminationServic
         }
 
         Doctor doctor = doctorRepository.findByAccount_UserId(doctorAccountId)
-                .orElseThrow(() -> new AppException("Tài khoản không gắn với thông tin Bác sĩ khám bệnh", HttpStatus.FORBIDDEN));
+                .orElseGet(() -> {
+                    if (booking.getDoctor() != null) {
+                        return booking.getDoctor();
+                    }
+                    throw new AppException("Tài khoản không gắn với thông tin Bác sĩ khám bệnh", HttpStatus.FORBIDDEN);
+                });
 
         // Kiểm tra xem đã có MedicalExaminationRecord cho booking này chưa
         var existingRecord = recordRepository.findByBooking_BookingCode(request.bookingCode());
         if (existingRecord.isPresent()) {
             MedicalExaminationRecord record = existingRecord.get();
+            if (doctor != null) {
+                record.setDoctor(doctor);
+                booking.setDoctor(doctor);
+            }
             if (request.symptoms() != null && !request.symptoms().isBlank()) {
                 record.setSymptoms(request.symptoms());
             }
@@ -237,14 +254,17 @@ public class ClinicalExaminationServiceImpl implements ClinicalExaminationServic
             }
         }
 
-        String effectiveReason = (reason != null && !reason.isBlank()) ? reason.trim() : "Bệnh nhân không quay lại buồng khám sau khi làm chỉ định cận lâm sàng";
+        if (reason == null || reason.trim().isBlank()) {
+            throw new AppException("Bác sĩ phải nhập lý do cụ thể khi đóng ca khám vắng mặt!", HttpStatus.BAD_REQUEST);
+        }
+        String effectiveReason = reason.trim();
         record.setState(MedicalExamState.DONE);
         record.setCompletedAt(LocalDateTime.now());
         if (record.getFinalDiagnosis() == null || record.getFinalDiagnosis().isBlank()) {
             record.setFinalDiagnosis("Hồ sơ đóng vắng mặt: " + effectiveReason);
         }
         if (record.getTreatmentPlan() == null || record.getTreatmentPlan().isBlank()) {
-            record.setTreatmentPlan("Bệnh nhân vắng mặt, chưa nhận tư vấn và đơn thuốc trực tiếp từ bác sĩ.");
+            record.setTreatmentPlan("Bệnh nhân vắng mặt, chưa nhận tư vấn và đơn thuốc trực tiếp từ bác sĩ. Lý do: " + effectiveReason);
         }
 
         if (record.getBooking() != null) {
@@ -286,7 +306,12 @@ public class ClinicalExaminationServiceImpl implements ClinicalExaminationServic
         }
 
         Doctor doctor = doctorRepository.findByAccount_UserId(doctorAccountId)
-                .orElseThrow(() -> new AppException("Tài khoản không gắn với thông tin Bác sĩ khám bệnh", HttpStatus.FORBIDDEN));
+                .orElseGet(() -> {
+                    if (booking.getDoctor() != null) {
+                        return booking.getDoctor();
+                    }
+                    throw new AppException("Tài khoản không gắn với thông tin Bác sĩ khám bệnh", HttpStatus.FORBIDDEN);
+                });
 
         MedicalExaminationRecord record = recordRepository.findByBooking_BookingCode(bookingCode)
                 .orElseGet(() -> recordRepository.save(MedicalExaminationRecord.builder()
@@ -317,7 +342,12 @@ public class ClinicalExaminationServiceImpl implements ClinicalExaminationServic
                 .orElseThrow(() -> new AppException("Không tìm thấy mã đặt khám: " + bookingCode, HttpStatus.NOT_FOUND));
 
         Doctor doctor = doctorRepository.findByAccount_UserId(doctorAccountId)
-                .orElseThrow(() -> new AppException("Tài khoản không gắn với thông tin Bác sĩ khám bệnh", HttpStatus.FORBIDDEN));
+                .orElseGet(() -> {
+                    if (booking.getDoctor() != null) {
+                        return booking.getDoctor();
+                    }
+                    throw new AppException("Tài khoản không gắn với thông tin Bác sĩ khám bệnh", HttpStatus.FORBIDDEN);
+                });
 
         MedicalExaminationRecord record = recordRepository.findByBooking_BookingCode(bookingCode)
                 .orElseGet(() -> recordRepository.save(MedicalExaminationRecord.builder()
@@ -341,7 +371,12 @@ public class ClinicalExaminationServiceImpl implements ClinicalExaminationServic
                 .orElseThrow(() -> new AppException("Không tìm thấy mã đặt khám: " + bookingCode, HttpStatus.NOT_FOUND));
 
         Doctor doctor = doctorRepository.findByAccount_UserId(doctorAccountId)
-                .orElseThrow(() -> new AppException("Tài khoản không gắn với thông tin Bác sĩ khám bệnh", HttpStatus.FORBIDDEN));
+                .orElseGet(() -> {
+                    if (booking.getDoctor() != null) {
+                        return booking.getDoctor();
+                    }
+                    throw new AppException("Tài khoản không gắn với thông tin Bác sĩ khám bệnh", HttpStatus.FORBIDDEN);
+                });
 
         MedicalExaminationRecord record = recordRepository.findByBooking_BookingCode(bookingCode)
                 .orElseGet(() -> recordRepository.save(MedicalExaminationRecord.builder()
@@ -442,16 +477,6 @@ public class ClinicalExaminationServiceImpl implements ClinicalExaminationServic
             throw new AppException("Hồ sơ bệnh án đã bị khóa sau 24h theo Thông tư 46/2018/TT-BYT. Mọi chỉnh sửa bổ sung phải thông qua Phụ lục bệnh án (Addendum).", HttpStatus.BAD_REQUEST);
         }
 
-        // 1. Kiểm tra toàn bộ xét nghiệm cận lâm sàng (không cho phép hoàn tất nếu còn xét nghiệm chưa hoàn thành hoặc chưa hủy)
-        if (record.getMedicalTests() != null && !record.getMedicalTests().isEmpty()) {
-            boolean hasUnfinishedTests = record.getMedicalTests().stream()
-                    .anyMatch(t -> t.getState() != MedicalTestState.COMPLETED && t.getState() != MedicalTestState.CANCELLED);
-            if (hasUnfinishedTests) {
-                throw new AppException("Không thể hoàn tất ca khám do bệnh nhân vẫn còn chỉ định cận lâm sàng chưa hoàn thành hoặc chưa được hủy!", HttpStatus.BAD_REQUEST);
-            }
-        }
-
-
         record.setFinalDiagnosis(request.finalDiagnosis());
         record.setTreatmentPlan(request.treatmentPlan());
         record.setReExaminationDate(request.reExaminationDate());
@@ -540,6 +565,15 @@ public class ClinicalExaminationServiceImpl implements ClinicalExaminationServic
             }
         }
 
+        // 1. Kiểm tra toàn bộ xét nghiệm cận lâm sàng (bắt buộc hoàn thành hoặc đã hủy)
+        if (record.getMedicalTests() != null && !record.getMedicalTests().isEmpty()) {
+            boolean hasUnfinishedTests = record.getMedicalTests().stream()
+                    .anyMatch(t -> t.getState() != MedicalTestState.COMPLETED && t.getState() != MedicalTestState.CANCELLED);
+            if (hasUnfinishedTests) {
+                throw new AppException("Không thể hoàn tất ca khám do bệnh nhân vẫn còn chỉ định cận lâm sàng chưa hoàn thành hoặc chưa được hủy!", HttpStatus.BAD_REQUEST);
+            }
+        }
+
         if (record.getFinalDiagnosis() == null || record.getFinalDiagnosis().isBlank()) {
             throw new AppException("Bác sĩ phải nhập kết luận chẩn đoán lâm sàng xác định trước khi hoàn tất hồ sơ khám bệnh!", HttpStatus.BAD_REQUEST);
         }
@@ -586,26 +620,46 @@ public class ClinicalExaminationServiceImpl implements ClinicalExaminationServic
             throw new AppException("Hồ sơ bệnh án đã bị khóa sau 24h theo Thông tư 46/2018/TT-BYT. Mọi chỉnh sửa bổ sung phải thông qua Phụ lục bệnh án (Addendum).", HttpStatus.BAD_REQUEST);
         }
 
+        // 1. Kiểm tra toàn bộ xét nghiệm cận lâm sàng trước khi kê đơn hoàn tất ca
+        if (record.getMedicalTests() != null && !record.getMedicalTests().isEmpty()) {
+            boolean hasUnfinishedTests = record.getMedicalTests().stream()
+                    .anyMatch(t -> t.getState() != MedicalTestState.COMPLETED && t.getState() != MedicalTestState.CANCELLED);
+            if (hasUnfinishedTests) {
+                throw new AppException("Không thể kê đơn hoàn tất ca khám do bệnh nhân vẫn còn chỉ định cận lâm sàng chưa hoàn thành hoặc chưa được hủy!", HttpStatus.BAD_REQUEST);
+            }
+        }
+
+        // 2. Kiểm tra chẩn đoán xác định bắt buộc trước khi kê đơn
+        if (record.getFinalDiagnosis() == null || record.getFinalDiagnosis().isBlank()) {
+            throw new AppException("Bác sĩ phải nhập kết luận chẩn đoán lâm sàng xác định trước khi kê toa hoàn tất ca khám!", HttpStatus.BAD_REQUEST);
+        }
+
         // Kiểm tra an toàn dược lý & dị ứng chéo (CDS Drug Safety Check - tham khảo E-healthcare)
         DrugSafetyCheckResponse safetyCheck = checkPrescriptionSafety(
                 recordId,
                 new CheckPrescriptionSafetyRequest(request.items(), null)
         );
-        if (safetyCheck.criticalCount() > 0 && !Boolean.TRUE.equals(request.overrideAllergyWarning())) {
-            String firstAlert = !safetyCheck.warnings().isEmpty() ? safetyCheck.warnings().get(0).warningMessage() : "Phát hiện nguy cơ dị ứng thuốc nguy hiểm";
-            throw new AppException(
-                    "CẢNH BÁO AN TOÀN DƯỢC LÝ: " + firstAlert + " Vui lòng đổi thuốc an toàn hoặc xác nhận ghi đè lâm sàng (overrideAllergyWarning) nếu có chỉ định đặc biệt từ Bác sĩ.",
-                    HttpStatus.BAD_REQUEST
-            );
-        }
-        if (safetyCheck.criticalCount() > 0 && Boolean.TRUE.equals(request.overrideAllergyWarning())) {
-            log.warn("BÁC SĨ GHI ĐÈ CẢNH BÁO DỊ ỨNG: Bác sĩ đã xác nhận ghi đè lâm sàng cho hồ sơ {} với {} cảnh báo nguy hiểm", recordId, safetyCheck.criticalCount());
+        String validOverrideReason = null;
+        if (safetyCheck.criticalCount() > 0) {
+            if (!Boolean.TRUE.equals(request.overrideAllergyWarning())) {
+                String firstAlert = !safetyCheck.warnings().isEmpty() ? safetyCheck.warnings().get(0).warningMessage() : "Phát hiện nguy cơ dị ứng thuốc nguy hiểm";
+                throw new AppException(
+                        "CẢNH BÁO AN TOÀN DƯỢC LÝ: " + firstAlert + " Vui lòng đổi thuốc an toàn hoặc xác nhận ghi đè lâm sàng (overrideAllergyWarning) nếu có chỉ định đặc biệt từ Bác sĩ.",
+                        HttpStatus.BAD_REQUEST
+                );
+            }
+            if (request.overrideReason() == null || request.overrideReason().trim().length() < 5) {
+                throw new AppException("Bác sĩ phải cung cấp lý do lâm sàng xác thực (tối thiểu 5 ký tự) khi ghi đè cảnh báo dị ứng thuốc nguy hiểm!", HttpStatus.BAD_REQUEST);
+            }
+            validOverrideReason = request.overrideReason().trim();
+            log.warn("BÁC SĨ GHI ĐÈ CẢNH BÁO DỊ ỨNG: Bác sĩ đã xác nhận ghi đè lâm sàng cho hồ sơ {} với lý do: [{}]", recordId, validOverrideReason);
         }
 
         Prescription prescription = Prescription.builder()
                 .prescriptionCode("RX-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
                 .medicalRecord(record)
                 .doctorNotes(request.doctorNotes())
+                .overrideReason(validOverrideReason)
                 .totalAmount(BigDecimal.ZERO)
                 .build();
 
@@ -670,7 +724,7 @@ public class ClinicalExaminationServiceImpl implements ClinicalExaminationServic
                 "CREATE_PRESCRIPTION",
                 "PRESCRIPTION",
                 savedPrescription.getPrescriptionId().toString(),
-                "Kê đơn thuốc " + savedPrescription.getPrescriptionCode() + " gồm " + items.size() + " loại thuốc cho hồ sơ " + record.getRecordId(),
+                "Kê đơn thuốc " + savedPrescription.getPrescriptionCode() + " gồm " + items.size() + " loại thuốc cho hồ sơ " + record.getRecordId() + (validOverrideReason != null ? " [GHI ĐÈ DỊ ỨNG: " + validOverrideReason + "]" : ""),
                 null
         );
 
@@ -682,20 +736,31 @@ public class ClinicalExaminationServiceImpl implements ClinicalExaminationServic
         MedicalExaminationRecord record = recordRepository.findById(recordId)
                 .orElseThrow(() -> new AppException("Không tìm thấy hồ sơ khám bệnh", HttpStatus.NOT_FOUND));
 
-        String rawAllergies = "";
-        if (request.patientAllergies() != null && !request.patientAllergies().trim().isEmpty()) {
-            rawAllergies = request.patientAllergies().trim();
-        } else {
-            // Tự động kiểm tra triệu chứng, ghi chú bệnh án xem có ghi nhận dị ứng không
-            StringBuilder sb = new StringBuilder();
-            if (record.getSymptoms() != null && record.getSymptoms().toLowerCase().contains("dị ứng")) {
-                sb.append(record.getSymptoms()).append(" ");
-            }
-            if (record.getTreatmentPlan() != null && record.getTreatmentPlan().toLowerCase().contains("dị ứng")) {
-                sb.append(record.getTreatmentPlan()).append(" ");
-            }
-            rawAllergies = sb.toString().trim();
+        StringBuilder allergyBuilder = new StringBuilder();
+
+        // 1. Đọc tiền sử dị ứng đã lưu trong thực thể PatientProfile (CSDL)
+        PatientProfile patientProfile = record.getPatientProfile();
+        if (patientProfile == null && record.getBooking() != null) {
+            patientProfile = record.getBooking().getPatientProfile();
         }
+        if (patientProfile != null && patientProfile.getAllergies() != null && !patientProfile.getAllergies().isBlank()) {
+            allergyBuilder.append(patientProfile.getAllergies().trim()).append(" ");
+        }
+
+        // 2. Gộp thêm dữ liệu dị ứng truyền từ request (nếu có)
+        if (request.patientAllergies() != null && !request.patientAllergies().trim().isEmpty()) {
+            allergyBuilder.append(request.patientAllergies().trim()).append(" ");
+        }
+
+        // 3. Tự động kiểm tra triệu chứng, ghi chú bệnh án xem có bổ sung ghi nhận dị ứng không
+        if (record.getSymptoms() != null && record.getSymptoms().toLowerCase().contains("dị ứng")) {
+            allergyBuilder.append(record.getSymptoms()).append(" ");
+        }
+        if (record.getTreatmentPlan() != null && record.getTreatmentPlan().toLowerCase().contains("dị ứng")) {
+            allergyBuilder.append(record.getTreatmentPlan()).append(" ");
+        }
+
+        String rawAllergies = allergyBuilder.toString().trim();
 
         List<DrugSafetyWarningDto> warnings = new ArrayList<>();
         String cleanAllergy = rawAllergies.toLowerCase().trim();
@@ -915,6 +980,24 @@ public class ClinicalExaminationServiceImpl implements ClinicalExaminationServic
     public List<DoctorQueueResponse> getDoctorQueue(UUID doctorAccountId, LocalDate date) {
         LocalDate queryDate = date != null ? date : LocalDate.now();
         List<Booking> bookings = bookingRepository.findAllByDoctor_Account_UserIdAndBookingDateAndDeletedFalseOrderByIsPriorityDescQueueNumberAsc(doctorAccountId, queryDate);
+
+        if (bookings.isEmpty() && doctorAccountId != null) {
+            var acc = accountRepository.findById(doctorAccountId).orElse(null);
+            if (acc != null && acc.getRole() != null) {
+                var r = acc.getRole();
+                if (r == com.hospital.api.constant.Role.ROLE_ADMIN || r == com.hospital.api.constant.Role.ROLE_HEAD_OF_DEPARTMENT) {
+                    var docOpt = doctorRepository.findByAccount_UserId(doctorAccountId);
+                    if (docOpt.isPresent() && docOpt.get().getDepartment() != null) {
+                        bookings = bookingRepository.findAllByDoctor_Department_DepartmentIdAndBookingDateAndDeletedFalseOrderByIsPriorityDescQueueNumberAsc(
+                                docOpt.get().getDepartment().getDepartmentId(), queryDate);
+                    }
+                    if (bookings.isEmpty()) {
+                        bookings = bookingRepository.findAllByBookingDateAndDeletedFalseOrderByIsPriorityDescQueueNumberAsc(queryDate);
+                    }
+                }
+            }
+        }
+
         return bookings.stream()
                 .filter(BookingReceptionTransition::doctorEligible)
                 .map(b -> {
@@ -1169,13 +1252,43 @@ public class ClinicalExaminationServiceImpl implements ClinicalExaminationServic
             return MedicalTestResponse.fromEntity(test, isTestPaid(test));
         }
 
+        boolean wasPaid = isTestPaid(test);
+
         test.setState(MedicalTestState.CANCELLED);
         String cancelNote = "[ĐÃ HỦY CHỈ ĐỊNH]: " + reason.trim();
         test.setTestResult(cancelNote);
+
+        // Nếu xét nghiệm này đã thanh toán trước đó, thực hiện hoàn tiền tự động vào ví bệnh nhân
+        MedicalExaminationRecord record = test.getMedicalRecord();
+        if (wasPaid && test.getPrice() != null && test.getPrice().compareTo(BigDecimal.ZERO) > 0) {
+            Booking booking = (record != null) ? record.getBooking() : null;
+            Account patientAccount = null;
+            if (booking != null && booking.getPatientProfile() != null) {
+                patientAccount = booking.getPatientProfile().getAccount();
+            }
+            if (patientAccount != null) {
+                BigDecimal currentBalance = patientAccount.getBalance() != null ? patientAccount.getBalance() : BigDecimal.ZERO;
+                patientAccount.setBalance(currentBalance.add(test.getPrice()));
+                accountRepository.save(patientAccount);
+            }
+            Transaction refundTxn = Transaction.builder()
+                    .account(patientAccount)
+                    .booking(booking)
+                    .medicalTest(test)
+                    .amount(test.getPrice())
+                    .transactionType(TransactionType.REFUND)
+                    .paymentMethod(PaymentMethod.INTERNAL_WALLET)
+                    .status("SUCCESS")
+                    .isVerified(true)
+                    .description("Hoàn tiền xét nghiệm [" + (test.getMedicalService() != null ? test.getMedicalService().getServiceName() : test.getTestCode()) + "] số tiền " + test.getPrice() + " VNĐ do bác sĩ hủy chỉ định: " + reason.trim())
+                    .build();
+            transactionRepository.save(refundTxn);
+            test.setIsPaid(false);
+        }
+
         MedicalTest saved = testRepository.save(test);
 
         // Kiểm tra xem các xét nghiệm còn lại đã hoàn tất hoặc bị hủy hết chưa để chuyển sang DIAGNOSING
-        MedicalExaminationRecord record = test.getMedicalRecord();
         if (record != null && record.getMedicalTests() != null) {
             boolean allDone = record.getMedicalTests().stream()
                     .allMatch(t -> t.getState() == MedicalTestState.COMPLETED || t.getState() == MedicalTestState.CANCELLED);

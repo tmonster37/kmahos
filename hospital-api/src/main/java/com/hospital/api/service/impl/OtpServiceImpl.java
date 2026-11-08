@@ -6,6 +6,7 @@ import com.hospital.api.dto.request.VerifyOtpRequest;
 import com.hospital.api.dto.response.OtpResponse;
 import com.hospital.api.entity.OtpToken;
 import com.hospital.api.exception.AppException;
+import com.hospital.api.repository.AccountRepository;
 import com.hospital.api.repository.OtpTokenRepository;
 import com.hospital.api.service.OtpService;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +33,7 @@ import java.util.Optional;
 public class OtpServiceImpl implements OtpService {
 
     private final OtpTokenRepository otpTokenRepository;
+    private final AccountRepository accountRepository;
     private final JavaMailSender mailSender;
     private final long otpValidDurationMs;
     private final int maxAttempts;
@@ -41,8 +43,10 @@ public class OtpServiceImpl implements OtpService {
     private final int maxSendPerHourIp;
     private static final SecureRandom RANDOM = new SecureRandom();
 
+    @Autowired
     public OtpServiceImpl(
             OtpTokenRepository otpTokenRepository,
+            @Autowired(required = false) AccountRepository accountRepository,
             @Autowired(required = false) JavaMailSender mailSender,
             @Value("${otp.expiration-ms:300000}") long otpValidDurationMs,
             @Value("${otp.max-attempts:5}") int maxAttempts,
@@ -52,6 +56,7 @@ public class OtpServiceImpl implements OtpService {
             @Value("${otp.max-send-per-hour-ip:15}") int maxSendPerHourIp
     ) {
         this.otpTokenRepository = otpTokenRepository;
+        this.accountRepository = accountRepository;
         this.mailSender = mailSender;
         this.otpValidDurationMs = otpValidDurationMs;
         this.maxAttempts = maxAttempts;
@@ -61,6 +66,19 @@ public class OtpServiceImpl implements OtpService {
         this.maxSendPerHourIp = maxSendPerHourIp;
     }
 
+    public OtpServiceImpl(
+            OtpTokenRepository otpTokenRepository,
+            JavaMailSender mailSender,
+            long otpValidDurationMs,
+            int maxAttempts,
+            long resendCooldownSeconds,
+            int lockoutDurationMinutes,
+            int maxSendPerHourRecipient,
+            int maxSendPerHourIp
+    ) {
+        this(otpTokenRepository, null, mailSender, otpValidDurationMs, maxAttempts, resendCooldownSeconds, lockoutDurationMinutes, maxSendPerHourRecipient, maxSendPerHourIp);
+    }
+
     @Override
     public OtpResponse sendOtp(SendOtpRequest request) {
         return sendOtp(request, null);
@@ -68,7 +86,18 @@ public class OtpServiceImpl implements OtpService {
 
     @Override
     public OtpResponse sendOtp(SendOtpRequest request, String clientIp) {
-        sendEmailOtp(request.email(), request.purpose(), clientIp);
+        String targetEmail = request.email();
+        if ((targetEmail == null || targetEmail.isBlank()) && request.phoneNumber() != null && !request.phoneNumber().isBlank()) {
+            if (accountRepository != null) {
+                var accountOpt = accountRepository.findByPhoneNumber(request.phoneNumber().trim());
+                if (accountOpt.isPresent() && accountOpt.get().getEmail() != null && !accountOpt.get().getEmail().isBlank()) {
+                    targetEmail = accountOpt.get().getEmail();
+                } else {
+                    return OtpResponse.ofSuccess("Mã OTP đã được gửi tới email liên kết với tài khoản (nếu tồn tại trong hệ thống).", otpValidDurationMs / 1000);
+                }
+            }
+        }
+        sendEmailOtp(targetEmail, request.purpose(), clientIp);
         return OtpResponse.ofSuccess("Mã OTP đã được gửi tới email của bạn. Vui lòng kiểm tra hộp thư đến (hoặc thư rác).", otpValidDurationMs / 1000);
     }
 

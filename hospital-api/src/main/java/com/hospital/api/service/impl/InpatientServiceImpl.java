@@ -37,6 +37,7 @@ public class InpatientServiceImpl implements InpatientService {
     private final InpatientNursingCareRepository nursingCareRepository;
     private final StaffRepository staffRepository;
     private final AccountRepository accountRepository;
+    private final MedicalExaminationRecordRepository recordRepository;
     private final com.hospital.api.service.AuditLogService auditLogService;
 
     @Override
@@ -151,7 +152,29 @@ public class InpatientServiceImpl implements InpatientService {
         // Tính số ngày nằm viện (tối thiểu 1 ngày)
         long days = Math.max(1, Duration.between(admission.getAdmissionDate(), now).toDays());
         BigDecimal dailyFee = admission.getDailyRoomFee() != null ? admission.getDailyRoomFee() : BigDecimal.valueOf(300000);
-        BigDecimal totalCost = dailyFee.multiply(BigDecimal.valueOf(days));
+        BigDecimal roomCost = dailyFee.multiply(BigDecimal.valueOf(days));
+
+        // Tính chi phí thuốc & xét nghiệm phát sinh trong suốt thời gian nằm viện
+        BigDecimal additionalCost = BigDecimal.ZERO;
+        if (admission.getPatientProfile() != null && admission.getPatientProfile().getPatientProfileId() != null) {
+            List<MedicalExaminationRecord> records = recordRepository.findAllByPatientProfile_PatientProfileIdAndDeletedFalseOrderByCreatedAtDesc(
+                    admission.getPatientProfile().getPatientProfileId());
+            for (MedicalExaminationRecord rec : records) {
+                if (rec.getCreatedAt() != null && !rec.getCreatedAt().isBefore(admission.getAdmissionDate())) {
+                    if (rec.getMedicalTests() != null) {
+                        for (MedicalTest t : rec.getMedicalTests()) {
+                            if (t.getState() != com.hospital.api.constant.MedicalTestState.CANCELLED && t.getPrice() != null) {
+                                additionalCost = additionalCost.add(t.getPrice());
+                            }
+                        }
+                    }
+                    if (rec.getPrescription() != null && rec.getPrescription().getTotalAmount() != null) {
+                        additionalCost = additionalCost.add(rec.getPrescription().getTotalAmount());
+                    }
+                }
+            }
+        }
+        BigDecimal totalCost = roomCost.add(additionalCost);
 
         Discharge discharge = Discharge.builder()
                 .hospitalAdmission(admission)
@@ -161,6 +184,8 @@ public class InpatientServiceImpl implements InpatientService {
                 .reExaminationDate(request.reExaminationDate())
                 .totalDays((int) days)
                 .totalInpatientCost(totalCost)
+                .isPaid(false)
+                .settlementStatus("PENDING_PAYMENT")
                 .build();
 
         // Giải phóng giường bệnh khi xuất viện -> chuyển sang CLEANING (vệ sinh khử khuẩn)
@@ -205,6 +230,20 @@ public class InpatientServiceImpl implements InpatientService {
                     || !admission.getPatientProfile().getAccount().getUserId().equals(currentUserId)) {
                 throw new AppException("Bạn không có quyền truy cập hồ sơ nhập viện này", HttpStatus.FORBIDDEN);
             }
+        } else if (currentUserId != null) {
+            accountRepository.findById(currentUserId).ifPresent(acc -> {
+                if (acc.getRole() == com.hospital.api.constant.Role.ROLE_DOCTOR || acc.getRole() == com.hospital.api.constant.Role.ROLE_HEAD_OF_DEPARTMENT) {
+                    var docOpt = doctorRepository.findByAccount_UserId(currentUserId);
+                    if (docOpt.isPresent() && docOpt.get().getDepartment() != null && admission.getDepartment() != null) {
+                        Integer staffDeptId = docOpt.get().getDepartment().getDepartmentId();
+                        Integer admissionDeptId = admission.getDepartment().getDepartmentId();
+                        boolean isTreatingDoc = admission.getTreatingDoctor() != null && docOpt.get().getDoctorId().equals(admission.getTreatingDoctor().getDoctorId());
+                        if (!staffDeptId.equals(admissionDeptId) && !isTreatingDoc) {
+                            throw new AppException("Bác sĩ chỉ có quyền truy cập hồ sơ bệnh nhân nội trú thuộc chuyên khoa của mình hoặc do mình điều trị!", HttpStatus.FORBIDDEN);
+                        }
+                    }
+                }
+            });
         }
 
         return admission;
@@ -282,6 +321,22 @@ public class InpatientServiceImpl implements InpatientService {
                     || !admission.getPatientProfile().getAccount().getUserId().equals(currentUserId)) {
                 throw new AppException("Bạn không có quyền xem nhật ký theo dõi của hồ sơ này", HttpStatus.FORBIDDEN);
             }
+        } else if (currentUserId != null) {
+            HospitalAdmission admission = admissionRepository.findById(admissionId)
+                    .orElseThrow(() -> new AppException("Không tìm thấy hồ sơ nhập viện", HttpStatus.NOT_FOUND));
+            accountRepository.findById(currentUserId).ifPresent(acc -> {
+                if (acc.getRole() == com.hospital.api.constant.Role.ROLE_DOCTOR || acc.getRole() == com.hospital.api.constant.Role.ROLE_HEAD_OF_DEPARTMENT) {
+                    var docOpt = doctorRepository.findByAccount_UserId(currentUserId);
+                    if (docOpt.isPresent() && docOpt.get().getDepartment() != null && admission.getDepartment() != null) {
+                        Integer staffDeptId = docOpt.get().getDepartment().getDepartmentId();
+                        Integer admissionDeptId = admission.getDepartment().getDepartmentId();
+                        boolean isTreatingDoc = admission.getTreatingDoctor() != null && docOpt.get().getDoctorId().equals(admission.getTreatingDoctor().getDoctorId());
+                        if (!staffDeptId.equals(admissionDeptId) && !isTreatingDoc) {
+                            throw new AppException("Bác sĩ chỉ có quyền truy cập hồ sơ bệnh nhân nội trú thuộc chuyên khoa của mình hoặc do mình điều trị!", HttpStatus.FORBIDDEN);
+                        }
+                    }
+                }
+            });
         }
         return detailRepository.findAllByHospitalAdmission_AdmissionIdOrderByLogDateDesc(admissionId);
     }

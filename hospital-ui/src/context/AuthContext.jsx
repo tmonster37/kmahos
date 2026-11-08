@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import axiosInstance from "../services/AxiosInstance";
+import axiosInstance, { setInMemoryAccessToken, clearInMemoryAccessToken } from "../services/AxiosInstance";
 
 const AuthContext = createContext();
 
@@ -25,10 +25,19 @@ export const AuthProvider = ({ children }) => {
 
     useEffect(() => {
         clearLegacyVitals();
+        // Xóa hoàn toàn accessToken cũ khỏi localStorage (Cookie-Only mode)
+        localStorage.removeItem("accessToken");
         const storedUser = localStorage.getItem("user");
         if (storedUser) {
             try {
-                setUser(JSON.parse(storedUser));
+                const parsed = JSON.parse(storedUser);
+                if (parsed && typeof parsed === "object") {
+                    const { accessToken: _omitted, ...safeUser } = parsed;
+                    if (parsed.accessToken) {
+                        localStorage.setItem("user", JSON.stringify(safeUser));
+                    }
+                    setUser(safeUser);
+                }
             } catch {
                 localStorage.removeItem("user");
             }
@@ -37,17 +46,20 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     const login = (authData) => {
-        // authData chứa: userId, fullName, role, phoneNumber, (accessToken)
-        // Token được quản lý qua HttpOnly cookie bởi trình duyệt; lưu user info cho UI rendering
-        localStorage.setItem("user", JSON.stringify(authData));
-        if (authData.accessToken) {
-            localStorage.setItem("accessToken", authData.accessToken);
+        // Token xác thực được quản lý qua HttpOnly cookie (access_token) và RAM;
+        // tuyệt đối không lưu accessToken vào localStorage.
+        localStorage.removeItem("accessToken");
+        if (authData?.accessToken) {
+            setInMemoryAccessToken(authData.accessToken);
         }
-        setUser(authData);
+        const { accessToken: _omitted, ...safeUser } = authData || {};
+        localStorage.setItem("user", JSON.stringify(safeUser));
+        setUser(safeUser);
     };
 
     const logout = async () => {
         clearLegacyVitals();
+        clearInMemoryAccessToken();
         try {
             await axiosInstance.post("/api/auth/logout");
         } catch {

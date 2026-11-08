@@ -4,9 +4,9 @@ import designTokens from "./designTokens";
 const tntTheme = createTheme({
     palette: {
         primary: {
-            main: designTokens.brand.primary,      // YouMed medical blue (#0088D6)
-            light: designTokens.brand.primaryLight, // #EBF6FE
-            dark: designTokens.brand.primaryDark,   // #CFFBF1
+            main: designTokens.brand.primary,       // #0F766E - WCAG AA compliant (5.47:1)
+            light: designTokens.brand.primaryLight, // #F0FDFA
+            dark: designTokens.brand.primaryDark,   // #115E59
             contrastText: "#FFFFFF",
         },
         secondary: {
@@ -16,7 +16,7 @@ const tntTheme = createTheme({
             contrastText: "#FFFFFF",
         },
         info: {
-            main: designTokens.status.info.main,    // #02adc7ff
+            main: designTokens.status.info.main,    // #0284C7
             light: designTokens.status.info.bg,     // #E0F2FE
             dark: "#0369A1",
             contrastText: "#FFFFFF",
@@ -79,7 +79,7 @@ const tntTheme = createTheme({
                     borderRadius: 10,
                     boxShadow: "none",
                     "&:hover": {
-                        boxShadow: "0 4px 12px rgba(0, 136, 214, 0.2)",
+                        boxShadow: "0 4px 12px rgba(15, 118, 110, 0.2)",
                     },
                 },
                 containedPrimary: {
@@ -223,4 +223,3 @@ const tntTheme = createTheme({
 });
 
 export default tntTheme;
-

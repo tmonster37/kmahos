@@ -10,12 +10,27 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_account_google_sub ON accounts(google_sub)
 
 -- 1.1 Medical Examination Records: Bỏ check constraint cũ của state để hỗ trợ CALLING, IN_PROGRESS, SKIPPED
 ALTER TABLE medical_examination_records DROP CONSTRAINT IF EXISTS medical_examination_records_state_check;
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN (
+        SELECT con.conname 
+        FROM pg_constraint con 
+        JOIN pg_class rel ON rel.oid = con.conrelid 
+        WHERE LOWER(rel.relname) = 'medical_examination_records' 
+          AND con.contype = 'c' 
+          AND pg_get_constraintdef(con.oid) LIKE '%state%'
+    ) LOOP
+        EXECUTE 'ALTER TABLE medical_examination_records DROP CONSTRAINT IF EXISTS ' || quote_ident(r.conname);
+    END LOOP;
+END $$;
 
 -- 2. OTP Tokens: Bảng lưu trữ mã xác thực OTP bảo mật
 CREATE TABLE IF NOT EXISTS otp_tokens (
-    token_id UUID PRIMARY KEY,
-    identifier VARCHAR(255) NOT NULL,
-    otp_code VARCHAR(20) NOT NULL,
+    id UUID PRIMARY KEY,
+    recipient VARCHAR(150) NOT NULL,
+    otp_hash VARCHAR(255) NOT NULL,
     purpose VARCHAR(50) NOT NULL,
     attempts INT NOT NULL DEFAULT 0,
     is_used BOOLEAN NOT NULL DEFAULT FALSE,
@@ -24,7 +39,7 @@ CREATE TABLE IF NOT EXISTS otp_tokens (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX IF NOT EXISTS idx_otp_identifier_purpose ON otp_tokens(identifier, purpose);
+CREATE INDEX IF NOT EXISTS idx_otp_recipient_purpose ON otp_tokens(recipient, purpose);
 CREATE INDEX IF NOT EXISTS idx_otp_expires_at ON otp_tokens(expires_at);
 
 -- 3. Patient Profiles: Tiền sử dị ứng, tiền sử bệnh án & liên kết tài khoản
@@ -193,3 +208,18 @@ CREATE INDEX IF NOT EXISTS idx_patient_profiles_phone ON patient_profiles(phone_
 CREATE INDEX IF NOT EXISTS idx_patient_profiles_identity ON patient_profiles(identity_number);
 CREATE INDEX IF NOT EXISTS idx_doctor_schedules_doc_date ON doctor_schedules(doctor_id, schedule_date);
 CREATE INDEX IF NOT EXISTS idx_medical_tests_state ON medical_tests(state, created_at DESC);
+
+-- 14. Payment Itemization & Granular Reconciliation
+ALTER TABLE medical_tests ADD COLUMN IF NOT EXISTS is_paid BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS booking_id UUID REFERENCES bookings(booking_id);
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS medical_test_id UUID REFERENCES medical_tests(medical_test_id);
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS prescription_id UUID REFERENCES prescriptions(prescription_id);
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS admission_id UUID REFERENCES hospital_admissions(admission_id);
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS discharge_id UUID REFERENCES discharges(discharge_id);
+
+CREATE INDEX IF NOT EXISTS idx_txn_booking_id ON transactions(booking_id);
+CREATE INDEX IF NOT EXISTS idx_txn_medical_test_id ON transactions(medical_test_id);
+CREATE INDEX IF NOT EXISTS idx_txn_prescription_id ON transactions(prescription_id);
+CREATE INDEX IF NOT EXISTS idx_txn_admission_id ON transactions(admission_id);
+CREATE INDEX IF NOT EXISTS idx_txn_discharge_id ON transactions(discharge_id);
+

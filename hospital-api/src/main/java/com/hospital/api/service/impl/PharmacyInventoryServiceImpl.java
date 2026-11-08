@@ -315,26 +315,36 @@ public class PharmacyInventoryServiceImpl implements PharmacyInventoryService {
         // 2. Chốt chặn Quầy Thu Ngân (Pharmacy Payment Gatekeeper - BIZ-P1-01)
         Booking booking = (prescription.getMedicalRecord() != null) ? prescription.getMedicalRecord().getBooking() : null;
         if (booking != null && !Boolean.TRUE.equals(booking.getIsPriority())) {
-            String code = booking.getBookingCode();
-            List<Transaction> txns = transactionRepository.findAllByDescriptionContainingAndStatus(code, "SUCCESS");
-            BigDecimal totalPaid = txns.stream()
-                    .map(Transaction::getAmount)
-                    .filter(java.util.Objects::nonNull)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            boolean isPaid = Boolean.TRUE.equals(prescription.getIsPaid());
+            if (!isPaid && prescription.getPrescriptionId() != null) {
+                isPaid = transactionRepository.existsByPrescription_PrescriptionIdAndStatus(prescription.getPrescriptionId(), "SUCCESS");
+            }
+            if (!isPaid) {
+                String code = booking.getBookingCode();
+                List<Transaction> txns = transactionRepository.findAllByBooking_BookingIdAndStatus(booking.getBookingId(), "SUCCESS");
+                if (txns.isEmpty()) {
+                    txns = transactionRepository.findAllByDescriptionContainingAndStatus(code, "SUCCESS");
+                }
+                boolean hasPrescriptionTxn = txns.stream().anyMatch(t -> {
+                    if (t.getPrescription() != null && t.getPrescription().getPrescriptionId().equals(prescription.getPrescriptionId())) {
+                        return true;
+                    }
+                    String desc = t.getDescription() != null ? t.getDescription() : "";
+                    String ref = t.getVnpayTxnRef() != null ? t.getVnpayTxnRef() : "";
+                    return (prescription.getPrescriptionCode() != null && (desc.contains(prescription.getPrescriptionCode()) || ref.contains(prescription.getPrescriptionCode())))
+                            || desc.contains("PRESCRIPTION-" + prescription.getPrescriptionCode())
+                            || ref.contains("MED-" + prescription.getPrescriptionCode());
+                });
+                if (hasPrescriptionTxn) {
+                    isPaid = true;
+                }
+            }
 
-            BigDecimal examPrice = booking.getPrice() != null ? booking.getPrice() : BigDecimal.ZERO;
-            BigDecimal prescPrice = prescription.getTotalAmount() != null ? prescription.getTotalAmount() : BigDecimal.ZERO;
-
-            boolean hasPrescriptionTxn = txns.stream().anyMatch(t -> {
-                String desc = t.getDescription() != null ? t.getDescription() : "";
-                String ref = t.getVnpayTxnRef() != null ? t.getVnpayTxnRef() : "";
-                return desc.contains("TREATMENT") || desc.contains("PRESCRIPTION") || desc.contains("MEDICINE") || ref.contains("MED");
-            });
-
-            if (!hasPrescriptionTxn && totalPaid.compareTo(examPrice.add(prescPrice)) < 0) {
+            if (!isPaid) {
                 throw new AppException("Đơn thuốc [" + prescription.getPrescriptionCode() + "] chưa được thanh toán tiền thuốc tại quầy thu ngân! Vui lòng hướng dẫn bệnh nhân hoàn tất viện phí trước khi cấp phát.", HttpStatus.PAYMENT_REQUIRED);
             }
         }
+
 
         PharmacyWarehouse warehouse = warehouseRepository.findById(request.warehouseId())
                 .orElseThrow(() -> new AppException("Không tìm thấy kho cấp phát thuốc", HttpStatus.NOT_FOUND));

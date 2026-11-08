@@ -11,6 +11,7 @@ public interface CashierService {
     List<CashierPendingBillResponse> getPendingBills();
     List<CashierPendingBillResponse> getPendingBills(Integer page, Integer size);
     List<CashierPendingBillResponse> getPendingBillsForPatient(UUID accountId);
+    List<com.hospital.api.dto.response.PatientPendingBillResponse> getPatientPendingBills(UUID accountId);
     CashierReceiptResponse processPayment(String cashierUsername, CashierPaymentRequest request);
     List<CashierReceiptResponse> getPaymentHistory();
     List<CashierReceiptResponse> getPaymentHistory(Integer page, Integer size);

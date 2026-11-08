@@ -591,7 +591,7 @@ export default function Navbar() {
                         </Box>
                         <Box>
                             <Typography variant="subtitle2" fontWeight="800" color={designTokens.brand.primary}>
-                                YouMed TNT
+                                TNT Hospital
                             </Typography>
                             <Typography variant="caption" color="textSecondary" fontSize="0.7rem">
                                 Bệnh Viện Thông Minh

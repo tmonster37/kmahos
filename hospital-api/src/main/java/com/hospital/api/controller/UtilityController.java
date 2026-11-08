@@ -33,6 +33,7 @@ public class UtilityController {
     private final NotificationRepository notificationRepository;
     private final NotificationService notificationService;
     private final DashboardServiceImpl dashboardService;
+    private final com.hospital.api.service.PushDeviceService pushDeviceService;
 
     // Gửi thông báo đến bệnh nhân (qua bookingCode hoặc phoneNumber)
     @PostMapping("/notifications/send")
@@ -87,9 +88,14 @@ public class UtilityController {
 
     // 5. Xem thông báo cá nhân
     @GetMapping("/notifications")
-    public ResponseEntity<ApiResponse<List<Notification>>> getMyNotifications(@AuthenticationPrincipal UserPrincipal user) {
+    public ResponseEntity<ApiResponse<List<com.hospital.api.dto.response.PatientNotificationResponse>>> getMyNotifications(@AuthenticationPrincipal UserPrincipal user) {
+        List<com.hospital.api.dto.response.PatientNotificationResponse> items = notificationRepository
+                .findAllByAccount_UserIdAndDeletedFalseOrderByCreatedAtDesc(user.getId())
+                .stream()
+                .map(com.hospital.api.dto.response.PatientNotificationResponse::fromEntity)
+                .toList();
         return ResponseEntity.ok(ApiResponse.ok(
-                notificationRepository.findAllByAccount_UserIdAndDeletedFalseOrderByCreatedAtDesc(user.getId()),
+                items,
                 "Lấy thông báo thành công"
         ));
     }
@@ -101,7 +107,7 @@ public class UtilityController {
             @PathVariable UUID notificationId
     ) {
         notificationRepository.findById(notificationId).ifPresent(n -> {
-            if (n.getAccount().getUserId().equals(user.getId())) {
+            if (!n.isDeleted() && n.getAccount() != null && n.getAccount().getUserId().equals(user.getId())) {
                 n.setRead(true);
                 notificationRepository.save(n);
             }
@@ -118,6 +124,26 @@ public class UtilityController {
         }
         notificationRepository.saveAll(list);
         return ResponseEntity.ok(ApiResponse.ok(null, "Đã đánh dấu tất cả đã đọc"));
+    }
+
+    // Đăng ký thiết bị nhận thông báo đẩy
+    @PostMapping("/push-devices")
+    public ResponseEntity<ApiResponse<Void>> registerPushDevice(
+            @AuthenticationPrincipal UserPrincipal user,
+            @Valid @RequestBody com.hospital.api.dto.request.RegisterPushDeviceRequest request
+    ) {
+        pushDeviceService.registerDevice(user, request);
+        return ResponseEntity.ok(ApiResponse.ok(null, "Đăng ký thiết bị nhận thông báo thành công"));
+    }
+
+    // Thu hồi thiết bị nhận thông báo đẩy
+    @DeleteMapping("/push-devices/{deviceInstallId}")
+    public ResponseEntity<ApiResponse<Void>> revokePushDevice(
+            @AuthenticationPrincipal UserPrincipal user,
+            @PathVariable String deviceInstallId
+    ) {
+        pushDeviceService.revokeDevice(user, deviceInstallId);
+        return ResponseEntity.ok(ApiResponse.ok(null, "Thu hồi thiết bị nhận thông báo thành công"));
     }
 
     // 6. Dashboard Thống kê dành cho Admin & Trưởng khoa

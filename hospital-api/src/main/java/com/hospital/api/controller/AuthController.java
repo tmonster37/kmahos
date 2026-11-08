@@ -1,6 +1,7 @@
 package com.hospital.api.controller;
 
 import com.hospital.api.common.ApiResponse;
+import com.hospital.api.dto.request.ForgotPasswordRequest;
 import com.hospital.api.dto.request.GoogleLoginRequest;
 import com.hospital.api.dto.request.LoginRequest;
 import com.hospital.api.dto.request.RegisterRequest;
@@ -113,6 +114,14 @@ public class AuthController {
         String clientIp = extractClientIp(httpRequest);
         boolean valid = otpService.verifyOtp(request, clientIp);
         return ResponseEntity.ok(ApiResponse.ok(valid, "Xác minh mã OTP thành công"));
+    }
+
+    // Khôi phục mật khẩu tài khoản
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponse<Void>> forgotPassword(
+            @Valid @RequestBody ForgotPasswordRequest request) {
+        authService.forgotPassword(request);
+        return ResponseEntity.ok(ApiResponse.ok(null, "Khôi phục mật khẩu thành công. Vui lòng đăng nhập lại với mật khẩu mới."));
     }
 
     // Endpoint kiểm tra Token & lấy thông tin hồ sơ tài khoản (Bao gồm số dư ví nội bộ)

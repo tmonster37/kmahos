@@ -8,6 +8,7 @@ import com.hospital.api.repository.DepartmentRepository;
 import com.hospital.api.repository.DoctorRepository;
 import com.hospital.api.service.AiTriageService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.net.URLEncoder;
@@ -20,6 +21,13 @@ public class AiTriageServiceImpl implements AiTriageService {
 
     private final DepartmentRepository departmentRepository;
     private final DoctorRepository doctorRepository;
+
+    @Value("${app.ai-triage.clinical-approved:false}")
+    private boolean clinicalApproved;
+
+    public void setClinicalApproved(boolean clinicalApproved) {
+        this.clinicalApproved = clinicalApproved;
+    }
 
     private static final List<String> QUICK_PROMPTS = List.of(
             "Tôi bị đau tức ngực và khó thở khi đi lại nhanh",
@@ -43,7 +51,7 @@ public class AiTriageServiceImpl implements AiTriageService {
         // 1. Kiểm tra dấu hiệu khẩn cấp (Emergency Red Flags)
         boolean isEmergency = checkEmergencyFlags(lowerQuery);
         String emergencyAlert = null;
-        String triageLevel = isEmergency ? "EMERGENCY" : "ROUTINE";
+        String triageLevel = isEmergency ? "EMERGENCY" : (clinicalApproved ? "ROUTINE" : "ADVISORY_ONLY");
 
         if (isEmergency) {
             emergencyAlert = "🚨 CẢNH BÁO NGUY CẤP: Dấu hiệu bạn mô tả có thể là tình trạng cần cấp cứu y tế khẩn cấp! "
@@ -104,10 +112,37 @@ public class AiTriageServiceImpl implements AiTriageService {
     }
 
     private boolean checkEmergencyFlags(String text) {
-        return text.contains("đột quỵ") || text.contains("méo miệng") || text.contains("liệt nửa người")
+        boolean directRedFlag = text.contains("đột quỵ") || text.contains("méo miệng") || text.contains("liệt nửa người")
                 || text.contains("nhồi máu cơ tim") || text.contains("đau thắt ngực dữ dội") || text.contains("ngất xỉu")
                 || text.contains("co giật") || text.contains("nôn ra máu") || text.contains("sốc phản vệ")
                 || text.contains("khó thở dữ dội") || text.contains("chảy máu không cầm") || text.contains("hôn mê");
+        if (directRedFlag) {
+            return true;
+        }
+
+        // Đau/tức ngực kèm khó thở hoặc khi gắng sức/đi lại nhanh/vã mồ hôi (nghi ngờ hội chứng vành cấp)
+        boolean hasChestPain = text.contains("đau tức ngực") || text.contains("đau ngực")
+                || text.contains("tức ngực") || text.contains("đau thắt ngực");
+        boolean hasCardioRespiratoryWarning = text.contains("khó thở") || text.contains("đi lại nhanh")
+                || text.contains("gắng sức") || text.contains("vã mồ hôi") || text.contains("lan lên hàm")
+                || text.contains("lan xuống tay");
+        if (hasChestPain && hasCardioRespiratoryWarning) {
+            return true;
+        }
+
+        // Đau đầu dữ dội kèm dấu hiệu thần kinh/tăng áp lực nội sọ
+        if (text.contains("đau đầu dữ dội") && (text.contains("chóng mặt") || text.contains("buồn nôn") || text.contains("nôn") || text.contains("nhìn mờ"))) {
+            return true;
+        }
+
+        // Trẻ nhỏ sốt cao kèm dấu hiệu nguy hiểm
+        boolean isChild = text.contains("trẻ") || text.contains("bé") || text.contains("sơ sinh");
+        boolean isHighFever = text.contains("sốt 39") || text.contains("sốt 40") || text.contains("sốt cao");
+        if (isChild && isHighFever && (text.contains("li bì") || text.contains("khó đánh thức") || text.contains("bỏ bú") || text.contains("thở nhanh") || text.contains("tím tái"))) {
+            return true;
+        }
+
+        return false;
     }
 
     private Department matchDepartment(String text, List<Department> departments) {
