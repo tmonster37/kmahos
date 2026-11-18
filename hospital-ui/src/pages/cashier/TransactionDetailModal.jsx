@@ -16,6 +16,7 @@ import {
 import PriceCheckIcon from "@mui/icons-material/PriceCheck";
 import CloseIcon from "@mui/icons-material/Close";
 import designTokens from "../../theme/designTokens";
+import { isBillTotalAmountValid } from "./CashierPage";
 
 export default function TransactionDetailModal({
     open,
@@ -30,6 +31,7 @@ export default function TransactionDetailModal({
         <Dialog
             open={open}
             onClose={onClose}
+            disablePortal
             maxWidth="sm"
             fullWidth
             PaperProps={{ sx: { borderRadius: 3 } }}
@@ -61,7 +63,7 @@ export default function TransactionDetailModal({
                         <Grid item xs={6}>
                             <Typography variant="caption" color="text.secondary">SỐ TIỀN GIAO DỊCH</Typography>
                             <Typography variant="h6" fontWeight={900} color={selectedTxn.status === "SUCCESS" ? designTokens.status.success.main : designTokens.status.danger.main}>
-                                {formatCurrency(selectedTxn.amount)}
+                                {isBillTotalAmountValid(selectedTxn) ? formatCurrency(selectedTxn.amount) : "Chưa có dữ liệu"}
                             </Typography>
                         </Grid>
                         <Grid item xs={6}>
@@ -89,7 +91,7 @@ export default function TransactionDetailModal({
                         </Grid>
                         <Grid item xs={12}>
                             <Typography variant="caption" color="text.secondary">NỘI DUNG CHUYỂN KHOẢN / MÔ TẢ</Typography>
-                            <Typography variant="body2">
+                            <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
                                 {selectedTxn.description || "Thanh toán viện phí bệnh viện"}
                             </Typography>
                         </Grid>

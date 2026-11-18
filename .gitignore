@@ -1,15 +1,17 @@
 # ==============================================================================
-# ROOT .GITIGNORE - KMA HOSPITAL MANAGEMENT SYSTEM (HMS)
+# .GITIGNORE - KMA HOSPITAL MANAGEMENT SYSTEM (HMS)
+# Chỉ theo dõi các file cần thiết để cài đặt, cấu hình và vận hành dự án.
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
-# 1. Environment Variables & Secret Credentials (CRITICAL SECURITY)
+# 1. BIẾN MÔI TRƯỜNG & KHÓA BẢO MẬT (SECRETS & CREDENTIALS)
 # ------------------------------------------------------------------------------
 .env
 .env.local
 .env.*.local
 *.env
 !.env.example
+!**/.env.example
 **/application-local.yml
 **/application-local.yaml
 **/application-local.properties
@@ -26,45 +28,77 @@ credentials*.json
 *.credential.json
 
 # ------------------------------------------------------------------------------
-# 2. Database Dumps & Backups
+# 2. KIỂM THỬ TỰ ĐỘNG & TEST FRAMEWORKS (TEST SUITES & CONFIGS)
 # ------------------------------------------------------------------------------
-backups/
-*.dump
-*.dump.sha256
-*.sql.gz
-*.tar.gz
-*.bak
+**/test/
+**/tests/
+**/__tests__/
+**/spec/
+**/e2e/
+**/*.test.*
+**/*.spec.*
+conftest.py
+test-plans/
+tnt_automation/
+test_*.js
+*.local.js
+jest.config.*
+jest.setup.*
+pytest.ini
+cypress.*
+playwright.config.*
+.vitest*
+**/.pytest_cache/
+**/mockito-extensions/
+hospital-mobile/scripts/
 
 # ------------------------------------------------------------------------------
-# 3. Log Files & Crash Reports
+# 3. THƯ VIỆN PHỤ THUỘC & SẢN PHẨM BUILD (DEPENDENCIES & BUILD OUTPUTS)
 # ------------------------------------------------------------------------------
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+dist-ssr/
+**/dist-ssr/
+build/
+**/build/
+target/
+**/target/
+.expo/
+**/web-build/
+.gradle/
+**/bin/
+.npm
+.eslintcache
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+venv/
+**/venv/
+.venv/
+**/expo-env.d.ts
+
+# ------------------------------------------------------------------------------
+# 4. LOGS, CACHE, COVERAGE & DỮ LIỆU TẠM
+# ------------------------------------------------------------------------------
+logs/
 *.log
 **/*.log
-logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+coverage/
+.nyc_output/
+tmp/
+temp/
+*.tmp
+scratch/
 
 # ------------------------------------------------------------------------------
-# 4. Frontend Build Artifacts & Dependencies (React/Vite)
-# ------------------------------------------------------------------------------
-**/node_modules/
-**/dist/
-**/dist-ssr/
-.npm
-.eslintcache
-
-# ------------------------------------------------------------------------------
-# 5. Backend Build Artifacts (Maven/Java)
-# ------------------------------------------------------------------------------
-**/target/
-**/build/
-**/bin/
-.gradle/
-
-# ------------------------------------------------------------------------------
-# 6. IDEs & Editors Configuration
+# 5. IDE, HỆ ĐIỀU HÀNH & CÔNG CỤ AGENT/AI
 # ------------------------------------------------------------------------------
 .idea/
 .vscode/
@@ -78,57 +112,66 @@ pnpm-debug.log*
 Thumbs.db
 ehthumbs.db
 desktop.ini
-
-# ------------------------------------------------------------------------------
-# 7. Testing & Automation Caches (Python / Pytest)
-# ------------------------------------------------------------------------------
-**/__pycache__/
-**/*.py[cod]
-**/*$py.class
-**/.pytest_cache/
-**/venv/
-tnt_automation/venv/
-tnt_automation/bao_cao_test.html
-
-# ------------------------------------------------------------------------------
-# 8. Temporary & Agent Working Directories
-# ------------------------------------------------------------------------------
-scratch/
 .agents/
+.claude/
+.codex/
+.superpowers/
 .sharkrebel-antigravity/
 .work/
-anh/
+diagram.json
+.postman/
+postman/
 
 # ------------------------------------------------------------------------------
-# 9. Local Integration & Verification Test Scripts
+# 6. SAO LƯU, DỮ LIỆU THỬ NGHIỆM, SCRIPT DEV/DEBUG & TÀI LIỆU NỘI BỘ
 # ------------------------------------------------------------------------------
-test_payos_real_integration.js
-*.local.js
-test_department_constraints.js
-test_edit_doctor_schedule.js
-test_link_patient_profile.js
-test_patient_journey_e2e.js
-parse_headings.ps1
-parse_sections.ps1
-print_sec1_10.ps1
+backups/
+*.dump
+*.dump.sha256
+*.sql.gz
+*.tar.gz
+*.bak
+*.old
+*.zip
+process/
+AGENTS.md
+CLAUDE.md
+PROJECT_RULES.md
+HUONG_DAN_KIEM_THU_HE_THONG.md
+QUY_TRINH_KHAM_CHUA_BENH_DEMO.md
+YEU_CAU_CHUC_NANG_BO_SUNG.md
+architecture.md
+implementation_plan*.md
+master-plan.md
+memory.md
+plan.md
+seed_*.js
+check_*.ps1
+check_*.js
+dump_*.ps1
+parse_*.ps1
+print_*.ps1
+read_docx.js
+*.docx
+*.pdf
+docx_extracted/
+extracted_media/
+extracted_yeu_cau.txt
+bc34*.txt
+chapter*.txt
 ref_doc_text.txt
 req_doc_text.txt
-sections_full_text.txt
-sections_summary.csv
-temp_doc_extracted.xml
-temp_doc_text.txt
-temp_rels.xml
-BC_34*
-*.docx
-docx_extracted/
-check_*.ps1
-dump_*.ps1
-chapter*.txt
-bc34*.txt
-captions_extracted.csv
+sections_*.txt
+sections_*.csv
+captions_*.csv
+temp_*.xml
+temp_*.txt
+anh/
+docs/
+.github/
 
 # ------------------------------------------------------------------------------
-# 10. Visual Test Screenshots
+# 7. ẢNH CHỤP MÀN HÌNH ROOT (CHO PHÉP ASSETS TRONG UI/MOBILE)
 # ------------------------------------------------------------------------------
 *.png
 *.jpg

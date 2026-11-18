@@ -38,6 +38,7 @@ export default function AuditEntryModal({
         <Dialog
             open={open}
             onClose={onClose}
+            disablePortal
             maxWidth="sm"
             fullWidth
             PaperProps={{ sx: { borderRadius: 3 } }}
@@ -56,6 +57,12 @@ export default function AuditEntryModal({
                     <Alert severity="info" sx={{ borderRadius: 2 }}>
                         Số liệu kiểm kê sẽ được ghi nhận vào <b>Sổ nhật ký kiểm toán bất biến</b> để làm căn cứ bàn giao và đối soát với Ngân quỹ.
                     </Alert>
+
+                    {shiftStats?.hasMissingAmount && (
+                        <Alert severity="warning" sx={{ borderRadius: 2 }}>
+                            ⚠️ <b>CẢNH BÁO ĐỐI SOÁT:</b> Ca trực ghi nhận có giao dịch chưa xác định được tổng tiền. Số tiền mặt sổ sách chỉ là tổng từng phần, cần đối chiếu kỹ trước khi kết ca.
+                        </Alert>
+                    )}
 
                     <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5, bgcolor: designTokens.neutral.borderLight }}>
                         <Typography variant="caption" color="text.secondary" fontWeight={700}>

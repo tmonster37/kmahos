@@ -45,12 +45,36 @@ import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import axiosInstance from "../../services/AxiosInstance";
 import { formatISODate } from "../../utils/formatters";
 import { useAuth } from "../../context/AuthContext";
+import designTokens from "../../theme/designTokens";
+
+const PRIMARY_BRAND = designTokens.brand.primary;
+const PRIMARY_DARK = designTokens.brand.primaryDark;
+const PRIMARY_LIGHT = designTokens.brand.primaryLight;
 
 const SESSION_OPTIONS = [
     { value: "MORNING", label: "Buổi Sáng (07:30 - 11:30)", shortLabel: "Sáng", color: "primary" },
     { value: "AFTERNOON", label: "Buổi Chiều (13:00 - 17:00)", shortLabel: "Chiều", color: "warning" },
     { value: "EVENING", label: "Buổi Tối (17:30 - 20:30)", shortLabel: "Tối", color: "secondary" },
 ];
+
+export function validateScheduleRoomSelection(roomId, departmentId, availableRooms = []) {
+    if (!roomId && roomId !== 0) {
+        return { isValid: false, selectedRoomId: "", errorMessage: "Vui lòng chọn buồng / phòng khám cho ca trực!" };
+    }
+    const rNum = Number(roomId);
+    const targetRoom = availableRooms.find(r => Number(r.roomId) === rNum);
+    if (!targetRoom) {
+        return { isValid: false, selectedRoomId: "", errorMessage: "Phòng khám đã chọn không tồn tại trong hệ thống!" };
+    }
+    if (departmentId != null && departmentId !== "" && targetRoom.departmentId != null && Number(targetRoom.departmentId) !== Number(departmentId)) {
+        return {
+            isValid: false,
+            selectedRoomId: "",
+            errorMessage: "Phòng khám đã chọn không thuộc chuyên khoa được phân công!"
+        };
+    }
+    return { isValid: true, selectedRoomId: rNum, errorMessage: "" };
+}
 
 export default function ScheduleManagePage() {
     const { user } = useAuth();
@@ -226,8 +250,9 @@ export default function ScheduleManagePage() {
             setEditError("Vui lòng chọn bác sĩ phụ trách ca trực!");
             return;
         }
-        if (!editFormData.roomId) {
-            setEditError("Vui lòng chọn buồng / phòng khám cho ca trực!");
+        const roomCheck = validateScheduleRoomSelection(editFormData.roomId, editFormData.departmentId, rooms);
+        if (!roomCheck.isValid) {
+            setEditError(roomCheck.errorMessage);
             return;
         }
         if (!editFormData.maxCapacityPerSlot || editFormData.maxCapacityPerSlot < 1) {
@@ -262,7 +287,7 @@ export default function ScheduleManagePage() {
         const doc = doctors.find(d => d.doctorId === doctorId);
         const docDeptId = doc?.departmentId || "";
         const deptRooms = rooms.filter(r => docDeptId ? r.departmentId === docDeptId : true);
-        const targetRoomId = deptRooms[0]?.roomId || rooms[0]?.roomId || "";
+        const targetRoomId = deptRooms[0]?.roomId || "";
 
         setFormData(prev => ({
             ...prev,
@@ -275,11 +300,11 @@ export default function ScheduleManagePage() {
     // Khi chọn Khoa trong modal (tùy chọn chuyển khoa / lọc phòng)
     const handleDepartmentChange = (departmentId) => {
         const deptRooms = rooms.filter(r => departmentId ? r.departmentId === Number(departmentId) : true);
-        const targetRoomId = deptRooms[0]?.roomId || rooms[0]?.roomId || "";
+        const targetRoomId = deptRooms[0]?.roomId || "";
         
         // Tìm bác sĩ thuộc khoa này nếu có
         const docsInDept = doctors.filter(d => d.departmentId === Number(departmentId));
-        const newDoctorId = docsInDept.length > 0 ? docsInDept[0].doctorId : formData.doctorId;
+        const newDoctorId = docsInDept.length > 0 ? docsInDept[0].doctorId : "";
 
         setFormData(prev => ({
             ...prev,
@@ -308,8 +333,9 @@ export default function ScheduleManagePage() {
             setError("Vui lòng chọn bác sĩ phụ trách ca trực!");
             return;
         }
-        if (!formData.roomId) {
-            setError("Vui lòng chọn buồng / phòng khám cho ca trực!");
+        const roomCheck = validateScheduleRoomSelection(formData.roomId, formData.departmentId, rooms);
+        if (!roomCheck.isValid) {
+            setError(roomCheck.errorMessage);
             return;
         }
 
@@ -327,7 +353,8 @@ export default function ScheduleManagePage() {
             setToast({ open: true, message: "Phân lịch ca trực thành công!", severity: "success" });
             loadSchedules();
         } catch (err) {
-            setError(err.message || "Lỗi tạo ca trực (Bác sĩ hoặc phòng đã có ca trực trong buổi này)!");
+            const msg = err.response?.data?.message || err.message || "Lỗi tạo ca trực (Bác sĩ hoặc phòng đã có ca trực trong buổi này)!";
+            setError(msg);
         } finally {
             setLoading(false);
         }
@@ -406,12 +433,12 @@ export default function ScheduleManagePage() {
                             width: 48,
                             height: 48,
                             borderRadius: "14px",
-                            bgcolor: "rgba(0, 136, 214, 0.1)",
-                            color: "#0088D6",
+                            bgcolor: PRIMARY_LIGHT,
+                            color: PRIMARY_BRAND,
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
-                            boxShadow: "0 4px 14px rgba(0, 136, 214, 0.2)"
+                            boxShadow: "0 4px 14px rgba(15, 118, 110, 0.2)"
                         }}
                     >
                         <EventIcon sx={{ fontSize: 26 }} />
@@ -428,9 +455,9 @@ export default function ScheduleManagePage() {
                                     height: 22,
                                     fontSize: "0.72rem",
                                     fontWeight: 700,
-                                    bgcolor: "rgba(0, 136, 214, 0.1)",
-                                    color: "#0088D6",
-                                    border: "1px solid rgba(0, 136, 214, 0.2)"
+                                    bgcolor: PRIMARY_LIGHT,
+                                    color: PRIMARY_BRAND,
+                                    border: "1px solid rgba(15, 118, 110, 0.2)"
                                 }}
                             />
                         </Box>
@@ -466,9 +493,9 @@ export default function ScheduleManagePage() {
                             fontWeight: 700,
                             textTransform: "none",
                             fontSize: "0.85rem",
-                            bgcolor: "#0088D6",
-                            boxShadow: "0 4px 14px rgba(0, 136, 214, 0.25)",
-                            "&:hover": { bgcolor: "#0073B7" }
+                            bgcolor: PRIMARY_BRAND,
+                            boxShadow: "0 4px 14px rgba(15, 118, 110, 0.25)",
+                            "&:hover": { bgcolor: PRIMARY_DARK }
                         }}
                     >
                         Tạo Ca Trực Mới
@@ -495,7 +522,7 @@ export default function ScheduleManagePage() {
                                 left: 0,
                                 right: 0,
                                 height: 3,
-                                bgcolor: "#0088D6"
+                                bgcolor: PRIMARY_BRAND
                             }
                         }}
                     >
@@ -670,7 +697,7 @@ export default function ScheduleManagePage() {
                                     fontWeight: 700,
                                     whiteSpace: "nowrap",
                                     ...(selectedDate === new Date().toISOString().split("T")[0]
-                                        ? { bgcolor: "#0088D6" }
+                                        ? { bgcolor: PRIMARY_BRAND }
                                         : { color: "#475569", borderColor: "rgba(15, 23, 42, 0.2)" })
                                 }}
                             >
@@ -686,7 +713,7 @@ export default function ScheduleManagePage() {
                                     fontWeight: 700,
                                     whiteSpace: "nowrap",
                                     ...(selectedDate === new Date(Date.now() + 86400000).toISOString().split("T")[0]
-                                        ? { bgcolor: "#0088D6" }
+                                        ? { bgcolor: PRIMARY_BRAND }
                                         : { color: "#475569", borderColor: "rgba(15, 23, 42, 0.2)" })
                                 }}
                             >
@@ -766,7 +793,7 @@ export default function ScheduleManagePage() {
                         {tableLoading ? (
                             <TableRow>
                                 <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
-                                    <CircularProgress size={36} sx={{ color: "#0088D6" }} />
+                                    <CircularProgress size={36} sx={{ color: PRIMARY_BRAND }} />
                                     <Typography variant="body2" sx={{ color: "#64748B", mt: 1 }}>Đang tải danh sách ca trực...</Typography>
                                 </TableCell>
                             </TableRow>
@@ -788,8 +815,8 @@ export default function ScheduleManagePage() {
                                             borderRadius: 2, 
                                             textTransform: "none", 
                                             fontWeight: 700,
-                                            borderColor: "rgba(0, 136, 214, 0.3)",
-                                            color: "#0088D6"
+                                            borderColor: "rgba(15, 118, 110, 0.3)",
+                                            color: PRIMARY_BRAND
                                         }}
                                     >
                                         Phân ca trực ngay
@@ -805,7 +832,7 @@ export default function ScheduleManagePage() {
                                 }[sch.session] || { label: sch.session, color: "#64748B", bg: "rgba(100, 116, 139, 0.08)" };
 
                                 return (
-                                    <TableRow key={sch.scheduleId} hover sx={{ "&:hover": { bgcolor: "rgba(0, 136, 214, 0.02) !important" } }}>
+                                    <TableRow key={sch.scheduleId} hover sx={{ "&:hover": { bgcolor: "rgba(15, 118, 110, 0.04) !important" } }}>
                                         <TableCell>
                                             <Box display="flex" alignItems="center" gap={1.2}>
                                                 <Box
@@ -813,8 +840,8 @@ export default function ScheduleManagePage() {
                                                         width: 34,
                                                         height: 34,
                                                         borderRadius: "10px",
-                                                        bgcolor: "rgba(0, 136, 214, 0.08)",
-                                                        color: "#0088D6",
+                                                        bgcolor: PRIMARY_LIGHT,
+                                                        color: PRIMARY_BRAND,
                                                         display: "flex",
                                                         alignItems: "center",
                                                         justifyContent: "center",
@@ -836,15 +863,15 @@ export default function ScheduleManagePage() {
                                         </TableCell>
                                         <TableCell>
                                             <Chip
-                                                icon={<LocalHospitalIcon sx={{ fontSize: "15px !important", color: "#0088D6 !important" }} />}
+                                                icon={<LocalHospitalIcon sx={{ fontSize: "15px !important", color: `${PRIMARY_BRAND} !important` }} />}
                                                 label={sch.departmentName || "Đa khoa"}
                                                 size="small"
                                                 sx={{
                                                     fontWeight: 600,
                                                     fontSize: "0.75rem",
-                                                    bgcolor: "rgba(0, 136, 214, 0.08)",
-                                                    color: "#0088D6",
-                                                    border: "1px solid rgba(0, 136, 214, 0.2)"
+                                                    bgcolor: PRIMARY_LIGHT,
+                                                    color: PRIMARY_BRAND,
+                                                    border: "1px solid rgba(15, 118, 110, 0.2)"
                                                 }}
                                             />
                                         </TableCell>
@@ -895,9 +922,9 @@ export default function ScheduleManagePage() {
                                                                         fontSize: "0.72rem",
                                                                         fontWeight: 600,
                                                                         fontFamily: "monospace",
-                                                                        bgcolor: isFull ? "rgba(239, 68, 68, 0.1)" : hasBookings ? "rgba(0, 136, 214, 0.08)" : "#F8FAFC",
-                                                                        color: isFull ? "#EF4444" : hasBookings ? "#0088D6" : "#64748B",
-                                                                        border: `1px solid ${isFull ? "rgba(239, 68, 68, 0.25)" : hasBookings ? "rgba(0, 136, 214, 0.25)" : "rgba(15, 23, 42, 0.08)"}`
+                                                                        bgcolor: isFull ? "rgba(239, 68, 68, 0.1)" : hasBookings ? PRIMARY_LIGHT : "#F8FAFC",
+                                                                        color: isFull ? "#EF4444" : hasBookings ? PRIMARY_BRAND : "#64748B",
+                                                                        border: `1px solid ${isFull ? "rgba(239, 68, 68, 0.25)" : hasBookings ? "rgba(15, 118, 110, 0.25)" : "rgba(15, 23, 42, 0.08)"}`
                                                                     }}
                                                                 />
                                                             </Tooltip>
@@ -920,9 +947,9 @@ export default function ScheduleManagePage() {
                                                                     disabled={isPast}
                                                                     onClick={() => handleOpenEdit(sch)}
                                                                     sx={{
-                                                                        bgcolor: isPast ? "rgba(148, 163, 184, 0.12)" : "rgba(0, 136, 214, 0.08)",
-                                                                        color: isPast ? "#94A3B8" : "#0088D6",
-                                                                        "&:hover": { bgcolor: "rgba(0, 136, 214, 0.18)" }
+                                                                        bgcolor: isPast ? "rgba(148, 163, 184, 0.12)" : PRIMARY_LIGHT,
+                                                                        color: isPast ? "#94A3B8" : PRIMARY_BRAND,
+                                                                        "&:hover": { bgcolor: "rgba(15, 118, 110, 0.18)" }
                                                                     }}
                                                                 >
                                                                     <EditIcon fontSize="small" />
@@ -968,7 +995,7 @@ export default function ScheduleManagePage() {
                 }}
             >
                 <DialogTitle sx={{ fontWeight: 800, color: "#0F172A", display: "flex", alignItems: "center", gap: 1 }}>
-                    <AddIcon sx={{ color: "#0088D6" }} /> Phân Lịch Trực Mới Cho Bác Sĩ
+                    <AddIcon sx={{ color: PRIMARY_BRAND }} /> Phân Lịch Trực Mới Cho Bác Sĩ
                 </DialogTitle>
                 <DialogContent dividers sx={{ borderColor: "rgba(15, 23, 42, 0.08)" }}>
                     {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
@@ -1097,9 +1124,9 @@ export default function ScheduleManagePage() {
                             borderRadius: 2, 
                             textTransform: "none", 
                             fontWeight: 700, 
-                            bgcolor: "#0088D6",
-                            boxShadow: "0 4px 14px rgba(0, 136, 214, 0.25)",
-                            "&:hover": { bgcolor: "#0073B7" }
+                            bgcolor: PRIMARY_BRAND,
+                            boxShadow: "0 4px 14px rgba(15, 118, 110, 0.25)",
+                            "&:hover": { bgcolor: PRIMARY_DARK }
                         }}
                     >
                         {loading ? "Đang xử lý..." : "Xác Nhận Tạo Ca Trực"}
@@ -1121,7 +1148,7 @@ export default function ScheduleManagePage() {
                 }}
             >
                 <DialogTitle sx={{ fontWeight: 800, color: "#0F172A", display: "flex", alignItems: "center", gap: 1 }}>
-                    <EditIcon sx={{ color: "#0088D6" }} /> Cập Nhật Ca Trực Bác Sĩ
+                    <EditIcon sx={{ color: PRIMARY_BRAND }} /> Cập Nhật Ca Trực Bác Sĩ
                 </DialogTitle>
                 <DialogContent dividers sx={{ borderColor: "rgba(15, 23, 42, 0.08)" }}>
                     {editError && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{editError}</Alert>}
@@ -1285,9 +1312,9 @@ export default function ScheduleManagePage() {
                             borderRadius: 2, 
                             textTransform: "none", 
                             fontWeight: 700, 
-                            bgcolor: "#0088D6",
-                            boxShadow: "0 4px 14px rgba(0, 136, 214, 0.25)",
-                            "&:hover": { bgcolor: "#0073B7" }
+                            bgcolor: PRIMARY_BRAND,
+                            boxShadow: "0 4px 14px rgba(15, 118, 110, 0.25)",
+                            "&:hover": { bgcolor: PRIMARY_DARK }
                         }}
                     >
                         {editLoading ? "Đang lưu..." : "Lưu Thay Đổi"}

@@ -83,6 +83,8 @@ export default function NurseReceptionPage() {
     const [searchKeyword, setSearchKeyword] = useState("");
     const [feedback, setFeedback] = useState({ type: "", message: "" });
     const [counterRefreshKey, setCounterRefreshKey] = useState(0);
+    const [queueError, setQueueError] = useState("");
+    const [queueLoading, setQueueLoading] = useState(false);
 
     // 2. Chuyển đổi Tab chức năng chính để ĐƠN GIẢN HÓA GIAO DIỆN
     // Tab 0: Quầy Dịch Vụ & Thu Viện Phí PayOS (Mặc định)
@@ -215,7 +217,9 @@ export default function NurseReceptionPage() {
 
     const fetchQueueOnly = async () => {
         try {
-            const queueRes = await axiosInstance.get("/api/nurse/reception/queue").catch(() => null);
+            setQueueLoading(true);
+            const queueRes = await axiosInstance.get("/api/nurse/reception/queue");
+            setQueueError("");
             const rawList = Array.isArray(queueRes?.data?.data)
                 ? queueRes.data.data
                 : (Array.isArray(queueRes?.data) ? queueRes.data : []);
@@ -226,17 +230,17 @@ export default function NurseReceptionPage() {
                     queueNumber: item.queueNumber || (idx + 1),
                     queueCode: item.queueCode || `#${item.queueNumber || idx + 1}`,
                     patientName: item.patientName || "Bệnh nhân",
-                    phone: item.patientPhone || item.phone || "09xxxx",
+                    phone: item.patientPhone || item.phone || "Chưa có dữ liệu",
                     departmentName: item.departmentName || "Khoa khám",
                     departmentId: item.departmentId,
-                    roomName: item.roomName || "Phòng 101",
+                    roomName: item.roomName || "Chờ phân phòng",
                     roomId: item.roomId,
-                    doctorName: item.doctorName || "BS. Phụ trách",
+                    doctorName: item.doctorName || "Chưa phân công",
                     doctorId: item.doctorId,
                     status: item.status === "IN_PROGRESS" ? "EXAMINING" : item.status === "CONFIRMED" ? "WAITING" : item.status,
                     checkedInAt: item.checkedInAt || null,
-                    checkInTime: item.checkedInAt?.slice(11, 16) || item.startTime || "08:00",
-                    symptoms: item.symptoms || "Khám theo chuyên khoa",
+                    checkInTime: item.checkedInAt?.slice(11, 16) || item.startTime || "--:--",
+                    symptoms: item.symptoms || "Chưa ghi nhận",
                     isPaid: Boolean(item.isPaid),
                     price: item.price != null ? Number(item.price) : (item.examinationFee != null ? Number(item.examinationFee) : 0),
                     isDispatched: Boolean(item.isDispatched),
@@ -247,6 +251,9 @@ export default function NurseReceptionPage() {
             }
         } catch (err) {
             console.error("Lỗi cập nhật hàng đợi:", err);
+            setQueueError("Không thể tải danh sách hàng đợi tiếp đón. Vui lòng kiểm tra kết nối mạng và thử lại.");
+        } finally {
+            setQueueLoading(false);
         }
     };
 
@@ -316,7 +323,7 @@ export default function NurseReceptionPage() {
         const defaultRooms = deptRooms.map(r => ({
             roomId: String(r.roomId),
             roomName: r.roomName,
-            doctorName: r.doctorName || "BS. Phụ trách",
+            doctorName: r.doctorName || "Chưa phân công",
             departmentName: r.departmentName || "Khoa Khám Bệnh"
         }));
 
@@ -352,26 +359,28 @@ export default function NurseReceptionPage() {
     // Hàm gọi nộp tiền từ danh sách: Chuyển sang Tab 0 và kích hoạt gọi số tại quầy
     const handleCallPatientToPay = (item) => {
         if (!item) return;
-        const ticketCode = item.queueCode || `#${item.queueNumber || 1}`;
+        // Giữ riêng mã vé quầy và mã hàng đợi khám: KHÔNG gán queueCode (khám) thành ticketCode (quầy)!
         setPatientToCall({
             ...item,
-            ticketCode,
+            ticketCode: item.ticketCode || null,
+            bookingQueueCode: item.bookingQueueCode || item.queueCode || null,
             _timestamp: Date.now()
         });
         setActiveMainTab(0); // Tự động chuyển ngay sang Tab Quầy tiếp đón
+        const ident = item.ticketCode ? `vé quầy ${item.ticketCode}` : (item.bookingCode ? `mã hẹn ${item.bookingCode}` : "");
         setFeedback({
             type: "info",
-            message: `🔔 Đang phát loa gọi bệnh nhân [${item.patientName}] (${ticketCode}) vào Quầy tiếp đón để nộp viện phí!`
+            message: `🔔 Đang chuyển bệnh nhân [${item.patientName}]${ident ? ` (${ident})` : ""} sang Quầy tiếp đón để nộp viện phí!`
         });
     };
 
     // Hàm thu tiền nhanh từ danh sách: Chuyển sang Tab 0 và mở modal PayOS VietQR
     const handleDirectPayPatient = (item) => {
         if (!item) return;
-        const ticketCode = item.queueCode || `#${item.queueNumber || 1}`;
         setPatientToCall({
             ...item,
-            ticketCode,
+            ticketCode: item.ticketCode || null,
+            bookingQueueCode: item.bookingQueueCode || item.queueCode || null,
             openPayNow: true,
             _timestamp: Date.now()
         });
@@ -395,26 +404,10 @@ export default function NurseReceptionPage() {
             const res = await axiosInstance.get(`/api/patient-profiles?search=${encodeURIComponent(query)}`);
             const profiles = Array.isArray(res.data?.data) ? res.data.data : (Array.isArray(res.data) ? res.data : []);
 
-            let exactMatch = profiles.find(p =>
-                (p.phoneNumber && p.phoneNumber === query) ||
-                (p.identityCard && p.identityCard === query)
-            );
-
-            if (exactMatch) {
-                setFoundPatient(exactMatch);
-                setCandidateProfiles([exactMatch]);
-                setFeedback({ type: "success", message: `Đã tìm thấy hồ sơ chính xác: ${exactMatch.fullName}` });
-            } else if (profiles.length === 1) {
-                setFoundPatient(profiles[0]);
-                setCandidateProfiles(profiles);
-                setFeedback({ type: "success", message: `Đã tìm thấy 1 hồ sơ phù hợp: ${profiles[0].fullName}` });
-            } else if (profiles.length > 1) {
-                setCandidateProfiles(profiles);
-                setFeedback({ type: "info", message: `Tìm thấy ${profiles.length} hồ sơ khả dụng. Vui lòng đối chiếu và chọn hồ sơ bệnh nhân bên dưới.` });
-            } else {
-                setCandidateProfiles([]);
-                setFeedback({ type: "info", message: "Không tìm thấy hồ sơ cũ phù hợp. Điều dưỡng có thể bấm Tiếp Nhận Mới để đăng ký." });
-            }
+            const { foundPatient: matchedPatient, candidateProfiles: matchedCandidates, feedback: fb } = processPatientLookupResults(query, profiles);
+            setFoundPatient(matchedPatient);
+            setCandidateProfiles(matchedCandidates);
+            setFeedback(fb);
         } catch (err) {
             console.error("Lỗi tra cứu:", err);
             setFeedback({ type: "error", message: "Không thể kết nối đến máy chủ tra cứu hồ sơ." });
@@ -487,13 +480,15 @@ export default function NurseReceptionPage() {
                 bookingId: data.bookingId,
                 bookingCode: data.bookingCode,
                 queueNumber: data.queueNumber,
-                queueCode: data.queueCode || `#${String(data.queueNumber).padStart(2, '0')}`,
+                queueCode: data.queueCode || (data.queueNumber != null ? `#${data.queueNumber}` : null),
+                bookingQueueCode: data.queueCode || null,
+                ticketCode: data.ticketCode || null,
                 patientName: data.patientName || newProfile.fullName,
                 phone: data.phone || newProfile.phoneNumber,
-                departmentName: data.departmentName || departments.find(d => String(d.departmentId) === String(newProfile.departmentId))?.departmentName || "Khoa Khám Bệnh",
+                departmentName: data.departmentName || departments.find(d => String(d.departmentId) === String(newProfile.departmentId))?.departmentName || "Chưa có thông tin khoa",
                 departmentId: data.departmentId || newProfile.departmentId,
                 roomName: data.roomName || "Chờ phân phòng",
-                doctorName: data.doctorName || "BS. Phụ trách",
+                doctorName: data.doctorName || "Chưa phân công bác sĩ",
                 status: data.status || "WAITING",
                 isPaid: !!data.isPaid,
                 price: data.price != null ? Number(data.price) : (data.examinationFee != null ? Number(data.examinationFee) : 0),
@@ -508,7 +503,7 @@ export default function NurseReceptionPage() {
             setPrintTicket(newEntry);
             setFeedback({
                 type: "success",
-                message: `✅ Tiếp nhận & Cấp số thứ tự thành công cho [${newEntry.patientName}] - STT: ${newEntry.queueCode}!`
+                message: `✅ Tiếp nhận thành công cho [${newEntry.patientName}]${newEntry.queueCode ? ` - STT khám: ${newEntry.queueCode}` : ""}!`
             });
             await fetchQueueOnly();
             setCounterRefreshKey(k => k + 1);
@@ -913,6 +908,19 @@ export default function NurseReceptionPage() {
                     </Box>
 
                     {/* BẢNG DANH SÁCH BỆNH NHÂN TIẾP ĐÓN */}
+                    {queueError && (
+                        <Alert
+                            severity="error"
+                            action={
+                                <Button color="inherit" size="small" onClick={fetchQueueOnly} sx={{ fontWeight: 800 }}>
+                                    Thử Lại
+                                </Button>
+                            }
+                            sx={{ mb: 2, borderRadius: 2 }}
+                        >
+                            {queueError}
+                        </Alert>
+                    )}
                     <TableContainer sx={{ borderRadius: 2.5, border: "1px solid #E2E8F0" }}>
                         <Table size="medium">
                             <TableHead sx={{ bgcolor: "#F8FAFC" }}>
@@ -1285,13 +1293,29 @@ export default function NurseReceptionPage() {
                                                 <Chip label={p.gender === "MALE" ? "Nam" : "Nữ"} size="small" sx={{ height: 18, fontSize: "0.65rem" }} />
                                             </Box>
                                             <Typography variant="caption" color="#475569" display="block">
-                                                SĐT: <b>{p.phoneNumber || "---"}</b> • CCCD: <b>{p.identityCard || "---"}</b> • NS: <b>{p.dateOfBirth ? formatDate(p.dateOfBirth) : "Chưa có dữ liệu"}</b>
+                                                SĐT: <b>{p.phoneNumber || "---"}</b> • NS: <b>{p.dateOfBirth ? formatDate(p.dateOfBirth) : "Chưa có dữ liệu"}</b>
+                                                {p.identityCard ? ` • CCCD: •••• ${p.identityCard.slice(-4)}` : ""}
+                                                {p.relationship ? ` • Quan hệ: ${p.relationship}` : ""}
                                             </Typography>
-                                            {p.address && (
-                                                <Typography variant="caption" color="#64748B" display="block" noWrap>
-                                                    Đ/C: {p.address}
-                                                </Typography>
-                                            )}
+                                            <Box display="flex" justifyContent="flex-end" mt={0.5}>
+                                                <Button
+                                                    size="small"
+                                                    variant={isSelected ? "contained" : "outlined"}
+                                                    sx={{
+                                                        fontSize: "0.72rem",
+                                                        py: 0.2,
+                                                        px: 1.2,
+                                                        borderRadius: 1.5,
+                                                        textTransform: "none",
+                                                        fontWeight: 700,
+                                                        bgcolor: isSelected ? "#0D9488" : "transparent",
+                                                        color: isSelected ? "#FFFFFF" : "#0D9488",
+                                                        borderColor: "#0D9488"
+                                                    }}
+                                                >
+                                                    {isSelected ? "Đang Chọn" : "Chọn Hồ Sơ Này"}
+                                                </Button>
+                                            </Box>
                                         </Card>
                                     );
                                 })}
@@ -1311,7 +1335,10 @@ export default function NurseReceptionPage() {
                                 </Box>
                                 <Chip label={foundPatient.gender === "MALE" ? "Nam" : "Nữ"} color="primary" size="small" sx={{ fontWeight: 700 }} />
                             </Box>
-                            <Typography variant="body2" color="#475569">SĐT: <b>{foundPatient.phoneNumber}</b> • CCCD: <b>{foundPatient.identityCard || "---"}</b></Typography>
+                            <Typography variant="body2" color="#475569">
+                                SĐT: <b>{foundPatient.phoneNumber}</b>
+                                {foundPatient.identityCard ? ` • CCCD: •••• ${foundPatient.identityCard.slice(-4)}` : ""}
+                            </Typography>
                             <Typography variant="body2" color="#475569">Ngày sinh: <b>{foundPatient.dateOfBirth ? formatDate(foundPatient.dateOfBirth) : "Chưa có dữ liệu"}</b></Typography>
                             <Typography variant="body2" color="#475569">Địa chỉ: <b>{foundPatient.address || "---"}</b></Typography>
                             {foundPatient.medicalHistory && (
@@ -1724,4 +1751,35 @@ export default function NurseReceptionPage() {
             </Dialog>
         </Container>
     );
+}
+
+export function processPatientLookupResults(query, profiles = []) {
+    const trimmedQuery = (query || "").trim();
+    const cccdMatches = profiles.filter(p => p.identityCard && p.identityCard.trim() === trimmedQuery);
+
+    if (cccdMatches.length === 1) {
+        return {
+            foundPatient: cccdMatches[0],
+            candidateProfiles: cccdMatches,
+            feedback: { type: "success", message: `Đã tìm thấy hồ sơ chính xác: ${cccdMatches[0].fullName}` }
+        };
+    } else if (profiles.length === 1) {
+        return {
+            foundPatient: profiles[0],
+            candidateProfiles: profiles,
+            feedback: { type: "success", message: `Đã tìm thấy 1 hồ sơ phù hợp: ${profiles[0].fullName}` }
+        };
+    } else if (profiles.length > 1) {
+        return {
+            foundPatient: null,
+            candidateProfiles: profiles,
+            feedback: { type: "info", message: `Tìm thấy ${profiles.length} hồ sơ khả dụng. Vui lòng đối chiếu và chọn đúng người bệnh bên dưới.` }
+        };
+    } else {
+        return {
+            foundPatient: null,
+            candidateProfiles: [],
+            feedback: { type: "info", message: "Không tìm thấy hồ sơ cũ phù hợp. Điều dưỡng có thể bấm Tiếp Nhận Mới để đăng ký." }
+        };
+    }
 }

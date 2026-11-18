@@ -46,7 +46,18 @@ export default function SlotReservationScreen({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const activeReservationIdRef = useRef<string | null>(null);
+  const activeReservationProfileIdRef = useRef<string | null>(null);
+  const reservationSeqRef = useRef(0);
+  const selectedProfileIdRef = useRef('');
   const bookingConfirmedRef = useRef(false);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -57,6 +68,7 @@ export default function SlotReservationScreen({
         setProfiles(list);
         if (list.length > 0) {
           setSelectedProfileId(list[0].patientProfileId);
+          selectedProfileIdRef.current = list[0].patientProfileId;
         }
       } catch (err) {
         if (active) {
@@ -77,19 +89,50 @@ export default function SlotReservationScreen({
     };
   }, [profilesService, reservationsService]);
 
+  const handleSelectProfile = (profileId: string) => {
+    if (submitting) return;
+    if (profileId === selectedProfileId) return;
+
+    reservationSeqRef.current += 1;
+
+    const currentResId = activeReservationIdRef.current;
+    if (currentResId) {
+      activeReservationIdRef.current = null;
+      activeReservationProfileIdRef.current = null;
+      setReservation(null);
+      void reservationsService.releaseSlot(currentResId).catch(() => undefined);
+    }
+    setSelectedProfileId(profileId);
+    selectedProfileIdRef.current = profileId;
+  };
+
   const handleReserveSlot = async () => {
+    if (submitting) return;
     if (!selectedProfileId) {
       setErrorMessage('Vui lòng chọn hồ sơ bệnh nhân.');
       return;
     }
+    const requestedProfileId = selectedProfileId;
+    const requestSeq = ++reservationSeqRef.current;
     setErrorMessage(null);
     setConflictMessage(null);
     setSubmitting(true);
     try {
-      const held = await reservationsService.reserveSlot(timeSlotId, selectedProfileId);
+      const held = await reservationsService.reserveSlot(timeSlotId, requestedProfileId);
+      const isStale =
+        !isMountedRef.current ||
+        requestSeq !== reservationSeqRef.current ||
+        requestedProfileId !== selectedProfileIdRef.current;
+
+      if (isStale) {
+        void reservationsService.releaseSlot(held.reservationId).catch(() => undefined);
+        return;
+      }
       activeReservationIdRef.current = held.reservationId;
+      activeReservationProfileIdRef.current = requestedProfileId;
       setReservation(held);
     } catch (err) {
+      if (!isMountedRef.current || requestSeq !== reservationSeqRef.current) return;
       if (err instanceof ApiClientError && (err.status === 409 || err.status === 400)) {
         setConflictMessage(
           err.message || 'Khung giờ vừa được đặt đầy hoặc hết hạn. Đang cập nhật lại lịch khám.'
@@ -101,14 +144,18 @@ export default function SlotReservationScreen({
         );
       }
     } finally {
-      setSubmitting(false);
+      if (isMountedRef.current && requestSeq === reservationSeqRef.current) {
+        setSubmitting(false);
+      }
     }
   };
 
   const handleCancelAndRelease = async () => {
+    if (submitting) return;
     const currentResId = activeReservationIdRef.current;
     if (currentResId) {
       activeReservationIdRef.current = null;
+      activeReservationProfileIdRef.current = null;
       setReservation(null);
       await reservationsService.releaseSlot(currentResId).catch(() => undefined);
     }
@@ -116,8 +163,14 @@ export default function SlotReservationScreen({
   };
 
   const handleCreateBooking = async () => {
+    if (submitting) return;
     if (!reservation) {
       setErrorMessage('Vui lòng giữ chỗ khung giờ trước khi xác nhận đặt khám.');
+      return;
+    }
+    const bookingProfileId = activeReservationProfileIdRef.current ?? selectedProfileId;
+    if (!bookingProfileId || bookingProfileId !== selectedProfileId) {
+      setErrorMessage('Hồ sơ bệnh nhân không khớp với phiên giữ chỗ. Vui lòng giữ chỗ lại.');
       return;
     }
     if (!symptoms.trim()) {
@@ -129,18 +182,22 @@ export default function SlotReservationScreen({
     setSubmitting(true);
     try {
       const created = await bookingService.createBooking({
-        patientProfileId: selectedProfileId,
+        patientProfileId: bookingProfileId,
         timeSlotId,
         symptoms: symptoms.trim(),
         reservationId: reservation.reservationId,
       });
+      if (!isMountedRef.current) return;
       bookingConfirmedRef.current = true;
       activeReservationIdRef.current = null;
+      activeReservationProfileIdRef.current = null;
       router.replace(`/(patient)/appointments/${created.bookingId}` as never);
     } catch (err) {
+      if (!isMountedRef.current) return;
       if (activeReservationIdRef.current) {
         const toRelease = activeReservationIdRef.current;
         activeReservationIdRef.current = null;
+        activeReservationProfileIdRef.current = null;
         setReservation(null);
         await reservationsService.releaseSlot(toRelease).catch(() => undefined);
       }
@@ -153,12 +210,18 @@ export default function SlotReservationScreen({
         );
       }
     } finally {
-      setSubmitting(false);
+      if (isMountedRef.current) {
+        setSubmitting(false);
+      }
     }
   };
 
   return (
     <ScrollView style={styles.screen} testID="slot-reservation-screen">
+      <View style={styles.stepHeader}>
+        <Text style={styles.stepBadge}>Bước 3 / 3</Text>
+        <Text style={styles.stepSubtext}>Quy trình đặt khám</Text>
+      </View>
       <Text style={styles.title}>Giữ chỗ & Xác nhận đặt khám</Text>
 
       {loading ? <ActivityIndicator color={tokens.colors.primary} /> : null}
@@ -182,8 +245,11 @@ export default function SlotReservationScreen({
           style={[
             styles.profileChip,
             selectedProfileId === p.patientProfileId && styles.profileChipActive,
+            submitting && styles.profileChipDisabled,
           ]}
-          onPress={() => setSelectedProfileId(p.patientProfileId)}
+          onPress={() => handleSelectProfile(p.patientProfileId)}
+          disabled={submitting}
+          accessibilityState={{ disabled: submitting }}
         >
           <Text style={styles.profileName}>{p.fullName}</Text>
         </Pressable>
@@ -192,11 +258,14 @@ export default function SlotReservationScreen({
       {!reservation ? (
         <Pressable
           testID="reserve-slot-button"
-          style={styles.primaryBtn}
+          style={[styles.primaryBtn, submitting && styles.primaryBtnDisabled]}
           onPress={() => void handleReserveSlot()}
           disabled={submitting}
+          accessibilityState={{ disabled: submitting }}
         >
-          <Text style={styles.primaryBtnText}>Giữ chỗ khung giờ</Text>
+          <Text style={styles.primaryBtnText}>
+            {submitting ? 'Đang giữ chỗ...' : 'Giữ chỗ khung giờ'}
+          </Text>
         </Pressable>
       ) : (
         <View testID="active-reservation-box" style={styles.reservationBox}>
@@ -212,19 +281,24 @@ export default function SlotReservationScreen({
           />
           <Pressable
             testID="confirm-booking-button"
-            style={styles.primaryBtn}
+            style={[styles.primaryBtn, submitting && styles.primaryBtnDisabled]}
             onPress={() => void handleCreateBooking()}
             disabled={submitting}
+            accessibilityState={{ disabled: submitting }}
           >
-            <Text style={styles.primaryBtnText}>Xác nhận đặt khám</Text>
+            <Text style={styles.primaryBtnText}>
+              {submitting ? 'Đang xử lý đặt khám...' : 'Xác nhận đặt khám'}
+            </Text>
           </Pressable>
         </View>
       )}
 
       <Pressable
         testID="abandon-reservation-button"
-        style={styles.cancelBtn}
+        style={[styles.cancelBtn, submitting && styles.cancelBtnDisabled]}
         onPress={() => void handleCancelAndRelease()}
+        disabled={submitting}
+        accessibilityState={{ disabled: submitting }}
       >
         <Text style={styles.cancelBtnText}>Quay lại / Hủy giữ chỗ</Text>
       </Pressable>
@@ -238,9 +312,28 @@ const styles = StyleSheet.create({
     backgroundColor: tokens.colors.background,
     padding: tokens.spacing.lg,
   },
+  stepHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacing.xs,
+    marginBottom: tokens.spacing.xs,
+  },
+  stepBadge: {
+    fontSize: tokens.typography.caption,
+    fontWeight: '700',
+    color: tokens.colors.primary,
+    backgroundColor: tokens.colors.primaryLight,
+    paddingHorizontal: tokens.spacing.sm,
+    paddingVertical: 2,
+    borderRadius: tokens.radius.pill,
+  },
+  stepSubtext: {
+    fontSize: tokens.typography.caption,
+    color: tokens.colors.textMuted,
+  },
   title: {
     fontSize: tokens.typography.title,
-    fontWeight: '700',
+    fontWeight: '800',
     color: tokens.colors.primaryDark,
     marginBottom: tokens.spacing.md,
   },
@@ -270,10 +363,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: tokens.colors.border,
     marginBottom: tokens.spacing.xs,
+    minHeight: 48,
+    justifyContent: 'center',
   },
   profileChipActive: {
     borderColor: tokens.colors.primary,
     backgroundColor: tokens.colors.primaryLight,
+  },
+  profileChipDisabled: {
+    opacity: 0.6,
   },
   profileName: {
     fontWeight: '600',
@@ -302,6 +400,11 @@ const styles = StyleSheet.create({
     borderRadius: tokens.radius.sm,
     alignItems: 'center',
     marginTop: tokens.spacing.sm,
+    minHeight: 48,
+    justifyContent: 'center',
+  },
+  primaryBtnDisabled: {
+    opacity: 0.6,
   },
   primaryBtnText: {
     color: tokens.colors.surface,
@@ -311,6 +414,11 @@ const styles = StyleSheet.create({
     marginTop: tokens.spacing.md,
     paddingVertical: tokens.spacing.md,
     alignItems: 'center',
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  cancelBtnDisabled: {
+    opacity: 0.5,
   },
   cancelBtnText: {
     color: tokens.colors.textSecondary,

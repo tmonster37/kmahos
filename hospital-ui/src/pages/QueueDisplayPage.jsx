@@ -109,8 +109,8 @@ export default function QueueDisplayPage() {
                             queueCode: latestCalled.queueCode,
                             queueNumber: latestCalled.queueNumber,
                             patientName: latestCalled.patientName,
-                            roomName: latestCalled.roomName || "01",
-                            departmentName: latestCalled.departmentName || "Khám Bệnh",
+                            roomName: latestCalled.roomName || null,
+                            departmentName: latestCalled.departmentName || null,
                             isPriority: latestCalled.isPriority,
                             isReturnAfterResult: Boolean(latestCalled.isReturnAfterResult || (latestCalled.queueCode && latestCalled.queueCode.startsWith("KQ")))
                         });
@@ -134,21 +134,29 @@ export default function QueueDisplayPage() {
 
     // Nhóm theo từng buồng phòng khám
     const roomsMap = {};
+    const unassignedTickets = [];
     filteredQueue.forEach(item => {
         if (item.status === "COMPLETED" || item.status === "CANCELLED") return;
-        const rName = item.roomName || "Phòng Khám 101";
-        if (!roomsMap[rName]) {
-            roomsMap[rName] = {
-                roomName: rName,
-                departmentName: item.departmentName || "Khoa Khám Bệnh",
+        const rawRoom = (item.roomName || "").trim();
+        const isUnassigned = !rawRoom || rawRoom.toLowerCase() === "chờ phân phòng" || rawRoom.toLowerCase() === "cho phan phong";
+
+        if (isUnassigned) {
+            unassignedTickets.push(item);
+            return;
+        }
+
+        if (!roomsMap[rawRoom]) {
+            roomsMap[rawRoom] = {
+                roomName: rawRoom,
+                departmentName: item.departmentName || "Chưa có thông tin khoa",
                 current: null,
                 waiting: []
             };
         }
-        if ((item.status === "IN_PROGRESS" || item.recordState === "CALLING") && !roomsMap[rName].current) {
-            roomsMap[rName].current = item;
+        if ((item.status === "IN_PROGRESS" || item.recordState === "CALLING") && !roomsMap[rawRoom].current) {
+            roomsMap[rawRoom].current = item;
         } else {
-            roomsMap[rName].waiting.push(item);
+            roomsMap[rawRoom].waiting.push(item);
         }
     });
 
@@ -160,7 +168,7 @@ export default function QueueDisplayPage() {
     const upcomingQueue = filteredQueue.filter((p) => p !== currentCalling && p.status !== "COMPLETED" && p.status !== "CANCELLED");
 
     // Tính toán số người đang chờ phía trước cho phiếu cá nhân
-    const myTicketQueueCode = myTicket?.queueCode || (myTicket?.queueNumber ? `KB-${String(myTicket.queueNumber).padStart(2, '0')}` : null);
+    const myTicketQueueCode = myTicket?.queueCode || (myTicket?.queueNumber ? `#${myTicket.queueNumber}` : null);
     const peopleAheadCount = myTicket && queue.length > 0
         ? queue.filter(q => q.status === "WAITING" && q.queueNumber < (myTicket.queueNumber || 9999)).length
         : 0;
@@ -367,7 +375,7 @@ export default function QueueDisplayPage() {
                                     my: 0.5
                                 }}
                             >
-                                {myTicketQueueCode || myTicket.queueCode || `KB-${myTicket.queueNumber}`}
+                                {myTicketQueueCode || myTicket.queueCode || (myTicket.queueNumber != null ? `#${myTicket.queueNumber}` : "---")}
                             </Typography>
                             <Typography variant="body2" sx={{ color: "#E2E8F0", fontWeight: 700 }}>
                                 {myTicket.patientName}
@@ -382,13 +390,13 @@ export default function QueueDisplayPage() {
                                 <Box display="flex" alignItems="center" gap={1}>
                                     <MeetingRoomIcon sx={{ color: "#38BDF8", fontSize: 20 }} />
                                     <Typography variant="body2" sx={{ color: "#F8FAFC" }}>
-                                        <strong>Phòng khám:</strong> {myTicket.roomName || "Phòng khám"} • {myTicket.departmentName || "Khoa Khám Bệnh"}
+                                        <strong>Phòng khám:</strong> {myTicket.roomName || "Chưa có thông tin phòng"} • {myTicket.departmentName || "Chưa có thông tin khoa"}
                                     </Typography>
                                 </Box>
                                 <Box display="flex" alignItems="center" gap={1}>
                                     <PersonSearchIcon sx={{ color: "#34D399", fontSize: 20 }} />
                                     <Typography variant="body2" sx={{ color: "#F8FAFC" }}>
-                                        <strong>Bác sĩ phụ trách:</strong> {myTicket.doctorName || "Bác sĩ chuyên khoa"}
+                                        <strong>Bác sĩ phụ trách:</strong> {myTicket.doctorName || "Chưa phân công bác sĩ"}
                                     </Typography>
                                 </Box>
                             </Stack>
@@ -410,7 +418,9 @@ export default function QueueDisplayPage() {
                                         }}
                                     />
                                     <Typography variant="caption" display="block" sx={{ color: "#A7F3D0", mt: 0.8, fontWeight: 600 }}>
-                                        Mời bạn tiến vào {myTicket.roomName || "phòng khám"} gặp {myTicket.doctorName}
+                                        {myTicket.roomName
+                                            ? `Mời bạn tiến vào ${myTicket.roomName}${myTicket.doctorName ? ` gặp ${myTicket.doctorName}` : ''}`
+                                            : 'Mời bạn chú ý thông báo hoặc liên hệ quầy tiếp đón để được hướng dẫn buồng khám'}
                                     </Typography>
                                 </Box>
                             ) : myTicket.status === "COMPLETED" || myTicket.status === "DONE" ? (
@@ -577,7 +587,7 @@ export default function QueueDisplayPage() {
                                                                             color: isWReturn ? "#34D399" : (isWPri ? "#F87171" : "#FBBF24")
                                                                         }}
                                                                     >
-                                                                        #{w.queueCode || w.queueNumber}
+                                                                        {w.queueCode || (w.queueNumber ? `#${w.queueNumber}` : "---")}
                                                                     </Typography>
                                                                     {isWReturn && (
                                                                         <Typography variant="caption" sx={{ fontSize: "0.65rem", color: "#6EE7B7", fontWeight: 700 }}>
@@ -608,6 +618,69 @@ export default function QueueDisplayPage() {
                                 <Typography variant="h6" color="#94A3B8">
                                     Hiện chưa có lượt khám nào trong hàng đợi hôm nay.
                                 </Typography>
+                            </Paper>
+                        </Grid>
+                    )}
+
+                    {/* Bệnh nhân chưa phân buồng: Hiển thị nhóm riêng biệt tại sảnh chờ, không tạo card buồng khám bác sĩ giả */}
+                    {unassignedTickets.length > 0 && (
+                        <Grid item xs={12}>
+                            <Paper
+                                elevation={0}
+                                sx={{
+                                    p: 2.5,
+                                    borderRadius: "16px",
+                                    bgcolor: "rgba(15, 23, 42, 0.75)",
+                                    border: "1px dashed rgba(251, 191, 36, 0.35)",
+                                    backdropFilter: "blur(12px)"
+                                }}
+                            >
+                                <Box display="flex" alignItems="center" gap={1} mb={1.5} flexWrap="wrap">
+                                    <HourglassEmptyIcon sx={{ color: "#FBBF24", fontSize: 20 }} />
+                                    <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "#FBBF24", letterSpacing: "0.02em" }}>
+                                        DANH SÁCH BỆNH NHÂN CHỜ TIẾP ĐÓN PHÂN BỔ BUỒNG KHÁM ({unassignedTickets.length})
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ color: "#94A3B8" }}>
+                                        • Vui lòng chú ý loa gọi số tại các Quầy Tiếp Đón Sảnh
+                                    </Typography>
+                                </Box>
+                                <Grid container spacing={1.5}>
+                                    {unassignedTickets.map((u, uIdx) => (
+                                        <Grid item xs={12} sm={6} md={4} lg={3} key={uIdx}>
+                                            <Box
+                                                sx={{
+                                                    p: 1.5,
+                                                    borderRadius: "10px",
+                                                    bgcolor: "rgba(255, 255, 255, 0.04)",
+                                                    border: "1px solid rgba(255, 255, 255, 0.08)",
+                                                    display: "flex",
+                                                    justifyContent: "space-between",
+                                                    alignItems: "center"
+                                                }}
+                                            >
+                                                <Box>
+                                                    <Typography variant="body2" sx={{ fontWeight: 800, color: "#FBBF24", fontFamily: "monospace" }}>
+                                                        {u.queueCode || (u.queueNumber ? `#${u.queueNumber}` : (u.ticketCode || "---"))}
+                                                    </Typography>
+                                                    <Typography variant="caption" sx={{ color: "#E2E8F0", fontWeight: 600 }} noWrap>
+                                                        {u.patientName}
+                                                    </Typography>
+                                                </Box>
+                                                <Chip
+                                                    label={u.departmentName || "Chờ tiếp đón"}
+                                                    size="small"
+                                                    sx={{
+                                                        height: 22,
+                                                        fontSize: "0.7rem",
+                                                        bgcolor: "rgba(251, 191, 36, 0.15)",
+                                                        color: "#FBBF24",
+                                                        fontWeight: 700
+                                                    }}
+                                                />
+                                            </Box>
+                                        </Grid>
+                                    ))}
+                                </Grid>
                             </Paper>
                         </Grid>
                     )}
@@ -700,7 +773,7 @@ export default function QueueDisplayPage() {
                                         }}
                                     >
                                         <Typography variant="subtitle1" sx={{ color: "#34D399", fontWeight: 700 }}>
-                                            📍 {currentCalling?.roomName || "Phòng 101"} • {currentCalling?.departmentName || "Khoa Khám Bệnh"}
+                                            📍 {currentCalling?.roomName || "Chưa phân buồng khám"} • {currentCalling?.departmentName || "Chưa có thông tin khoa"}
                                         </Typography>
                                     </Paper>
                                 </Box>

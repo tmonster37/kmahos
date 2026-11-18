@@ -64,6 +64,60 @@ import axiosInstance from "../../services/AxiosInstance";
 import { formatCurrency, formatDateTime } from "../../utils/formatters";
 import { printReceipt, printShiftReconciliation } from "../../utils/printHelper";
 
+export function isBillTotalAmountValid(billOrAmount) {
+    if (billOrAmount == null) return false;
+    const val = typeof billOrAmount === "object"
+        ? (billOrAmount.totalAmount !== undefined ? billOrAmount.totalAmount : billOrAmount.amount)
+        : billOrAmount;
+    if (val == null) return false;
+    if (typeof val === "string") {
+        const trimmed = val.trim();
+        if (trimmed === "") return false;
+        const num = Number(trimmed);
+        return Number.isFinite(num) && num >= 0;
+    }
+    if (typeof val === "number") {
+        return Number.isFinite(val) && val >= 0;
+    }
+    return false;
+}
+
+export async function executeCashierPayment({
+    selectedBill,
+    paymentMethod,
+    cashGiven,
+    paymentSuccess,
+    apiClient = axiosInstance
+}) {
+    if (!selectedBill) throw new Error("Chưa chọn hóa đơn thanh toán.");
+
+    if (!isBillTotalAmountValid(selectedBill)) {
+        throw new Error("Hóa đơn chưa có tổng tiền hợp lệ từ hệ thống. Thao tác thanh toán bị khóa để đảm bảo an toàn tài chính.");
+    }
+
+    if (paymentMethod === "QR" && !paymentSuccess) {
+        throw new Error("Thanh toán PayOS VietQR cần được xác nhận tự động từ ngân hàng hoặc đồng bộ qua nút 'Đồng Bộ PayOS Ngay' trước khi xuất biên lai.");
+    }
+
+    if (paymentMethod === "CASH") {
+        if (cashGiven === "" || isNaN(Number(cashGiven)) || Number(cashGiven) < Number(selectedBill.totalAmount)) {
+            throw new Error("Số tiền khách đưa không hợp lệ hoặc chưa đủ để thanh toán.");
+        }
+    }
+
+    const methodToSend = paymentMethod === "QR" ? "PAYOS" : paymentMethod;
+    const targetBookingCode = selectedBill.billId || selectedBill.bookingCode;
+
+    const res = await apiClient.post("/api/cashier/pay", {
+        bookingCode: targetBookingCode,
+        paymentMethod: methodToSend,
+        amountGiven: paymentMethod === "CASH" ? Number(cashGiven) : Number(selectedBill.totalAmount),
+        notes: `Thu viện phí tại quầy cho ${targetBookingCode} qua ${methodToSend}`
+    });
+
+    return res.data?.data || res.data;
+}
+
 export default function CashierPage() {
     const [searchKeyword, setSearchKeyword] = useState("");
     const [pendingBills, setPendingBills] = useState([]);
@@ -143,16 +197,36 @@ export default function CashierPage() {
             const formattedHistory = Array.isArray(history) ? history : [];
             setPaidHistory(formattedHistory);
 
-            const total = formattedHistory.reduce((acc, cur) => acc + (Number(cur.totalAmount) || 0), 0);
+            let hasMissingAmount = false;
+            for (const item of formattedHistory) {
+                if (!isBillTotalAmountValid(item)) {
+                    hasMissingAmount = true;
+                    break;
+                }
+            }
+            const total = formattedHistory.reduce((acc, cur) => {
+                if (!isBillTotalAmountValid(cur)) {
+                    hasMissingAmount = true;
+                    return acc;
+                }
+                return acc + Number(cur.totalAmount);
+            }, 0);
             const cash = formattedHistory
                 .filter(p => p.paymentMethod === "CASH" || p.paymentMethod === "COUNTER_CASH")
-                .reduce((acc, cur) => acc + (Number(cur.totalAmount) || 0), 0);
+                .reduce((acc, cur) => {
+                    if (!isBillTotalAmountValid(cur)) {
+                        hasMissingAmount = true;
+                        return acc;
+                    }
+                    return acc + Number(cur.totalAmount);
+                }, 0);
 
             setShiftStats({
                 totalCollected: total,
                 cashTotal: cash,
                 digitalTotal: total - cash,
                 transactionCount: formattedHistory.length,
+                hasMissingAmount,
                 hasError: false
             });
         } catch (err) {
@@ -176,16 +250,36 @@ export default function CashierPage() {
             const formattedHistory = Array.isArray(history) ? history : [];
             setPaidHistory(formattedHistory);
 
-            const total = formattedHistory.reduce((acc, cur) => acc + (Number(cur.totalAmount) || 0), 0);
+            let hasMissingAmount = false;
+            for (const item of formattedHistory) {
+                if (!isBillTotalAmountValid(item)) {
+                    hasMissingAmount = true;
+                    break;
+                }
+            }
+            const total = formattedHistory.reduce((acc, cur) => {
+                if (!isBillTotalAmountValid(cur)) {
+                    hasMissingAmount = true;
+                    return acc;
+                }
+                return acc + Number(cur.totalAmount);
+            }, 0);
             const cash = formattedHistory
                 .filter(p => p.paymentMethod === "CASH" || p.paymentMethod === "COUNTER_CASH")
-                .reduce((acc, cur) => acc + (Number(cur.totalAmount) || 0), 0);
+                .reduce((acc, cur) => {
+                    if (!isBillTotalAmountValid(cur)) {
+                        hasMissingAmount = true;
+                        return acc;
+                    }
+                    return acc + Number(cur.totalAmount);
+                }, 0);
 
             setShiftStats({
                 totalCollected: total,
                 cashTotal: cash,
                 digitalTotal: total - cash,
                 transactionCount: formattedHistory.length,
+                hasMissingAmount,
                 hasError: false
             });
         } catch (err) {
@@ -197,6 +291,10 @@ export default function CashierPage() {
     // Khởi tạo link thanh toán PayOS thật từ cổng Open Banking
     const initPayOSPayment = async (bill) => {
         if (!bill) return;
+        if (!isBillTotalAmountValid(bill)) {
+            setErrorMessage("Không thể tạo mã VietQR/PayOS: Hóa đơn chưa có tổng tiền hợp lệ từ hệ thống.");
+            return;
+        }
         setPayosLoading(true);
         setPayosData(null);
         setQrImgError(false);
@@ -282,6 +380,10 @@ export default function CashierPage() {
     // Hoàn tất biên lai khi phát hiện giao dịch số thành công
     const finalizeDigitalPayment = async (bill, method, txnRef) => {
         if (!bill) return;
+        if (!isBillTotalAmountValid(bill)) {
+            setErrorMessage("Không thể hoàn tất thanh toán số: Hóa đơn thiếu tổng tiền hợp lệ từ hệ thống.");
+            return;
+        }
         setSubmitting(true);
         setErrorMessage("");
 
@@ -310,7 +412,8 @@ export default function CashierPage() {
     const handleOpenPayment = (bill) => {
         setSelectedBill(bill);
         setPaymentMethod("CASH");
-        setCashGiven(String(bill.totalAmount || 0));
+        const validAmount = isBillTotalAmountValid(bill);
+        setCashGiven(validAmount ? String(bill.totalAmount) : "");
         setPaymentSuccess(false);
         setReceiptData(null);
         setErrorMessage("");
@@ -345,6 +448,24 @@ export default function CashierPage() {
 
     const handleConfirmPayment = async () => {
         if (!selectedBill) return;
+
+        if (!isBillTotalAmountValid(selectedBill)) {
+            setErrorMessage("Hóa đơn chưa có tổng tiền hợp lệ từ hệ thống. Thao tác thanh toán bị khóa để đảm bảo an toàn tài chính.");
+            return;
+        }
+
+        if (paymentMethod === "QR" && !paymentSuccess) {
+            setErrorMessage("Thanh toán PayOS VietQR cần được xác nhận tự động từ ngân hàng hoặc đồng bộ qua nút 'Đồng Bộ PayOS Ngay' trước khi xuất biên lai.");
+            return;
+        }
+
+        if (paymentMethod === "CASH") {
+            const cashNum = typeof cashGiven === "string" ? Number(cashGiven.trim()) : Number(cashGiven);
+            if (cashGiven === "" || !Number.isFinite(cashNum) || cashNum < Number(selectedBill.totalAmount)) {
+                setErrorMessage("Số tiền khách đưa không hợp lệ hoặc chưa đủ để thanh toán.");
+                return;
+            }
+        }
 
         setSubmitting(true);
         setErrorMessage("");
@@ -413,9 +534,9 @@ export default function CashierPage() {
                 ? receipt.items.map(it => ({
                     name: it.name,
                     qty: it.quantity || it.qty || 1,
-                    price: it.unitPrice || it.price || it.totalPrice || 0
+                    price: it.unitPrice != null ? it.unitPrice : (it.price != null ? it.price : (it.totalPrice != null ? it.totalPrice : null))
                 }))
-                : [{ name: "Thanh toán viện phí", qty: 1, price: receipt.totalAmount || 0 }]
+                : [{ name: "Thanh toán viện phí", qty: 1, price: receipt.totalAmount != null ? receipt.totalAmount : null }]
         };
         printReceipt(mapped);
     };
@@ -470,13 +591,39 @@ export default function CashierPage() {
     });
 
     const shiftReconData = React.useMemo(() => {
+        let hasMissingAmount = false;
+        for (const item of filteredHistory) {
+            if (!isBillTotalAmountValid(item)) {
+                hasMissingAmount = true;
+                break;
+            }
+        }
+
         const cashItems = filteredHistory.filter(p => p.paymentMethod === "CASH" || p.paymentMethod === "COUNTER_CASH");
         const qrItems = filteredHistory.filter(p => p.paymentMethod === "VIETQR" || p.paymentMethod === "PAYOS" || p.paymentMethod === "QR");
         const posItems = filteredHistory.filter(p => p.paymentMethod === "POS");
 
-        const cashSum = cashItems.reduce((acc, cur) => acc + (Number(cur.totalAmount) || 0), 0);
-        const qrSum = qrItems.reduce((acc, cur) => acc + (Number(cur.totalAmount) || 0), 0);
-        const posSum = posItems.reduce((acc, cur) => acc + (Number(cur.totalAmount) || 0), 0);
+        const cashSum = cashItems.reduce((acc, cur) => {
+            if (!isBillTotalAmountValid(cur)) {
+                hasMissingAmount = true;
+                return acc;
+            }
+            return acc + Number(cur.totalAmount);
+        }, 0);
+        const qrSum = qrItems.reduce((acc, cur) => {
+            if (!isBillTotalAmountValid(cur)) {
+                hasMissingAmount = true;
+                return acc;
+            }
+            return acc + Number(cur.totalAmount);
+        }, 0);
+        const posSum = posItems.reduce((acc, cur) => {
+            if (!isBillTotalAmountValid(cur)) {
+                hasMissingAmount = true;
+                return acc;
+            }
+            return acc + Number(cur.totalAmount);
+        }, 0);
 
         return {
             totalCollected: cashSum + qrSum + posSum,
@@ -487,6 +634,7 @@ export default function CashierPage() {
             posTotal: posSum,
             posCount: posItems.length,
             transactionCount: filteredHistory.length,
+            hasMissingAmount,
             transactions: filteredHistory
         };
     }, [filteredHistory]);
@@ -509,8 +657,11 @@ export default function CashierPage() {
         }
     };
 
-    const cashChange = Number(cashGiven) >= (selectedBill?.totalAmount || 0)
-        ? Number(cashGiven) - (selectedBill?.totalAmount || 0)
+    const isTotalAmountValid = isBillTotalAmountValid(selectedBill);
+    const validBillTotal = isTotalAmountValid ? Number(selectedBill.totalAmount) : null;
+    const cashGivenNum = cashGiven !== "" && !isNaN(Number(cashGiven)) ? Number(cashGiven) : null;
+    const cashChange = (validBillTotal != null && cashGivenNum != null)
+        ? (cashGivenNum >= validBillTotal ? cashGivenNum - validBillTotal : -(validBillTotal - cashGivenNum))
         : 0;
 
     return (
@@ -626,6 +777,12 @@ export default function CashierPage() {
                 </Alert>
             )}
 
+            {shiftStats.hasMissingAmount && (
+                <Alert severity="warning" sx={{ mb: 2.5, borderRadius: 2.5, fontWeight: 600 }}>
+                    ⚠️ CẢNH BÁO ĐỐI SOÁT: Ca trực ghi nhận giao dịch chưa có số tiền hợp lệ từ hệ thống. Các số liệu thống kê chỉ phản ánh tổng từng phần của các giao dịch hợp lệ và không thể coi là báo cáo tài chính đầy đủ.
+                </Alert>
+            )}
+
             {/* Thẻ Thống Kê Ca Trực Thu Ngân (Apple HIG Metric Cards) */}
             <Grid container spacing={2.5} mb={3}>
                 <Grid item xs={12} sm={6} md={3}>
@@ -648,6 +805,9 @@ export default function CashierPage() {
                         <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: "monospace", color: "#0088D6", mt: 0.8 }}>
                             {shiftStats.hasError ? "--" : formatCurrency(shiftStats.totalCollected)}
                         </Typography>
+                        {shiftStats.hasMissingAmount && (
+                            <Chip label="Số liệu từng phần" size="small" color="warning" sx={{ mt: 0.8, fontWeight: 700, fontSize: "0.7rem", height: 22 }} />
+                        )}
                     </Paper>
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
@@ -944,8 +1104,13 @@ export default function CashierPage() {
                                                     </Stack>
                                                 </TableCell>
                                                 <TableCell align="right">
-                                                    <Typography variant="subtitle1" fontWeight="bold" color="error.main" sx={{ fontSize: "1.1rem" }}>
-                                                        {formatCurrency(bill.totalAmount)}
+                                                    <Typography
+                                                        variant="subtitle1"
+                                                        fontWeight="bold"
+                                                        color={bill.totalAmount != null && !isNaN(Number(bill.totalAmount)) ? "error.main" : "text.secondary"}
+                                                        sx={{ fontSize: "1.1rem" }}
+                                                    >
+                                                        {bill.totalAmount != null && !isNaN(Number(bill.totalAmount)) ? formatCurrency(bill.totalAmount) : "Chưa có dữ liệu"}
                                                     </Typography>
                                                     <Typography variant="caption" color="text.secondary">Chưa thanh toán</Typography>
                                                 </TableCell>
@@ -1051,7 +1216,7 @@ export default function CashierPage() {
                                                         Tổng thanh toán:
                                                     </Typography>
                                                     <Typography variant="h6" fontWeight="bold" color="#0F766E">
-                                                        {formatCurrency(bill.totalAmount)}
+                                                        {bill.totalAmount != null && !isNaN(Number(bill.totalAmount)) ? formatCurrency(bill.totalAmount) : "Chưa có dữ liệu"}
                                                     </Typography>
                                                 </Box>
                                             </CardContent>
@@ -1204,7 +1369,7 @@ export default function CashierPage() {
                                             </TableCell>
                                             <TableCell>
                                                 <Typography variant="body1" fontWeight="bold" color="success.main">
-                                                    {formatCurrency(item.totalAmount)}
+                                                    {item.totalAmount != null && !isNaN(Number(item.totalAmount)) ? formatCurrency(item.totalAmount) : "Chưa có dữ liệu"}
                                                 </Typography>
                                             </TableCell>
                                             <TableCell>
@@ -1251,6 +1416,7 @@ export default function CashierPage() {
 
             {/* MODAL THU TIỀN & XUẤT BIÊN LAI (SẮP XẾP BỐ CỤC 2 CỘT HIỆN ĐẠI CHUẨN POS Y TẾ) */}
             <Dialog
+                disablePortal
                 open={openPaymentModal}
                 onClose={handleClosePaymentModal}
                 maxWidth="md"
@@ -1292,7 +1458,9 @@ export default function CashierPage() {
                                 <Divider sx={{ my: 1.5 }} />
                                 <Box display="flex" justifyContent="space-between" alignItems="center">
                                     <Typography variant="body2" fontWeight="bold">Tổng số tiền đã thu:</Typography>
-                                    <Typography variant="h5" fontWeight="bold" color="success.main">{formatCurrency(receiptData.totalAmount)}</Typography>
+                                    <Typography variant="h5" fontWeight="bold" color="success.main">
+                                        {receiptData.totalAmount != null && !isNaN(Number(receiptData.totalAmount)) ? formatCurrency(receiptData.totalAmount) : "Chưa có dữ liệu"}
+                                    </Typography>
                                 </Box>
                                 {receiptData.paymentMethod === "CASH" && (
                                     <Box display="flex" justifyContent="space-between" mt={1}>
@@ -1385,16 +1553,23 @@ export default function CashierPage() {
 
                                                 <Box sx={{ maxHeight: 200, overflowY: "auto", pr: 0.5 }}>
                                                     <Stack spacing={0.8}>
-                                                        {selectedBill.items?.map((it, idx) => (
-                                                            <Box key={idx} display="flex" justifyContent="space-between" alignItems="center">
-                                                                <Typography variant="body2" noWrap sx={{ maxWidth: 170 }}>
-                                                                    {it.name} <span style={{ color: "#64748B", fontSize: "0.8rem" }}>x{it.qty || it.quantity || 1}</span>
-                                                                </Typography>
-                                                                <Typography variant="body2" fontWeight="bold">
-                                                                    {formatCurrency(it.totalPrice || (it.price * (it.qty || it.quantity || 1)) || it.unitPrice || 0)}
-                                                                </Typography>
-                                                            </Box>
-                                                        ))}
+                                                        {selectedBill.items?.map((it, idx) => {
+                                                            const itemPrice = it.totalPrice != null
+                                                                ? it.totalPrice
+                                                                : (it.price != null
+                                                                    ? it.price * (it.qty || it.quantity || 1)
+                                                                    : (it.unitPrice != null ? it.unitPrice : null));
+                                                            return (
+                                                                <Box key={idx} display="flex" justifyContent="space-between" alignItems="center" gap={1}>
+                                                                    <Typography variant="body2" sx={{ wordBreak: "break-word", flex: 1, pr: 1 }}>
+                                                                        {it.name || "Dịch vụ y tế"} <span style={{ color: "#64748B", fontSize: "0.8rem", whiteSpace: "nowrap" }}>x{it.qty || it.quantity || 1}</span>
+                                                                    </Typography>
+                                                                    <Typography variant="body2" fontWeight="bold" sx={{ whiteSpace: "nowrap" }}>
+                                                                        {itemPrice != null ? formatCurrency(itemPrice) : "Chưa có dữ liệu"}
+                                                                    </Typography>
+                                                                </Box>
+                                                            );
+                                                        })}
                                                     </Stack>
                                                 </Box>
                                             </Box>
@@ -1404,7 +1579,7 @@ export default function CashierPage() {
                                                     TỔNG TIỀN PHẢI THU:
                                                 </Typography>
                                                 <Typography variant="h5" fontWeight="bold" color="primary.main">
-                                                    {formatCurrency(selectedBill.totalAmount)}
+                                                    {selectedBill.totalAmount != null ? formatCurrency(selectedBill.totalAmount) : "Chưa có dữ liệu"}
                                                 </Typography>
                                             </Box>
                                         </Paper>
@@ -1412,6 +1587,12 @@ export default function CashierPage() {
 
                                     {/* CỘT PHẢI: PHƯƠNG THỨC THANH TOÁN (PAYOS, TIỀN MẶT, POS) */}
                                     <Grid item xs={12} md={7}>
+                                        {!isTotalAmountValid && (
+                                            <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
+                                                Hóa đơn chưa có tổng tiền hợp lệ từ hệ thống ("Chưa có dữ liệu"). Thao tác thanh toán bị khóa để đảm bảo an toàn tài chính.
+                                            </Alert>
+                                        )}
+
                                         <Typography variant="subtitle2" fontWeight="bold" mb={1.5}>
                                             Chọn phương thức thanh toán:
                                         </Typography>
@@ -1437,6 +1618,7 @@ export default function CashierPage() {
                                                     label="Tiền khách đưa (VNĐ)"
                                                     value={cashGiven}
                                                     onChange={(e) => setCashGiven(e.target.value)}
+                                                    disabled={!isTotalAmountValid}
                                                     InputProps={{
                                                         endAdornment: <InputAdornment position="end">VNĐ</InputAdornment>,
                                                     }}
@@ -1451,10 +1633,11 @@ export default function CashierPage() {
                                                     <Button
                                                         size="small"
                                                         variant="outlined"
-                                                        onClick={() => setCashGiven(String(selectedBill.totalAmount || 0))}
+                                                        onClick={() => isTotalAmountValid && setCashGiven(String(selectedBill.totalAmount))}
+                                                        disabled={!isTotalAmountValid}
                                                         sx={{ fontSize: "0.75rem", borderRadius: 1.5 }}
                                                     >
-                                                        Đủ Tiền ({formatCurrency(selectedBill.totalAmount)})
+                                                        Đủ Tiền ({isTotalAmountValid ? formatCurrency(selectedBill.totalAmount) : "Chưa có dữ liệu"})
                                                     </Button>
                                                     {[100000, 200000, 500000, 1000000, 2000000].map((amt) => (
                                                         <Button
@@ -1462,6 +1645,7 @@ export default function CashierPage() {
                                                             size="small"
                                                             variant={Number(cashGiven) === amt ? "contained" : "outlined"}
                                                             onClick={() => setCashGiven(String(amt))}
+                                                            disabled={!isTotalAmountValid}
                                                             sx={{ fontSize: "0.75rem", borderRadius: 1.5 }}
                                                         >
                                                             {amt >= 1000000 ? `${amt / 1000000}tr` : `${amt / 1000}k`}
@@ -1475,19 +1659,27 @@ export default function CashierPage() {
                                                     alignItems="center"
                                                     p={1.5}
                                                     borderRadius={2}
-                                                    bgcolor={Number(cashGiven) >= (selectedBill?.totalAmount || 0) ? "#F0FDF4" : "#FEF2F2"}
-                                                    border={Number(cashGiven) >= (selectedBill?.totalAmount || 0) ? "1px solid #BBF7D0" : "1px solid #FECACA"}
+                                                    bgcolor={!isTotalAmountValid ? "#F8FAFC" : (Number(cashGiven) >= validBillTotal ? "#F0FDF4" : "#FEF2F2")}
+                                                    border={!isTotalAmountValid ? "1px solid #E2E8F0" : (Number(cashGiven) >= validBillTotal ? "1px solid #BBF7D0" : "1px solid #FECACA")}
                                                 >
-                                                    <Typography variant="body2" color="text.secondary">
-                                                        {Number(cashGiven) >= (selectedBill?.totalAmount || 0) ? "Tiền thối lại cho khách:" : "Khách đưa còn thiếu:"}
-                                                    </Typography>
-                                                    <Typography
-                                                        variant="subtitle1"
-                                                        fontWeight="bold"
-                                                        color={Number(cashGiven) >= (selectedBill?.totalAmount || 0) ? "success.main" : "error.main"}
-                                                    >
-                                                        {formatCurrency(Math.abs(cashChange))}
-                                                    </Typography>
+                                                    {!isTotalAmountValid ? (
+                                                        <Typography variant="body2" color="error.main" fontWeight="bold">
+                                                            Chưa có dữ liệu tổng tiền để tính chênh lệch
+                                                        </Typography>
+                                                    ) : (
+                                                        <>
+                                                            <Typography variant="body2" color="text.secondary">
+                                                                {Number(cashGiven) >= validBillTotal ? "Tiền thối lại cho khách:" : "Khách đưa còn thiếu:"}
+                                                            </Typography>
+                                                            <Typography
+                                                                variant="subtitle1"
+                                                                fontWeight="bold"
+                                                                color={Number(cashGiven) >= validBillTotal ? "success.main" : "error.main"}
+                                                            >
+                                                                {formatCurrency(Math.abs(cashChange))}
+                                                            </Typography>
+                                                        </>
+                                                    )}
                                                 </Box>
                                             </Box>
                                         )}
@@ -1534,15 +1726,7 @@ export default function CashierPage() {
                                                         {/* Khu vực hiển thị QR Code */}
                                                         <Box display="flex" flexDirection={{ xs: "column", sm: "row" }} gap={2} alignItems="center">
                                                             <Box textAlign="center">
-                                                                {qrImgError || !payosData?.qrImageUrl ? (
-                                                                    <Box sx={{ p: 1.5, bgcolor: "white", display: "inline-block", borderRadius: 2, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
-                                                                        <QRCodeCanvas
-                                                                            value={payosData?.rawQrCode || `https://pay.hospital.vn/bill/${selectedBill.billId}?amount=${selectedBill.totalAmount}`}
-                                                                            size={150}
-                                                                            level="H"
-                                                                        />
-                                                                    </Box>
-                                                                ) : (
+                                                                {payosData?.qrImageUrl && !qrImgError ? (
                                                                     <Box
                                                                         component="img"
                                                                         src={payosData.qrImageUrl}
@@ -1557,6 +1741,20 @@ export default function CashierPage() {
                                                                             p: 0.8
                                                                         }}
                                                                     />
+                                                                ) : (payosData?.rawQrCode || payosData?.qrCode) ? (
+                                                                    <Box sx={{ p: 1.5, bgcolor: "white", display: "inline-block", borderRadius: 2, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
+                                                                        <QRCodeCanvas
+                                                                            value={payosData.rawQrCode || payosData.qrCode}
+                                                                            size={150}
+                                                                            level="H"
+                                                                        />
+                                                                    </Box>
+                                                                ) : (
+                                                                    <Box sx={{ p: 2, bgcolor: "#F8FAFC", borderRadius: 2, border: "1px dashed #CBD5E1", width: 160, height: 160, display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
+                                                                        <Typography variant="caption" color="text.secondary">
+                                                                            Chưa có dữ liệu mã QR từ hệ thống
+                                                                        </Typography>
+                                                                    </Box>
                                                                 )}
                                                                 <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
                                                                     Quét bằng mọi App Ngân Hàng
@@ -1568,42 +1766,50 @@ export default function CashierPage() {
                                                                 <Paper variant="outlined" sx={{ p: 1.5, bgcolor: "white", borderRadius: 2 }}>
                                                                     <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
                                                                         <Typography variant="caption" color="text.secondary">Ngân hàng:</Typography>
-                                                                        <Typography variant="caption" fontWeight="bold">{payosData?.bankName || "MBBank"}</Typography>
+                                                                        <Typography variant="caption" fontWeight="bold">{payosData?.bankName || "Chưa có dữ liệu"}</Typography>
                                                                     </Box>
                                                                     <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
                                                                         <Typography variant="caption" color="text.secondary">Số tài khoản:</Typography>
                                                                         <Box display="flex" alignItems="center" gap={0.5}>
-                                                                            <Typography variant="caption" fontWeight="bold">{payosData?.accountNumber || "0987654321"}</Typography>
-                                                                            <Tooltip title={copiedField === "acc" ? "Đã chép!" : "Sao chép"}>
-                                                                                <IconButton size="small" onClick={() => handleCopy(payosData?.accountNumber || "0987654321", "acc")} sx={{ p: 0.2 }}>
-                                                                                    {copiedField === "acc" ? <CheckIcon fontSize="inherit" color="success" /> : <ContentCopyIcon fontSize="inherit" />}
-                                                                                </IconButton>
+                                                                            <Typography variant="caption" fontWeight="bold">{payosData?.accountNumber || "Chưa có dữ liệu"}</Typography>
+                                                                            <Tooltip title={!payosData?.accountNumber ? "Chưa có dữ liệu để sao chép" : (copiedField === "acc" ? "Đã chép!" : "Sao chép")}>
+                                                                                <span>
+                                                                                    <IconButton size="small" disabled={!payosData?.accountNumber} onClick={() => payosData?.accountNumber && handleCopy(payosData.accountNumber, "acc")} sx={{ p: 0.2 }}>
+                                                                                        {copiedField === "acc" ? <CheckIcon fontSize="inherit" color="success" /> : <ContentCopyIcon fontSize="inherit" />}
+                                                                                    </IconButton>
+                                                                                </span>
                                                                             </Tooltip>
                                                                         </Box>
                                                                     </Box>
                                                                     <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
                                                                         <Typography variant="caption" color="text.secondary">Chủ TK:</Typography>
-                                                                        <Typography variant="caption" fontWeight="bold">{payosData?.accountHolder || "BENH VIEN DA KHOA QUOC TE TNT"}</Typography>
+                                                                        <Typography variant="caption" fontWeight="bold">{payosData?.accountHolder || "Chưa có dữ liệu"}</Typography>
                                                                     </Box>
                                                                     <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
                                                                         <Typography variant="caption" color="text.secondary">Số tiền:</Typography>
                                                                         <Box display="flex" alignItems="center" gap={0.5}>
-                                                                            <Typography variant="caption" fontWeight="bold" color="primary.main">{formatCurrency(selectedBill.totalAmount)}</Typography>
-                                                                            <Tooltip title={copiedField === "amt" ? "Đã chép!" : "Sao chép"}>
-                                                                                <IconButton size="small" onClick={() => handleCopy(selectedBill.totalAmount, "amt")} sx={{ p: 0.2 }}>
-                                                                                    {copiedField === "amt" ? <CheckIcon fontSize="inherit" color="success" /> : <ContentCopyIcon fontSize="inherit" />}
-                                                                                </IconButton>
+                                                                            <Typography variant="caption" fontWeight="bold" color="primary.main">
+                                                                                {isTotalAmountValid ? formatCurrency(selectedBill.totalAmount) : "Chưa có dữ liệu"}
+                                                                            </Typography>
+                                                                            <Tooltip title={!isTotalAmountValid ? "Chưa có dữ liệu để sao chép" : (copiedField === "amt" ? "Đã chép!" : "Sao chép")}>
+                                                                                <span>
+                                                                                    <IconButton size="small" disabled={!isTotalAmountValid} onClick={() => isTotalAmountValid && handleCopy(selectedBill.totalAmount, "amt")} sx={{ p: 0.2 }}>
+                                                                                        {copiedField === "amt" ? <CheckIcon fontSize="inherit" color="success" /> : <ContentCopyIcon fontSize="inherit" />}
+                                                                                    </IconButton>
+                                                                                </span>
                                                                             </Tooltip>
                                                                         </Box>
                                                                     </Box>
                                                                     <Box display="flex" justifyContent="space-between" alignItems="center">
                                                                         <Typography variant="caption" color="text.secondary">Nội dung CK:</Typography>
                                                                         <Box display="flex" alignItems="center" gap={0.5}>
-                                                                            <Typography variant="caption" fontWeight="bold" color="error.main">{payosData?.transferContent || `VP ${selectedBill.billId}`}</Typography>
-                                                                            <Tooltip title={copiedField === "desc" ? "Đã chép!" : "Sao chép"}>
-                                                                                <IconButton size="small" onClick={() => handleCopy(payosData?.transferContent || `VP ${selectedBill.billId}`, "desc")} sx={{ p: 0.2 }}>
-                                                                                    {copiedField === "desc" ? <CheckIcon fontSize="inherit" color="success" /> : <ContentCopyIcon fontSize="inherit" />}
-                                                                                </IconButton>
+                                                                            <Typography variant="caption" fontWeight="bold" color="error.main">{payosData?.transferContent || "Chưa có dữ liệu"}</Typography>
+                                                                            <Tooltip title={!payosData?.transferContent ? "Chưa có dữ liệu để sao chép" : (copiedField === "desc" ? "Đã chép!" : "Sao chép")}>
+                                                                                <span>
+                                                                                    <IconButton size="small" disabled={!payosData?.transferContent} onClick={() => payosData?.transferContent && handleCopy(payosData.transferContent, "desc")} sx={{ p: 0.2 }}>
+                                                                                        {copiedField === "desc" ? <CheckIcon fontSize="inherit" color="success" /> : <ContentCopyIcon fontSize="inherit" />}
+                                                                                    </IconButton>
+                                                                                </span>
                                                                             </Tooltip>
                                                                         </Box>
                                                                     </Box>
@@ -1665,7 +1871,7 @@ export default function CashierPage() {
                                                 <Box display="inline-block" p={1.5} bgcolor="#F1F5F9" borderRadius={2} border="1px solid #CBD5E1">
                                                     <Typography variant="caption" color="text.secondary" display="block">Số tiền quẹt thẻ:</Typography>
                                                     <Typography variant="h5" fontWeight="bold" color="primary.main">
-                                                        {formatCurrency(selectedBill.totalAmount)}
+                                                        {isTotalAmountValid ? formatCurrency(selectedBill.totalAmount) : "Chưa có dữ liệu"}
                                                     </Typography>
                                                 </Box>
                                                 <Typography variant="caption" color="text.secondary" display="block" mt={1.5}>
@@ -1684,16 +1890,27 @@ export default function CashierPage() {
                         {paymentSuccess ? "Đóng" : "Hủy"}
                     </Button>
                     {!paymentSuccess && (
-                        <Button
-                            variant="contained"
-                            color="success"
-                            onClick={handleConfirmPayment}
-                            disabled={submitting}
-                            startIcon={submitting ? <CircularProgress size={18} color="inherit" /> : <CheckCircleIcon />}
-                            sx={{ px: 3, fontWeight: "bold", borderRadius: 2 }}
-                        >
-                            {submitting ? "Đang xử lý..." : "Xác Nhận & Xuất Biên Lai"}
-                        </Button>
+                        <Box display="flex" alignItems="center" gap={1.5}>
+                            {!isTotalAmountValid ? (
+                                <Typography variant="caption" color="error.main" sx={{ fontStyle: "italic", maxWidth: 280, textAlign: "right" }}>
+                                    * Hóa đơn thiếu tổng tiền, thao tác thu viện phí bị khóa.
+                                </Typography>
+                            ) : paymentMethod === "QR" ? (
+                                <Typography variant="caption" color="text.secondary" sx={{ fontStyle: "italic", maxWidth: 280, textAlign: "right" }}>
+                                    Cổng PayOS đang chờ quét mã hoặc bấm <b>"Đồng Bộ PayOS Ngay"</b>.
+                                </Typography>
+                            ) : null}
+                            <Button
+                                variant="contained"
+                                color="success"
+                                onClick={handleConfirmPayment}
+                                disabled={submitting || !isTotalAmountValid || (paymentMethod === "QR" && !paymentSuccess)}
+                                startIcon={submitting ? <CircularProgress size={18} color="inherit" /> : <CheckCircleIcon />}
+                                sx={{ px: 3, fontWeight: "bold", borderRadius: 2 }}
+                            >
+                                {submitting ? "Đang xử lý..." : "Xác Nhận & Xuất Biên Lai"}
+                            </Button>
+                        </Box>
                     )}
                 </DialogActions>
             </Dialog>

@@ -31,6 +31,33 @@ export default function PatientHomeShellScreen() {
 
       <View style={styles.menuGrid}>
         <Pressable
+          testID="nav-booking-button"
+          accessibilityRole="button"
+          style={({ pressed }) => [
+            styles.primaryHeroCard,
+            pressed && styles.primaryHeroCardPressed,
+          ]}
+          onPress={() => router.push('/(patient)/booking' as never)}
+        >
+          <View style={styles.menuCardHeader}>
+            <View style={[styles.menuIconBadge, { backgroundColor: tokens.colors.primaryLight }]}>
+              <Text style={[styles.menuIconText, { color: tokens.colors.primary }]}>📅</Text>
+            </View>
+            <View style={styles.menuTextContent}>
+              <View style={styles.heroTitleRow}>
+                <Text style={styles.heroMenuTitle}>Đặt lịch khám</Text>
+                <View style={styles.primaryBadge}>
+                  <Text style={styles.primaryBadgeText}>Ưu tiên</Text>
+                </View>
+              </View>
+              <Text style={styles.heroMenuDesc}>
+                Chọn chuyên khoa, bác sĩ và giữ chỗ khung giờ khám nhanh chóng
+              </Text>
+            </View>
+          </View>
+        </Pressable>
+
+        <Pressable
           testID="nav-profiles-button"
           accessibilityRole="button"
           style={({ pressed }) => [styles.menuCard, pressed && styles.menuCardPressed]}
@@ -43,23 +70,6 @@ export default function PatientHomeShellScreen() {
             <View style={styles.menuTextContent}>
               <Text style={styles.menuTitle}>Hồ sơ gia đình</Text>
               <Text style={styles.menuDesc}>Quản lý hồ sơ bệnh nhân của bạn và người thân</Text>
-            </View>
-          </View>
-        </Pressable>
-
-        <Pressable
-          testID="nav-booking-button"
-          accessibilityRole="button"
-          style={({ pressed }) => [styles.menuCard, pressed && styles.menuCardPressed]}
-          onPress={() => router.push('/(patient)/booking' as never)}
-        >
-          <View style={styles.menuCardHeader}>
-            <View style={[styles.menuIconBadge, { backgroundColor: tokens.colors.infoBg }]}>
-              <Text style={[styles.menuIconText, { color: tokens.colors.info }]}>📅</Text>
-            </View>
-            <View style={styles.menuTextContent}>
-              <Text style={styles.menuTitle}>Đặt lịch khám</Text>
-              <Text style={styles.menuDesc}>Chọn chuyên khoa, bác sĩ và khung giờ khám</Text>
             </View>
           </View>
         </Pressable>
@@ -194,6 +204,53 @@ const styles = StyleSheet.create({
   menuGrid: {
     gap: tokens.spacing.md,
     marginBottom: tokens.spacing.xl,
+  },
+  primaryHeroCard: {
+    backgroundColor: tokens.colors.surface,
+    borderRadius: tokens.radius.card,
+    padding: tokens.spacing.lg,
+    borderWidth: 2,
+    borderColor: tokens.colors.primary,
+    shadowColor: tokens.colors.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 3,
+    minHeight: 84,
+    justifyContent: 'center',
+  },
+  primaryHeroCardPressed: {
+    backgroundColor: tokens.colors.primaryLight,
+    borderColor: tokens.colors.primaryDark,
+  },
+  heroTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 2,
+  },
+  heroMenuTitle: {
+    fontSize: tokens.typography.subtitle,
+    fontWeight: '800',
+    color: tokens.colors.primaryDark,
+  },
+  heroMenuDesc: {
+    fontSize: tokens.typography.caption,
+    color: tokens.colors.textSecondary,
+    lineHeight: 18,
+  },
+  primaryBadge: {
+    backgroundColor: tokens.colors.primaryLight,
+    paddingHorizontal: tokens.spacing.sm,
+    paddingVertical: 2,
+    borderRadius: tokens.radius.pill,
+    borderWidth: 1,
+    borderColor: tokens.colors.primaryBorder,
+  },
+  primaryBadgeText: {
+    fontSize: tokens.typography.small,
+    color: tokens.colors.primaryDark,
+    fontWeight: '700',
   },
   menuCard: {
     backgroundColor: tokens.colors.surface,

@@ -113,16 +113,22 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
     paddingVertical: tokens.spacing.xs,
+    gap: tokens.spacing.sm,
   },
   label: {
     fontSize: tokens.typography.caption,
     color: tokens.colors.textSecondary,
+    flexShrink: 0,
+    maxWidth: '50%',
   },
   value: {
     fontSize: tokens.typography.caption,
     fontWeight: '600',
     color: tokens.colors.textPrimary,
+    flex: 1,
+    textAlign: 'right',
   },
 });
 

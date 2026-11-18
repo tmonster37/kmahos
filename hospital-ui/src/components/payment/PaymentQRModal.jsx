@@ -104,6 +104,7 @@ export default function PaymentQRModal({ open, onClose, paymentData, onSuccess }
     };
 
     const handleDownloadQR = () => {
+        if (!hasValidQr) return;
         // Ưu tiên 1: Tải trực tiếp file ảnh PNG độ nét cao từ QRCodeCanvas
         const canvas = qrCanvasRef.current || document.getElementById("vietqr-canvas");
         if (canvas) {
@@ -122,7 +123,7 @@ export default function PaymentQRModal({ open, onClose, paymentData, onSuccess }
         }
 
         // Ưu tiên 2: Tải từ URL nếu là link ảnh HTTP hợp lệ
-        if (isImageUrl && !imgError) {
+        if (isImageUrl && !imgError && qrImageUrl) {
             const link = document.createElement("a");
             link.href = qrImageUrl;
             link.download = `VietQR-${txnRef || "payment"}.png`;
@@ -168,13 +169,38 @@ export default function PaymentQRModal({ open, onClose, paymentData, onSuccess }
     );
 
     // Chuỗi mã hóa VietQR EMVCo (nếu backend trả về raw string trong qrCode hoặc qrImageUrl)
-    const emvCoPayload = rawQrCode || (!isImageUrl ? qrImageUrl : null);
+    const emvCoPayload = (rawQrCode && String(rawQrCode).trim()) || (!isImageUrl && qrImageUrl && String(qrImageUrl).trim() ? String(qrImageUrl).trim() : null);
 
-    // Giá trị QR code hợp lệ để hiển thị
-    const effectiveQrValue = emvCoPayload || (isImageUrl ? qrImageUrl : (paymentData.paymentUrl || `PAY:${txnRef}:${paymentData.amount}`));
+    // Payment URL hợp lệ từ provider (chỉ chấp nhận http:// hoặc https://)
+    const rawPaymentUrl = paymentData?.paymentUrl || paymentData?.checkoutUrl;
+    const validPaymentUrl = (rawPaymentUrl && (rawPaymentUrl.startsWith("http://") || rawPaymentUrl.startsWith("https://")))
+        ? rawPaymentUrl
+        : null;
+
+    // Giá trị QR code hợp lệ từ provider để hiển thị trên QRCodeCanvas (nếu có chuỗi EMVCo hoặc URL thanh toán hợp lệ)
+    const effectiveQrValue = emvCoPayload || validPaymentUrl || null;
+
+    // Kiểm tra tính hợp lệ toàn diện của mã QR từ provider: không dùng fake fallback PAY:${txnRef}:${amount}
+    const hasValidQr = Boolean(
+        emvCoPayload ||
+        (isImageUrl && !imgError) ||
+        validPaymentUrl
+    );
+
+    // Kiểm tra số tiền hợp lệ (từ chối null, undefined, rỗng, NaN, Infinity, âm; giữ số 0 hợp lệ)
+    const rawAmount = paymentData?.amount;
+    const hasValidAmount = Boolean(
+        rawAmount != null &&
+        (typeof rawAmount === "number"
+            ? Number.isFinite(rawAmount) && rawAmount >= 0
+            : (typeof rawAmount === "string" && rawAmount.trim() !== "" && Number.isFinite(Number(rawAmount.trim())) && Number(rawAmount.trim()) >= 0))
+    );
+
+    // Nội dung chuyển khoản hợp lệ
+    const cleanTransferContent = (paymentData?.transferContent && String(paymentData.transferContent).trim()) || (txnRef && String(txnRef).trim()) || "";
 
     // Số tài khoản sạch không chứa dấu cách để copy chính xác vào App ngân hàng
-    const displayAccountNo = paymentData.bankAccountNo || "---";
+    const displayAccountNo = paymentData?.bankAccountNo || "---";
     const cleanAccountNo = displayAccountNo !== "---" ? displayAccountNo.replace(/\s+/g, "") : "";
 
     return (
@@ -291,7 +317,7 @@ export default function PaymentQRModal({ open, onClose, paymentData, onSuccess }
                                                 objectFit: "contain"
                                             }}
                                         />
-                                    ) : (
+                                    ) : effectiveQrValue ? (
                                         <Box display="flex" flexDirection="column" alignItems="center" p={0.5}>
                                             <QRCodeCanvas
                                                 id="vietqr-canvas"
@@ -316,6 +342,23 @@ export default function PaymentQRModal({ open, onClose, paymentData, onSuccess }
                                                 />
                                             </Box>
                                         </Box>
+                                    ) : (
+                                        <Box
+                                            display="flex"
+                                            flexDirection="column"
+                                            alignItems="center"
+                                            justifyContent="center"
+                                            p={2}
+                                            sx={{ minWidth: 188, minHeight: 188, color: "text.secondary" }}
+                                            data-testid="qr-missing-state"
+                                        >
+                                            <Typography variant="body2" fontWeight="bold" color="error.main" textAlign="center">
+                                                Chưa có mã QR thanh toán từ cổng thanh toán
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary" textAlign="center" mt={0.5}>
+                                                Nhà cung cấp chưa trả dữ liệu QR hợp lệ. Vui lòng thử đồng bộ lại hoặc chuyển khoản thủ công.
+                                            </Typography>
+                                        </Box>
                                     )}
                                 </Paper>
 
@@ -328,22 +371,27 @@ export default function PaymentQRModal({ open, onClose, paymentData, onSuccess }
                                         sx={{ fontWeight: "bold" }}
                                     />
 
-                                    <Button
-                                        size="small"
-                                        variant="text"
-                                        startIcon={<DownloadIcon />}
-                                        onClick={handleDownloadQR}
-                                        sx={{ fontSize: "0.75rem", textTransform: "none", fontWeight: 700 }}
-                                    >
-                                        Tải ảnh QR về máy
-                                    </Button>
+                                    <Tooltip title={!hasValidQr ? "Chưa có dữ liệu QR để tải về" : ""}>
+                                        <span>
+                                            <Button
+                                                size="small"
+                                                variant="text"
+                                                startIcon={<DownloadIcon />}
+                                                onClick={handleDownloadQR}
+                                                disabled={!hasValidQr}
+                                                sx={{ fontSize: "0.75rem", textTransform: "none", fontWeight: 700 }}
+                                            >
+                                                Tải ảnh QR về máy
+                                            </Button>
+                                        </span>
+                                    </Tooltip>
 
-                                    {paymentData?.paymentUrl && (
+                                    {validPaymentUrl && (
                                         <Button
                                             variant="contained"
                                             size="small"
                                             component="a"
-                                            href={paymentData.paymentUrl}
+                                            href={validPaymentUrl}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             startIcon={<OpenInNewIcon />}
@@ -371,14 +419,14 @@ export default function PaymentQRModal({ open, onClose, paymentData, onSuccess }
                                         <Box>
                                             <Typography variant="caption" color="text.secondary">Ngân hàng thụ hưởng:</Typography>
                                             <Typography variant="body2" fontWeight="bold" color="#0F172A">
-                                                {paymentData.bankName || "MBBank - Ngân hàng TMCP Quân Đội"}
+                                                {paymentData.bankName || "Chưa có dữ liệu"}
                                             </Typography>
                                         </Box>
 
                                         <Box>
                                             <Typography variant="caption" color="text.secondary">Chủ tài khoản:</Typography>
                                             <Typography variant="body2" fontWeight="bold" color="#0F172A">
-                                                {paymentData.accountHolder || "BENH VIEN DA KHOA QUOC TE TNT"}
+                                                {paymentData.accountHolder || "Chưa có dữ liệu"}
                                             </Typography>
                                         </Box>
 
@@ -389,10 +437,12 @@ export default function PaymentQRModal({ open, onClose, paymentData, onSuccess }
                                                     {displayAccountNo}
                                                 </Typography>
                                             </Box>
-                                            <Tooltip title={copiedField === "account" ? "Đã copy!" : "Copy số TK"}>
-                                                <IconButton size="small" onClick={() => handleCopy(cleanAccountNo, "account")}>
-                                                    {copiedField === "account" ? <CheckCircleIcon color="success" fontSize="small" /> : <ContentCopyIcon fontSize="small" />}
-                                                </IconButton>
+                                            <Tooltip title={!cleanAccountNo ? "Chưa có dữ liệu để copy" : (copiedField === "account" ? "Đã copy!" : "Copy số TK")}>
+                                                <span>
+                                                    <IconButton size="small" disabled={!cleanAccountNo} onClick={() => cleanAccountNo && handleCopy(cleanAccountNo, "account")}>
+                                                        {copiedField === "account" ? <CheckCircleIcon color="success" fontSize="small" /> : <ContentCopyIcon fontSize="small" />}
+                                                    </IconButton>
+                                                </span>
                                             </Tooltip>
                                         </Box>
 
@@ -400,13 +450,15 @@ export default function PaymentQRModal({ open, onClose, paymentData, onSuccess }
                                             <Box>
                                                 <Typography variant="caption" color="text.secondary">Số tiền chuyển:</Typography>
                                                 <Typography variant="h6" fontWeight="900" color="error.main">
-                                                    {formatCurrency(paymentData.amount)}
+                                                    {hasValidAmount ? formatCurrency(paymentData.amount) : "Chưa có dữ liệu"}
                                                 </Typography>
                                             </Box>
-                                            <Tooltip title={copiedField === "amount" ? "Đã copy!" : "Copy số tiền"}>
-                                                <IconButton size="small" onClick={() => handleCopy(String(paymentData.amount), "amount")}>
-                                                    {copiedField === "amount" ? <CheckCircleIcon color="success" fontSize="small" /> : <ContentCopyIcon fontSize="small" />}
-                                                </IconButton>
+                                            <Tooltip title={!hasValidAmount ? "Chưa có số tiền hợp lệ để copy" : (copiedField === "amount" ? "Đã copy!" : "Copy số tiền")}>
+                                                <span>
+                                                    <IconButton size="small" disabled={!hasValidAmount} onClick={() => hasValidAmount && handleCopy(String(paymentData.amount), "amount")}>
+                                                        {copiedField === "amount" ? <CheckCircleIcon color="success" fontSize="small" /> : <ContentCopyIcon fontSize="small" />}
+                                                    </IconButton>
+                                                </span>
                                             </Tooltip>
                                         </Box>
 
@@ -414,13 +466,15 @@ export default function PaymentQRModal({ open, onClose, paymentData, onSuccess }
                                             <Box>
                                                 <Typography variant="caption" color="#92400E" fontWeight="bold">Nội dung chuyển khoản (Bắt buộc):</Typography>
                                                 <Typography variant="body2" fontWeight="900" color="#78350F" fontFamily="monospace">
-                                                    {paymentData.transferContent || txnRef}
+                                                    {cleanTransferContent || "Chưa có dữ liệu"}
                                                 </Typography>
                                             </Box>
-                                            <Tooltip title={copiedField === "content" ? "Đã copy!" : "Copy nội dung"}>
-                                                <IconButton size="small" onClick={() => handleCopy(paymentData.transferContent || txnRef, "content")}>
-                                                    {copiedField === "content" ? <CheckCircleIcon color="success" fontSize="small" /> : <ContentCopyIcon fontSize="small" />}
-                                                </IconButton>
+                                            <Tooltip title={!cleanTransferContent ? "Chưa có nội dung chuyển khoản để copy" : (copiedField === "content" ? "Đã copy!" : "Copy nội dung")}>
+                                                <span>
+                                                    <IconButton size="small" disabled={!cleanTransferContent} onClick={() => cleanTransferContent && handleCopy(cleanTransferContent, "content")}>
+                                                        {copiedField === "content" ? <CheckCircleIcon color="success" fontSize="small" /> : <ContentCopyIcon fontSize="small" />}
+                                                    </IconButton>
+                                                </span>
                                             </Tooltip>
                                         </Box>
                                     </Stack>

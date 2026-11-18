@@ -38,6 +38,11 @@ import DownloadIcon from "@mui/icons-material/Download";
 import axiosInstance from "../../services/AxiosInstance";
 import { formatCurrency, formatDateTime } from "../../utils/formatters";
 import { printReceipt, printShiftReconciliation } from "../../utils/printHelper";
+import designTokens from "../../theme/designTokens";
+
+const BRAND_PRIMARY = designTokens.brand.primary;
+const BRAND_DARK = designTokens.brand.primaryDark;
+const BRAND_LIGHT = designTokens.brand.primaryLight;
 
 export default function TransactionManagePage() {
     const [transactions, setTransactions] = useState([]);
@@ -171,8 +176,8 @@ export default function TransactionManagePage() {
                                 fontSize: "0.68rem",
                                 fontWeight: 800,
                                 letterSpacing: "0.06em",
-                                bgcolor: "rgba(0, 136, 214, 0.08)",
-                                color: "#0088D6",
+                                bgcolor: BRAND_LIGHT,
+                                color: BRAND_PRIMARY,
                                 mb: 1
                             }}
                         />
@@ -191,10 +196,10 @@ export default function TransactionManagePage() {
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "center",
-                                    border: "1px solid rgba(0, 136, 214, 0.2)"
+                                    border: "1px solid rgba(15, 118, 110, 0.2)"
                                 }}
                             >
-                                <ReceiptLongIcon sx={{ color: "#0088D6", fontSize: 24 }} />
+                                <ReceiptLongIcon sx={{ color: BRAND_PRIMARY, fontSize: 24 }} />
                             </Box>
                             Đối Soát & Quản Lý Giao Dịch Thanh Toán
                         </Typography>
@@ -215,7 +220,7 @@ export default function TransactionManagePage() {
                                 px: 2.5,
                                 borderColor: "rgba(15, 23, 42, 0.15)",
                                 color: "#334155",
-                                "&:hover": { borderColor: "#0088D6", bgcolor: "rgba(0, 136, 214, 0.04)" }
+                                "&:hover": { borderColor: BRAND_PRIMARY, bgcolor: "rgba(15, 118, 110, 0.04)" }
                             }}
                         >
                             {loading ? "Đang tải..." : "Làm mới"}
@@ -246,10 +251,10 @@ export default function TransactionManagePage() {
                                 borderRadius: 2.5,
                                 fontWeight: 700,
                                 textTransform: "none",
-                                bgcolor: "#0088D6",
+                                bgcolor: BRAND_PRIMARY,
                                 "&:hover": { bgcolor: "#0070BA" },
                                 px: 3,
-                                boxShadow: "0 4px 14px rgba(0, 136, 214, 0.25)",
+                                boxShadow: "0 4px 14px rgba(15, 118, 110, 0.25)",
                                 display: { xs: "none", sm: "inline-flex" }
                             }}
                         >
@@ -410,7 +415,7 @@ export default function TransactionManagePage() {
                             borderRadius: 3,
                             bgcolor: "#FFFFFF",
                             border: "1px solid rgba(15, 23, 42, 0.08)",
-                            borderTop: "3px solid #0088D6",
+                            borderTop: `3px solid ${BRAND_PRIMARY}`,
                             boxShadow: "0 1px 3px rgba(0,0,0,0.02)"
                         }}
                     >
@@ -431,11 +436,11 @@ export default function TransactionManagePage() {
                                     width: 44,
                                     height: 44,
                                     borderRadius: 2.5,
-                                    bgcolor: "rgba(0, 136, 214, 0.1)",
+                                    bgcolor: BRAND_LIGHT,
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "center",
-                                    color: "#0088D6"
+                                    color: BRAND_PRIMARY
                                 }}
                             >
                                 <ReceiptLongIcon />
@@ -573,8 +578,8 @@ export default function TransactionManagePage() {
                                                     fontFamily: "monospace",
                                                     fontWeight: 700,
                                                     fontSize: "0.8rem",
-                                                    bgcolor: "rgba(0, 136, 214, 0.08)",
-                                                    color: "#0088D6",
+                                                    bgcolor: BRAND_LIGHT,
+                                                    color: BRAND_PRIMARY,
                                                     px: 1,
                                                     py: 0.35,
                                                     borderRadius: 1.5,
@@ -619,8 +624,8 @@ export default function TransactionManagePage() {
                                                     height: 22,
                                                     fontSize: "0.7rem",
                                                     fontWeight: 700,
-                                                    bgcolor: t.paymentChannel === "CASH" ? "#F1F5F9" : "rgba(0, 136, 214, 0.1)",
-                                                    color: t.paymentChannel === "CASH" ? "#475569" : "#0088D6"
+                                                    bgcolor: t.paymentChannel === "CASH" ? "#F1F5F9" : BRAND_LIGHT,
+                                                    color: t.paymentChannel === "CASH" ? "#475569" : BRAND_PRIMARY
                                                 }}
                                             />
                                         </TableCell>
@@ -662,10 +667,10 @@ export default function TransactionManagePage() {
                                                     size="small"
                                                     onClick={() => handleOpenDetail(t)}
                                                     sx={{
-                                                        bgcolor: "rgba(0, 136, 214, 0.08)",
-                                                        color: "#0088D6",
+                                                        bgcolor: BRAND_LIGHT,
+                                                        color: BRAND_PRIMARY,
                                                         borderRadius: 2,
-                                                        "&:hover": { bgcolor: "rgba(0, 136, 214, 0.16)" }
+                                                        "&:hover": { bgcolor: "rgba(15, 118, 110, 0.16)" }
                                                     }}
                                                 >
                                                     <VisibilityIcon fontSize="small" />
@@ -712,13 +717,13 @@ export default function TransactionManagePage() {
                             width: 36,
                             height: 36,
                             borderRadius: 2,
-                            bgcolor: "rgba(0, 136, 214, 0.1)",
+                            bgcolor: BRAND_LIGHT,
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center"
                         }}
                     >
-                        <ReceiptLongIcon sx={{ color: "#0088D6", fontSize: 20 }} />
+                        <ReceiptLongIcon sx={{ color: BRAND_PRIMARY, fontSize: 20 }} />
                     </Box>
                     <Box>
                         <Typography variant="subtitle1" fontWeight={800} color="#0F172A">
@@ -734,7 +739,7 @@ export default function TransactionManagePage() {
                         <Stack spacing={2} mt={0.5}>
                             <Box display="flex" justifyContent="space-between" alignItems="center">
                                 <Typography variant="body2" color="#64748B">Mã giao dịch hệ thống:</Typography>
-                                <Typography variant="body2" fontWeight={800} sx={{ fontFamily: "monospace", color: "#0088D6" }}>
+                                <Typography variant="body2" fontWeight={800} sx={{ fontFamily: "monospace", color: BRAND_PRIMARY }}>
                                     {selectedTxn.transactionId}
                                 </Typography>
                             </Box>
@@ -809,7 +814,7 @@ export default function TransactionManagePage() {
                             borderRadius: 2.5,
                             textTransform: "none",
                             fontWeight: 700,
-                            bgcolor: "#0088D6",
+                            bgcolor: BRAND_PRIMARY,
                             "&:hover": { bgcolor: "#0070BA" },
                             px: 3
                         }}

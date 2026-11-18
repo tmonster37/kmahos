@@ -48,6 +48,27 @@ import { useAuth } from "../../context/AuthContext";
 import axiosInstance from "../../services/AxiosInstance";
 import { formatCurrency, formatDate } from "../../utils/formatters";
 
+export function getDaysUntilExpiry(expDateStr) {
+    if (!expDateStr) return null;
+    const exp = new Date(expDateStr);
+    if (isNaN(exp.getTime())) return null;
+    const now = new Date();
+    const diffTime = exp - now;
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+}
+
+export function filterProcurementMedicines(medicines = []) {
+    return medicines.filter(m => {
+        if (m.deleted) return false;
+        const hasStock = m.stockQuantity != null && !isNaN(Number(m.stockQuantity));
+        const hasMinStock = m.minStock != null && !isNaN(Number(m.minStock));
+        const isLowStock = hasStock && hasMinStock && Number(m.stockQuantity) < Number(m.minStock);
+        const daysLeft = getDaysUntilExpiry(m.expiryDate);
+        const isExpiredOrExpiring = daysLeft != null && daysLeft <= 90;
+        return isLowStock || isExpiredOrExpiring;
+    });
+}
+
 export default function MedicineManagePage() {
     const { user } = useAuth();
     const canManageCatalog = user?.role === "ROLE_ADMIN" || user?.role === "ROLE_PHARMACIST";
@@ -60,7 +81,7 @@ export default function MedicineManagePage() {
     const [tabFilter, setTabFilter] = useState("ALL"); // ALL, ACTIVE, LOCKED, LOW_STOCK, EXPIRING_SOON, SAFE
     const [openRestock, setOpenRestock] = useState(false);
     const [selectedMed, setSelectedMed] = useState(null);
-    const [importQty, setImportQty] = useState(100);
+    const [importQty, setImportQty] = useState("");
     const [importBatch, setImportBatch] = useState("");
     const [importExpiry, setImportExpiry] = useState("");
     const [feedback, setFeedback] = useState({ type: "", message: "" });
@@ -72,8 +93,8 @@ export default function MedicineManagePage() {
         medicineName: "",
         activeIngredient: "",
         unit: "TABLET",
-        price: 10000,
-        stockQuantity: 0
+        price: "",
+        stockQuantity: ""
     });
 
     // State cho Dialog Khóa / Mở khóa thuốc (2.2.47 & 2.2.48)
@@ -98,21 +119,11 @@ export default function MedicineManagePage() {
         loadMedicines();
     }, []);
 
-    const getDaysUntilExpiry = (expDateStr) => {
-        if (!expDateStr) return 999;
-        const exp = new Date(expDateStr);
-        const now = new Date();
-        const diffTime = exp - now;
-        return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    };
-
     const handleOpenRestockModal = (m) => {
         setSelectedMed(m);
-        setImportQty(100);
-        setImportBatch(`LOT-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 90) + 10)}`);
-        const nextYear = new Date();
-        nextYear.setFullYear(nextYear.getFullYear() + 2);
-        setImportExpiry(nextYear.toISOString().split("T")[0]);
+        setImportQty("");
+        setImportBatch("");
+        setImportExpiry("");
         setOpenRestock(true);
     };
 
@@ -123,21 +134,19 @@ export default function MedicineManagePage() {
             alert("Vui lòng nhập số lượng hợp lệ!");
             return;
         }
+        if (!importBatch || !importBatch.trim()) {
+            alert("Vui lòng nhập số lô sản xuất!");
+            return;
+        }
+        if (!importExpiry) {
+            alert("Vui lòng chọn hạn sử dụng!");
+            return;
+        }
 
-        setMedicines(prev => prev.map((m) =>
-            m.medicineId === selectedMed.medicineId
-                ? {
-                    ...m,
-                    stockQuantity: (Number(m.stockQuantity) || 0) + qtyNum,
-                    batchNumber: importBatch || m.batchNumber,
-                    expiryDate: importExpiry || m.expiryDate
-                }
-                : m
-        ));
         setOpenRestock(false);
         setFeedback({
-            type: "success",
-            message: `Đã nhập thêm +${qtyNum} ${selectedMed.unit || "đơn vị"} (Lô: ${importBatch}, HSD: ${importExpiry}) cho thuốc [${selectedMed.medicineName}] thành công!`
+            type: "warning",
+            message: `Chưa thể xác nhận nhập kho: Danh mục thuốc không hỗ trợ cập nhật tồn kho trực tiếp khi chưa có chứng từ backend. Vui lòng chuyển sang phân hệ Kho Dược (/admin/pharmacy-inventory) để lập phiếu nhập kho FEFO chính thức.`
         });
     };
 
@@ -148,8 +157,8 @@ export default function MedicineManagePage() {
             medicineName: "",
             activeIngredient: "",
             unit: "TABLET",
-            price: 15000,
-            stockQuantity: 100
+            price: "",
+            stockQuantity: ""
         });
         setOpenEdit(true);
     };
@@ -161,8 +170,8 @@ export default function MedicineManagePage() {
             medicineName: m.medicineName || "",
             activeIngredient: m.activeIngredient || "",
             unit: m.unit || "TABLET",
-            price: m.price || 0,
-            stockQuantity: m.stockQuantity || 0
+            price: m.price != null ? m.price : "",
+            stockQuantity: m.stockQuantity != null ? m.stockQuantity : ""
         });
         setOpenEdit(true);
     };
@@ -174,6 +183,16 @@ export default function MedicineManagePage() {
             setFeedback({ type: "warning", message: "Vui lòng nhập tên thuốc!" });
             return;
         }
+        const priceNum = editFormData.price === "" ? null : Number(editFormData.price);
+        if (priceNum === null || isNaN(priceNum) || priceNum < 0) {
+            setFeedback({ type: "warning", message: "Vui lòng nhập đơn giá hợp lệ!" });
+            return;
+        }
+        const stockNum = editFormData.stockQuantity === "" ? 0 : Number(editFormData.stockQuantity);
+        if (isNaN(stockNum) || stockNum < 0) {
+            setFeedback({ type: "warning", message: "Vui lòng nhập số lượng tồn kho hợp lệ!" });
+            return;
+        }
 
         setSubmitting(true);
         try {
@@ -183,8 +202,8 @@ export default function MedicineManagePage() {
                     medicineName: editFormData.medicineName.trim(),
                     activeIngredient: editFormData.activeIngredient?.trim(),
                     unit: editFormData.unit,
-                    price: Number(editFormData.price),
-                    stockQuantity: Number(editFormData.stockQuantity)
+                    price: priceNum,
+                    stockQuantity: stockNum
                 });
                 setFeedback({
                     type: "success",
@@ -196,8 +215,8 @@ export default function MedicineManagePage() {
                     medicineName: editFormData.medicineName.trim(),
                     activeIngredient: editFormData.activeIngredient?.trim(),
                     unit: editFormData.unit,
-                    price: Number(editFormData.price),
-                    stockQuantity: Number(editFormData.stockQuantity)
+                    price: priceNum,
+                    stockQuantity: stockNum
                 });
                 setFeedback({
                     type: "success",
@@ -252,11 +271,16 @@ export default function MedicineManagePage() {
     // Phân loại
     const activeList = medicines.filter(m => !m.deleted);
     const lockedList = medicines.filter(m => Boolean(m.deleted));
-    const lowStockList = medicines.filter(m => !m.deleted && (Number(m.stockQuantity) || 0) < (m.minStock || 50));
+    const lowStockList = medicines.filter(m => {
+        if (m.deleted) return false;
+        const hasStock = m.stockQuantity != null && !isNaN(Number(m.stockQuantity));
+        const hasMinStock = m.minStock != null && !isNaN(Number(m.minStock));
+        return hasStock && hasMinStock && Number(m.stockQuantity) < Number(m.minStock);
+    });
     const expiringSoonList = medicines.filter(m => {
         if (m.deleted) return false;
         const days = getDaysUntilExpiry(m.expiryDate);
-        return days <= 90 && days >= 0;
+        return days != null && days <= 90 && days >= 0;
     });
 
     const filteredMedicines = medicines.filter(m => {
@@ -265,17 +289,19 @@ export default function MedicineManagePage() {
             m.activeIngredient?.toLowerCase().includes(searchKeyword.toLowerCase()) ||
             m.batchNumber?.toLowerCase().includes(searchKeyword.toLowerCase());
 
-        const stock = Number(m.stockQuantity) || 0;
-        const minStock = m.minStock || 50;
+        const hasStock = m.stockQuantity != null && !isNaN(Number(m.stockQuantity));
+        const hasMinStock = m.minStock != null && !isNaN(Number(m.minStock));
+        const stock = hasStock ? Number(m.stockQuantity) : null;
+        const minStock = hasMinStock ? Number(m.minStock) : null;
         const days = getDaysUntilExpiry(m.expiryDate);
 
         if (!matchSearch) return false;
 
         if (tabFilter === "ACTIVE") return !m.deleted;
         if (tabFilter === "LOCKED") return Boolean(m.deleted);
-        if (tabFilter === "LOW_STOCK") return !m.deleted && stock < minStock;
-        if (tabFilter === "EXPIRING_SOON") return !m.deleted && days <= 90;
-        if (tabFilter === "SAFE") return !m.deleted && stock >= minStock && days > 90;
+        if (tabFilter === "LOW_STOCK") return !m.deleted && hasStock && hasMinStock && stock < minStock;
+        if (tabFilter === "EXPIRING_SOON") return !m.deleted && days != null && days <= 90 && days >= 0;
+        if (tabFilter === "SAFE") return !m.deleted && hasStock && hasMinStock && stock >= minStock && (days == null || days > 90);
         return true;
     });
 
@@ -297,10 +323,15 @@ export default function MedicineManagePage() {
     };
 
     const handleExportProcurementList = () => {
-        const needed = medicines.filter(m => !m.deleted && ((Number(m.stockQuantity) || 0) < (m.minStock || 50) || getDaysUntilExpiry(m.expiryDate) <= 90));
+        const needed = filterProcurementMedicines(medicines);
         let csvContent = "data:text/csv;charset=utf-8,Mã thuốc,Tên thuốc,Hoạt chất,Tồn kho,Ngưỡng an toàn,Hạn sử dụng,Lô sản xuất,Đề xuất nhập thêm\n";
         needed.forEach(n => {
-            csvContent += `${n.medicineId},"${n.medicineName}","${n.activeIngredient || ''}",${n.stockQuantity},${n.minStock || 50},${n.expiryDate},${n.batchNumber},${(n.minStock || 50) * 3}\n`;
+            const stockStr = n.stockQuantity != null ? n.stockQuantity : "Chưa có dữ liệu";
+            const minStockStr = n.minStock != null ? n.minStock : "Chưa có dữ liệu";
+            const expStr = n.expiryDate || "Chưa có dữ liệu";
+            const batchStr = n.batchNumber || "Chưa có số lô";
+            const recommendedOrder = n.minStock != null && !isNaN(Number(n.minStock)) ? Number(n.minStock) * 3 : "Chưa xác định";
+            csvContent += `${n.medicineId},"${n.medicineName}","${n.activeIngredient || ''}",${stockStr},${minStockStr},${expStr},${batchStr},${recommendedOrder}\n`;
         });
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
@@ -409,22 +440,24 @@ export default function MedicineManagePage() {
                     >
                         Xuất Dự Trù Dược Phẩm (CSV)
                     </Button>
-                    <Button
-                        variant="contained"
-                        startIcon={<AddIcon />}
-                        onClick={handleOpenAddModal}
-                        sx={{
-                            borderRadius: 2.5,
-                            fontWeight: 700,
-                            textTransform: "none",
-                            fontSize: "0.85rem",
-                            bgcolor: "#0088D6",
-                            boxShadow: "0 4px 14px rgba(0, 136, 214, 0.25)",
-                            "&:hover": { bgcolor: "#0073B7" }
-                        }}
-                    >
-                        Thêm Thuốc Mới
-                    </Button>
+                    {canManageCatalog && (
+                        <Button
+                            variant="contained"
+                            startIcon={<AddIcon />}
+                            onClick={handleOpenAddModal}
+                            sx={{
+                                borderRadius: 2.5,
+                                fontWeight: 700,
+                                textTransform: "none",
+                                fontSize: "0.85rem",
+                                bgcolor: "#0088D6",
+                                boxShadow: "0 4px 14px rgba(0, 136, 214, 0.25)",
+                                "&:hover": { bgcolor: "#0073B7" }
+                            }}
+                        >
+                            Thêm Thuốc Mới
+                        </Button>
+                    )}
                 </Stack>
             </Paper>
 
@@ -811,12 +844,14 @@ export default function MedicineManagePage() {
                             ) : (
                                 filteredMedicines.map((m) => {
                                     const isLocked = Boolean(m.deleted);
-                                    const stock = Number(m.stockQuantity) || 0;
-                                    const minStock = m.minStock || 50;
-                                    const isLow = stock < minStock;
+                                    const hasStock = m.stockQuantity != null && !isNaN(Number(m.stockQuantity));
+                                    const hasMinStock = m.minStock != null && !isNaN(Number(m.minStock));
+                                    const stock = hasStock ? Number(m.stockQuantity) : null;
+                                    const minStock = hasMinStock ? Number(m.minStock) : null;
+                                    const isLow = (hasStock && hasMinStock) ? stock < minStock : false;
                                     const daysUntilExp = getDaysUntilExpiry(m.expiryDate);
-                                    const isExpiringSoon = daysUntilExp <= 90 && daysUntilExp >= 0;
-                                    const isExpired = daysUntilExp < 0;
+                                    const isExpired = daysUntilExp != null && daysUntilExp <= 0;
+                                    const isExpiringSoon = daysUntilExp != null && daysUntilExp > 0 && daysUntilExp <= 90;
                                     const unitLabel = getUnitLabel(m.unit);
 
                                     return (
@@ -847,7 +882,7 @@ export default function MedicineManagePage() {
                                             </TableCell>
                                             <TableCell sx={{ py: 2, borderBottom: "1px solid rgba(15, 23, 42, 0.06)" }}>
                                                 <Chip
-                                                    label={m.batchNumber || "LOT-STD"}
+                                                    label={m.batchNumber || "Chưa có số lô"}
                                                     size="small"
                                                     sx={{
                                                         fontFamily: "monospace",
@@ -856,26 +891,30 @@ export default function MedicineManagePage() {
                                                         bgcolor: "rgba(100, 116, 139, 0.08)",
                                                         color: "#475569",
                                                         border: "1px solid rgba(100, 116, 139, 0.2)",
-                                                        borderRadius: 1.5
+                                                        borderRadius: 1.5,
+                                                        fontStyle: m.batchNumber ? "normal" : "italic"
                                                     }}
                                                 />
                                             </TableCell>
                                             <TableCell sx={{ py: 2, borderBottom: "1px solid rgba(15, 23, 42, 0.06)" }}>
                                                 <Typography variant="body2" fontWeight={700} color={isExpired ? "#EF4444" : (isExpiringSoon ? "#D97706" : "#0F172A")} sx={{ fontFamily: "monospace" }}>
-                                                    {m.expiryDate ? formatDate(m.expiryDate) : "31/12/2027"}
+                                                    {m.expiryDate ? formatDate(m.expiryDate) : "Chưa có dữ liệu"}
                                                 </Typography>
                                                 <Typography variant="caption" sx={{ color: isExpired ? "#EF4444" : (isExpiringSoon ? "#D97706" : "#94A3B8") }}>
-                                                    {isExpired ? "Đã hết hạn" : `(Còn ${daysUntilExp} ngày)`}
+                                                    {m.expiryDate ? (isExpired ? "Đã hết hạn" : `(Còn ${daysUntilExp} ngày)`) : "Chưa có hạn dùng"}
                                                 </Typography>
                                             </TableCell>
                                             <TableCell align="right" sx={{ py: 2, borderBottom: "1px solid rgba(15, 23, 42, 0.06)" }}>
                                                 <Typography variant="body2" fontWeight={800} color="#0F172A" sx={{ fontFamily: "monospace" }}>
-                                                    {formatCurrency(m.price)}
+                                                    {m.price != null && !isNaN(Number(m.price)) ? formatCurrency(m.price) : "Chưa có dữ liệu"}
                                                 </Typography>
                                             </TableCell>
                                             <TableCell align="center" sx={{ py: 2, borderBottom: "1px solid rgba(15, 23, 42, 0.06)", whiteSpace: "nowrap" }}>
                                                 <Typography variant="body2" fontWeight={700} sx={{ fontFamily: "monospace", color: isLow ? "#DC2626" : "#0F172A" }}>
-                                                    {stock.toLocaleString()} <Typography component="span" variant="caption" sx={{ color: "#64748B", fontWeight: 700, fontSize: "0.72rem" }}>{unitLabel}</Typography>
+                                                    {hasStock ? `${stock.toLocaleString()} ` : "Chưa có dữ liệu "}
+                                                    {hasStock && (
+                                                        <Typography component="span" variant="caption" sx={{ color: "#64748B", fontWeight: 700, fontSize: "0.72rem" }}>{unitLabel}</Typography>
+                                                    )}
                                                 </Typography>
                                             </TableCell>
                                             <TableCell align="center" sx={{ py: 2, borderBottom: "1px solid rgba(15, 23, 42, 0.06)" }}>
@@ -885,6 +924,8 @@ export default function MedicineManagePage() {
                                                     <Chip label="HẾT HẠN - TIÊU HỦY" size="small" sx={{ fontWeight: 800, fontSize: "0.7rem", bgcolor: "rgba(239, 68, 68, 0.12)", color: "#DC2626", border: "1px solid rgba(239, 68, 68, 0.3)", borderRadius: 1.5 }} />
                                                 ) : isExpiringSoon ? (
                                                     <Chip label="ƯU TIÊN XUẤT (FEFO)" size="small" sx={{ fontWeight: 800, fontSize: "0.7rem", bgcolor: "rgba(245, 158, 11, 0.12)", color: "#D97706", border: "1px solid rgba(245, 158, 11, 0.3)", borderRadius: 1.5 }} />
+                                                ) : (!hasStock || !hasMinStock) ? (
+                                                    <Chip label="CHƯA XÁC ĐỊNH TỒN KHO" size="small" sx={{ fontWeight: 700, fontSize: "0.7rem", bgcolor: "rgba(100, 116, 139, 0.08)", color: "#64748B", border: "1px solid rgba(100, 116, 139, 0.2)", borderRadius: 1.5 }} />
                                                 ) : isLow ? (
                                                     <Chip label="SẮP HẾT TỒN KHO" size="small" sx={{ fontWeight: 700, fontSize: "0.7rem", bgcolor: "rgba(239, 68, 68, 0.08)", color: "#EF4444", border: "1px solid rgba(239, 68, 68, 0.2)", borderRadius: 1.5 }} />
                                                 ) : (
@@ -892,79 +933,85 @@ export default function MedicineManagePage() {
                                                 )}
                                             </TableCell>
                                             <TableCell align="center" sx={{ py: 2, borderBottom: "1px solid rgba(15, 23, 42, 0.06)", minWidth: 190, whiteSpace: "nowrap" }}>
-                                                <Stack direction="row" spacing={0.8} justifyContent="center" alignItems="center">
-                                                    {/* Nút Chỉnh sửa thông tin thuốc (2.2.46) */}
-                                                    <Tooltip title="Chỉnh sửa thông tin thuốc (2.2.46)">
-                                                        <IconButton
+                                                {canManageCatalog ? (
+                                                    <Stack direction="row" spacing={0.8} justifyContent="center" alignItems="center">
+                                                        {/* Nút Chỉnh sửa thông tin thuốc (2.2.46) */}
+                                                        <Tooltip title="Chỉnh sửa thông tin thuốc (2.2.46)">
+                                                            <IconButton
+                                                                size="small"
+                                                                onClick={() => handleOpenEditModal(m)}
+                                                                sx={{
+                                                                    bgcolor: "rgba(0, 136, 214, 0.08)",
+                                                                    color: "#0088D6",
+                                                                    borderRadius: 2,
+                                                                    "&:hover": { bgcolor: "rgba(0, 136, 214, 0.16)" }
+                                                                }}
+                                                            >
+                                                                <EditIcon fontSize="small" />
+                                                            </IconButton>
+                                                        </Tooltip>
+
+                                                        {/* Nút Khóa (2.2.47) / Mở khóa (2.2.48) */}
+                                                        {isLocked ? (
+                                                            <Tooltip title="Mở khóa thuốc (2.2.48)">
+                                                                <IconButton
+                                                                    size="small"
+                                                                    onClick={() => handleOpenToggleStatus(m)}
+                                                                    sx={{
+                                                                        bgcolor: "rgba(16, 185, 129, 0.08)",
+                                                                        color: "#10B981",
+                                                                        borderRadius: 2,
+                                                                        "&:hover": { bgcolor: "rgba(16, 185, 129, 0.18)" }
+                                                                    }}
+                                                                >
+                                                                    <LockOpenIcon fontSize="small" />
+                                                                </IconButton>
+                                                            </Tooltip>
+                                                        ) : (
+                                                            <Tooltip title="Khóa thuốc ngừng sử dụng (2.2.47)">
+                                                                <IconButton
+                                                                    size="small"
+                                                                    onClick={() => handleOpenToggleStatus(m)}
+                                                                    sx={{
+                                                                        bgcolor: "rgba(239, 68, 68, 0.08)",
+                                                                        color: "#EF4444",
+                                                                        borderRadius: 2,
+                                                                        "&:hover": { bgcolor: "rgba(239, 68, 68, 0.16)" }
+                                                                    }}
+                                                                >
+                                                                    <BlockIcon fontSize="small" />
+                                                                </IconButton>
+                                                            </Tooltip>
+                                                        )}
+
+                                                        {/* Nút Nhập thêm */}
+                                                        <Button
                                                             size="small"
-                                                            onClick={() => handleOpenEditModal(m)}
+                                                            variant="contained"
+                                                            startIcon={<AddShoppingCartIcon sx={{ fontSize: 15 }} />}
+                                                            onClick={() => handleOpenRestockModal(m)}
+                                                            disabled={isLocked}
                                                             sx={{
-                                                                bgcolor: "rgba(0, 136, 214, 0.08)",
-                                                                color: "#0088D6",
                                                                 borderRadius: 2,
-                                                                "&:hover": { bgcolor: "rgba(0, 136, 214, 0.16)" }
+                                                                textTransform: "none",
+                                                                fontWeight: 700,
+                                                                fontSize: "0.76rem",
+                                                                whiteSpace: "nowrap",
+                                                                px: 1.4,
+                                                                py: 0.5,
+                                                                bgcolor: "#0088D6",
+                                                                boxShadow: "0 2px 8px rgba(0, 136, 214, 0.2)",
+                                                                "&:hover": { bgcolor: "#0073B7" }
                                                             }}
                                                         >
-                                                            <EditIcon fontSize="small" />
-                                                        </IconButton>
-                                                    </Tooltip>
-
-                                                    {/* Nút Khóa (2.2.47) / Mở khóa (2.2.48) */}
-                                                    {isLocked ? (
-                                                        <Tooltip title="Mở khóa thuốc (2.2.48)">
-                                                            <IconButton
-                                                                size="small"
-                                                                onClick={() => handleOpenToggleStatus(m)}
-                                                                sx={{
-                                                                    bgcolor: "rgba(16, 185, 129, 0.08)",
-                                                                    color: "#10B981",
-                                                                    borderRadius: 2,
-                                                                    "&:hover": { bgcolor: "rgba(16, 185, 129, 0.18)" }
-                                                                }}
-                                                            >
-                                                                <LockOpenIcon fontSize="small" />
-                                                            </IconButton>
-                                                        </Tooltip>
-                                                    ) : (
-                                                        <Tooltip title="Khóa thuốc ngừng sử dụng (2.2.47)">
-                                                            <IconButton
-                                                                size="small"
-                                                                onClick={() => handleOpenToggleStatus(m)}
-                                                                sx={{
-                                                                    bgcolor: "rgba(239, 68, 68, 0.08)",
-                                                                    color: "#EF4444",
-                                                                    borderRadius: 2,
-                                                                    "&:hover": { bgcolor: "rgba(239, 68, 68, 0.16)" }
-                                                                }}
-                                                            >
-                                                                <BlockIcon fontSize="small" />
-                                                            </IconButton>
-                                                        </Tooltip>
-                                                    )}
-
-                                                    {/* Nút Nhập thêm */}
-                                                    <Button
-                                                        size="small"
-                                                        variant="contained"
-                                                        startIcon={<AddShoppingCartIcon sx={{ fontSize: 15 }} />}
-                                                        onClick={() => handleOpenRestockModal(m)}
-                                                        disabled={isLocked}
-                                                        sx={{
-                                                            borderRadius: 2,
-                                                            textTransform: "none",
-                                                            fontWeight: 700,
-                                                            fontSize: "0.76rem",
-                                                            whiteSpace: "nowrap",
-                                                            px: 1.4,
-                                                            py: 0.5,
-                                                            bgcolor: "#0088D6",
-                                                            boxShadow: "0 2px 8px rgba(0, 136, 214, 0.2)",
-                                                            "&:hover": { bgcolor: "#0073B7" }
-                                                        }}
-                                                    >
-                                                        Nhập thêm
-                                                    </Button>
-                                                </Stack>
+                                                            Nhập thêm
+                                                        </Button>
+                                                    </Stack>
+                                                ) : (
+                                                    <Typography variant="caption" color="text.secondary" sx={{ fontStyle: "italic" }}>
+                                                        Chế độ xem
+                                                    </Typography>
+                                                )}
                                             </TableCell>
                                         </TableRow>
                                     );
@@ -977,6 +1024,7 @@ export default function MedicineManagePage() {
 
             {/* Modal Chỉnh sửa thông tin thuốc (2.2.46) */}
             <Dialog
+                disablePortal
                 open={openEdit}
                 onClose={() => !submitting && setOpenEdit(false)}
                 maxWidth="sm"
@@ -1042,7 +1090,7 @@ export default function MedicineManagePage() {
                                     type="number"
                                     label="Đơn giá niêm yết (VNĐ)"
                                     value={editFormData.price}
-                                    onChange={(e) => setEditFormData({ ...editFormData, price: Number(e.target.value) })}
+                                    onChange={(e) => setEditFormData({ ...editFormData, price: e.target.value })}
                                     required
                                     InputProps={{
                                         endAdornment: <InputAdornment position="end">đ</InputAdornment>,
@@ -1056,7 +1104,7 @@ export default function MedicineManagePage() {
                                     type="number"
                                     label="Số lượng tồn kho"
                                     value={editFormData.stockQuantity}
-                                    onChange={(e) => setEditFormData({ ...editFormData, stockQuantity: Number(e.target.value) })}
+                                    onChange={(e) => setEditFormData({ ...editFormData, stockQuantity: e.target.value })}
                                     InputProps={{ sx: { borderRadius: 2.5 } }}
                                 />
                             </Grid>
@@ -1086,6 +1134,7 @@ export default function MedicineManagePage() {
 
             {/* Dialog Khóa / Mở khóa thuốc (2.2.47 & 2.2.48) */}
             <Dialog
+                disablePortal
                 open={lockConfirm.open}
                 onClose={() => !submitting && setLockConfirm({ open: false, medicine: null, isLocking: true })}
                 PaperProps={{
@@ -1159,6 +1208,7 @@ export default function MedicineManagePage() {
             {/* Modal Nhập thêm thuốc theo Lô & HSD (FEFO) */}
             {selectedMed && (
                 <Dialog
+                    disablePortal
                     open={openRestock}
                     onClose={() => setOpenRestock(false)}
                     maxWidth="sm"
@@ -1178,6 +1228,9 @@ export default function MedicineManagePage() {
                         Nhập Thêm Lô Thuốc: {selectedMed.medicineName}
                     </DialogTitle>
                     <DialogContent dividers sx={{ borderColor: "rgba(15, 23, 42, 0.08)" }}>
+                        <Alert severity="warning" sx={{ mb: 2, borderRadius: 2.5, fontWeight: 600 }}>
+                            Quy định quản lý kho: Phân hệ Danh mục thuốc không hỗ trợ cập nhật tồn kho trực tiếp không qua chứng từ backend. Mọi nghiệp vụ nhập kho, quản lý lô sản xuất và cập nhật số lượng tồn kho thực tế phải có chứng từ nhập kho chính thức tại phân hệ <b>Kho Dược (/admin/pharmacy-inventory)</b>.
+                        </Alert>
                         <Box sx={{ mb: 2.5, p: 2, bgcolor: "#F8FAFC", borderRadius: 3, border: "1px solid rgba(15, 23, 42, 0.08)" }}>
                             <Grid container spacing={1.5}>
                                 <Grid item xs={6}>
@@ -1190,13 +1243,13 @@ export default function MedicineManagePage() {
                                 </Grid>
                                 <Grid item xs={6}>
                                     <Typography variant="body2" sx={{ color: "#64748B" }}>Tồn kho hiện tại:</Typography>
-                                    <Typography variant="body2" fontWeight={800} sx={{ color: selectedMed.stockQuantity < 50 ? "#EF4444" : "#10B981" }}>
-                                        {selectedMed.stockQuantity} {getUnitLabel(selectedMed.unit)}
+                                    <Typography variant="body2" fontWeight={800} sx={{ color: selectedMed.stockQuantity != null && Number(selectedMed.stockQuantity) < 50 ? "#EF4444" : "#10B981" }}>
+                                        {selectedMed.stockQuantity != null ? selectedMed.stockQuantity : "Chưa có dữ liệu"} {getUnitLabel(selectedMed.unit)}
                                     </Typography>
                                 </Grid>
                                 <Grid item xs={6}>
                                     <Typography variant="body2" sx={{ color: "#64748B" }}>Lô hiện hành:</Typography>
-                                    <Typography variant="body2" fontWeight={800} color="#0F172A" sx={{ fontFamily: "monospace" }}>{selectedMed.batchNumber || "LOT-STD"}</Typography>
+                                    <Typography variant="body2" fontWeight={800} color="#0F172A" sx={{ fontFamily: "monospace" }}>{selectedMed.batchNumber || "Chưa có số lô"}</Typography>
                                 </Grid>
                             </Grid>
                         </Box>

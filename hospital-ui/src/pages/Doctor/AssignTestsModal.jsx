@@ -21,6 +21,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import ScienceIcon from "@mui/icons-material/Science";
 import axiosInstance from "../../services/AxiosInstance";
 import { formatCurrency } from "../../utils/formatters";
+import designTokens from "../../theme/designTokens";
 
 export default function AssignTestsModal({ open, onClose, recordId, onAssigned }) {
     const [services, setServices] = useState([]);
@@ -174,12 +175,12 @@ export default function AssignTestsModal({ open, onClose, recordId, onAssigned }
                                             p: 1.5,
                                             mb: 1,
                                             borderRadius: 2,
-                                            border: isSelected ? "1.5px solid #2563EB" : "1px solid #E2E8F0",
-                                            bgcolor: isSelected ? "rgba(37, 99, 235, 0.04)" : "background.paper",
+                                            border: isSelected ? `1.5px solid ${designTokens.brand.primary}` : "1px solid #E2E8F0",
+                                            bgcolor: isSelected ? `${designTokens.brand.primaryLight}` : "background.paper",
                                             cursor: "pointer",
                                             transition: "all 0.15s ease",
                                             "&:hover": {
-                                                bgcolor: isSelected ? "rgba(37, 99, 235, 0.08)" : "#F8FAFC",
+                                                bgcolor: isSelected ? `${designTokens.brand.primaryBorder}` : "#F8FAFC",
                                             },
                                         }}
                                     >
@@ -219,7 +220,7 @@ export default function AssignTestsModal({ open, onClose, recordId, onAssigned }
 
                 <Box display="flex" justifyContent="space-between" alignItems="center">
                     <Typography variant="body2" color="text.secondary">
-                        Đã chọn: <b style={{ color: "#2563EB" }}>{selectedIds.length}</b> dịch vụ
+                        Đã chọn: <b style={{ color: designTokens.brand.primary }}>{selectedIds.length}</b> dịch vụ
                     </Typography>
                     <Typography variant="subtitle1" fontWeight="bold" color="primary.main">
                         Tổng chi phí tạm tính: {formatCurrency(calculateTotalFee())}

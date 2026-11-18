@@ -15,11 +15,13 @@ import {
     TableCell,
     TableBody,
     Chip,
-    Button
+    Button,
+    Alert
 } from "@mui/material";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import PrintIcon from "@mui/icons-material/Print";
 import designTokens from "../../theme/designTokens";
+import { isBillTotalAmountValid } from "./CashierPage";
 
 export default function ReconciliationModal({
     open,
@@ -36,6 +38,7 @@ export default function ReconciliationModal({
         <Dialog
             open={open}
             onClose={onClose}
+            disablePortal
             maxWidth="md"
             fullWidth
             PaperProps={{ sx: { borderRadius: 3 } }}
@@ -44,6 +47,11 @@ export default function ReconciliationModal({
                 <AssessmentIcon color="primary" /> Bảng Đối Soát & Bàn Giao Ca Trực Thu Ngân
             </DialogTitle>
             <DialogContent sx={{ pt: 2.5 }}>
+                {shiftReconData.hasMissingAmount && (
+                    <Alert severity="warning" sx={{ mb: 2, borderRadius: 2, fontWeight: 600 }}>
+                        ⚠️ CẢNH BÁO ĐỐI SOÁT: Ca trực có giao dịch chưa xác định được số tiền từ máy chủ. Tổng tiền hiển thị dưới đây là tổng từng phần và chưa phải là số liệu tài chính hoàn chỉnh.
+                    </Alert>
+                )}
                 <Box mb={2.5}>
                     <Typography variant="subtitle2" color="text.secondary">
                         Phạm vi ca đối soát: <b>{
@@ -61,7 +69,10 @@ export default function ReconciliationModal({
                             <Typography variant="h6" fontWeight="bold" color={designTokens.status.info.main} mt={0.5}>
                                 {formatCurrency(shiftReconData.totalCollected)}
                             </Typography>
-                            <Typography variant="caption" color="text.secondary">{shiftReconData.transactionCount} lượt thu</Typography>
+                            {shiftReconData.hasMissingAmount && (
+                                <Chip label="Số liệu từng phần" size="small" color="warning" sx={{ mt: 0.5, fontWeight: 700, fontSize: "0.68rem", height: 20 }} />
+                            )}
+                            <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>{shiftReconData.transactionCount} lượt thu</Typography>
                         </Paper>
                     </Grid>
                     <Grid item xs={12} sm={6} md={3}>
@@ -117,8 +128,8 @@ export default function ReconciliationModal({
                             ) : (
                                 shiftReconData.transactions.map((t, i) => (
                                     <TableRow key={i} hover>
-                                        <TableCell sx={{ fontWeight: "bold", color: "primary.main" }}>{t.receiptCode || t.billId}</TableCell>
-                                        <TableCell>{t.patientName}</TableCell>
+                                        <TableCell sx={{ fontWeight: "bold", color: "primary.main", wordBreak: "break-word" }}>{t.receiptCode || t.billId || "Chưa có mã"}</TableCell>
+                                        <TableCell sx={{ wordBreak: "break-word" }}>{t.patientName || "Chưa có dữ liệu"}</TableCell>
                                         <TableCell>
                                             <Chip
                                                 label={
@@ -138,8 +149,8 @@ export default function ReconciliationModal({
                                                 }
                                             />
                                         </TableCell>
-                                        <TableCell align="right" sx={{ fontWeight: "bold", color: "success.main" }}>
-                                            {formatCurrency(t.totalAmount)}
+                                        <TableCell align="right" sx={{ fontWeight: "bold", color: isBillTotalAmountValid(t) ? "success.main" : "warning.dark" }}>
+                                            {isBillTotalAmountValid(t) ? formatCurrency(t.totalAmount) : "Chưa có dữ liệu"}
                                         </TableCell>
                                         <TableCell sx={{ fontSize: "0.8rem", color: "text.secondary" }}>
                                             {formatDateTime(t.paidAt)}

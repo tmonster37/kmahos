@@ -50,11 +50,13 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import PaymentIcon from '@mui/icons-material/Payment';
 import FlashOnIcon from '@mui/icons-material/FlashOn';
 import CloseIcon from '@mui/icons-material/Close';
+import RefreshIcon from '@mui/icons-material/Refresh';
 
 import axiosInstance from '../services/AxiosInstance';
 import ThermalTicketModal from '../components/kiosk/ThermalTicketModal';
 import { createBookingPayment, getVerifiedPayment } from '../services/bookingPayment';
 import designTokens from '../theme/designTokens';
+import { formatCurrency } from '../utils/formatters';
 
 const PRIORITY_OPTIONS = [
   { id: 'STANDARD', label: 'Bệnh nhân thường', reason: '', icon: <MedicalServicesIcon sx={{ fontSize: 20 }} />, color: '#0284C7', bg: '#E0F2FE' },
@@ -79,6 +81,7 @@ export default function KioskPage() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [departments, setDepartments] = useState([]);
   const [loadingDepts, setLoadingDepts] = useState(true);
+  const [deptError, setDeptError] = useState('');
 
   // Kiosk Form state
   const [selectedDept, setSelectedDept] = useState(null);
@@ -125,26 +128,24 @@ export default function KioskPage() {
   const fetchDepartments = async () => {
     try {
       setLoadingDepts(true);
+      setDeptError('');
       const res = await axiosInstance.get('/api/departments');
       const list = res.data && Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []);
       if (list.length > 0) {
         setDepartments(list.map(d => ({
           departmentId: d.departmentId,
           name: d.departmentName || d.name,
-          description: d.description || 'Khám chuyên khoa tiêu chuẩn'
+          description: d.description || 'Khám chuyên khoa tiêu chuẩn',
+          consultationFee: d.consultationFee ?? d.price ?? null
         })));
+      } else {
+        setDepartments([]);
+        setDeptError('Hiện tại chưa có dữ liệu chuyên khoa. Vui lòng liên hệ quầy tiếp đón.');
       }
     } catch (err) {
       console.error("Lỗi tải danh sách chuyên khoa:", err);
-      // Fallback placeholder departments if network fails
-      setDepartments([
-        { departmentId: 1, name: 'Khoa Nội Tổng Quát', description: 'Khám tim mạch, hô hấp, tiêu hóa, nội tiết' },
-        { departmentId: 2, name: 'Khoa Tim Mạch Can Thiệp', description: 'Khám mạch vành, huyết áp, loạn nhịp tim' },
-        { departmentId: 3, name: 'Khoa Nhi', description: 'Khám sức khỏe trẻ sơ sinh, trẻ nhỏ và thiếu nhi' },
-        { departmentId: 4, name: 'Khoa Răng Hàm Mặt', description: 'Khám và điều trị nha khoa, răng hàm mặt' },
-        { departmentId: 5, name: 'Khoa Tai Mũi Họng', description: 'Khám và điều trị các bệnh tai mũi họng' },
-        { departmentId: 6, name: 'Khoa Da Liễu', description: 'Khám và tư vấn bệnh ngoài da, dị ứng' }
-      ]);
+      setDepartments([]);
+      setDeptError('Không thể tải danh sách chuyên khoa. Vui lòng bấm thử lại hoặc liên hệ nhân viên tiếp đón.');
     } finally {
       setLoadingDepts(false);
     }
@@ -544,6 +545,20 @@ export default function KioskPage() {
                   <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexGrow: 1, py: 8 }}>
                     <CircularProgress size={44} />
                   </Box>
+                ) : deptError ? (
+                  <Box sx={{ py: 6, px: 2, textAlign: 'center', width: '100%' }}>
+                    <Alert severity="error" sx={{ mb: 2, maxWidth: 500, mx: 'auto', borderRadius: '12px' }}>
+                      {deptError}
+                    </Alert>
+                    <Button
+                      variant="contained"
+                      onClick={fetchDepartments}
+                      startIcon={<RefreshIcon />}
+                      sx={{ borderRadius: '12px', fontWeight: 800, textTransform: 'none', px: 3, py: 1.2, minHeight: 44 }}
+                    >
+                      Tải Lại Danh Sách Chuyên Khoa
+                    </Button>
+                  </Box>
                 ) : (
                   <Grid container spacing={2} sx={{ flexGrow: 1, alignContent: 'flex-start' }}>
                     {departments.map((dept) => {
@@ -842,7 +857,7 @@ export default function KioskPage() {
                           '&:hover': { bgcolor: payNow ? '#047857' : '#F0FDF4', borderColor: '#059669' }
                         }}
                       >
-                        ⚡ Quét VietQR (150k)<br/>Vào thẳng Bác sĩ
+                        ⚡ Quét VietQR{selectedDept?.consultationFee != null ? ` (${formatCurrency(selectedDept.consultationFee)})` : ''}<br/>Vào thẳng Bác sĩ
                       </Button>
                     </Grid>
                     <Grid item xs={6}>

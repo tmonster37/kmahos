@@ -50,6 +50,11 @@ import CodeIcon from "@mui/icons-material/Code";
 import gatewayApi from "../../services/gatewayApi";
 import PacsViewerModal from "../../components/PacsViewerModal";
 import { formatDateTime } from "../../utils/formatters";
+import designTokens from "../../theme/designTokens";
+
+const BRAND_PRIMARY = designTokens.brand.primary;
+const BRAND_DARK = designTokens.brand.primaryDark;
+const BRAND_LIGHT = designTokens.brand.primaryLight;
 
 export default function EhrAndGatewayPage() {
     const [currentTab, setCurrentTab] = useState(0);
@@ -239,8 +244,8 @@ export default function EhrAndGatewayPage() {
                                 fontSize: "0.68rem",
                                 fontWeight: 800,
                                 letterSpacing: "0.06em",
-                                bgcolor: "rgba(0, 136, 214, 0.08)",
-                                color: "#0088D6",
+                                bgcolor: BRAND_LIGHT,
+                                color: BRAND_PRIMARY,
                                 mb: 1
                             }}
                         />
@@ -259,10 +264,10 @@ export default function EhrAndGatewayPage() {
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "center",
-                                    border: "1px solid rgba(0, 136, 214, 0.2)"
+                                    border: "1px solid rgba(15, 118, 110, 0.2)"
                                 }}
                             >
-                                <HubIcon sx={{ color: "#0088D6", fontSize: 24 }} />
+                                <HubIcon sx={{ color: BRAND_PRIMARY, fontSize: 24 }} />
                             </Box>
                             Cổng Tích Hợp LIS/RIS Gateway & EHR Concept Dictionary
                         </Typography>
@@ -283,7 +288,7 @@ export default function EhrAndGatewayPage() {
                                 px: 2.5,
                                 borderColor: "rgba(15, 23, 42, 0.15)",
                                 color: "#334155",
-                                "&:hover": { borderColor: "#0088D6", bgcolor: "rgba(0, 136, 214, 0.04)" }
+                                "&:hover": { borderColor: BRAND_PRIMARY, bgcolor: "rgba(15, 118, 110, 0.04)" }
                             }}
                         >
                             Làm Mới
@@ -347,8 +352,8 @@ export default function EhrAndGatewayPage() {
                             color: "#64748B",
                             minHeight: 52
                         },
-                        "& .Mui-selected": { color: "#0088D6" },
-                        "& .MuiTabs-indicator": { bgcolor: "#0088D6", height: 3, borderRadius: "3px 3px 0 0" }
+                        "& .Mui-selected": { color: BRAND_PRIMARY },
+                        "& .MuiTabs-indicator": { bgcolor: BRAND_PRIMARY, height: 3, borderRadius: "3px 3px 0 0" }
                     }}
                 >
                     <Tab icon={<MenuBookIcon sx={{ fontSize: 19 }} />} iconPosition="start" label={`1. Quản Trị Concept Dictionary (${concepts.length})`} />
@@ -391,10 +396,10 @@ export default function EhrAndGatewayPage() {
                                     borderRadius: 2.5,
                                     fontWeight: 700,
                                     textTransform: "none",
-                                    bgcolor: "#0088D6",
+                                    bgcolor: BRAND_PRIMARY,
                                     "&:hover": { bgcolor: "#0070BA" },
                                     px: 2.5,
-                                    boxShadow: "0 4px 14px rgba(0, 136, 214, 0.25)"
+                                    boxShadow: "0 4px 14px rgba(15, 118, 110, 0.25)"
                                 }}
                             >
                                 Thêm Concept Mới
@@ -458,7 +463,7 @@ export default function EhrAndGatewayPage() {
                                                         {c.uuid}
                                                     </Box>
                                                 </TableCell>
-                                                <TableCell sx={{ fontWeight: 800, color: "#0088D6" }}>
+                                                <TableCell sx={{ fontWeight: 800, color: BRAND_PRIMARY }}>
                                                     {c.conceptName}
                                                 </TableCell>
                                                 <TableCell>
@@ -469,8 +474,8 @@ export default function EhrAndGatewayPage() {
                                                             height: 22,
                                                             fontSize: "0.7rem",
                                                             fontWeight: 800,
-                                                            bgcolor: c.conceptClass === "TEST" ? "rgba(0, 136, 214, 0.1)" : c.conceptClass === "FINDING" ? "rgba(139, 92, 246, 0.1)" : "#F1F5F9",
-                                                            color: c.conceptClass === "TEST" ? "#0088D6" : c.conceptClass === "FINDING" ? "#7C3AED" : "#475569"
+                                                            bgcolor: c.conceptClass === "TEST" ? BRAND_LIGHT : c.conceptClass === "FINDING" ? "rgba(139, 92, 246, 0.1)" : "#F1F5F9",
+                                                            color: c.conceptClass === "TEST" ? BRAND_PRIMARY : c.conceptClass === "FINDING" ? "#7C3AED" : "#475569"
                                                         }}
                                                     />
                                                 </TableCell>
@@ -527,11 +532,11 @@ export default function EhrAndGatewayPage() {
                                         width: 40,
                                         height: 40,
                                         borderRadius: 2.5,
-                                        bgcolor: "rgba(0, 136, 214, 0.1)",
+                                        bgcolor: BRAND_LIGHT,
                                         display: "flex",
                                         alignItems: "center",
                                         justifyContent: "center",
-                                        color: "#0088D6"
+                                        color: BRAND_PRIMARY
                                     }}
                                 >
                                     <ScienceIcon sx={{ fontSize: 24 }} />
@@ -622,9 +627,9 @@ export default function EhrAndGatewayPage() {
                                         fontWeight: 800,
                                         borderRadius: 2.5,
                                         textTransform: "none",
-                                        bgcolor: "#0088D6",
+                                        bgcolor: BRAND_PRIMARY,
                                         "&:hover": { bgcolor: "#0070BA" },
-                                        boxShadow: "0 4px 14px rgba(0, 136, 214, 0.25)"
+                                        boxShadow: "0 4px 14px rgba(15, 118, 110, 0.25)"
                                     }}
                                 >
                                     Bắn Kết Quả LIS Vào Hệ Thống
@@ -661,7 +666,7 @@ export default function EhrAndGatewayPage() {
                                 4. <strong>Tự động ánh xạ sang EHR</strong>: Cổng Gateway tự động phân tích chỉ số, so sánh khoảng tham chiếu và đồng bộ ngay thành một <code>MedicalObservation</code> trong hồ sơ bệnh án điện tử của người bệnh.
                             </Typography>
 
-                            <Box p={2.5} sx={{ bgcolor: "#002B49", borderRadius: 2.5, color: "#38BDF8", fontFamily: "monospace", fontSize: "0.825rem", overflowX: "auto", border: "1px solid rgba(0, 136, 214, 0.3)" }}>
+                            <Box p={2.5} sx={{ bgcolor: "#002B49", borderRadius: 2.5, color: "#38BDF8", fontFamily: "monospace", fontSize: "0.825rem", overflowX: "auto", border: "1px solid rgba(15, 118, 110, 0.3)" }}>
                                 {`// Chuẩn Webhook JSON từ máy xét nghiệm máu:
 POST /api/gateway/lis/results
 {
@@ -759,8 +764,8 @@ POST /api/gateway/lis/results
                                                             fontFamily: "monospace",
                                                             fontSize: "0.8rem",
                                                             fontWeight: 700,
-                                                            bgcolor: "rgba(0, 136, 214, 0.08)",
-                                                            color: "#0088D6",
+                                                            bgcolor: BRAND_LIGHT,
+                                                            color: BRAND_PRIMARY,
                                                             px: 1,
                                                             py: 0.35,
                                                             borderRadius: 1.5,
@@ -778,8 +783,8 @@ POST /api/gateway/lis/results
                                                             height: 22,
                                                             fontSize: "0.7rem",
                                                             fontWeight: 800,
-                                                            bgcolor: "rgba(0, 136, 214, 0.1)",
-                                                            color: "#0088D6"
+                                                            bgcolor: BRAND_LIGHT,
+                                                            color: BRAND_PRIMARY
                                                         }}
                                                     />
                                                 </TableCell>
@@ -819,7 +824,7 @@ POST /api/gateway/lis/results
                                                             textTransform: "none",
                                                             fontWeight: 700,
                                                             borderRadius: 2,
-                                                            bgcolor: "#0088D6",
+                                                            bgcolor: BRAND_PRIMARY,
                                                             "&:hover": { bgcolor: "#0070BA" }
                                                         }}
                                                     >

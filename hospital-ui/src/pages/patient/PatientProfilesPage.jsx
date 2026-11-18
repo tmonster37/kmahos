@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
     Container,
     Grid,
@@ -63,7 +63,10 @@ import BookmarkBorderIcon from "@mui/icons-material/BookmarkBorder";
 import LinkIcon from "@mui/icons-material/Link";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { bookingApi } from "../../services/bookingApi";
+import { clinicalApi } from "../../services/clinicalApi";
+import { getBookingCodeDisplay, getQueueNumberDisplay } from "../customer/BookingPage";
 import { printAppointmentTicket, printMedicalRecordSheet } from "../../utils/printHelper";
+import designTokens from "../../theme/designTokens";
 import PatientProfileDetailModal from "../../components/common/PatientProfileDetailModal";
 import ElectronicMedicalRecordModal from "../../components/common/ElectronicMedicalRecordModal";
 import LinkExistingProfileModal from "../../components/common/LinkExistingProfileModal";
@@ -84,13 +87,104 @@ import {
 import { useAuth } from "../../context/AuthContext";
 import axiosInstance from "../../services/AxiosInstance";
 
-export default function PatientProfilesPage() {
+export function usePatientHistoryDetailWorkflow({
+    initialSelectedHistoryDetail = null,
+    clinicalApiClient = clinicalApi
+} = {}) {
+    const [selectedHistoryDetail, setSelectedHistoryDetailState] = useState(initialSelectedHistoryDetail);
+    const historyRequestSeqRef = useRef(0);
+
+    const setSelectedHistoryDetail = (val) => {
+        if (val === null) {
+            historyRequestSeqRef.current += 1;
+        }
+        setSelectedHistoryDetailState(val);
+    };
+
+    const handleOpenHistoryDetail = async (v) => {
+        const seq = ++historyRequestSeqRef.current;
+        setSelectedHistoryDetailState({ ...v, loadingClinicalRecord: true, clinicalRecordError: null });
+        const rawCode = v?.rawBookingCode || (v?.bookingCode && v.bookingCode !== "Chưa có mã" && !v.bookingCode.startsWith("Chưa") ? v.bookingCode : null);
+        if (!rawCode) {
+            if (historyRequestSeqRef.current !== seq) return;
+            setSelectedHistoryDetailState(prev => ({
+                ...prev,
+                loadingClinicalRecord: false,
+                clinicalRecord: null,
+                reExaminationDate: null
+            }));
+            return;
+        }
+
+        try {
+            const client = clinicalApiClient || clinicalApi;
+            const res = await client.getRecordByBookingCode(rawCode);
+            if (historyRequestSeqRef.current !== seq) return;
+            const rec = res?.data?.data || res?.data || res;
+            if (rec && rec.recordId) {
+                setSelectedHistoryDetailState(prev => ({
+                    ...prev,
+                    loadingClinicalRecord: false,
+                    clinicalRecord: rec,
+                    reExaminationDate: (rec.state === "DONE" && rec.reExaminationDate) ? rec.reExaminationDate : null
+                }));
+            } else {
+                setSelectedHistoryDetailState(prev => ({
+                    ...prev,
+                    loadingClinicalRecord: false,
+                    clinicalRecord: null,
+                    reExaminationDate: null
+                }));
+            }
+        } catch (err) {
+            if (historyRequestSeqRef.current !== seq) return;
+            const status = err?.response?.status;
+            if (status === 404) {
+                setSelectedHistoryDetailState(prev => ({
+                    ...prev,
+                    loadingClinicalRecord: false,
+                    clinicalRecord: null,
+                    reExaminationDate: null
+                }));
+            } else {
+                setSelectedHistoryDetailState(prev => ({
+                    ...prev,
+                    loadingClinicalRecord: false,
+                    clinicalRecordError: "Không thể tải thông tin bệnh án từ máy chủ. Vui lòng thử lại sau."
+                }));
+            }
+        }
+    };
+
+    const handleCloseHistoryDetail = () => {
+        historyRequestSeqRef.current += 1;
+        setSelectedHistoryDetailState(null);
+    };
+
+    return {
+        selectedHistoryDetail,
+        setSelectedHistoryDetail,
+        handleOpenHistoryDetail,
+        handleCloseHistoryDetail,
+        historyRequestSeqRef
+    };
+}
+
+export default function PatientProfilesPage({
+    initialActiveTab,
+    initialSelectedHistoryDetail,
+    initialProfiles,
+    initialBookings,
+    clinicalApiClient = clinicalApi,
+    bookingApiClient = bookingApi
+} = {}) {
     const navigate = useNavigate();
     const location = useLocation();
     const { user } = useAuth();
 
     // Tab đang chọn: 0: Hồ sơ bệnh nhân (Hình 134-135), 1: Phiếu khám bệnh (Hình 136-137), 2: Lịch sử khám bệnh (Hình 138-139), 3: Thông báo
     const [activeTab, setActiveTab] = useState(() => {
+        if (initialActiveTab !== undefined) return initialActiveTab;
         const params = new URLSearchParams(location.search);
         const tab = params.get("tab");
         if (tab === "ticket") return 1;
@@ -99,8 +193,8 @@ export default function PatientProfilesPage() {
         return 0;
     });
 
-    const [profiles, setProfiles] = useState([]);
-    const [bookings, setBookings] = useState([]);
+    const [profiles, setProfiles] = useState(initialProfiles || []);
+    const [bookings, setBookings] = useState(initialBookings || []);
     const [loading, setLoading] = useState(false);
     const [maskPhoneMap, setMaskPhoneMap] = useState({});
 
@@ -118,7 +212,16 @@ export default function PatientProfilesPage() {
     const [expandedTicketProfileId, setExpandedTicketProfileId] = useState(null);
 
     // Modal / View Chi tiết Lịch sử khám bệnh & Toa thuốc (Hình 139)
-    const [selectedHistoryDetail, setSelectedHistoryDetail] = useState(null);
+    const {
+        selectedHistoryDetail,
+        setSelectedHistoryDetail,
+        handleOpenHistoryDetail,
+        handleCloseHistoryDetail,
+        historyRequestSeqRef
+    } = usePatientHistoryDetailWorkflow({
+        initialSelectedHistoryDetail,
+        clinicalApiClient
+    });
     const [expandedHistoryProfileId, setExpandedHistoryProfileId] = useState(null);
 
     // Modal Chi tiết Hồ sơ bệnh nhân (Hành chính & Nhân khẩu - Hình 135)
@@ -136,11 +239,19 @@ export default function PatientProfilesPage() {
     const [toastMessage, setToastMessage] = useState("");
 
     useEffect(() => {
+        if (initialProfiles !== undefined || initialBookings !== undefined) {
+            if (initialProfiles && initialProfiles.length > 0) {
+                setExpandedTicketProfileId(prev => prev || initialProfiles[0]?.patientProfileId);
+                setExpandedHistoryProfileId(prev => prev || initialProfiles[0]?.patientProfileId);
+            }
+            return;
+        }
         loadData();
     }, []);
 
     // Đồng bộ URL parameter với tab ngay cả khi chuyển link hoặc back/forward
     useEffect(() => {
+        if (initialActiveTab !== undefined) return;
         const params = new URLSearchParams(location.search);
         const tab = params.get("tab");
         if (tab === "ticket") {
@@ -206,7 +317,7 @@ export default function PatientProfilesPage() {
         setLoading(true);
         try {
             // 1. Tải danh sách hồ sơ của tài khoản
-            const profileRes = await bookingApi.getMyProfiles().catch(() => null);
+            const profileRes = await (bookingApiClient || bookingApi).getMyProfiles().catch(() => null);
             const rawProfiles = profileRes?.data || (Array.isArray(profileRes) ? profileRes : []);
             const profileList = Array.isArray(rawProfiles) ? rawProfiles : [];
             setProfiles(profileList);
@@ -217,7 +328,7 @@ export default function PatientProfilesPage() {
             }
 
             // 2. Tải danh sách các phiếu khám & lịch sử khám
-            const bookingRes = await bookingApi.getMyBookings().catch(() => null);
+            const bookingRes = await (bookingApiClient || bookingApi).getMyBookings().catch(() => null);
             const rawBookings = bookingRes?.data || (Array.isArray(bookingRes) ? bookingRes : []);
             let bookingList = Array.isArray(rawBookings) ? rawBookings : [];
             
@@ -225,16 +336,17 @@ export default function PatientProfilesPage() {
                 // Đảm bảo có đủ trường chi tiết để in phiếu khám
                 bookingList = bookingList.map((b, idx) => ({
                     ...b,
-                    queueNumber: b?.queueNumber || (idx + 1),
-                    bookingCode: b?.bookingCode || (b?.bookingId ? `BK-${String(b.bookingId).substring(0, 8).toUpperCase()}` : `BK-${idx + 1}`),
+                    rawBookingCode: b?.bookingCode || null,
+                    queueNumber: b?.queueNumber != null ? b.queueNumber : null,
+                    bookingCode: getBookingCodeDisplay(b?.bookingCode),
                     patientName: b?.patientName || "Bệnh nhân",
                     patientPhone: b?.patientPhone || user?.phoneNumber || "",
                     patientDob: b?.patientDob || null,
                     patientGender: b?.patientGender || "OTHER",
                     identityNumber: b?.identityNumber || "",
-                    doctorName: b?.doctorName || "Bác sĩ phụ trách",
+                    doctorName: b?.doctorName || "Chưa phân công",
                     departmentName: b?.departmentName || "Khám Chuyên Khoa",
-                    roomName: b?.roomName || "Phòng khám",
+                    roomName: b?.roomName || "Chưa xếp phòng",
                     statusLabel: b?.status === "COMPLETED" ? "Đã khám" : (b?.status === "CONFIRMED" ? "Đang chờ khám" : (b?.status === "CANCELLED" ? "Đã hủy lịch" : "Chờ tiếp nhận"))
                 }));
             }
@@ -985,20 +1097,20 @@ export default function PatientProfilesPage() {
                                                 {/* Mục 3: Phân định Số thứ tự Khám Bác sĩ & Số phiếu Quầy Tiếp đón */}
                                                 <Grid container spacing={1.5} sx={{ mt: 2 }}>
                                                     <Grid item xs={12} sm={6}>
-                                                        <Box sx={{ p: 2, border: "2px solid #0088D6", borderRadius: 2.5, bgcolor: "#F0F9FF", textAlign: "center" }}>
-                                                            <Typography variant="caption" color="#0088D6" fontWeight="700" textTransform="uppercase" display="block">
+                                                        <Box sx={{ p: 2, border: `2px solid ${designTokens.brand.primary}`, borderRadius: 2.5, bgcolor: designTokens.brand.primaryLight, textAlign: "center" }}>
+                                                            <Typography variant="caption" color={designTokens.brand.primary} fontWeight="700" textTransform="uppercase" display="block">
                                                                 Số Khám Bác Sĩ
                                                             </Typography>
                                                             <Typography
                                                                 variant="h3"
                                                                 fontWeight="900"
-                                                                color="#0088D6"
+                                                                color={designTokens.brand.primary}
                                                                 sx={{ fontSize: "2.4rem", lineHeight: 1.1, my: 0.5 }}
                                                             >
-                                                                {selectedTicketDetail.queueCode || ("KB-" + String(selectedTicketDetail.queueNumber || "01").padStart(2, "0"))}
+                                                                {getQueueNumberDisplay(selectedTicketDetail.queueNumber, selectedTicketDetail.queueCode)}
                                                             </Typography>
                                                             <Typography variant="caption" color="text.secondary" fontWeight="600" display="block">
-                                                                {selectedTicketDetail.roomName || "Buồng khám chuyên khoa"}
+                                                                {selectedTicketDetail.roomName || "Chưa xếp phòng"}
                                                             </Typography>
                                                         </Box>
                                                     </Grid>
@@ -1063,7 +1175,7 @@ export default function PatientProfilesPage() {
                                                             ? "Khi đến bệnh viện, quý khách vui lòng quét mã QR vé khám tại Kiosk tự phục vụ hoặc tới Quầy Tiếp Đón để check-in."
                                                             : selectedTicketDetail.counterTicketCode && !selectedTicketDetail.dispatchedAt
                                                             ? `Vui lòng chú ý loa gọi phiếu số ${selectedTicketDetail.counterTicketCode} tại ${selectedTicketDetail.counterName || "Quầy Tiếp Đón"}.`
-                                                            : `Đã hoàn tất tiếp đón! Vui lòng có mặt trước ${selectedTicketDetail.roomName || "phòng khám"} và theo dõi số khám ${selectedTicketDetail.queueCode || ("KB-" + selectedTicketDetail.queueNumber)} trên màn hình.`
+                                                            : `Đã hoàn tất tiếp đón! Vui lòng có mặt trước ${selectedTicketDetail.roomName || "phòng khám"} và theo dõi số khám ${getQueueNumberDisplay(selectedTicketDetail.queueNumber, selectedTicketDetail.queueCode)} trên màn hình.`
                                                         }
                                                     </Typography>
                                                 </Box>
@@ -1136,7 +1248,7 @@ export default function PatientProfilesPage() {
                                                         <Box display="flex" justifyContent="space-between">
                                                             <Typography variant="body2" color="#64748B">Bác sĩ</Typography>
                                                             <Typography variant="body2" fontWeight="700" color="#0F172A">
-                                                                {selectedTicketDetail.doctorName || "BS. Phụ trách"}
+                                                                {selectedTicketDetail.doctorName || "Chưa có thông tin bác sĩ"}
                                                             </Typography>
                                                         </Box>
                                                         <Box display="flex" justifyContent="space-between">
@@ -1148,13 +1260,13 @@ export default function PatientProfilesPage() {
                                                         <Box display="flex" justifyContent="space-between">
                                                             <Typography variant="body2" color="#64748B">Buổi khám</Typography>
                                                             <Typography variant="body2" fontWeight="700" color="#059669">
-                                                                {selectedTicketDetail.appointmentTime?.includes("Chiều") || selectedTicketDetail.appointmentTime?.startsWith("13") || selectedTicketDetail.session === "AFTERNOON" ? "Chiều" : "Sáng"}
+                                                                {selectedTicketDetail.appointmentTime || selectedTicketDetail.session ? (selectedTicketDetail.appointmentTime?.includes("Chiều") || selectedTicketDetail.appointmentTime?.startsWith("13") || selectedTicketDetail.session === "AFTERNOON" ? "Chiều" : "Sáng") : "Chưa có dữ liệu"}
                                                             </Typography>
                                                         </Box>
                                                         <Box display="flex" justifyContent="space-between">
                                                             <Typography variant="body2" color="#64748B">Phí khám</Typography>
                                                             <Typography variant="body2" fontWeight="800" color="#0088D6">
-                                                                {formatCurrency(selectedTicketDetail.price || selectedTicketDetail.totalAmount || 160000)}
+                                                                {(selectedTicketDetail.price != null || selectedTicketDetail.totalAmount != null) ? formatCurrency(selectedTicketDetail.price ?? selectedTicketDetail.totalAmount) : "Chưa có dữ liệu"}
                                                             </Typography>
                                                         </Box>
                                                     </Box>
@@ -1372,19 +1484,19 @@ export default function PatientProfilesPage() {
                                                                                         border: "1.5px solid #E2E8F0",
                                                                                         transition: "all 0.2s ease",
                                                                                         "&:hover": {
-                                                                                            borderColor: "#0088D6",
-                                                                                            boxShadow: "0 6px 20px rgba(0, 136, 214, 0.12)",
+                                                                                            borderColor: designTokens.brand.primary,
+                                                                                            boxShadow: "0 6px 20px rgba(15, 118, 110, 0.12)",
                                                                                             transform: "translateY(-2px)"
                                                                                         }
                                                                                     }}
                                                                                 >
                                                                                     <Box display="flex" justifyContent="space-between" alignItems="center" mb={1.5}>
                                                                                         <Chip
-                                                                                            label={`STT: ${String(t.queueNumber || (tidx + 1)).padStart(2, "0")}`}
+                                                                                            label={t.queueNumber != null ? `STT: ${String(t.queueNumber).padStart(2, "0")}` : "Chờ cấp STT"}
                                                                                             sx={{
                                                                                                 fontWeight: 900,
                                                                                                 fontSize: "0.85rem",
-                                                                                                bgcolor: "#0088D6",
+                                                                                                bgcolor: designTokens.brand.primary,
                                                                                                 color: "#FFFFFF",
                                                                                                 px: 0.5
                                                                                             }}
@@ -1405,17 +1517,17 @@ export default function PatientProfilesPage() {
                                                                                         🏥 {t.departmentName || "Khám Chuyên Khoa"}
                                                                                     </Typography>
                                                                                     <Typography variant="body2" color="#475569" mt={0.5} noWrap>
-                                                                                        👨‍⚕️ Bác sĩ: <b>{t.doctorName || "Bác sĩ phụ trách"}</b>
+                                                                                        👨‍⚕️ Bác sĩ: <b>{t.doctorName || "Chưa phân công"}</b>
                                                                                     </Typography>
                                                                                     <Typography variant="body2" color="#64748B" mt={0.3}>
-                                                                                        📅 Ngày khám: <b>{formatDate(t.bookingDate || t.appointmentDate)}</b> • {t.roomName || "Phòng khám"}
+                                                                                        📅 Ngày khám: <b>{formatDate(t.bookingDate || t.appointmentDate)}</b> • {t.roomName || "Chưa xếp phòng"}
                                                                                     </Typography>
-                                                                                    <Typography variant="caption" fontFamily="monospace" color="#0088D6" fontWeight={700} display="block" mt={0.5}>
+                                                                                    <Typography variant="caption" fontFamily="monospace" color={designTokens.brand.primary} fontWeight={700} display="block" mt={0.5}>
                                                                                         Mã phiếu: {t.bookingCode}
                                                                                     </Typography>
 
                                                                                     <Box mt={2} pt={1.5} borderTop="1px dashed #E2E8F0" display="flex" justifyContent="flex-end">
-                                                                                        <Typography variant="caption" fontWeight={700} color="#0088D6">
+                                                                                        <Typography variant="caption" fontWeight={700} color={designTokens.brand.primary}>
                                                                                             Xem chi tiết vé & mã vạch &rarr;
                                                                                         </Typography>
                                                                                     </Box>
@@ -1542,7 +1654,7 @@ export default function PatientProfilesPage() {
                                                 </Grid>
                                                 <Grid item xs={12} sm={6}>
                                                     <span>Bác sĩ chữa trị: </span>
-                                                    <b>{selectedHistoryDetail.doctorName || "BS. Phụ trách"}</b>
+                                                    <b>{selectedHistoryDetail.doctorName || "Chưa có dữ liệu"}</b>
                                                 </Grid>
                                                 <Grid item xs={12} sm={6}>
                                                     <span>Chẩn đoán của bác sĩ: </span>
@@ -1608,11 +1720,32 @@ export default function PatientProfilesPage() {
                                             </Box>
                                             {/* Mục 5: Ngày tái khám & Lưu ý (Hình 139 mục 5) */}
                                             <Box sx={{ mb: 3 }}>
-                                                <Box sx={{ display: "inline-block", border: "1.5px solid #EF4444", p: 0.8, px: 1.5, borderRadius: 1.5, mb: 0.5 }}>
-                                                    <Typography variant="body2" fontWeight="700" color="#DC2626">
-                                                        Tái khám ngày: {selectedHistoryDetail.reExaminationDate ? formatDate(selectedHistoryDetail.reExaminationDate) : (selectedHistoryDetail.doctorNotes?.match(/\d{2}\/\d{2}\/\d{4}/) ? selectedHistoryDetail.doctorNotes.match(/\d{2}\/\d{2}\/\d{4}/)[0] : "27/12/2023")}
-                                                    </Typography>
-                                                </Box>
+                                                {selectedHistoryDetail.loadingClinicalRecord ? (
+                                                    <Box sx={{ display: "inline-flex", alignItems: "center", gap: 1, border: "1.5px solid #CBD5E1", p: 0.8, px: 1.5, borderRadius: 1.5, mb: 0.5 }}>
+                                                        <CircularProgress size={16} sx={{ color: "#0284C7" }} />
+                                                        <Typography variant="body2" color="text.secondary">
+                                                            Đang tải thông tin tái khám...
+                                                        </Typography>
+                                                    </Box>
+                                                ) : selectedHistoryDetail.clinicalRecordError ? (
+                                                    <Alert
+                                                        severity="warning"
+                                                        sx={{ mb: 1, borderRadius: 1.5 }}
+                                                        action={
+                                                            <Button color="inherit" size="small" onClick={() => handleOpenHistoryDetail(selectedHistoryDetail)}>
+                                                                Thử lại
+                                                            </Button>
+                                                        }
+                                                    >
+                                                        {selectedHistoryDetail.clinicalRecordError}
+                                                    </Alert>
+                                                ) : (
+                                                    <Box sx={{ display: "inline-block", border: "1.5px solid #EF4444", p: 0.8, px: 1.5, borderRadius: 1.5, mb: 0.5 }}>
+                                                        <Typography variant="body2" fontWeight="700" color="#DC2626">
+                                                            Tái khám ngày: {selectedHistoryDetail.reExaminationDate ? formatDate(selectedHistoryDetail.reExaminationDate) : "Chưa có ngày hẹn tái khám"}
+                                                        </Typography>
+                                                    </Box>
+                                                )}
                                                 <Typography variant="caption" color="text.secondary" display="block">
                                                     Lưu ý: Trẻ em cần có bố mẹ đi tái khám chung
                                                 </Typography>
@@ -1769,7 +1902,7 @@ export default function PatientProfilesPage() {
                                                                                 <Box>
                                                                                     <Box display="flex" alignItems="center" gap={1.5}>
                                                                                         <Chip
-                                                                                            label={v.bookingCode || `BK-${vidx + 1}`}
+                                                                                            label={getBookingCodeDisplay(v.bookingCode)}
                                                                                             size="small"
                                                                                             sx={{ fontFamily: "monospace", fontWeight: 700, bgcolor: "#ECFDF5", color: "#059669" }}
                                                                                         />
@@ -1800,7 +1933,7 @@ export default function PatientProfilesPage() {
                                                                                     <Button
                                                                                         variant="contained"
                                                                                         startIcon={<VisibilityIcon />}
-                                                                                        onClick={() => setSelectedHistoryDetail(v)}
+                                                                                        onClick={() => handleOpenHistoryDetail(v)}
                                                                                         sx={{
                                                                                             borderRadius: 2,
                                                                                             textTransform: "none",

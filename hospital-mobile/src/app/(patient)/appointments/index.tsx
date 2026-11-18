@@ -49,6 +49,13 @@ export default function AppointmentsListScreen({
       {errorMessage ? (
         <View style={styles.errorBox} testID="appointments-error">
           <Text style={styles.errorText}>{errorMessage}</Text>
+          <Pressable
+            testID="appointments-retry-button"
+            style={styles.retryBtn}
+            onPress={() => void loadBookings()}
+          >
+            <Text style={styles.retryBtnText}>Thử lại</Text>
+          </Pressable>
         </View>
       ) : null}
 
@@ -63,12 +70,14 @@ export default function AppointmentsListScreen({
           <Pressable
             key={item.bookingId}
             testID={`appointment-card-${item.bookingId}`}
-            style={styles.card}
+            style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
             onPress={() => router.push(`/(patient)/appointments/${item.bookingId}` as never)}
           >
             <View style={styles.row}>
               <Text style={styles.code}>{item.bookingCode}</Text>
-              <Text style={styles.status}>{item.status}</Text>
+              <View style={styles.statusBadge}>
+                <Text style={styles.status}>{item.status}</Text>
+              </View>
             </View>
             <Text style={styles.meta}>
               {item.departmentName} • {item.doctorName}
@@ -105,9 +114,28 @@ const styles = StyleSheet.create({
     backgroundColor: tokens.colors.dangerBg,
     padding: tokens.spacing.md,
     borderRadius: tokens.radius.sm,
+    marginBottom: tokens.spacing.md,
   },
   errorText: {
     color: tokens.colors.danger,
+    marginBottom: tokens.spacing.sm,
+  },
+  retryBtn: {
+    alignSelf: 'flex-start',
+    backgroundColor: tokens.colors.surface,
+    paddingHorizontal: tokens.spacing.md,
+    minHeight: 44,
+    minWidth: 88,
+    borderRadius: tokens.radius.button,
+    borderWidth: 1,
+    borderColor: tokens.colors.dangerBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  retryBtnText: {
+    color: tokens.colors.danger,
+    fontWeight: '600',
+    fontSize: tokens.typography.caption,
   },
   card: {
     backgroundColor: tokens.colors.surface,
@@ -116,10 +144,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: tokens.colors.border,
     marginBottom: tokens.spacing.sm,
+    minHeight: 72,
+    justifyContent: 'center',
+  },
+  cardPressed: {
+    backgroundColor: tokens.colors.hoverBg,
+    borderColor: tokens.colors.primaryBorder,
   },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: tokens.spacing.xs,
   },
   code: {
@@ -127,9 +162,15 @@ const styles = StyleSheet.create({
     fontSize: tokens.typography.subtitle,
     color: tokens.colors.textPrimary,
   },
+  statusBadge: {
+    backgroundColor: tokens.colors.primaryLight,
+    paddingHorizontal: tokens.spacing.sm,
+    paddingVertical: 2,
+    borderRadius: tokens.radius.pill,
+  },
   status: {
-    fontWeight: '600',
-    fontSize: tokens.typography.caption,
+    fontWeight: '700',
+    fontSize: tokens.typography.small,
     color: tokens.colors.primaryDark,
   },
   meta: {

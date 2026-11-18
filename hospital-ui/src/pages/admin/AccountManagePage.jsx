@@ -47,6 +47,11 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import axiosInstance from "../../services/AxiosInstance";
 import { formatDateTime } from "../../utils/formatters";
+import designTokens from "../../theme/designTokens";
+
+const BRAND_PRIMARY = designTokens.brand.primary;
+const BRAND_DARK = designTokens.brand.primaryDark;
+const BRAND_LIGHT = designTokens.brand.primaryLight;
 
 const ROLE_OPTIONS = [
     { value: "ROLE_ADMIN", label: "Quản trị viên (Admin)", color: "error" },
@@ -304,7 +309,7 @@ export default function AccountManagePage() {
         const item = ROLE_OPTIONS.find(r => r.value === roleStr);
         const roleColorMap = {
             ROLE_ADMIN: { bg: "rgba(239, 68, 68, 0.08)", text: "#DC2626", border: "rgba(239, 68, 68, 0.2)" },
-            ROLE_DOCTOR: { bg: "rgba(0, 136, 214, 0.08)", text: "#0088D6", border: "rgba(0, 136, 214, 0.2)" },
+            ROLE_DOCTOR: { bg: BRAND_LIGHT, text: BRAND_PRIMARY, border: "rgba(15, 118, 110, 0.2)" },
             ROLE_HEAD_OF_DEPARTMENT: { bg: "rgba(139, 92, 246, 0.08)", text: "#7C3AED", border: "rgba(139, 92, 246, 0.2)" },
             ROLE_LAB_TECHNICIAN: { bg: "rgba(6, 182, 212, 0.08)", text: "#0891B2", border: "rgba(6, 182, 212, 0.2)" },
             ROLE_PHARMACIST: { bg: "rgba(168, 85, 247, 0.08)", text: "#9333EA", border: "rgba(168, 85, 247, 0.2)" },
@@ -357,7 +362,7 @@ export default function AccountManagePage() {
                             height: 52,
                             borderRadius: "16px",
                             bgcolor: "rgba(0, 136, 214, 0.1)",
-                            color: "#0088D6",
+                            color: BRAND_PRIMARY,
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
@@ -379,7 +384,7 @@ export default function AccountManagePage() {
                                     fontSize: "0.72rem",
                                     fontWeight: 700,
                                     bgcolor: "rgba(0, 136, 214, 0.1)",
-                                    color: "#0088D6",
+                                    color: BRAND_PRIMARY,
                                     border: "1px solid rgba(0, 136, 214, 0.2)"
                                 }}
                             />
@@ -417,9 +422,9 @@ export default function AccountManagePage() {
                             fontWeight: 700,
                             textTransform: "none",
                             fontSize: "0.85rem",
-                            bgcolor: "#0088D6",
+                            bgcolor: BRAND_PRIMARY,
                             boxShadow: "0 4px 14px rgba(0, 136, 214, 0.25)",
-                            "&:hover": { bgcolor: "#0073B7" }
+                            "&:hover": { bgcolor: BRAND_DARK }
                         }}
                     >
                         Tạo Tài Khoản Mới
@@ -447,12 +452,12 @@ export default function AccountManagePage() {
                                 left: 0,
                                 right: 0,
                                 height: "3.5px",
-                                bgcolor: "#0088D6"
+                                bgcolor: BRAND_PRIMARY
                             }
                         }}
                     >
                         <CardContent sx={{ display: "flex", alignItems: "center", gap: 2, p: 2.5 }}>
-                            <Avatar sx={{ bgcolor: "rgba(0, 136, 214, 0.1)", color: "#0088D6", width: 48, height: 48, borderRadius: 2.5 }}>
+                            <Avatar sx={{ bgcolor: "rgba(0, 136, 214, 0.1)", color: BRAND_PRIMARY, width: 48, height: 48, borderRadius: 2.5 }}>
                                 <PeopleAltIcon />
                             </Avatar>
                             <Box>
@@ -622,8 +627,8 @@ export default function AccountManagePage() {
                                     borderRadius: 2.5,
                                     bgcolor: "#F8FAFC",
                                     "& fieldset": { borderColor: "rgba(15, 23, 42, 0.1)" },
-                                    "&:hover fieldset": { borderColor: "#0088D6" },
-                                    "&.Mui-focused fieldset": { borderColor: "#0088D6" }
+                                    "&:hover fieldset": { borderColor: BRAND_PRIMARY },
+                                    "&.Mui-focused fieldset": { borderColor: BRAND_PRIMARY }
                                 }
                             }}
                         />
@@ -642,8 +647,8 @@ export default function AccountManagePage() {
                                     borderRadius: 2.5,
                                     bgcolor: "#F8FAFC",
                                     "& fieldset": { borderColor: "rgba(15, 23, 42, 0.1)" },
-                                    "&:hover fieldset": { borderColor: "#0088D6" },
-                                    "&.Mui-focused fieldset": { borderColor: "#0088D6" }
+                                    "&:hover fieldset": { borderColor: BRAND_PRIMARY },
+                                    "&.Mui-focused fieldset": { borderColor: BRAND_PRIMARY }
                                 }
                             }}
                         >
@@ -692,7 +697,7 @@ export default function AccountManagePage() {
                         {loading ? (
                             <TableRow>
                                 <TableCell colSpan={7} align="center" sx={{ py: 8 }}>
-                                    <CircularProgress size={34} sx={{ color: "#0088D6" }} />
+                                    <CircularProgress size={34} sx={{ color: BRAND_PRIMARY }} />
                                     <Typography variant="body2" sx={{ color: "#64748B", mt: 1.5, fontWeight: 600 }}>
                                         Đang tải dữ liệu tài khoản...
                                     </Typography>
@@ -714,7 +719,7 @@ export default function AccountManagePage() {
                                             <Avatar
                                                 sx={{
                                                     bgcolor: acc.isActive ? "rgba(0, 136, 214, 0.1)" : "rgba(148, 163, 184, 0.2)",
-                                                    color: acc.isActive ? "#0088D6" : "#64748B",
+                                                    color: acc.isActive ? BRAND_PRIMARY : "#64748B",
                                                     width: 38,
                                                     height: 38,
                                                     fontSize: "0.9rem",
@@ -735,7 +740,7 @@ export default function AccountManagePage() {
                                         </Box>
                                     </TableCell>
                                     <TableCell sx={{ py: 2, borderBottom: "1px solid rgba(15, 23, 42, 0.06)" }}>
-                                        <Typography variant="body2" fontWeight={700} color="#0088D6" sx={{ fontFamily: "monospace" }}>
+                                        <Typography variant="body2" fontWeight={700} color={BRAND_PRIMARY} sx={{ fontFamily: "monospace" }}>
                                             {acc.phoneNumber}
                                         </Typography>
                                     </TableCell>
@@ -776,7 +781,7 @@ export default function AccountManagePage() {
                                                     onClick={() => handleOpenResetPassword(acc)}
                                                     sx={{
                                                         bgcolor: "rgba(0, 136, 214, 0.08)",
-                                                        color: "#0088D6",
+                                                        color: BRAND_PRIMARY,
                                                         borderRadius: 2,
                                                         "&:hover": { bgcolor: "rgba(0, 136, 214, 0.16)" }
                                                     }}
@@ -900,7 +905,7 @@ export default function AccountManagePage() {
                 }}
             >
                 <DialogTitle sx={{ fontWeight: 800, color: "#0F172A", display: "flex", alignItems: "center", gap: 1.2, pb: 1 }}>
-                    <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: "rgba(0, 136, 214, 0.1)", color: "#0088D6", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: "rgba(0, 136, 214, 0.1)", color: BRAND_PRIMARY, display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <KeyIcon sx={{ fontSize: 20 }} />
                     </Box>
                     Cấp / Đổi Lại Mật Khẩu
@@ -912,7 +917,7 @@ export default function AccountManagePage() {
                                 {selectedAccount?.fullName}
                             </Typography>
                             <Typography variant="caption" sx={{ color: "#64748B", display: "block", mt: 0.3 }}>
-                                SĐT: <b style={{ color: "#0088D6" }}>{selectedAccount?.phoneNumber}</b> • Vai trò: <b>{selectedAccount?.role}</b>
+                                SĐT: <b style={{ color: BRAND_PRIMARY }}>{selectedAccount?.phoneNumber}</b> • Vai trò: <b>{selectedAccount?.role}</b>
                             </Typography>
                         </Box>
 
@@ -977,8 +982,8 @@ export default function AccountManagePage() {
                                 borderRadius: 2.2,
                                 fontWeight: 700,
                                 textTransform: "none",
-                                bgcolor: "#0088D6",
-                                "&:hover": { bgcolor: "#0073B7" }
+                                bgcolor: BRAND_PRIMARY,
+                                "&:hover": { bgcolor: BRAND_DARK }
                             }}
                         >
                             {saving ? "Đang lưu..." : "Xác Nhận Đổi Mật Khẩu"}
@@ -1002,7 +1007,7 @@ export default function AccountManagePage() {
                 }}
             >
                 <DialogTitle sx={{ fontWeight: 800, color: "#0F172A", display: "flex", alignItems: "center", gap: 1.2, pb: 1 }}>
-                    <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: "rgba(0, 136, 214, 0.1)", color: "#0088D6", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: "rgba(0, 136, 214, 0.1)", color: BRAND_PRIMARY, display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <AddIcon sx={{ fontSize: 22 }} />
                     </Box>
                     Thêm Mới Tài Khoản Hệ Thống
@@ -1101,8 +1106,8 @@ export default function AccountManagePage() {
                                 borderRadius: 2.2,
                                 fontWeight: 700,
                                 textTransform: "none",
-                                bgcolor: "#0088D6",
-                                "&:hover": { bgcolor: "#0073B7" }
+                                bgcolor: BRAND_PRIMARY,
+                                "&:hover": { bgcolor: BRAND_DARK }
                             }}
                         >
                             {saving ? "Đang tạo..." : "Tạo Tài Khoản"}
@@ -1187,7 +1192,7 @@ export default function AccountManagePage() {
                 }}
             >
                 <DialogTitle sx={{ fontWeight: 800, color: "#0F172A", display: "flex", alignItems: "center", gap: 1.2, pb: 1 }}>
-                    <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: "rgba(0, 136, 214, 0.1)", color: "#0088D6", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: "rgba(0, 136, 214, 0.1)", color: BRAND_PRIMARY, display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <EditIcon sx={{ fontSize: 20 }} />
                     </Box>
                     Chỉnh Sửa Thông Tin Tài Khoản
@@ -1246,8 +1251,8 @@ export default function AccountManagePage() {
                                 borderRadius: 2.2,
                                 fontWeight: 700,
                                 textTransform: "none",
-                                bgcolor: "#0088D6",
-                                "&:hover": { bgcolor: "#0073B7" }
+                                bgcolor: BRAND_PRIMARY,
+                                "&:hover": { bgcolor: BRAND_DARK }
                             }}
                         >
                             {saving ? "Đang lưu..." : "Lưu Thay Đổi"}

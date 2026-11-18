@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     Container,
@@ -112,6 +112,20 @@ const playCallChime = () => {
     } catch (e) {
         console.log("Audio chime error:", e);
     }
+};
+
+// Helper: Detect abnormal indicator in test result string
+export const hasAbnormalIndicator = (text) => {
+    if (!text) return false;
+    const upper = text.toUpperCase();
+    return (
+        upper.includes("CAO") ||
+        upper.includes("THẤP") ||
+        upper.includes("BẤT THƯỜNG") ||
+        upper.includes("VƯỢT NGƯỠNG") ||
+        upper.includes("⬆️") ||
+        upper.includes("⬇️")
+    );
 };
 
 // Kho danh mục ICD-10 chuyên sâu phân theo chuyên khoa và từ khóa tìm kiếm tiếng Việt
@@ -246,6 +260,7 @@ export default function ExaminationPage() {
     const [record, setRecord] = useState(null);
     const [loadingQueue, setLoadingQueue] = useState(false);
     const [startingExam, setStartingExam] = useState(false);
+    const currentPatientSeqRef = useRef(0);
 
     // Examination Form States
     const [triageNurseRecorded, setTriageNurseRecorded] = useState(false);
@@ -307,20 +322,6 @@ export default function ExaminationPage() {
     const [message, setMessage] = useState("");
     const [errorMessage, setErrorMessage] = useState("");
     const [isRefreshingTests, setIsRefreshingTests] = useState(false);
-
-    // Helper: Detect abnormal indicator in test result string
-    const hasAbnormalIndicator = (text) => {
-        if (!text) return false;
-        const upper = text.toUpperCase();
-        return (
-            upper.includes("CAO") ||
-            upper.includes("THẤP") ||
-            upper.includes("BẤT THƯỜNG") ||
-            upper.includes("VƯỢT NGƯỠNG") ||
-            upper.includes("⬆️") ||
-            upper.includes("⬇️")
-        );
-    };
 
     useEffect(() => {
         fetchDoctorQueue();
@@ -395,9 +396,16 @@ export default function ExaminationPage() {
     };
 
     const handleSelectPatient = async (patientItem) => {
+        const requestSeq = ++currentPatientSeqRef.current;
         setSelectedPatient(patientItem);
         setMessage("");
+        setErrorMessage("");
         setAdmissionInfo(null);
+        setRecord(null);
+        setInitialDiagnosis("");
+        setFinalDiagnosis("");
+        setTreatmentPlan("");
+        setReExamDate("");
 
         // 1. Phân tích sinh hiệu được lưu trữ an toàn từ máy chủ backend (trong trường symptoms của lượt khám)
         let triageVitals = null;
@@ -491,6 +499,7 @@ export default function ExaminationPage() {
         if (patientItem.patientProfileId) {
             axiosInstance.get(`/api/inpatient/patient/${patientItem.patientProfileId}`)
                 .then((res) => {
+                    if (currentPatientSeqRef.current !== requestSeq) return;
                     const list = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
                     const activeAdmit = list.find(a => a.state === "ADMITTED");
                     if (activeAdmit) setAdmissionInfo(activeAdmit);
@@ -501,6 +510,7 @@ export default function ExaminationPage() {
         if (patientItem.recordId) {
             try {
                 const res = await axiosInstance.get(`/api/clinical/records/${patientItem.recordId}`);
+                if (currentPatientSeqRef.current !== requestSeq) return;
                 const data = res?.data || res;
                 setRecord(data);
                 setInitialDiagnosis(data.initialDiagnosis || "");
@@ -508,7 +518,9 @@ export default function ExaminationPage() {
                 setTreatmentPlan(data.treatmentPlan || "");
                 setReExamDate(data.reExaminationDate || "");
             } catch (err) {
+                if (currentPatientSeqRef.current !== requestSeq) return;
                 console.error("Lỗi tải bệnh án:", err);
+                setErrorMessage(err?.response?.data?.message || err?.message || "Không thể tải hồ sơ bệnh án!");
             }
         } else {
             // Tự động mở/tiếp nhận hồ sơ khám để không bị ẩn Tabs cận lâm sàng & chẩn đoán
@@ -518,6 +530,7 @@ export default function ExaminationPage() {
                     symptoms: patientItem.symptoms || "Khám lâm sàng tổng quát",
                     initialDiagnosis: "Khám lâm sàng ban đầu",
                 });
+                if (currentPatientSeqRef.current !== requestSeq) return;
                 const recData = startRes?.data || startRes;
                 const finalRec = recData?.recordId ? recData : (recData?.data || recData);
                 setRecord(finalRec);
@@ -527,6 +540,7 @@ export default function ExaminationPage() {
                 setReExamDate(finalRec.reExaminationDate || "");
                 fetchDoctorQueue();
             } catch (err) {
+                if (currentPatientSeqRef.current !== requestSeq) return;
                 console.error("Lỗi tự động mở hồ sơ:", err);
                 setRecord(null);
                 const errMsg = err?.response?.data?.message || err?.message || "Không thể khởi tạo hoặc mở hồ sơ khám bệnh từ hệ thống!";
@@ -545,7 +559,7 @@ export default function ExaminationPage() {
     const handleCallNext = async () => {
         const nextPatient = queue.find(p => p.recordState === "CALLING") || queue.find(isWaitingPatient);
         if (!nextPatient) {
-            alert("Không còn bệnh nhân nào đang chờ khám trong hàng đợi hôm nay!");
+            setErrorMessage("Không còn bệnh nhân nào đang chờ khám trong hàng đợi hôm nay!");
             return;
         }
         await handleCallPatient(nextPatient);
@@ -554,7 +568,7 @@ export default function ExaminationPage() {
     const handleCallPatient = async (patientItem) => {
         if (!patientItem) return;
         if (patientItem.isPaid === false || patientItem.status === "PENDING_PAYMENT") {
-            alert(`Bệnh nhân [${patientItem.patientName}] chưa hoàn tất thanh toán tiền khám. Vui lòng thanh toán tại Quầy thu ngân/Kiosk trước khi gọi vào buồng khám!`);
+            setErrorMessage(`Bệnh nhân [${patientItem.patientName}] chưa hoàn tất thanh toán tiền khám. Vui lòng thanh toán tại Quầy thu ngân/Kiosk trước khi gọi vào buồng khám!`);
             return;
         }
         try {
@@ -573,7 +587,7 @@ export default function ExaminationPage() {
             fetchDoctorQueue();
         } catch (err) {
             console.error("Lỗi gọi bệnh nhân:", err);
-            alert(err?.response?.data?.message || err?.message || "Không thể gọi bệnh nhân!");
+            setErrorMessage(err?.response?.data?.message || err?.message || "Không thể gọi bệnh nhân!");
         }
     };
 
@@ -585,7 +599,7 @@ export default function ExaminationPage() {
             fetchDoctorQueue();
         } catch (err) {
             console.error("Lỗi bỏ qua lượt:", err);
-            alert(err?.response?.data?.message || err?.message || "Không thể bỏ qua lượt!");
+            setErrorMessage(err?.response?.data?.message || err?.message || "Không thể bỏ qua lượt!");
         }
     };
 
@@ -597,37 +611,46 @@ export default function ExaminationPage() {
             fetchDoctorQueue();
         } catch (err) {
             console.error("Lỗi gọi lại bệnh nhân:", err);
-            alert(err?.response?.data?.message || err?.message || "Không thể khôi phục bệnh nhân!");
+            setErrorMessage(err?.response?.data?.message || err?.message || "Không thể khôi phục bệnh nhân!");
         }
     };
 
     const handleStartExam = async (patientItem) => {
+        const requestSeq = ++currentPatientSeqRef.current;
         setStartingExam(true);
         setSelectedPatient(patientItem);
+        setMessage("");
+        setErrorMessage("");
         try {
             const res = await axiosInstance.post("/api/clinical/start", {
                 bookingCode: patientItem.bookingCode,
                 symptoms: patientItem.symptoms,
                 initialDiagnosis: initialDiagnosis || "Khám lâm sàng tổng quát ban đầu",
             });
+            if (currentPatientSeqRef.current !== requestSeq) return;
             const data = res?.data || res;
             const finalRec = data?.recordId ? data : (data?.data || data);
             setRecord(finalRec);
             setMessage(`Đã tiếp nhận bệnh nhân STT ${patientItem.queueNumber}: ${patientItem.patientName} vào buồng khám!`);
             fetchDoctorQueue();
         } catch (err) {
+            if (currentPatientSeqRef.current !== requestSeq) return;
             console.error("Lỗi tiếp nhận bệnh nhân:", err);
             const errDetail = err?.response?.data?.message || err?.message || "Không thể tiếp nhận bệnh nhân!";
-            alert(errDetail);
+            setErrorMessage(errDetail);
         } finally {
-            setStartingExam(false);
+            if (currentPatientSeqRef.current === requestSeq) {
+                setStartingExam(false);
+            }
         }
     };
 
     const handleSaveDiagnosis = async () => {
         if (!record) return;
-        if (!finalDiagnosis) {
-            alert("Vui lòng nhập chẩn đoán xác định!");
+        setErrorMessage("");
+        setMessage("");
+        if (!finalDiagnosis?.trim()) {
+            setErrorMessage("Vui lòng nhập chẩn đoán xác định!");
             return;
         }
         setSavingDiagnosis(true);
@@ -645,7 +668,7 @@ export default function ExaminationPage() {
             }
 
             const res = await axiosInstance.put(`/api/clinical/records/${targetRecordId}/diagnosis`, {
-                finalDiagnosis,
+                finalDiagnosis: finalDiagnosis.trim(),
                 treatmentPlan: treatmentPlan ? treatmentPlan.trim() : "",
                 reExaminationDate: cleanDate,
             });
@@ -654,7 +677,8 @@ export default function ExaminationPage() {
             setMessage("Đã ghi nhận chẩn đoán xác định & phác đồ điều trị thành công!");
             fetchDoctorQueue();
         } catch (err) {
-            alert(err.message || "Lỗi lưu chẩn đoán!");
+            console.error("Lỗi lưu chẩn đoán:", err);
+            setErrorMessage(err?.response?.data?.message || err?.message || "Lỗi lưu chẩn đoán!");
         } finally {
             setSavingDiagnosis(false);
         }
@@ -669,6 +693,8 @@ export default function ExaminationPage() {
     const handleAbandonAfterTests = async () => {
         if (!record?.recordId) return;
         setAbandoning(true);
+        setErrorMessage("");
+        setMessage("");
         try {
             const res = await axiosInstance.post(`/api/clinical/records/${record.recordId}/abandon-after-tests`, {
                 reason: abandonReason.trim() || "Bệnh nhân không quay lại buồng khám sau khi làm chỉ định cận lâm sàng"
@@ -681,7 +707,7 @@ export default function ExaminationPage() {
             fetchDoctorQueue();
         } catch (err) {
             console.error("Lỗi đóng ca khám vắng mặt:", err);
-            alert(err?.response?.data?.message || err?.message || "Lỗi đóng ca khám vắng mặt!");
+            setErrorMessage(err?.response?.data?.message || err?.message || "Lỗi đóng ca khám vắng mặt!");
         } finally {
             setAbandoning(false);
         }
@@ -689,9 +715,11 @@ export default function ExaminationPage() {
 
     const handleCompleteExamWithoutPrescription = async () => {
         if (!record) return;
+        setErrorMessage("");
+        setMessage("");
 
         if (!finalDiagnosis?.trim()) {
-            alert("Bác sĩ phải nhập kết luận chẩn đoán lâm sàng xác định trước khi hoàn tất ca khám!");
+            setErrorMessage("Bác sĩ phải nhập kết luận chẩn đoán lâm sàng xác định trước khi hoàn tất ca khám!");
             return;
         }
 
@@ -699,7 +727,7 @@ export default function ExaminationPage() {
             t => t.state !== "COMPLETED" && t.state !== "CANCELLED"
         );
         if (unfinishedTests.length > 0) {
-            alert(`Không thể hoàn tất ca khám do bệnh nhân vẫn còn ${unfinishedTests.length} chỉ định cận lâm sàng chưa hoàn thành hoặc chưa được hủy!\n\nVui lòng chờ phòng xét nghiệm trả kết quả hoặc bấm hủy chỉ định nếu bệnh nhân không thực hiện.`);
+            setErrorMessage(`Không thể hoàn tất ca khám do bệnh nhân vẫn còn ${unfinishedTests.length} chỉ định cận lâm sàng chưa hoàn thành hoặc chưa được hủy! Vui lòng chờ phòng xét nghiệm trả kết quả hoặc bấm hủy chỉ định nếu bệnh nhân không thực hiện.`);
             return;
         }
 
@@ -733,7 +761,7 @@ export default function ExaminationPage() {
             fetchDoctorQueue();
         } catch (err) {
             console.error("Lỗi hoàn tất buổi khám:", err);
-            alert(err?.message || "Lỗi hoàn tất buổi khám!");
+            setErrorMessage(err?.response?.data?.message || err?.message || "Lỗi hoàn tất buổi khám!");
         } finally {
             setCompletingExam(false);
         }
@@ -2353,6 +2381,16 @@ export default function ExaminationPage() {
                                                     )}
                                                 </Paper>
 
+                                                {errorMessage && (
+                                                    <Alert
+                                                        severity="error"
+                                                        sx={{ mb: 2, borderRadius: 2 }}
+                                                        onClose={() => setErrorMessage("")}
+                                                    >
+                                                        {errorMessage}
+                                                    </Alert>
+                                                )}
+
                                                 <Grid container spacing={2.5}>
                                                     <Grid item xs={12}>
                                                         <TextField
@@ -2774,8 +2812,8 @@ export default function ExaminationPage() {
                                                             <TableBody>
                                                                 {record.tests.map((t) => (
                                                                     <TableRow key={t.testId} hover>
-                                                                        <TableCell sx={{ fontWeight: 700, color: "#0f172a" }}>{t.testCode}</TableCell>
-                                                                        <TableCell sx={{ fontWeight: 600 }}>{t.serviceName}</TableCell>
+                                                                        <TableCell sx={{ fontWeight: 700, color: "#0f172a", wordBreak: "break-word" }}>{t.testCode}</TableCell>
+                                                                        <TableCell sx={{ fontWeight: 600, wordBreak: "break-word" }}>{t.serviceName}</TableCell>
                                                                         <TableCell sx={{ fontWeight: 700, color: "#0284c7" }}>{formatCurrency(t.price)}</TableCell>
                                                                         <TableCell>
                                                                             <Chip
@@ -2810,6 +2848,7 @@ export default function ExaminationPage() {
                                                                                             borderRadius: 1.5,
                                                                                             border: hasAbnormalIndicator(t.testResult) ? "1px solid #FECACA" : "1px solid #E2E8F0",
                                                                                             whiteSpace: "pre-line",
+                                                                                            wordBreak: "break-word",
                                                                                             fontSize: "0.825rem",
                                                                                             lineHeight: 1.5
                                                                                         }}
@@ -3001,11 +3040,11 @@ export default function ExaminationPage() {
                                                                 <TableBody>
                                                                     {record.prescription.items?.map((it, idx) => (
                                                                         <TableRow key={idx} hover>
-                                                                            <TableCell sx={{ fontWeight: 700, color: "#0f172a" }}>{it.medicineName}</TableCell>
+                                                                            <TableCell sx={{ fontWeight: 700, color: "#0f172a", wordBreak: "break-word", maxWidth: 220 }}>{it.medicineName}</TableCell>
                                                                             <TableCell align="center">
                                                                                 <Chip label={`${it.quantity} ${it.unit}`} size="small" sx={{ fontWeight: 700 }} />
                                                                             </TableCell>
-                                                                            <TableCell sx={{ color: "#334155" }}>
+                                                                            <TableCell sx={{ color: "#334155", wordBreak: "break-word" }}>
                                                                                 {it.dosageInstruction || `Sáng: ${it.morningAmount} • Trưa: ${it.noonAmount} • Chiều: ${it.afternoonAmount} • Tối: ${it.eveningAmount}`}
                                                                             </TableCell>
                                                                             <TableCell align="right" sx={{ fontWeight: 700, color: "#16a34a" }}>

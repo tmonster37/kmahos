@@ -44,6 +44,11 @@ import BlockIcon from "@mui/icons-material/Block";
 import { useAuth } from "../../context/AuthContext";
 import axiosInstance from "../../services/AxiosInstance";
 import { formatCurrency } from "../../utils/formatters";
+import designTokens from "../../theme/designTokens";
+
+const BRAND_PRIMARY = designTokens.brand.primary;
+const BRAND_DARK = designTokens.brand.primaryDark;
+const BRAND_LIGHT = designTokens.brand.primaryLight;
 
 export default function MedicalServiceManagePage() {
     const { user } = useAuth();
@@ -252,7 +257,7 @@ export default function MedicalServiceManagePage() {
                             height: 52,
                             borderRadius: "16px",
                             bgcolor: "rgba(0, 136, 214, 0.1)",
-                            color: "#0088D6",
+                            color: BRAND_PRIMARY,
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
@@ -274,7 +279,7 @@ export default function MedicalServiceManagePage() {
                                     fontSize: "0.72rem",
                                     fontWeight: 700,
                                     bgcolor: "rgba(0, 136, 214, 0.1)",
-                                    color: "#0088D6",
+                                    color: BRAND_PRIMARY,
                                     border: "1px solid rgba(0, 136, 214, 0.2)"
                                 }}
                             />
@@ -312,9 +317,9 @@ export default function MedicalServiceManagePage() {
                             fontWeight: 700,
                             textTransform: "none",
                             fontSize: "0.85rem",
-                            bgcolor: "#0088D6",
+                            bgcolor: BRAND_PRIMARY,
                             boxShadow: "0 4px 14px rgba(0, 136, 214, 0.25)",
-                            "&:hover": { bgcolor: "#0073B7" }
+                            "&:hover": { bgcolor: BRAND_DARK }
                         }}
                     >
                         Thêm Dịch Vụ Mới
@@ -342,12 +347,12 @@ export default function MedicalServiceManagePage() {
                                 left: 0,
                                 right: 0,
                                 height: "3.5px",
-                                bgcolor: "#0088D6"
+                                bgcolor: BRAND_PRIMARY
                             }
                         }}
                     >
                         <CardContent sx={{ display: "flex", alignItems: "center", gap: 2, p: 2.5 }}>
-                            <Avatar sx={{ bgcolor: "rgba(0, 136, 214, 0.1)", color: "#0088D6", width: 48, height: 48, borderRadius: 2.5 }}>
+                            <Avatar sx={{ bgcolor: "rgba(0, 136, 214, 0.1)", color: BRAND_PRIMARY, width: 48, height: 48, borderRadius: 2.5 }}>
                                 <MedicalServicesIcon />
                             </Avatar>
                             <Box>
@@ -480,8 +485,8 @@ export default function MedicalServiceManagePage() {
                                     borderRadius: 2.5,
                                     bgcolor: "#F8FAFC",
                                     "& fieldset": { borderColor: "rgba(15, 23, 42, 0.1)" },
-                                    "&:hover fieldset": { borderColor: "#0088D6" },
-                                    "&.Mui-focused fieldset": { borderColor: "#0088D6" }
+                                    "&:hover fieldset": { borderColor: BRAND_PRIMARY },
+                                    "&.Mui-focused fieldset": { borderColor: BRAND_PRIMARY }
                                 }
                             }}
                         />
@@ -497,8 +502,8 @@ export default function MedicalServiceManagePage() {
                                     borderRadius: 2.5,
                                     bgcolor: "#F8FAFC",
                                     "& fieldset": { borderColor: "rgba(15, 23, 42, 0.1)" },
-                                    "&:hover fieldset": { borderColor: "#0088D6" },
-                                    "&.Mui-focused fieldset": { borderColor: "#0088D6" }
+                                    "&:hover fieldset": { borderColor: BRAND_PRIMARY },
+                                    "&.Mui-focused fieldset": { borderColor: BRAND_PRIMARY }
                                 }
                             }}
                         >
@@ -519,8 +524,8 @@ export default function MedicalServiceManagePage() {
                                     borderRadius: 2.5,
                                     bgcolor: "#F8FAFC",
                                     "& fieldset": { borderColor: "rgba(15, 23, 42, 0.1)" },
-                                    "&:hover fieldset": { borderColor: "#0088D6" },
-                                    "&.Mui-focused fieldset": { borderColor: "#0088D6" }
+                                    "&:hover fieldset": { borderColor: BRAND_PRIMARY },
+                                    "&.Mui-focused fieldset": { borderColor: BRAND_PRIMARY }
                                 }
                             }}
                         >
@@ -564,7 +569,7 @@ export default function MedicalServiceManagePage() {
                         {loading ? (
                             <TableRow>
                                 <TableCell colSpan={7} align="center" sx={{ py: 8 }}>
-                                    <CircularProgress size={34} sx={{ color: "#0088D6" }} />
+                                    <CircularProgress size={34} sx={{ color: BRAND_PRIMARY }} />
                                     <Typography variant="body2" sx={{ color: "#64748B", mt: 1.5, fontWeight: 600 }}>Đang tải danh mục dịch vụ...</Typography>
                                 </TableCell>
                             </TableRow>
@@ -634,7 +639,7 @@ export default function MedicalServiceManagePage() {
                                                     fontWeight: 700,
                                                     fontSize: "0.72rem",
                                                     bgcolor: isLocked ? "rgba(100, 116, 139, 0.08)" : "rgba(0, 136, 214, 0.08)",
-                                                    color: isLocked ? "#64748B" : "#0088D6",
+                                                    color: isLocked ? "#64748B" : BRAND_PRIMARY,
                                                     border: isLocked ? "1px solid rgba(100, 116, 139, 0.2)" : "1px solid rgba(0, 136, 214, 0.2)",
                                                     borderRadius: 1.5,
                                                     height: 24
@@ -691,7 +696,7 @@ export default function MedicalServiceManagePage() {
                                                     onClick={() => handleOpenEdit(item)}
                                                     sx={{
                                                         bgcolor: "rgba(0, 136, 214, 0.08)",
-                                                        color: "#0088D6",
+                                                        color: BRAND_PRIMARY,
                                                         borderRadius: 2,
                                                         mr: 0.8,
                                                         "&:hover": { bgcolor: "rgba(0, 136, 214, 0.16)" }
@@ -839,7 +844,7 @@ export default function MedicalServiceManagePage() {
                 }}
             >
                 <DialogTitle sx={{ fontWeight: 800, color: "#0F172A", display: "flex", alignItems: "center", gap: 1.2, pb: 1 }}>
-                    <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: "rgba(0, 136, 214, 0.1)", color: "#0088D6", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: "rgba(0, 136, 214, 0.1)", color: BRAND_PRIMARY, display: "flex", alignItems: "center", justifyContent: "center" }}>
                         {editingServiceId ? <EditIcon sx={{ fontSize: 20 }} /> : <AddIcon sx={{ fontSize: 20 }} />}
                     </Box>
                     {editingServiceId ? "Chỉnh Sửa Dịch Vụ Kỹ Thuật" : "Thêm Dịch Vụ Kỹ Thuật Mới"}
@@ -912,8 +917,8 @@ export default function MedicalServiceManagePage() {
                                 borderRadius: 2.2,
                                 fontWeight: 700,
                                 textTransform: "none",
-                                bgcolor: "#0088D6",
-                                "&:hover": { bgcolor: "#0073B7" }
+                                bgcolor: BRAND_PRIMARY,
+                                "&:hover": { bgcolor: BRAND_DARK }
                             }}
                         >
                             {submitting ? "Đang lưu..." : (editingServiceId ? "Cập Nhật CSDL" : "Lưu CSDL")}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
     Container,
     Grid,
@@ -78,6 +78,312 @@ const STEPS = [
     "5. Xác Nhận & Cấp Phiếu"
 ];
 
+/**
+ * Hiển thị giá khám chuẩn hóa theo hợp đồng dữ liệu:
+ * - 0 được hiển thị là "0 ₫" (không coi 0 là falsy hay thiếu dữ liệu)
+ * - Giá trị thiếu (null/undefined) hiển thị "Chưa có dữ liệu"
+ */
+export const renderFeeDisplay = (fee) => {
+    if (fee === 0 || fee === "0") return "0 ₫";
+    if (fee != null && fee !== "" && !isNaN(Number(fee))) {
+        return formatCurrency(Number(fee));
+    }
+    return "Chưa có dữ liệu";
+};
+
+/**
+ * Hiển thị mã phiếu khám trung thực:
+ * - Nếu backend trả về mã: hiển thị mã đó
+ * - Nếu rỗng / null / undefined: hiển thị "Chưa có mã", KHÔNG tự chế BK-${id}
+ */
+export const getBookingCodeDisplay = (code) => {
+    if (code && typeof code === "string" && code.trim().length > 0) {
+        return code.trim();
+    }
+    return "Chưa có mã";
+};
+
+/**
+ * Hiển thị số thứ tự / mã xếp hàng:
+ * - Nếu có queueCode: hiển thị queueCode
+ * - Nếu queueNumber !== null && !== undefined: hiển thị "#${queueNumber}" (giữ 0 là "#0")
+ * - Nếu không có: hiển thị "Chờ cấp số tại quầy"
+ */
+export const getQueueNumberDisplay = (num, code) => {
+    if (code && typeof code === "string" && code.trim().length > 0) {
+        return code.trim();
+    }
+    if (num !== null && num !== undefined && num !== "") {
+        return `#${num}`;
+    }
+    return "Chờ cấp số tại quầy";
+};
+
+/**
+ * Kiểm tra xem phản hồi giữ chỗ có bị lỗi thời (stale do race condition) không:
+ * - Sequence number của request không khớp sequence hiện tại
+ * - Hoặc ngày khám hiện tại đã đổi khác với ngày lúc bấm giữ chỗ
+ * - Hoặc chuyên khoa hiện tại đã đổi khác với chuyên khoa lúc bấm giữ chỗ
+ */
+export const isReservationStale = ({ currentSeq, activeSeq, requestDate, currentDate, requestDeptId, currentDeptId }) => {
+    return currentSeq !== activeSeq || requestDate !== currentDate || requestDeptId !== currentDeptId;
+};
+
+/**
+ * Kiểm tra xem phản hồi tải lịch khám (fetchSchedules) có bị lỗi thời (stale do race condition) không:
+ * - Sequence number của request không khớp scheduleSeq hiện tại
+ * - Hoặc ngày khám hiện tại đã đổi khác với ngày lúc gửi request
+ * - Hoặc chuyên khoa hiện tại đã đổi khác với chuyên khoa lúc gửi request
+ */
+export const isScheduleStale = ({ requestSeq, activeSeq, requestDate, currentDate, requestDeptId, currentDeptId }) => {
+    return requestSeq !== activeSeq || requestDate !== currentDate || requestDeptId !== currentDeptId;
+};
+
+/**
+ * Hook quản lý toàn bộ luồng tải lịch và giữ chỗ khám bệnh, phòng chống race condition:
+ * - Race khi đổi ngày trong lúc request reserve-slot đang pending: tự động hủy, giải phóng reservingSlot an toàn, release hold trên server
+ * - Race khi hai request fetchSchedules trả về ngược thứ tự: bỏ qua kết quả request cũ, không để lịch cũ ghi đè lên ngày mới
+ */
+export function useBookingScheduleWorkflow({
+    selectedDept,
+    selectedDate,
+    selectedProfile,
+    axiosClient = axiosInstance,
+    onSessionError
+}) {
+    const [schedules, setSchedules] = useState([]);
+    const [selectedDoctorSchedule, setSelectedDoctorSchedule] = useState(null);
+    const [selectedSlot, setSelectedSlot] = useState(null);
+    const [reservationId, setReservationId] = useState(null);
+    const [holdingSecondsLeft, setHoldingSecondsLeft] = useState(null);
+    const [reservingSlot, setReservingSlot] = useState(false);
+    const [loadingSchedules, setLoadingSchedules] = useState(false);
+    const [scheduleError, setScheduleError] = useState("");
+
+    const reservationSeqRef = useRef(0);
+    const reservingSeqRef = useRef(0);
+    const scheduleSeqRef = useRef(0);
+
+    const selectedDateRef = useRef(selectedDate);
+    selectedDateRef.current = selectedDate;
+    const selectedDeptRef = useRef(selectedDept);
+    selectedDeptRef.current = selectedDept;
+    const selectedProfileRef = useRef(selectedProfile);
+    selectedProfileRef.current = selectedProfile;
+
+    // Holding Slot TTL 600s (10 phút)
+    useEffect(() => {
+        if (!holdingSecondsLeft || holdingSecondsLeft <= 0) return;
+        const interval = setInterval(() => {
+            setHoldingSecondsLeft(prev => {
+                if (prev <= 1) {
+                    clearInterval(interval);
+                    setSelectedSlot(null);
+                    setReservationId(null);
+                    const msg = "Hết thời gian giữ chỗ (10 phút). Khung giờ khám đã được giải phóng tự động.";
+                    setScheduleError(msg);
+                    if (onSessionError) onSessionError(msg);
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [holdingSecondsLeft, onSessionError]);
+
+    const fetchSchedules = async () => {
+        const dept = selectedDeptRef.current;
+        if (!dept) return;
+
+        scheduleSeqRef.current += 1;
+        const currentScheduleSeq = scheduleSeqRef.current;
+        const requestDeptId = dept.departmentId;
+        const requestDate = selectedDateRef.current;
+
+        // 1. Khi fetchSchedules vô hiệu hóa request giữ chỗ cũ, bảo đảm reservingSlot được giải phóng an toàn
+        reservationSeqRef.current += 1;
+        setReservingSlot(false);
+        reservingSeqRef.current = 0;
+
+        setLoadingSchedules(true);
+        setScheduleError("");
+
+        if (reservationId) {
+            try {
+                await axiosClient.post(`/api/bookings/release-slot/${reservationId}`);
+            } catch (e) {
+                // silent release of previous held slot
+            }
+            setReservationId(null);
+            setHoldingSecondsLeft(0);
+        }
+        setSelectedSlot(null);
+        setSelectedDoctorSchedule(null);
+
+        try {
+            const res = await axiosClient.get(`/api/schedules/by-department?departmentId=${requestDeptId}&date=${requestDate}`);
+            
+            // 2. Bảo vệ request GET lịch: response chỉ được cập nhật giao diện nếu vẫn thuộc đúng ngày/khoa hiện tại và chưa bị request mới thay thế
+            if (isScheduleStale({
+                requestSeq: currentScheduleSeq,
+                activeSeq: scheduleSeqRef.current,
+                requestDate,
+                currentDate: selectedDateRef.current,
+                requestDeptId,
+                currentDeptId: selectedDeptRef.current?.departmentId
+            })) {
+                return;
+            }
+
+            const data = (res && Array.isArray(res.data)) ? res.data : (Array.isArray(res) ? res : []);
+            setSchedules(data);
+            if (data.length > 0) {
+                setSelectedDoctorSchedule(data[0]);
+            } else {
+                setSelectedDoctorSchedule(null);
+            }
+            setSelectedSlot(null);
+        } catch (err) {
+            if (isScheduleStale({
+                requestSeq: currentScheduleSeq,
+                activeSeq: scheduleSeqRef.current,
+                requestDate,
+                currentDate: selectedDateRef.current,
+                requestDeptId,
+                currentDeptId: selectedDeptRef.current?.departmentId
+            })) {
+                return;
+            }
+            setSchedules([]);
+            setSelectedDoctorSchedule(null);
+            setSelectedSlot(null);
+            const errMsg = err.response?.data?.message || err.message || "Không thể tải lịch khám của chuyên khoa. Vui lòng thử lại sau.";
+            setScheduleError(errMsg);
+            if (onSessionError) onSessionError(errMsg);
+        } finally {
+            if (scheduleSeqRef.current === currentScheduleSeq) {
+                setLoadingSchedules(false);
+            }
+        }
+    };
+
+    const handleSelectSlot = async (slot) => {
+        if (reservingSlot) return; // Khóa thay đổi lựa chọn khi request đang chạy
+        if (selectedSlot?.timeSlotId === slot.timeSlotId) return;
+
+        reservationSeqRef.current += 1;
+        const currentSeq = reservationSeqRef.current;
+        reservingSeqRef.current = currentSeq;
+        const requestDeptId = selectedDeptRef.current?.departmentId;
+        const requestDate = selectedDateRef.current;
+
+        if (reservationId) {
+            try {
+                await axiosClient.post(`/api/bookings/release-slot/${reservationId}`);
+            } catch (e) {
+                console.log("Giải phóng slot cũ:", e);
+            }
+            if (reservationSeqRef.current !== currentSeq) {
+                if (reservingSeqRef.current === currentSeq || reservingSeqRef.current === 0) {
+                    setReservingSlot(false);
+                    if (reservingSeqRef.current === currentSeq) reservingSeqRef.current = 0;
+                }
+                return;
+            }
+            setReservationId(null);
+            setHoldingSecondsLeft(0);
+        }
+
+        setReservingSlot(true);
+        try {
+            const res = await axiosClient.post("/api/bookings/reserve-slot", {
+                timeSlotId: slot.timeSlotId,
+                patientProfileId: selectedProfileRef.current?.patientProfileId
+            });
+            const resData = res?.data?.data || res?.data || res;
+
+            // Kiểm tra race condition: người dùng đã đổi ngày, khoa hoặc chọn slot khác
+            if (isReservationStale({
+                currentSeq,
+                activeSeq: reservationSeqRef.current,
+                requestDate,
+                currentDate: selectedDateRef.current,
+                requestDeptId,
+                currentDeptId: selectedDeptRef.current?.departmentId
+            })) {
+                // Phản hồi cũ: giải phóng ngay slot vừa giữ chỗ để không rò rỉ reservation trên backend
+                if (resData?.reservationId) {
+                    try {
+                        await axiosClient.post(`/api/bookings/release-slot/${resData.reservationId}`);
+                    } catch (e) {
+                        // silent cleanup
+                    }
+                }
+                return;
+            }
+
+            setSelectedSlot(slot);
+            setReservationId(resData.reservationId);
+            setHoldingSecondsLeft(resData.ttlSeconds || 600);
+            setScheduleError("");
+        } catch (err) {
+            if (reservationSeqRef.current !== currentSeq) return;
+            console.error("Lỗi giữ chỗ slot:", err);
+            const errMsg = err.response?.data?.message || "Không thể giữ chỗ khung giờ này, vui lòng chọn khung giờ khác.";
+            setScheduleError(errMsg);
+            if (onSessionError) onSessionError(errMsg);
+        } finally {
+            if (reservingSeqRef.current === currentSeq || reservingSeqRef.current === 0) {
+                setReservingSlot(false);
+                if (reservingSeqRef.current === currentSeq) {
+                    reservingSeqRef.current = 0;
+                }
+            }
+        }
+    };
+
+    // Tự động kích hoạt tải lịch khi selectedDept hoặc selectedDate thay đổi
+    useEffect(() => {
+        if (selectedDept && selectedDate) {
+            fetchSchedules();
+        }
+    }, [selectedDept, selectedDate]);
+
+    return {
+        schedules,
+        setSchedules,
+        selectedDoctorSchedule,
+        setSelectedDoctorSchedule,
+        selectedSlot,
+        setSelectedSlot,
+        reservationId,
+        setReservationId,
+        holdingSecondsLeft,
+        setHoldingSecondsLeft,
+        reservingSlot,
+        loadingSchedules,
+        scheduleError,
+        setScheduleError,
+        fetchSchedules,
+        handleSelectSlot,
+        scheduleSeqRef,
+        reservationSeqRef,
+        reservingSeqRef
+    };
+}
+
+/**
+ * Trích xuất chữ cái đại diện bác sĩ trung tính khi không có ảnh thật
+ */
+export const getDoctorInitials = (name) => {
+    if (!name) return "BS";
+    const cleanName = name
+        .replace(/^(GS\.|PGS\.|TS\.|ThS\.|BS\.|CKI{1,2}\.|BS\s*CKI{1,2}|BS|Bác sĩ)\s*/gi, "")
+        .replace(/^(GS|PGS|TS|ThS|BS|CKI{1,2})\.?\s*/gi, "")
+        .trim();
+    return cleanName ? cleanName.charAt(0).toUpperCase() : "BS";
+};
+
 export default function BookingPage() {
     const location = useLocation();
     const navigate = useNavigate();
@@ -100,9 +406,6 @@ export default function BookingPage() {
         const d = new Date();
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     });
-    const [schedules, setSchedules] = useState([]);
-    const [selectedDoctorSchedule, setSelectedDoctorSchedule] = useState(null);
-    const [selectedSlot, setSelectedSlot] = useState(null);
     const [activeSession, setActiveSession] = useState("ALL"); // ALL, MORNING, AFTERNOON, EVENING
 
     // Profile & Symptoms States
@@ -129,56 +432,32 @@ export default function BookingPage() {
     const [openQRModal, setOpenQRModal] = useState(false);
     const [bookingResult, setBookingResult] = useState(null);
     const [loadingBooking, setLoadingBooking] = useState(false);
-    const [loadingSchedules, setLoadingSchedules] = useState(false);
     const [error, setError] = useState("");
 
-    // Holding Slot TTL 600s (10 phút)
-    const [reservationId, setReservationId] = useState(null);
-    const [holdingSecondsLeft, setHoldingSecondsLeft] = useState(null);
-
-    useEffect(() => {
-        if (!holdingSecondsLeft || holdingSecondsLeft <= 0) return;
-        const interval = setInterval(() => {
-            setHoldingSecondsLeft(prev => {
-                if (prev <= 1) {
-                    clearInterval(interval);
-                    setSelectedSlot(null);
-                    setReservationId(null);
-                    setError("Hết thời gian giữ chỗ (10 phút). Khung giờ khám đã được giải phóng tự động.");
-                    return 0;
-                }
-                return prev - 1;
-            });
-        }, 1000);
-        return () => clearInterval(interval);
-    }, [holdingSecondsLeft]);
-
-    const handleSelectSlot = async (slot) => {
-        if (selectedSlot?.timeSlotId === slot.timeSlotId) return;
-
-        if (reservationId) {
-            try {
-                await axiosInstance.post(`/api/bookings/release-slot/${reservationId}`);
-            } catch (e) {
-                console.log("Giải phóng slot cũ:", e);
-            }
-        }
-
-        try {
-            const res = await axiosInstance.post("/api/bookings/reserve-slot", {
-                timeSlotId: slot.timeSlotId,
-                patientProfileId: selectedProfile?.patientProfileId
-            });
-            const resData = res?.data?.data || res?.data || res;
-            setSelectedSlot(slot);
-            setReservationId(resData.reservationId);
-            setHoldingSecondsLeft(resData.ttlSeconds || 600);
-            setError("");
-        } catch (err) {
-            console.error("Lỗi giữ chỗ slot:", err);
-            setError(err.response?.data?.message || "Không thể giữ chỗ khung giờ này, vui lòng chọn khung giờ khác.");
-        }
-    };
+    // Luồng quản lý Lịch & Giữ chỗ (Phòng chống Race Condition)
+    const {
+        schedules,
+        setSchedules,
+        selectedDoctorSchedule,
+        setSelectedDoctorSchedule,
+        selectedSlot,
+        setSelectedSlot,
+        reservationId,
+        setReservationId,
+        holdingSecondsLeft,
+        setHoldingSecondsLeft,
+        reservingSlot,
+        loadingSchedules,
+        scheduleError,
+        fetchSchedules,
+        handleSelectSlot
+    } = useBookingScheduleWorkflow({
+        selectedDept,
+        selectedDate,
+        selectedProfile,
+        axiosClient: axiosInstance,
+        onSessionError: (msg) => setError(msg)
+    });
 
     // Callback khi thanh toán Cổng PayOS (VietQR) thành công
     const handleQRPaymentSuccess = () => {
@@ -230,35 +509,7 @@ export default function BookingPage() {
         }
     }, [deptSearch, departments]);
 
-    // Tải ca trực khi chọn Khoa hoặc Ngày
-    useEffect(() => {
-        if (selectedDept && selectedDate) {
-            fetchSchedules();
-        }
-    }, [selectedDept, selectedDate]);
 
-    const fetchSchedules = async () => {
-        if (!selectedDept) return;
-        setLoadingSchedules(true);
-        setError("");
-        try {
-            const res = await axiosInstance.get(`/api/schedules/by-department?departmentId=${selectedDept.departmentId}&date=${selectedDate}`);
-            const data = (res && Array.isArray(res.data)) ? res.data : (Array.isArray(res) ? res : []);
-            setSchedules(data);
-            if (data.length > 0) {
-                setSelectedDoctorSchedule(data[0]);
-            } else {
-                setSelectedDoctorSchedule(null);
-            }
-            setSelectedSlot(null);
-        } catch (err) {
-            setSchedules([]);
-            setSelectedDoctorSchedule(null);
-            setError(err.response?.data?.message || err.message || "Không thể tải lịch khám của chuyên khoa. Vui lòng thử lại sau.");
-        } finally {
-            setLoadingSchedules(false);
-        }
-    };
 
     // Tạo hồ sơ mới nhanh
     const handleCreateNewProfile = async () => {
@@ -322,6 +573,10 @@ export default function BookingPage() {
         }
         if (!selectedSlot) {
             setError("Vui lòng chọn khung giờ khám!");
+            return;
+        }
+        if (!reservationId) {
+            setError("Khung giờ khám chưa được giữ chỗ hoặc đã hết hạn giữ chỗ! Vui lòng chọn lại khung giờ.");
             return;
         }
 
@@ -396,22 +651,22 @@ export default function BookingPage() {
                         alignItems="center"
                         gap={1}
                         sx={{
-                            bgcolor: "#E0F2FE",
-                            border: "1px solid #BAE6FD",
+                            bgcolor: designTokens.brand.primaryLight,
+                            border: `1px solid ${designTokens.brand.primaryBorder}`,
                             borderRadius: "9999px",
                             px: 2,
                             py: 0.5,
                             mb: 1.5
                         }}
                     >
-                        <LocalHospitalIcon sx={{ color: "#0284C7", fontSize: 16 }} />
+                        <LocalHospitalIcon sx={{ color: designTokens.brand.primary, fontSize: 16 }} />
                         <Typography
                             sx={{
                                 fontSize: "0.78rem",
                                 fontWeight: 800,
                                 letterSpacing: "0.06em",
                                 textTransform: "uppercase",
-                                color: "#0369A1"
+                                color: designTokens.brand.primaryDark
                             }}
                         >
                             HỆ THỐNG ĐẶT KHÁM CHUYÊN KHOA TRỰC TUYẾN 24/7
@@ -455,8 +710,8 @@ export default function BookingPage() {
                                 <StepLabel
                                     StepIconProps={{
                                         sx: {
-                                            "&.Mui-active": { color: "#0284C7" },
-                                            "&.Mui-completed": { color: "#10B981" },
+                                            "&.Mui-active": { color: designTokens.brand.primary },
+                                            "&.Mui-completed": { color: designTokens.status.success.main },
                                             fontSize: { xs: "1.3rem", md: "1.5rem" }
                                         }
                                     }}
@@ -464,7 +719,7 @@ export default function BookingPage() {
                                     <Typography
                                         variant="subtitle2"
                                         fontWeight={activeStep === index ? 800 : 600}
-                                        color={activeStep === index ? "#0284C7" : activeStep > index ? "#0F172A" : "#94A3B8"}
+                                        color={activeStep === index ? designTokens.brand.primary : activeStep > index ? "#0F172A" : "#94A3B8"}
                                         sx={{ fontSize: { xs: "0.72rem", sm: "0.82rem" } }}
                                     >
                                         {label}
@@ -525,6 +780,11 @@ export default function BookingPage() {
 
                 {error && (
                     <Alert
+                        action={
+                            <Button color="inherit" size="small" onClick={fetchSchedules} sx={{ fontWeight: 800 }}>
+                                Thử lại
+                            </Button>
+                        }
                         severity="error"
                         sx={{ mb: 3, borderRadius: "12px", border: "1px solid #FECACA" }}
                         onClose={() => setError("")}
@@ -583,13 +843,13 @@ export default function BookingPage() {
                                                 cursor: "pointer",
                                                 borderRadius: "16px",
                                                 transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
-                                                border: isSelected ? "2px solid #0284C7" : "1px solid rgba(15, 23, 42, 0.08)",
-                                                bgcolor: isSelected ? "#F0F9FF" : "#FFFFFF",
-                                                boxShadow: isSelected ? "0 10px 25px -4px rgba(2, 132, 199, 0.16)" : "0 2px 8px rgba(15, 23, 42, 0.03)",
+                                                border: isSelected ? `2px solid ${designTokens.brand.primary}` : "1px solid rgba(15, 23, 42, 0.08)",
+                                                bgcolor: isSelected ? designTokens.brand.primaryLight : "#FFFFFF",
+                                                boxShadow: isSelected ? "0 10px 25px -4px rgba(15, 118, 110, 0.2)" : "0 2px 8px rgba(15, 23, 42, 0.03)",
                                                 "&:hover": {
                                                     transform: "translateY(-3px)",
-                                                    borderColor: "#0284C7",
-                                                    boxShadow: "0 12px 24px -6px rgba(2, 132, 199, 0.14)"
+                                                    borderColor: designTokens.brand.primary,
+                                                    boxShadow: "0 12px 24px -6px rgba(15, 118, 110, 0.16)"
                                                 }
                                             }}
                                         >
@@ -597,12 +857,12 @@ export default function BookingPage() {
                                                 <Box display="flex" alignItems="center" justifyContent="space-between" mb={1.5}>
                                                     <Avatar
                                                         sx={{
-                                                            bgcolor: isSelected ? "#0284C7" : "#E0F2FE",
-                                                            color: isSelected ? "#FFFFFF" : "#0284C7",
+                                                            bgcolor: isSelected ? designTokens.brand.primary : designTokens.brand.primaryLight,
+                                                            color: isSelected ? "#FFFFFF" : designTokens.brand.primary,
                                                             width: 46,
                                                             height: 46,
                                                             borderRadius: "12px",
-                                                            border: `1px solid ${isSelected ? "#0284C7" : "#BAE6FD"}`
+                                                            border: `1px solid ${isSelected ? designTokens.brand.primary : designTokens.brand.primaryBorder}`
                                                         }}
                                                     >
                                                         <MedicalServicesIcon sx={{ fontSize: 22 }} />
@@ -612,7 +872,7 @@ export default function BookingPage() {
                                                             label="Đang chọn"
                                                             size="small"
                                                             sx={{
-                                                                bgcolor: "#0284C7",
+                                                                bgcolor: designTokens.brand.primary,
                                                                 color: "#FFFFFF",
                                                                 fontWeight: 800,
                                                                 fontSize: "0.72rem",
@@ -660,7 +920,7 @@ export default function BookingPage() {
                                                     <Typography
                                                         variant="caption"
                                                         fontWeight="700"
-                                                        color="#0284C7"
+                                                        color={designTokens.brand.primary}
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             setSelectedDept(dept);
@@ -678,6 +938,28 @@ export default function BookingPage() {
                             })}
                         </Grid>
 
+                        {filteredDepartments.length === 0 && (
+                            <Box textAlign="center" py={6} px={2} bgcolor="#FFFFFF" borderRadius="16px" border="1px dashed #E2E8F0">
+                                <MedicalServicesIcon sx={{ fontSize: 48, color: "#94A3B8", mb: 1.5 }} />
+                                <Typography variant="h6" fontWeight="700" color="#334155">
+                                    Không tìm thấy chuyên khoa nào
+                                </Typography>
+                                <Typography variant="body2" color="#64748B" mb={2}>
+                                    Thử tìm kiếm với từ khóa khác hoặc xóa bộ lọc
+                                </Typography>
+                                {deptSearch && (
+                                    <Button
+                                        variant="outlined"
+                                        size="small"
+                                        onClick={() => setDeptSearch("")}
+                                        sx={{ color: designTokens.brand.primary, borderColor: designTokens.brand.primaryBorder }}
+                                    >
+                                        Xóa tìm kiếm
+                                    </Button>
+                                )}
+                            </Box>
+                        )}
+
                         <Box display="flex" justifyContent="flex-end" mt={4}>
                             <Button
                                 variant="contained"
@@ -686,14 +968,14 @@ export default function BookingPage() {
                                 endIcon={<ArrowForwardIcon />}
                                 onClick={() => setActiveStep(1)}
                                 sx={{
-                                    bgcolor: "#0284C7",
+                                    bgcolor: designTokens.brand.primary,
                                     px: 4,
                                     py: 1.3,
                                     borderRadius: "12px",
                                     fontWeight: 800,
                                     fontSize: "0.95rem",
-                                    boxShadow: "0 6px 16px rgba(2, 132, 199, 0.25)",
-                                    "&:hover": { bgcolor: "#0369A1" }
+                                    boxShadow: "0 6px 16px rgba(15, 118, 110, 0.25)",
+                                    "&:hover": { bgcolor: designTokens.brand.primaryHover }
                                 }}
                             >
                                 Tiếp tục: Bác Sĩ & Ngày Khám
@@ -716,7 +998,7 @@ export default function BookingPage() {
                                     Bước 2: Chọn Ngày Khám & Bác Sĩ Chuyên Khoa
                                 </Typography>
                                 <Typography variant="body2" color="#64748B">
-                                    Chuyên khoa đã chọn: <b style={{ color: "#0284C7" }}>{selectedDept?.departmentName}</b>
+                                    Chuyên khoa đã chọn: <b style={{ color: designTokens.brand.primary }}>{selectedDept?.departmentName}</b>
                                 </Typography>
                             </Box>
                         </Box>
@@ -773,11 +1055,11 @@ export default function BookingPage() {
                                                         borderRadius: "8px",
                                                         fontSize: "0.82rem",
                                                         border: "1px solid",
-                                                        borderColor: isCurrent ? "#0284C7" : "#E2E8F0",
-                                                        bgcolor: isCurrent ? "#0284C7" : "#F8FAFC",
+                                                        borderColor: isCurrent ? designTokens.brand.primary : "#E2E8F0",
+                                                        bgcolor: isCurrent ? designTokens.brand.primary : "#F8FAFC",
                                                         color: isCurrent ? "#FFFFFF" : "#334155",
                                                         "&:hover": {
-                                                            bgcolor: isCurrent ? "#0369A1" : "#E2E8F0"
+                                                            bgcolor: isCurrent ? designTokens.brand.primaryHover : "#E2E8F0"
                                                         }
                                                     }}
                                                 />
@@ -829,12 +1111,12 @@ export default function BookingPage() {
                                                     cursor: "pointer",
                                                     borderRadius: "16px",
                                                     p: 2.5,
-                                                    border: isSelected ? "2px solid #0284C7" : "1px solid rgba(15, 23, 42, 0.08)",
-                                                    bgcolor: isSelected ? "#F0F9FF" : "#FFFFFF",
-                                                    boxShadow: isSelected ? "0 10px 24px -4px rgba(2, 132, 199, 0.16)" : "0 2px 8px rgba(15, 23, 42, 0.03)",
+                                                    border: isSelected ? `2px solid ${designTokens.brand.primary}` : "1px solid rgba(15, 23, 42, 0.08)",
+                                                    bgcolor: isSelected ? designTokens.brand.primaryLight : "#FFFFFF",
+                                                    boxShadow: isSelected ? "0 10px 24px -4px rgba(15, 118, 110, 0.2)" : "0 2px 8px rgba(15, 23, 42, 0.03)",
                                                     transition: "all 0.25s ease",
                                                     "&:hover": {
-                                                        borderColor: "#0284C7",
+                                                        borderColor: designTokens.brand.primary,
                                                         transform: "translateY(-2px)"
                                                     }
                                                 }}
@@ -842,15 +1124,17 @@ export default function BookingPage() {
                                                 <Box display="flex" gap={2}>
                                                     <Box position="relative">
                                                         <Avatar
+                                                            src={sch.avatar || undefined}
                                                             sx={{
                                                                 width: 64,
                                                                 height: 64,
-                                                                bgcolor: "#0284C7",
+                                                                bgcolor: designTokens.brand.primary,
+                                                                color: "#FFFFFF",
                                                                 fontSize: "1.4rem",
                                                                 fontWeight: 900
                                                             }}
                                                         >
-                                                            {sch.doctorName ? sch.doctorName.charAt(0) : "BS"}
+                                                            {getDoctorInitials(sch.doctorName)}
                                                         </Avatar>
                                                         <Box
                                                             sx={{
@@ -875,8 +1159,8 @@ export default function BookingPage() {
                                                                 sx={{
                                                                     fontWeight: 800,
                                                                     fontSize: "0.7rem",
-                                                                    bgcolor: "#E0F2FE",
-                                                                    color: "#0369A1",
+                                                                    bgcolor: designTokens.brand.primaryLight,
+                                                                    color: designTokens.brand.primaryDark,
                                                                     borderRadius: "6px"
                                                                 }}
                                                             />
@@ -886,7 +1170,7 @@ export default function BookingPage() {
                                                                 color="#15803D"
                                                                 sx={{ fontFamily: "monospace", fontSize: "0.95rem" }}
                                                             >
-                                                                {formatCurrency(sch.consultationFee || 200000)}
+                                                                {renderFeeDisplay(sch.consultationFee)}
                                                             </Typography>
                                                         </Box>
 
@@ -898,7 +1182,7 @@ export default function BookingPage() {
                                                             Phòng: <b>{sch.roomName}</b> | Ca: <b>{sch.session === "MORNING" ? "Sáng" : sch.session === "AFTERNOON" ? "Chiều" : "Tối"}</b>
                                                         </Typography>
 
-                                                        <Typography variant="caption" color="#0284C7" fontWeight="700" display="block" mt={0.5}>
+                                                        <Typography variant="caption" color={designTokens.brand.primary} fontWeight="700" display="block" mt={0.5}>
                                                             Khung giờ có sẵn: {sch.timeSlots?.length || 0} lượt
                                                         </Typography>
                                                     </Box>
@@ -926,11 +1210,11 @@ export default function BookingPage() {
                                 endIcon={<ArrowForwardIcon />}
                                 onClick={() => setActiveStep(2)}
                                 sx={{
-                                    bgcolor: "#0284C7",
+                                    bgcolor: designTokens.brand.primary,
                                     px: 4,
                                     borderRadius: "12px",
                                     fontWeight: 800,
-                                    "&:hover": { bgcolor: "#0369A1" }
+                                    "&:hover": { bgcolor: designTokens.brand.primaryHover }
                                 }}
                             >
                                 Tiếp tục: Chọn Buổi & Khung Giờ
@@ -953,7 +1237,7 @@ export default function BookingPage() {
                                     Bước 3: Chọn Khung Giờ Khám Bệnh
                                 </Typography>
                                 <Typography variant="body2" color="#64748B">
-                                    Bác sĩ: <b style={{ color: "#0284C7" }}>{selectedDoctorSchedule?.doctorName}</b> - Phòng: <b>{selectedDoctorSchedule?.roomName}</b> ({formatDate(selectedDate)})
+                                    Bác sĩ: <b style={{ color: designTokens.brand.primary }}>{selectedDoctorSchedule?.doctorName}</b> - Phòng: <b>{selectedDoctorSchedule?.roomName}</b> ({formatDate(selectedDate)})
                                 </Typography>
                             </Box>
                         </Box>
@@ -986,7 +1270,7 @@ export default function BookingPage() {
                                             sx={{
                                                 fontWeight: activeSession === s.id ? 800 : 600,
                                                 borderRadius: "8px",
-                                                bgcolor: activeSession === s.id ? "#0284C7" : "#F1F5F9",
+                                                bgcolor: activeSession === s.id ? designTokens.brand.primary : "#F1F5F9",
                                                 color: activeSession === s.id ? "#FFFFFF" : "#334155"
                                             }}
                                         />
@@ -1028,7 +1312,7 @@ export default function BookingPage() {
                                                 <Grid item xs={6} sm={4} md={3} key={slot.timeSlotId}>
                                                     <Button
                                                         fullWidth
-                                                        disabled={isFull}
+                                                        disabled={isFull || reservingSlot}
                                                         variant={isSelected ? "contained" : "outlined"}
                                                         onClick={() => handleSelectSlot(slot)}
                                                         sx={{
@@ -1036,14 +1320,14 @@ export default function BookingPage() {
                                                             borderRadius: "12px",
                                                             flexDirection: "column",
                                                             borderWidth: 1.5,
-                                                            borderColor: isSelected ? "#0284C7" : isFull ? "#E2E8F0" : "#CBD5E1",
-                                                            bgcolor: isSelected ? "#0284C7" : isFull ? "#F8FAFC" : "#FFFFFF",
+                                                            borderColor: isSelected ? designTokens.brand.primary : isFull ? "#E2E8F0" : "#CBD5E1",
+                                                            bgcolor: isSelected ? designTokens.brand.primary : isFull ? "#F8FAFC" : "#FFFFFF",
                                                             color: isSelected ? "#FFFFFF" : isFull ? "#94A3B8" : "#0F172A",
                                                             transition: "all 0.2s ease",
                                                             "&:hover": {
                                                                 borderWidth: 1.5,
-                                                                borderColor: "#0284C7",
-                                                                bgcolor: isSelected ? "#0369A1" : "#E0F2FE"
+                                                                borderColor: isFull ? "#E2E8F0" : designTokens.brand.primary,
+                                                                bgcolor: isFull ? "#F8FAFC" : isSelected ? designTokens.brand.primaryHover : designTokens.brand.primaryLight
                                                             }
                                                         }}
                                                     >
@@ -1077,15 +1361,15 @@ export default function BookingPage() {
                             <Button
                                 variant="contained"
                                 size="large"
-                                disabled={!selectedSlot}
+                                disabled={!selectedSlot || !reservationId}
                                 endIcon={<ArrowForwardIcon />}
                                 onClick={() => setActiveStep(3)}
                                 sx={{
-                                    bgcolor: "#0284C7",
+                                    bgcolor: designTokens.brand.primary,
                                     px: 4,
                                     borderRadius: "12px",
                                     fontWeight: 800,
-                                    "&:hover": { bgcolor: "#0369A1" }
+                                    "&:hover": { bgcolor: designTokens.brand.primaryHover }
                                 }}
                             >
                                 Tiếp tục: Chọn Hồ Sơ Bệnh Nhân
@@ -1165,7 +1449,7 @@ export default function BookingPage() {
                                                 <Button
                                                     variant="contained"
                                                     onClick={() => setOpenNewProfileModal(true)}
-                                                    sx={{ bgcolor: "#0284C7", borderRadius: "10px", fontWeight: 700 }}
+                                                    sx={{ bgcolor: designTokens.brand.primary, borderRadius: "10px", fontWeight: 700, "&:hover": { bgcolor: designTokens.brand.primaryHover } }}
                                                 >
                                                     Tạo hồ sơ bệnh nhân đầu tiên
                                                 </Button>
@@ -1182,11 +1466,11 @@ export default function BookingPage() {
                                                                 sx={{
                                                                     cursor: "pointer",
                                                                     borderRadius: "14px",
-                                                                    border: isSelected ? "2px solid #0284C7" : "1px solid rgba(15, 23, 42, 0.08)",
-                                                                    bgcolor: isSelected ? "#F0F9FF" : "#FFFFFF",
+                                                                    border: isSelected ? `2px solid ${designTokens.brand.primary}` : "1px solid rgba(15, 23, 42, 0.08)",
+                                                                    bgcolor: isSelected ? designTokens.brand.primaryLight : "#FFFFFF",
                                                                     p: 2,
                                                                     transition: "0.2s",
-                                                                    "&:hover": { borderColor: "#0284C7" }
+                                                                    "&:hover": { borderColor: designTokens.brand.primary }
                                                                 }}
                                                             >
                                                                 <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
@@ -1200,7 +1484,7 @@ export default function BookingPage() {
                                                                         }
                                                                         size="small"
                                                                         sx={{
-                                                                            bgcolor: isSelected ? "#0284C7" : "#E2E8F0",
+                                                                            bgcolor: isSelected ? designTokens.brand.primary : "#E2E8F0",
                                                                             color: isSelected ? "#FFFFFF" : "#334155",
                                                                             fontWeight: 800,
                                                                             borderRadius: "6px",
@@ -1303,7 +1587,7 @@ export default function BookingPage() {
                                             </Box>
                                             <Box display="flex" justifyContent="space-between">
                                                 <Typography color="#64748B" variant="body2">Thời gian:</Typography>
-                                                <Typography fontWeight="800" color="#0284C7" variant="body2">
+                                                <Typography fontWeight="800" color={designTokens.brand.primary} variant="body2">
                                                     {selectedSlot?.startTime} - {selectedSlot?.endTime} ({formatDate(selectedDate)})
                                                 </Typography>
                                             </Box>
@@ -1325,7 +1609,7 @@ export default function BookingPage() {
                                                 color="#15803D"
                                                 sx={{ fontFamily: "monospace", fontSize: "1.15rem" }}
                                             >
-                                                {formatCurrency(selectedDoctorSchedule?.consultationFee || 200000)}
+                                                {renderFeeDisplay(selectedDoctorSchedule?.consultationFee)}
                                             </Typography>
                                         </Box>
 
@@ -1342,8 +1626,8 @@ export default function BookingPage() {
                                                         mb: 1,
                                                         borderRadius: "10px",
                                                         border: "1px solid",
-                                                        borderColor: paymentMethod === "VIETQR" ? "#0284C7" : "#E2E8F0",
-                                                        bgcolor: paymentMethod === "VIETQR" ? "#F0F9FF" : "#FFFFFF"
+                                                        borderColor: paymentMethod === "VIETQR" ? designTokens.brand.primary : "#E2E8F0",
+                                                        bgcolor: paymentMethod === "VIETQR" ? designTokens.brand.primaryLight : "#FFFFFF"
                                                     }}
                                                 >
                                                     <FormControlLabel
@@ -1351,7 +1635,7 @@ export default function BookingPage() {
                                                         control={<Radio size="small" />}
                                                         label={
                                                             <Box display="flex" alignItems="center" gap={1}>
-                                                                <AccountBalanceIcon sx={{ color: "#0284C7", fontSize: 20 }} />
+                                                                <AccountBalanceIcon sx={{ color: designTokens.brand.primary, fontSize: 20 }} />
                                                                 <Box>
                                                                     <Typography variant="body2" fontWeight="800" color="#0F172A">
                                                                         PayOS VietQR (Napas 24/7)
@@ -1436,11 +1720,11 @@ export default function BookingPage() {
                                                 mt: 2.5,
                                                 py: 1.4,
                                                 borderRadius: "12px",
-                                                bgcolor: "#0284C7",
+                                                bgcolor: designTokens.brand.primary,
                                                 fontWeight: 800,
                                                 fontSize: "0.98rem",
-                                                boxShadow: "0 6px 16px rgba(2, 132, 199, 0.25)",
-                                                "&:hover": { bgcolor: "#0369A1" }
+                                                boxShadow: "0 6px 16px rgba(15, 118, 110, 0.25)",
+                                                "&:hover": { bgcolor: designTokens.brand.primaryHover }
                                             }}
                                         >
                                             {loadingBooking ? <CircularProgress size={24} color="inherit" /> : "🎉 Hoàn Tất & Nhận STT Khám"}
@@ -1492,27 +1776,27 @@ export default function BookingPage() {
                             {/* Queue Code Highlight Box */}
                             <Box
                                 sx={{
-                                    bgcolor: "#F0FDF4",
-                                    border: "2px dashed #10B981",
+                                    bgcolor: designTokens.status.success.bg,
+                                    border: `2px dashed ${designTokens.status.success.main}`,
                                     p: 3,
                                     borderRadius: "16px",
                                     mb: 3.5
                                 }}
                             >
-                                <Typography variant="caption" color="#15803D" fontWeight="800" sx={{ letterSpacing: "0.06em" }}>
+                                <Typography variant="caption" color={designTokens.status.success.main} fontWeight="800" sx={{ letterSpacing: "0.06em" }}>
                                     SỐ THỨ TỰ KHÁM CỦA BẠN HÔM NAY:
                                 </Typography>
                                 <Typography
                                     variant="h1"
                                     fontWeight="900"
-                                    color="#10B981"
+                                    color={designTokens.status.success.main}
                                     my={0.5}
-                                    sx={{ fontFamily: "monospace", fontSize: { xs: "3.2rem", md: "4.2rem" } }}
+                                    sx={{ fontFamily: "monospace", fontSize: { xs: "2.8rem", md: "3.8rem" } }}
                                 >
-                                    #{bookingResult.queueNumber}
+                                    {getQueueNumberDisplay(bookingResult.queueNumber, bookingResult.queueCode)}
                                 </Typography>
                                 <Typography variant="body2" fontWeight="700" color="#0F172A">
-                                    Mã phiếu khám: <b style={{ color: "#0284C7" }}>{bookingResult.bookingCode}</b>
+                                    Mã phiếu khám: <b style={{ color: designTokens.brand.primary }}>{getBookingCodeDisplay(bookingResult.bookingCode)}</b>
                                 </Typography>
                             </Box>
 
@@ -1536,14 +1820,14 @@ export default function BookingPage() {
                                 </Grid>
                                 <Grid item xs={12} sm={6}>
                                     <Typography variant="caption" color="#64748B">Khung giờ hẹn khám:</Typography>
-                                    <Typography variant="subtitle2" fontWeight="800" color="#0284C7">
+                                    <Typography variant="subtitle2" fontWeight="800" color={designTokens.brand.primary}>
                                         {bookingResult.startTime} - {bookingResult.endTime} ({formatDate(bookingResult.bookingDate)})
                                     </Typography>
                                 </Grid>
                                 <Grid item xs={12} sm={6}>
                                     <Typography variant="caption" color="#64748B">Phí khám:</Typography>
                                     <Typography variant="subtitle2" fontWeight="900" color="#15803D" sx={{ fontFamily: "monospace" }}>
-                                        {formatCurrency(bookingResult.price || 200000)}
+                                        {renderFeeDisplay(bookingResult.price != null ? bookingResult.price : selectedDoctorSchedule?.consultationFee)}
                                     </Typography>
                                 </Grid>
                                 <Grid item xs={12} sm={6}>
@@ -1574,8 +1858,8 @@ export default function BookingPage() {
                                             px: 3,
                                             borderRadius: "12px",
                                             fontWeight: 800,
-                                            bgcolor: "#0284C7",
-                                            "&:hover": { bgcolor: "#0369A1" }
+                                            bgcolor: designTokens.brand.primary,
+                                            "&:hover": { bgcolor: designTokens.brand.primaryHover }
                                         }}
                                     >
                                         Mở Cổng Thanh Toán PayOS
@@ -1592,21 +1876,22 @@ export default function BookingPage() {
                                 </Button>
                                 <Button
                                     variant="contained"
-                                    color="secondary"
                                     size="large"
                                     onClick={() => printAppointmentTicket({
                                         bookingCode: bookingResult.bookingCode,
-                                        patientName: bookingResult.patientName || selectedProfile?.fullName || "Bệnh nhân YouMed TNT",
-                                        phoneNumber: selectedProfile?.phoneNumber || "---",
-                                        departmentName: bookingResult.departmentName || selectedDept?.departmentName || "Khoa Khám Bệnh",
-                                        doctorName: bookingResult.doctorName || selectedDoctorSchedule?.doctorName || "Bác sĩ chuyên khoa",
+                                        patientName: bookingResult.patientName || selectedProfile?.fullName,
+                                        phoneNumber: selectedProfile?.phoneNumber,
+                                        departmentName: bookingResult.departmentName || selectedDept?.departmentName,
+                                        roomName: bookingResult.roomName || selectedDoctorSchedule?.roomName,
+                                        doctorName: bookingResult.doctorName || selectedDoctorSchedule?.doctorName,
                                         bookingDate: formatDate(bookingResult.bookingDate || selectedDate),
-                                        timeSlot: selectedSlot?.timeSlot || (bookingResult.startTime && bookingResult.endTime ? `${bookingResult.startTime} - ${bookingResult.endTime}` : "Trong giờ hành chính"),
+                                        timeSlot: selectedSlot?.timeSlot || (bookingResult.startTime && bookingResult.endTime ? `${bookingResult.startTime} - ${bookingResult.endTime}` : null),
                                         queueNumber: bookingResult.queueNumber,
-                                        price: bookingResult.price || 200000
+                                        queueCode: bookingResult.queueCode,
+                                        price: bookingResult.price != null ? bookingResult.price : (selectedDoctorSchedule?.consultationFee != null ? selectedDoctorSchedule.consultationFee : undefined)
                                     })}
                                     startIcon={<PrintIcon />}
-                                    sx={{ py: 1.3, px: 3, borderRadius: "12px", fontWeight: 800 }}
+                                    sx={{ py: 1.3, px: 3, borderRadius: "12px", fontWeight: 800, bgcolor: designTokens.secondary.main, "&:hover": { bgcolor: designTokens.secondary.hover } }}
                                 >
                                     In Phiếu Khám
                                 </Button>

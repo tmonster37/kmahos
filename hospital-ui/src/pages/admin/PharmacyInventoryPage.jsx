@@ -70,6 +70,55 @@ const TRANSFER_STATUS_MAP = {
     CANCELLED: { label: "Đã hủy", color: "error" }
 };
 
+export function evaluateStockStatus(stock) {
+    const hasAvailable = stock?.availableQuantity != null && !isNaN(Number(stock?.availableQuantity));
+    const hasThreshold = stock?.minimumThreshold != null && !isNaN(Number(stock?.minimumThreshold));
+    const isStockKnown = hasAvailable && hasThreshold;
+    const isLowStock = isStockKnown && Number(stock.availableQuantity) <= Number(stock.minimumThreshold);
+
+    const daysLeft = stock?.daysUntilExpiry != null && !isNaN(Number(stock?.daysUntilExpiry)) ? Number(stock.daysUntilExpiry) : null;
+    const isExpired = daysLeft != null && daysLeft <= 0;
+    const isExpiringSoon = daysLeft != null && daysLeft > 0 && daysLeft <= 90;
+
+    let status = "AN TOÀN";
+    if (isExpired) status = "HẾT HẠN - TIÊU HỦY";
+    else if (isExpiringSoon) status = "CẬN HẠN DÙNG";
+    else if (!isStockKnown) status = "CHƯA XÁC ĐỊNH TỒN KHO";
+    else if (isLowStock) status = "SẮP HẾT HÀNG";
+
+    return {
+        hasAvailable,
+        hasThreshold,
+        isStockKnown,
+        isLowStock,
+        isExpired,
+        isExpiringSoon,
+        statusLabel: status
+    };
+}
+
+export async function executeDispenseFefoPure({
+    isDispensingRef,
+    dispensing,
+    dispenseResult,
+    dispenseData,
+    apiClient = pharmacyApi
+}) {
+    if (!dispenseData?.warehouseId || !dispenseData?.prescriptionId) {
+        throw new Error("Vui lòng chọn Kho cấp phát và kiểm tra mã đơn thuốc.");
+    }
+    if (isDispensingRef?.current || dispensing || Boolean(dispenseResult)) {
+        return { locked: true };
+    }
+    if (isDispensingRef) isDispensingRef.current = true;
+    try {
+        const res = await apiClient.dispensePrescription(dispenseData);
+        return { success: true, data: res?.data?.data || res?.data || res };
+    } finally {
+        if (isDispensingRef) isDispensingRef.current = false;
+    }
+}
+
 export default function PharmacyInventoryPage() {
     const [currentTab, setCurrentTab] = useState(0);
     const [loading, setLoading] = useState(false);
@@ -106,14 +155,14 @@ export default function PharmacyInventoryPage() {
     const [openReceiveBatch, setOpenReceiveBatch] = useState(false);
     const [receiveData, setReceiveData] = useState({
         warehouseId: "",
-        medicineId: 1,
+        medicineId: "",
         batchNumber: "",
         expiryDate: "",
         manufactureDate: "",
-        quantityReceived: 500,
-        unitImportPrice: 2000,
-        unitSellingPrice: 3000,
-        manufacturer: "Dược Hậu Giang (DHG Pharma)"
+        quantityReceived: "",
+        unitImportPrice: "",
+        unitSellingPrice: "",
+        manufacturer: ""
     });
 
     // Dialog: Lập phiếu điều chuyển kho
@@ -135,6 +184,8 @@ export default function PharmacyInventoryPage() {
         notes: "Cấp phát thuốc cho người bệnh ngoại trú"
     });
     const [dispenseResult, setDispenseResult] = useState(null);
+    const [dispensing, setDispensing] = useState(false);
+    const isDispensingRef = React.useRef(false);
 
     // ==========================================
     // 1. TẢI DỮ LIỆU BAN ĐẦU
@@ -331,6 +382,9 @@ export default function PharmacyInventoryPage() {
             setFeedback({ type: "warning", message: "Vui lòng chọn Kho cấp phát và kiểm tra mã đơn thuốc." });
             return;
         }
+        if (isDispensingRef.current || dispensing || Boolean(dispenseResult)) return;
+        isDispensingRef.current = true;
+        setDispensing(true);
         try {
             const res = await pharmacyApi.dispensePrescription(dispenseData);
             const data = res?.data?.data || res?.data || res;
@@ -340,6 +394,9 @@ export default function PharmacyInventoryPage() {
         } catch (err) {
             const msg = err.response?.data?.message || err.message || "Không thể cấp phát đơn thuốc.";
             setFeedback({ type: "error", message: msg });
+        } finally {
+            isDispensingRef.current = false;
+            setDispensing(false);
         }
     };
 
@@ -996,8 +1053,14 @@ export default function PharmacyInventoryPage() {
                                         </TableRow>
                                     ) : (
                                         filteredStocks.map((s, idx) => {
-                                            const isExpiringSoon = s.daysUntilExpiry != null && s.daysUntilExpiry <= 90;
-                                            const isLowStock = s.availableQuantity <= s.minimumThreshold;
+                                            const hasAvailable = s.availableQuantity != null && !isNaN(Number(s.availableQuantity));
+                                            const hasThreshold = s.minimumThreshold != null && !isNaN(Number(s.minimumThreshold));
+                                            const isStockKnown = hasAvailable && hasThreshold;
+                                            const isLowStock = isStockKnown && Number(s.availableQuantity) <= Number(s.minimumThreshold);
+
+                                            const daysLeft = s.daysUntilExpiry != null && !isNaN(Number(s.daysUntilExpiry)) ? Number(s.daysUntilExpiry) : null;
+                                            const isExpired = daysLeft != null && daysLeft <= 0;
+                                            const isExpiringSoon = daysLeft != null && daysLeft > 0 && daysLeft <= 90;
 
                                             return (
                                                 <TableRow key={s.stockId || idx} hover>
@@ -1008,18 +1071,22 @@ export default function PharmacyInventoryPage() {
                                                     <TableCell>{s.activeIngredient || "-"}</TableCell>
                                                     <TableCell>{s.unit || "Viên"}</TableCell>
                                                     <TableCell>
-                                                        <Chip label={s.batchNumber} size="small" sx={{ fontWeight: 800, bgcolor: "#E2E8F0" }} />
+                                                        <Chip label={s.batchNumber || "Chưa có số lô"} size="small" sx={{ fontWeight: 800, bgcolor: "#E2E8F0" }} />
                                                     </TableCell>
                                                     <TableCell>
                                                         <Typography
                                                             variant="body2"
                                                             sx={{
-                                                                fontWeight: isExpiringSoon ? 800 : 500,
-                                                                color: isExpiringSoon ? "#E11D48" : "inherit"
+                                                                fontWeight: isExpired || isExpiringSoon ? 800 : 500,
+                                                                color: isExpired || isExpiringSoon ? "#E11D48" : "inherit"
                                                             }}
                                                         >
                                                             {formatDate(s.expiryDate)}
-                                                            {isExpiringSoon && (
+                                                            {isExpired ? (
+                                                                <Typography variant="caption" display="block" color="#DC2626" fontWeight={800}>
+                                                                    (Đã hết hạn)
+                                                                </Typography>
+                                                            ) : isExpiringSoon && (
                                                                 <Typography variant="caption" display="block" color="#E11D48">
                                                                     (Còn {s.daysUntilExpiry} ngày)
                                                                 </Typography>
@@ -1027,26 +1094,30 @@ export default function PharmacyInventoryPage() {
                                                         </Typography>
                                                     </TableCell>
                                                     <TableCell align="right" sx={{ fontWeight: 700 }}>
-                                                        {s.quantityOnHand?.toLocaleString()}
+                                                        {s.quantityOnHand != null ? s.quantityOnHand.toLocaleString() : "Chưa có dữ liệu"}
                                                     </TableCell>
                                                     <TableCell align="right" sx={{ color: "#64748B" }}>
-                                                        {s.quantityReserved?.toLocaleString() || 0}
+                                                        {s.quantityReserved != null ? s.quantityReserved.toLocaleString() : "Chưa có dữ liệu"}
                                                     </TableCell>
                                                     <TableCell
                                                         align="right"
                                                         sx={{
-                                                            fontWeight: 800,
-                                                            color: isLowStock ? "#D97706" : "#059669"
+                                                             fontWeight: 800,
+                                                             color: !isStockKnown ? "#64748B" : isLowStock ? "#D97706" : "#059669"
                                                         }}
                                                     >
-                                                        {s.availableQuantity?.toLocaleString()}
+                                                        {hasAvailable ? Number(s.availableQuantity).toLocaleString() : "Chưa có dữ liệu"}
                                                     </TableCell>
                                                     <TableCell align="right" sx={{ color: "#64748B" }}>
-                                                        {s.minimumThreshold?.toLocaleString()}
+                                                        {hasThreshold ? Number(s.minimumThreshold).toLocaleString() : "Chưa có dữ liệu"}
                                                     </TableCell>
                                                     <TableCell align="center">
-                                                        {isExpiringSoon ? (
+                                                        {isExpired ? (
+                                                            <Chip label="HẾT HẠN - TIÊU HỦY" size="small" color="error" sx={{ fontWeight: 800, bgcolor: "#FEE2E2", color: "#DC2626" }} />
+                                                        ) : isExpiringSoon ? (
                                                             <Chip label="CẬN HẠN DÙNG" size="small" color="error" sx={{ fontWeight: 800 }} />
+                                                        ) : !isStockKnown ? (
+                                                            <Chip label="CHƯA XÁC ĐỊNH TỒN KHO" size="small" sx={{ fontWeight: 700, bgcolor: "#E2E8F0", color: "#64748B" }} />
                                                         ) : isLowStock ? (
                                                             <Chip label="SẮP HẾT HÀNG" size="small" color="warning" sx={{ fontWeight: 800 }} />
                                                         ) : (
@@ -1115,17 +1186,19 @@ export default function PharmacyInventoryPage() {
                                             {b.batchNumber}
                                         </TableCell>
                                         <TableCell sx={{ fontWeight: 700 }}>{b.medicineName}</TableCell>
-                                        <TableCell>{b.manufacturer || "DHG Pharma"}</TableCell>
+                                        <TableCell>{b.manufacturer || "Chưa có dữ liệu"}</TableCell>
                                         <TableCell>{formatDate(b.manufactureDate) || "-"}</TableCell>
                                         <TableCell sx={{ fontWeight: 700, color: "#D97706" }}>
                                             {formatDate(b.expiryDate)}
                                         </TableCell>
-                                        <TableCell align="right">{formatCurrency(b.unitImportPrice)}</TableCell>
+                                        <TableCell align="right">
+                                            {b.unitImportPrice != null && !isNaN(Number(b.unitImportPrice)) ? formatCurrency(b.unitImportPrice) : "Chưa có dữ liệu"}
+                                        </TableCell>
                                         <TableCell align="right" sx={{ fontWeight: 700, color: "#059669" }}>
-                                            {formatCurrency(b.unitSellingPrice)}
+                                            {b.unitSellingPrice != null && !isNaN(Number(b.unitSellingPrice)) ? formatCurrency(b.unitSellingPrice) : "Chưa có dữ liệu"}
                                         </TableCell>
                                         <TableCell align="right" sx={{ fontWeight: 800 }}>
-                                            {b.currentQuantity?.toLocaleString()}
+                                            {b.currentQuantity != null ? b.currentQuantity.toLocaleString() : "Chưa có dữ liệu"}
                                         </TableCell>
                                         <TableCell align="center">
                                             <Chip
@@ -1450,10 +1523,10 @@ export default function PharmacyInventoryPage() {
                                                     <TableCell sx={{ fontWeight: 700 }}>{l.medicineName}</TableCell>
                                                     <TableCell>{l.warehouseName}</TableCell>
                                                     <TableCell align="right" sx={{ fontWeight: 800, color: "#DC2626" }}>
-                                                        {l.availableQuantity?.toLocaleString()}
+                                                        {l.availableQuantity != null ? l.availableQuantity.toLocaleString() : "Chưa có dữ liệu"}
                                                     </TableCell>
                                                     <TableCell align="right" sx={{ color: "#64748B" }}>
-                                                        {l.minimumThreshold?.toLocaleString()}
+                                                        {l.minimumThreshold != null ? l.minimumThreshold.toLocaleString() : "Chưa có dữ liệu"}
                                                     </TableCell>
                                                     <TableCell align="center">
                                                         <Button
@@ -1484,7 +1557,7 @@ export default function PharmacyInventoryPage() {
             {/* ============================================================== */}
             {/* MODAL 1: THÊM KHO MỚI                                          */}
             {/* ============================================================== */}
-            <Dialog open={openAddWarehouse} onClose={() => setOpenAddWarehouse(false)} maxWidth="sm" fullWidth>
+            <Dialog disablePortal open={openAddWarehouse} onClose={() => setOpenAddWarehouse(false)} maxWidth="sm" fullWidth>
                 <DialogTitle sx={{ fontWeight: 800 }}>Thêm Kho Dược Mới Vào Hệ Thống</DialogTitle>
                 <DialogContent dividers>
                     <Grid container spacing={2} sx={{ pt: 1 }}>
@@ -1539,7 +1612,7 @@ export default function PharmacyInventoryPage() {
             {/* ============================================================== */}
             {/* MODAL 2: NHẬP LÔ THUỐC MỚI                                     */}
             {/* ============================================================== */}
-            <Dialog open={openReceiveBatch} onClose={() => setOpenReceiveBatch(false)} maxWidth="md" fullWidth>
+            <Dialog disablePortal open={openReceiveBatch} onClose={() => setOpenReceiveBatch(false)} maxWidth="md" fullWidth>
                 <DialogTitle sx={{ fontWeight: 800 }}>Nhập Lô Thuốc Mới Vào Kho (Goods Receipt)</DialogTitle>
                 <DialogContent dividers>
                     <Grid container spacing={2} sx={{ pt: 1 }}>
@@ -1767,7 +1840,7 @@ export default function PharmacyInventoryPage() {
             {/* ============================================================== */}
             {/* MODAL 4: CẤP PHÁT THUỐC FEFO TỰ ĐỘNG                           */}
             {/* ============================================================== */}
-            <Dialog open={openDispenseDialog} onClose={() => setOpenDispenseDialog(false)} maxWidth="md" fullWidth>
+            <Dialog disablePortal open={openDispenseDialog} onClose={() => setOpenDispenseDialog(false)} maxWidth="md" fullWidth>
                 <DialogTitle sx={{ fontWeight: 800 }}>
                     Cấp Phát Đơn Thuốc Tự Động Theo Thuật Toán FEFO
                 </DialogTitle>
@@ -1950,8 +2023,15 @@ export default function PharmacyInventoryPage() {
                 </DialogContent>
                 <DialogActions sx={{ p: 2 }}>
                     <Button onClick={() => setOpenDispenseDialog(false)} sx={{ fontWeight: 700 }}>Đóng</Button>
-                    <Button variant="contained" color="success" onClick={handleDispenseFefo} sx={{ fontWeight: 700 }}>
-                        Thực Hiện Xuất Thuốc (FEFO)
+                    <Button
+                        variant="contained"
+                        color="success"
+                        onClick={handleDispenseFefo}
+                        disabled={dispensing || Boolean(dispenseResult)}
+                        startIcon={dispensing ? <CircularProgress size={16} color="inherit" /> : null}
+                        sx={{ fontWeight: 700 }}
+                    >
+                        {dispensing ? "Đang xuất kho FEFO..." : "Thực Hiện Xuất Thuốc (FEFO)"}
                     </Button>
                 </DialogActions>
             </Dialog>

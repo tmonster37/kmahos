@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
     Container,
     Paper,
@@ -41,14 +42,135 @@ import WbTwilightOutlinedIcon from "@mui/icons-material/WbTwilightOutlined";
 import BedtimeOutlinedIcon from "@mui/icons-material/BedtimeOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import axiosInstance from "../../services/AxiosInstance";
+import { bookingApi } from "../../services/bookingApi";
+import { clinicalApi } from "../../services/clinicalApi";
 import { formatDate } from "../../utils/formatters";
+import { getUpcomingFollowUps, formatFollowUpDate, getLocalTodayIso } from "../../utils/followUpSchedule";
 
-export default function MedicineReminderPage() {
-    const [activeTab, setActiveTab] = useState(0);
+/**
+ * Loads owned profiles and their clinical records, normalizes doctor follow-ups,
+ * and separates confirmed bookings from clinical recommendations.
+ * Preserves whichever source succeeds if one source errors.
+ */
+export async function loadFollowUpSchedule({
+    bookingApiClient = bookingApi,
+    clinicalApiClient = clinicalApi,
+    todayIso = getLocalTodayIso()
+} = {}) {
+    let profiles = [];
+    let bookings = [];
+    let followUpError = null;
+    let bookingError = null;
+    const partialErrors = [];
+
+    // Fetch profiles and bookings concurrently
+    const [profilesRes, bookingsRes] = await Promise.allSettled([
+        bookingApiClient.getMyProfiles(),
+        bookingApiClient.getMyBookings()
+    ]);
+
+    if (profilesRes.status === "fulfilled") {
+        const pData = profilesRes.value?.data?.data || profilesRes.value?.data || profilesRes.value;
+        profiles = Array.isArray(pData) ? pData : [];
+    } else {
+        followUpError = "Không thể tải danh sách hồ sơ bệnh nhân để kiểm tra lịch tái khám.";
+    }
+
+    if (bookingsRes.status === "fulfilled") {
+        const bData = bookingsRes.value?.data?.data || bookingsRes.value?.data || bookingsRes.value;
+        bookings = Array.isArray(bData) ? bData : [];
+    } else {
+        bookingError = "Không thể kết nối đến máy chủ để tải danh sách lịch khám đã xác nhận.";
+    }
+
+    // Process profiles for doctor follow-ups if profile fetch succeeded
+    let doctorFollowUps = [];
+    if (!followUpError && profiles.length > 0) {
+        const recordsByProfile = [];
+        await Promise.allSettled(
+            profiles.map(async (prof) => {
+                const profileId = prof.patientProfileId || prof.id;
+                const fullName = prof.fullName || "";
+                try {
+                    const recRes = await clinicalApiClient.getRecordsByPatient(profileId);
+                    const recData = recRes?.data?.data || recRes?.data || recRes;
+                    recordsByProfile.push({
+                        patientProfileId: profileId,
+                        fullName,
+                        records: Array.isArray(recData) ? recData : []
+                    });
+                } catch (err) {
+                    partialErrors.push(`Không thể tải bệnh án của hồ sơ "${fullName || profileId}"`);
+                }
+            })
+        );
+
+        if (profiles.length > 0 && recordsByProfile.length === 0) {
+            followUpError = "Không thể kết nối đến máy chủ để tải lịch tái khám từ bệnh án.";
+        } else {
+            doctorFollowUps = getUpcomingFollowUps(recordsByProfile, todayIso);
+        }
+    }
+
+    // Filter confirmed upcoming bookings: status === "CONFIRMED" && (bookingDate || appointmentDate) >= todayIso
+    const confirmedBookings = (bookings || []).filter(b => {
+        if (!b || b.status !== "CONFIRMED") return false;
+        const bDate = b.bookingDate || b.appointmentDate;
+        return bDate && bDate >= todayIso;
+    });
+
+    return {
+        doctorFollowUps,
+        confirmedBookings,
+        partialErrors,
+        followUpError,
+        bookingError,
+        error: followUpError || bookingError || null
+    };
+}
+
+export default function MedicineReminderPage({
+    initialTab,
+    initialDoctorFollowUps,
+    initialConfirmedBookings,
+    initialLoading,
+    initialFollowUpLoading,
+    initialBookingLoading,
+    initialFollowUpError,
+    initialBookingError,
+    initialPartialErrors
+} = {}) {
+    let navigate;
+    try {
+        navigate = useNavigate();
+    } catch {
+        navigate = () => {};
+    }
+
+    const [activeTab, setActiveTab] = useState(initialTab !== undefined ? initialTab : 0);
     const [reminders, setReminders] = useState([]);
-    const [loading, setLoading] = useState(true);
+
+    // Độc lập trạng thái tải của nhắc thuốc và lịch tái khám
+    const [loading, setLoading] = useState(initialLoading !== undefined ? initialLoading : true);
+    const [followUpLoading, setFollowUpLoading] = useState(
+        initialFollowUpLoading !== undefined
+            ? initialFollowUpLoading
+            : (initialDoctorFollowUps !== undefined ? false : true)
+    );
+    const [bookingLoading, setBookingLoading] = useState(
+        initialBookingLoading !== undefined
+            ? initialBookingLoading
+            : (initialConfirmedBookings !== undefined ? false : true)
+    );
+
     const [actionLoading, setActionLoading] = useState(false);
-    const [followUps, setFollowUps] = useState([]);
+
+    // Follow-up state
+    const [doctorFollowUps, setDoctorFollowUps] = useState(initialDoctorFollowUps || []);
+    const [confirmedBookings, setConfirmedBookings] = useState(initialConfirmedBookings || []);
+    const [followUpError, setFollowUpError] = useState(initialFollowUpError || "");
+    const [bookingError, setBookingError] = useState(initialBookingError || "");
+    const [partialErrors, setPartialErrors] = useState(initialPartialErrors || []);
 
     // Modal Create Reminder
     const [openAddModal, setOpenAddModal] = useState(false);
@@ -70,8 +192,32 @@ export default function MedicineReminderPage() {
     const [fetchError, setFetchError] = useState("");
 
     useEffect(() => {
-        loadData();
+        if (initialDoctorFollowUps === undefined && initialConfirmedBookings === undefined) {
+            loadData();
+        } else {
+            setLoading(false);
+        }
     }, []);
+
+    const loadFollowUpData = async () => {
+        setFollowUpLoading(true);
+        setBookingLoading(true);
+        setFollowUpError("");
+        setBookingError("");
+        try {
+            const scheduleResult = await loadFollowUpSchedule();
+            setDoctorFollowUps(scheduleResult.doctorFollowUps);
+            setConfirmedBookings(scheduleResult.confirmedBookings);
+            setFollowUpError(scheduleResult.followUpError || "");
+            setBookingError(scheduleResult.bookingError || "");
+            setPartialErrors(scheduleResult.partialErrors || []);
+        } catch (err) {
+            setFollowUpError("Không thể kết nối đến máy chủ để tải lịch tái khám.");
+        } finally {
+            setFollowUpLoading(false);
+            setBookingLoading(false);
+        }
+    };
 
     const loadData = async () => {
         setLoading(true);
@@ -93,17 +239,15 @@ export default function MedicineReminderPage() {
             } else {
                 setReminders([]);
             }
-
-            const bookRes = await axiosInstance.get("/api/bookings/my-history").catch(() => ({ data: [] }));
-            const bookList = (bookRes && Array.isArray(bookRes.data)) ? bookRes.data : [];
-            const upcoming = bookList.filter(b => b.status === "CONFIRMED");
-            setFollowUps(upcoming);
         } catch (err) {
-            console.error("Lỗi tải dữ liệu:", err);
+            console.error("Lỗi tải dữ liệu nhắc thuốc:", err);
             setFetchError(err.message || "Không thể kết nối đến máy chủ để tải lịch nhắc thuốc.");
         } finally {
             setLoading(false);
         }
+
+        // Tải lịch tái khám độc lập với lịch nhắc thuốc
+        await loadFollowUpData();
     };
 
     const handleToggleTake = async (id) => {
@@ -189,7 +333,7 @@ export default function MedicineReminderPage() {
 
     return (
         <Container maxWidth="md" sx={{ py: 3 }}>
-            {/* Header Banner - Apple HIG + Linear Elevated Header */}
+            {/* Header Banner */}
             <Paper
                 elevation={0}
                 sx={{
@@ -321,7 +465,7 @@ export default function MedicineReminderPage() {
                 />
             </Paper>
 
-            {/* Tabs */}
+            {/* Tabs: The tab count represents upcoming/today doctor recommendations, not bookings */}
             <Tabs
                 value={activeTab}
                 onChange={(e, val) => setActiveTab(val)}
@@ -330,10 +474,10 @@ export default function MedicineReminderPage() {
                 sx={{ mb: 2.5, borderBottom: 1, borderColor: "divider", minHeight: 40 }}
             >
                 <Tab icon={<LocalPharmacyIcon fontSize="small" />} iconPosition="start" label="Lịch Uống Thuốc" sx={{ fontWeight: "600", textTransform: "none", py: 1 }} />
-                <Tab icon={<EventRepeatIcon fontSize="small" />} iconPosition="start" label={`Lịch Tái Khám (${followUps.length})`} sx={{ fontWeight: "600", textTransform: "none", py: 1 }} />
+                <Tab icon={<EventRepeatIcon fontSize="small" />} iconPosition="start" label={`Lịch Tái Khám (${doctorFollowUps.length})`} sx={{ fontWeight: "600", textTransform: "none", py: 1 }} />
             </Tabs>
 
-            {/* Alert lỗi nếu có */}
+            {/* Alert lỗi nhắc thuốc nếu có */}
             {fetchError && (
                 <Alert 
                     severity="error" 
@@ -430,51 +574,214 @@ export default function MedicineReminderPage() {
 
             {/* TAB 1: LỊCH HẸN TÁI KHÁM */}
             {activeTab === 1 && (
-                <Box display="flex" flexDirection="column" gap={1.5}>
-                    {followUps.length === 0 ? (
-                        <Alert severity="info" sx={{ borderRadius: 2 }}>
-                            Hiện tại bạn không có lịch hẹn tái khám nào.
+                <Box display="flex" flexDirection="column" gap={2}>
+                    {/* Cảnh báo nếu một số hồ sơ tải không thành công */}
+                    {partialErrors.length > 0 && (
+                        <Alert severity="warning" sx={{ borderRadius: 2 }}>
+                            Một số hồ sơ không thể tải được lịch tái khám: {partialErrors.join("; ")}
                         </Alert>
-                    ) : (
-                        followUps.map((item, idx) => (
-                            <Card key={idx} elevation={0} sx={{ p: 2.5, borderRadius: 2.5, border: "1px solid #bae6fd", bgcolor: "#f0f9ff" }}>
-                                <Box display="flex" justifyContent="space-between" alignItems="center" mb={1.5}>
-                                    <Box>
-                                        <Typography variant="subtitle1" fontWeight="bold" color="#0369a1">
-                                            Lịch Hẹn Tái Khám
-                                        </Typography>
-                                        <Typography variant="caption" color="text.secondary">
-                                            Mã phiếu: <b>{item.bookingCode}</b>
-                                        </Typography>
-                                    </Box>
-                                    <Chip label="Sắp diễn ra" color="primary" size="small" sx={{ fontWeight: "600" }} />
-                                </Box>
-
-                                <Grid container spacing={1.5}>
-                                    <Grid item xs={12} sm={6}>
-                                        <Typography variant="caption" color="text.secondary">Thời gian khám:</Typography>
-                                        <Typography variant="body2" fontWeight="bold" color="#0f172a">
-                                            {formatDate(item.bookingDate)} ({item.timeSlot || item.startTime || "08:00"})
-                                        </Typography>
-                                    </Grid>
-                                    <Grid item xs={12} sm={6}>
-                                        <Typography variant="caption" color="text.secondary">Bác sĩ phụ trách:</Typography>
-                                        <Typography variant="body2" fontWeight="bold" color="#0f172a">
-                                            BS. {item.doctorName || "Chuyên khoa"}
-                                        </Typography>
-                                    </Grid>
-                                    <Grid item xs={12} sm={6}>
-                                        <Typography variant="caption" color="text.secondary">Chuyên khoa & Phòng:</Typography>
-                                        <Typography variant="body2">{item.departmentName} - {item.roomName || "Phòng khám"}</Typography>
-                                    </Grid>
-                                    <Grid item xs={12} sm={6}>
-                                        <Typography variant="caption" color="text.secondary">Nội dung tái khám:</Typography>
-                                        <Typography variant="body2" color="text.secondary">{item.reason || item.symptoms || "Kiểm tra định kỳ"}</Typography>
-                                    </Grid>
-                                </Grid>
-                            </Card>
-                        ))
                     )}
+
+                    {/* MỤC 1: CHỈ ĐỊNH TÁI KHÁM CỦA BÁC SĨ (KHÁM NGOẠI TRÚ) */}
+                    <Box>
+                        <Box display="flex" justifyContent="space-between" alignItems="center" mb={1} flexWrap="wrap" gap={1}>
+                            <Box>
+                                <Typography variant="subtitle1" fontWeight="800" color="#0F172A">
+                                    Chỉ Định Tái Khám Của Bác Sĩ
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                    Các ngày hẹn tái khám được ghi nhận trực tiếp từ bệnh án ngoại trú đã hoàn tất của bác sĩ.
+                                </Typography>
+                            </Box>
+                            <Chip
+                                label={`${doctorFollowUps.length} chỉ định`}
+                                size="small"
+                                color={doctorFollowUps.length > 0 ? "primary" : "default"}
+                                sx={{ fontWeight: 700 }}
+                            />
+                        </Box>
+
+                        {/* Xử lý 4 trạng thái: Loading, Error, Empty, Populated - KHÔNG hiện Empty state khi đang tải hoặc lỗi */}
+                        {followUpLoading ? (
+                            <Paper elevation={0} sx={{ p: 3, textAlign: "center", bgcolor: "#F8FAFC", border: "1px dashed #CBD5E1", borderRadius: 2.5 }}>
+                                <CircularProgress size={28} sx={{ color: "#0284C7", mb: 1 }} />
+                                <Typography variant="body2" color="text.secondary">
+                                    Đang tải danh sách chỉ định tái khám từ bệnh án...
+                                </Typography>
+                            </Paper>
+                        ) : followUpError ? (
+                            <Alert
+                                severity="error"
+                                sx={{ borderRadius: 2 }}
+                                action={
+                                    <Button color="inherit" size="small" onClick={loadFollowUpData}>
+                                        Thử lại
+                                    </Button>
+                                }
+                            >
+                                {followUpError}
+                            </Alert>
+                        ) : doctorFollowUps.length === 0 ? (
+                            <Alert severity="info" sx={{ borderRadius: 2 }}>
+                                Hiện tại bạn không có lịch hẹn tái khám nào theo chỉ định của bác sĩ.
+                            </Alert>
+                        ) : (
+                            <Stack spacing={1.5}>
+                                {doctorFollowUps.map((item) => (
+                                    <Card
+                                        key={item.recordId}
+                                        elevation={0}
+                                        sx={{
+                                            p: 2.5,
+                                            borderRadius: 2.5,
+                                            border: "1px solid #BAE6FD",
+                                            bgcolor: "#F0F9FF"
+                                        }}
+                                    >
+                                        <Box display="flex" justifyContent="space-between" alignItems="flex-start" flexWrap="wrap" gap={1.5} mb={1.5}>
+                                            <Box>
+                                                <Typography variant="caption" color="#0284C7" fontWeight="700" textTransform="uppercase">
+                                                    Ngày tái khám được khuyến nghị
+                                                </Typography>
+                                                <Typography variant="h6" fontWeight="800" color="#0369A1">
+                                                    📅 {formatFollowUpDate(item.reExaminationDate)}
+                                                </Typography>
+                                            </Box>
+                                            <Button
+                                                variant="outlined"
+                                                size="small"
+                                                onClick={() => navigate("/booking")}
+                                                sx={{
+                                                    borderRadius: 2,
+                                                    textTransform: "none",
+                                                    fontWeight: 700,
+                                                    color: "#0284C7",
+                                                    borderColor: "#BAE6FD",
+                                                    "&:hover": { borderColor: "#0284C7", bgcolor: "#E0F2FE" }
+                                                }}
+                                            >
+                                                Đặt lịch khám &rarr;
+                                            </Button>
+                                        </Box>
+
+                                        <Grid container spacing={1.5}>
+                                            <Grid item xs={12} sm={6}>
+                                                <Typography variant="caption" color="text.secondary">Bệnh nhân:</Typography>
+                                                <Typography variant="body2" fontWeight="700" color="#0F172A">
+                                                    👤 {item.patientName || "Bệnh nhân"}
+                                                </Typography>
+                                            </Grid>
+                                            <Grid item xs={12} sm={6}>
+                                                <Typography variant="caption" color="text.secondary">Bác sĩ phụ trách:</Typography>
+                                                <Typography variant="body2" fontWeight="700" color="#0F172A">
+                                                    👨‍⚕️ {item.doctorName ? `BS. ${item.doctorName.replace(/^BS\.?\s*/i, "")}` : "Bác sĩ phụ trách"}
+                                                </Typography>
+                                            </Grid>
+                                            {item.treatmentPlan && (
+                                                <Grid item xs={12}>
+                                                    <Typography variant="caption" color="text.secondary">Kế hoạch điều trị & Dặn dò:</Typography>
+                                                    <Typography variant="body2" color="#334155" sx={{ bgcolor: "#FFFFFF", p: 1, borderRadius: 1.5, border: "1px solid #E2E8F0", mt: 0.5 }}>
+                                                        {item.treatmentPlan}
+                                                    </Typography>
+                                                </Grid>
+                                            )}
+                                        </Grid>
+                                    </Card>
+                                ))}
+                            </Stack>
+                        )}
+                    </Box>
+
+                    <Divider sx={{ my: 1 }} />
+
+                    {/* MỤC 2: LỊCH KHÁM ĐÃ XÁC NHẬN */}
+                    <Box>
+                        <Box display="flex" justifyContent="space-between" alignItems="center" mb={1} flexWrap="wrap" gap={1}>
+                            <Box>
+                                <Typography variant="subtitle1" fontWeight="800" color="#0F172A">
+                                    Lịch khám đã xác nhận
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                    Các cuộc hẹn đã được xếp lịch hoặc thanh toán thành công trong hệ thống.
+                                </Typography>
+                            </Box>
+                            <Chip
+                                label={`${confirmedBookings.length} lịch khám`}
+                                size="small"
+                                color={confirmedBookings.length > 0 ? "success" : "default"}
+                                sx={{ fontWeight: 700 }}
+                            />
+                        </Box>
+
+                        {/* Xử lý 4 trạng thái cho Booking: Loading, Error, Empty, Populated - KHÔNG hiện Empty state khi đang tải hoặc lỗi */}
+                        {bookingLoading ? (
+                            <Paper elevation={0} sx={{ p: 3, textAlign: "center", bgcolor: "#F8FAFC", border: "1px dashed #CBD5E1", borderRadius: 2.5 }}>
+                                <CircularProgress size={28} sx={{ color: "#16A34A", mb: 1 }} />
+                                <Typography variant="body2" color="text.secondary">
+                                    Đang tải danh sách lịch khám đã xác nhận...
+                                </Typography>
+                            </Paper>
+                        ) : bookingError ? (
+                            <Alert
+                                severity="error"
+                                sx={{ borderRadius: 2 }}
+                                action={
+                                    <Button color="inherit" size="small" onClick={loadFollowUpData}>
+                                        Thử lại
+                                    </Button>
+                                }
+                            >
+                                {bookingError}
+                            </Alert>
+                        ) : confirmedBookings.length === 0 ? (
+                            <Alert severity="info" sx={{ borderRadius: 2 }}>
+                                Không có lịch khám đã xác nhận nào sắp tới.
+                            </Alert>
+                        ) : (
+                            <Stack spacing={1.5}>
+                                {confirmedBookings.map((item, idx) => (
+                                    <Card key={item.bookingId || idx} elevation={0} sx={{ p: 2.5, borderRadius: 2.5, border: "1px solid #E2E8F0", bgcolor: "#FFFFFF" }}>
+                                        <Box display="flex" justifyContent="space-between" alignItems="center" mb={1.5}>
+                                            <Box>
+                                                <Typography variant="subtitle2" fontWeight="700" color="#0F172A">
+                                                    Mã phiếu: <b style={{ fontFamily: "monospace", color: "#0088D6" }}>{item.bookingCode}</b>
+                                                </Typography>
+                                                {item.patientName && (
+                                                    <Typography variant="caption" color="text.secondary" display="block">
+                                                        Bệnh nhân: <b>{item.patientName}</b>
+                                                    </Typography>
+                                                )}
+                                            </Box>
+                                            <Chip label="Đã xác nhận" color="success" size="small" sx={{ fontWeight: 600 }} />
+                                        </Box>
+
+                                        <Grid container spacing={1.5}>
+                                            <Grid item xs={12} sm={6}>
+                                                <Typography variant="caption" color="text.secondary">Thời gian khám:</Typography>
+                                                <Typography variant="body2" fontWeight="700" color="#0F172A">
+                                                    {formatDate(item.bookingDate || item.appointmentDate)} ({item.timeSlot || item.startTime || "08:00"})
+                                                </Typography>
+                                            </Grid>
+                                            <Grid item xs={12} sm={6}>
+                                                <Typography variant="caption" color="text.secondary">Bác sĩ phụ trách:</Typography>
+                                                <Typography variant="body2" fontWeight="700" color="#0F172A">
+                                                    {item.doctorName ? `BS. ${item.doctorName.replace(/^BS\.?\s*/i, "")}` : "Bác sĩ phụ trách"}
+                                                </Typography>
+                                            </Grid>
+                                            <Grid item xs={12} sm={6}>
+                                                <Typography variant="caption" color="text.secondary">Chuyên khoa & Phòng:</Typography>
+                                                <Typography variant="body2">{item.departmentName || "Khám Chuyên Khoa"} - {item.roomName || "Chưa xếp phòng"}</Typography>
+                                            </Grid>
+                                            <Grid item xs={12} sm={6}>
+                                                <Typography variant="caption" color="text.secondary">Lý do khám:</Typography>
+                                                <Typography variant="body2" color="text.secondary">{item.reason || item.symptoms || "Khám sức khỏe"}</Typography>
+                                            </Grid>
+                                        </Grid>
+                                    </Card>
+                                ))}
+                            </Stack>
+                        )}
+                    </Box>
                 </Box>
             )}
 

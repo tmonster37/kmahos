@@ -160,7 +160,7 @@ export default function ClinicalLayout() {
                         text: "Danh Mục Thuốc & Hoạt Chất",
                         desc: "Hoạt chất, biệt dược & giá bán",
                         path: "/admin/medicines",
-                        icon: <MedicationIcon sx={{ fontSize: 18, color: "#0088D6" }} />
+                        icon: <MedicationIcon sx={{ fontSize: 18, color: designTokens.brand.primary }} />
                     }
                 ]
             });
@@ -185,7 +185,7 @@ export default function ClinicalLayout() {
     const getRoleBadge = () => {
         switch (role) {
             case "ROLE_DOCTOR":
-                return { label: "Bác Sĩ", bgColor: "#EBF6FE", textColor: "#0088D6", borderColor: "#BAE6FD" };
+                return { label: "Bác Sĩ", bgColor: designTokens.brand.primaryLight, textColor: designTokens.brand.primary, borderColor: designTokens.brand.primaryBorder };
             case "ROLE_HEAD_OF_DEPARTMENT":
                 return { label: "Trưởng Khoa", bgColor: "#E6FAF4", textColor: "#008C69", borderColor: "#A7F3D0" };
             case "ROLE_NURSE":

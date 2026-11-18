@@ -161,11 +161,15 @@ export default function ThermalTicketModal({ open, onClose, ticketData, autoRese
   };
 
   const isPriority = ticketData.isPriority || ticketData.priority;
-  const queueCode = ticketData.ticketCode || ticketData.formattedQueueNumber || ticketData.queueCode || (isPriority ? `UT-${String(ticketData.queueNumber).padStart(2, '0')}` : `KB-${String(ticketData.queueNumber).padStart(2, '0')}`);
-  const trackingUrl = `${window.location.origin}/queue-display?code=${ticketData.bookingCode || ticketData.ticketCode || 'QUEUE'}`;
+  const queueCode = ticketData.ticketCode || ticketData.formattedQueueNumber || ticketData.queueCode || (ticketData.queueNumber != null ? `#${ticketData.queueNumber}` : (ticketData.bookingCode || '---'));
+  const rawTrackingCode = ticketData.bookingCode || ticketData.ticketCode || (ticketData.queueNumber != null ? String(ticketData.queueNumber) : null);
+  const trackingUrl = rawTrackingCode
+    ? `${typeof window !== 'undefined' && window.location?.origin ? window.location.origin : ''}/queue-display?code=${encodeURIComponent(rawTrackingCode)}`
+    : null;
+  const rawBarcodeValue = ticketData.bookingCode || ticketData.ticketCode || (ticketData.queueNumber != null ? String(ticketData.queueNumber) : null);
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 3, p: 1 } }}>
+    <Dialog open={open} onClose={onClose} disablePortal maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 3, p: 1 } }}>
       <DialogContent sx={{ p: { xs: 1.5, sm: 2 } }}>
         {/* Box chứa phiếu nhiệt 80mm mô phỏng */}
         <Box
@@ -243,7 +247,7 @@ export default function ThermalTicketModal({ open, onClose, ticketData, autoRese
           {/* Số Thứ Tự Lớn */}
           <Box sx={{ my: 1.5 }}>
             <Typography className="stt-label" sx={{ fontSize: '0.8rem', color: '#555', fontWeight: 600 }}>
-              SỐ THỨ TỰ KHÁM
+              {ticketData.isPaid ? 'SỐ THỨ TỰ KHÁM' : (ticketData.counterName ? 'SỐ THỨ TỰ TẠI QUẦY' : 'SỐ THỨ TỰ')}
             </Typography>
             <Typography
               className="stt-number"
@@ -302,7 +306,7 @@ export default function ThermalTicketModal({ open, onClose, ticketData, autoRese
               <tr>
                 <td className="info-label" style={{ color: '#666', padding: '3px 0' }}>Chuyên khoa:</td>
                 <td className="info-value" style={{ fontWeight: 700, color: '#0d47a1' }}>
-                  {ticketData.departmentName || 'Khoa Khám Bệnh'}
+                  {ticketData.departmentName || 'Chưa có thông tin khoa'}
                 </td>
               </tr>
               {ticketData.doctorName && (
@@ -324,7 +328,7 @@ export default function ThermalTicketModal({ open, onClose, ticketData, autoRese
               <tr>
                 <td className="info-label" style={{ color: '#666', padding: '3px 0' }}>Mã phiếu:</td>
                 <td className="info-value" style={{ fontWeight: 700, fontFamily: 'monospace', fontSize: '0.9rem' }}>
-                  {ticketData.bookingCode}
+                  {ticketData.bookingCode || ticketData.ticketCode || '---'}
                 </td>
               </tr>
               <tr>
@@ -343,20 +347,36 @@ export default function ThermalTicketModal({ open, onClose, ticketData, autoRese
             <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', color: '#111', mb: 0.5, letterSpacing: 0.5 }}>
               MÃ VẠCH CHECK-IN TỰ ĐỘNG
             </Typography>
-            <BarcodeView value={ticketData.bookingCode || `BK-${ticketData.queueNumber || '01'}`} height={42} moduleWidth={1.8} showText={true} />
-            <Typography sx={{ fontSize: '0.7rem', color: '#555', mt: 0.5, fontStyle: 'italic' }}>
-              Quét mã vạch tại đầu đọc trước cửa phòng để check-in có mặt
-            </Typography>
+            {rawBarcodeValue ? (
+              <>
+                <BarcodeView value={rawBarcodeValue} height={42} moduleWidth={1.8} showText={true} />
+                <Typography sx={{ fontSize: '0.7rem', color: '#555', mt: 0.5, fontStyle: 'italic' }}>
+                  Quét mã vạch tại đầu đọc trước cửa phòng để check-in có mặt
+                </Typography>
+              </>
+            ) : (
+              <Typography sx={{ fontSize: '0.75rem', color: '#888', my: 1, fontStyle: 'italic' }}>
+                (Chưa có mã vạch check-in)
+              </Typography>
+            )}
           </Box>
 
           <Box className="divider" sx={{ borderTop: '1px dashed #bbb', my: 1 }} />
 
           {/* QR Code tra cứu trên điện thoại */}
           <Box className="qr-wrapper" sx={{ my: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <QRCodeSVG value={trackingUrl} size={80} level="M" includeMargin={false} />
-            <Typography sx={{ fontSize: '0.7rem', color: '#666', mt: 0.5 }}>
-              Quét QR trên điện thoại để theo dõi tiến độ lượt khám
-            </Typography>
+            {trackingUrl ? (
+              <>
+                <QRCodeSVG value={trackingUrl} size={80} level="M" includeMargin={false} />
+                <Typography sx={{ fontSize: '0.7rem', color: '#666', mt: 0.5 }}>
+                  Quét QR trên điện thoại để theo dõi tiến độ lượt khám
+                </Typography>
+              </>
+            ) : (
+              <Typography sx={{ fontSize: '0.75rem', color: '#888', my: 1, fontStyle: 'italic' }}>
+                (Chưa có mã tra cứu trực tuyến)
+              </Typography>
+            )}
           </Box>
 
           <Box className="divider" sx={{ borderTop: '1px dashed #bbb', my: 1 }} />

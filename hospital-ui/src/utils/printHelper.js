@@ -20,18 +20,18 @@ import { generateBarcodeSvg } from "./barcodeGenerator";
 export function printReceipt(data) {
     if (!data) return;
 
-    const receiptCode = escapeHtml(data.receiptCode || data.billId || "RC-" + Math.floor(100000 + Math.random() * 900000));
-    const patientName = escapeHtml(data.patientName || "Khách hàng");
+    const receiptCode = escapeHtml(data.receiptCode || data.billId || "Chưa có mã biên lai");
+    const patientName = escapeHtml(data.patientName || "Chưa có dữ liệu");
     const phoneNumber = escapeHtml(data.phoneNumber || "---");
     const identityNumber = data.identityNumber || "---";
-    const departmentName = escapeHtml(data.departmentName || "Khoa Khám Bệnh");
-    const doctorName = escapeHtml(data.doctorName || "Bác sĩ phụ trách");
+    const departmentName = escapeHtml(data.departmentName || "Chưa có dữ liệu");
+    const doctorName = escapeHtml(data.doctorName || "Chưa phân công");
     const paymentMethodText = data.paymentMethod === "CASH" ? "Tiền mặt tại quầy" :
                               data.paymentMethod === "VIETQR" ? "Cổng PayOS (VietQR Napas 247)" :
                               data.paymentMethod === "WALLET" ? "Ví Viện Phí Điện Tử" : "Cổng PayOS (Chuyển khoản)";
-    const cashierName = escapeHtml(data.cashierName || "Thu ngân viện phí");
-    const paidAt = data.paidAt ? formatDateTime(data.paidAt) : formatDateTime(new Date().toISOString());
-    const totalAmount = Number(data.totalAmount || data.amount || 0);
+    const cashierName = escapeHtml(data.cashierName || "Thu ngân viên");
+    const paidAt = data.paidAt ? formatDateTime(data.paidAt) : "Chưa có dữ liệu";
+    const totalAmount = data.totalAmount != null ? data.totalAmount : (data.amount != null ? data.amount : null);
     const items = data.items && data.items.length > 0 ? data.items : [
         { name: data.description || "Thanh toán viện phí / Khám bệnh", qty: 1, price: totalAmount }
     ];
@@ -67,7 +67,7 @@ export function printReceipt(data) {
                 .info-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
                 .info-table td { padding: 3px 0; vertical-align: top; }
                 .item-table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-                .item-table th, .item-table td { border: 1px solid #333; padding: 5px 6px; font-size: 10pt; }
+                .item-table th, .item-table td { border: 1px solid #333; padding: 5px 6px; font-size: 10pt; word-break: break-word; }
                 .item-table th { background-color: #f2f2f2; text-align: center; font-weight: bold; }
                 .total-box { margin-top: 8px; font-weight: bold; font-size: 11.5pt; text-align: right; }
                 .footer-table { width: 100%; margin-top: 20px; border-collapse: collapse; }
@@ -123,20 +123,23 @@ export function printReceipt(data) {
                     </tr>
                 </thead>
                 <tbody>
-                    ${items.map((it, idx) => `
+                    ${items.map((it, idx) => {
+                        const itemPrice = it.price != null ? it.price : (it.amount != null ? it.amount : null);
+                        const itemQty = it.qty || it.quantity || 1;
+                        return `
                         <tr>
                             <td style="text-align: center;">${idx + 1}</td>
-                            <td>${escapeHtml(it.name || it.description)}</td>
-                            <td style="text-align: center;">${it.qty || 1}</td>
-                            <td style="text-align: right;">${formatCurrency(it.price || it.amount)}</td>
-                            <td style="text-align: right; font-weight: bold;">${formatCurrency((it.price || it.amount) * (it.qty || 1))}</td>
+                            <td>${escapeHtml(it.name || it.description || "Dịch vụ y tế")}</td>
+                            <td style="text-align: center;">${itemQty}</td>
+                            <td style="text-align: right;">${itemPrice != null ? formatCurrency(itemPrice) : "Chưa có dữ liệu"}</td>
+                            <td style="text-align: right; font-weight: bold;">${itemPrice != null ? formatCurrency(itemPrice * itemQty) : "Chưa có dữ liệu"}</td>
                         </tr>
-                    `).join("")}
+                    `;}).join("")}
                 </tbody>
             </table>
 
             <div class="total-box">
-                TỔNG SỐ TIỀN THU: <span style="color: #000; font-size: 13pt;">${formatCurrency(totalAmount)}</span>
+                TỔNG SỐ TIỀN THU: <span style="color: #000; font-size: 13pt;">${totalAmount != null ? formatCurrency(totalAmount) : "Chưa có dữ liệu"}</span>
             </div>
 
             <table class="footer-table">
@@ -180,17 +183,37 @@ export function printReceipt(data) {
  */
 export function printAppointmentTicket(data) {
     if (!data) return;
+    if (typeof window === "undefined") return;
 
-    const bookingCode = escapeHtml(data.bookingCode || "BK-2026-XXXX");
-    const patientName = data.patientName || "Khách hàng";
-    const phoneNumber = data.phoneNumber || data.patientPhone || "---";
-    const departmentName = data.departmentName || "Khoa Khám Bệnh";
-    const roomName = escapeHtml(data.roomName || "Phòng khám");
-    const doctorName = data.doctorName || "Bác sĩ chuyên khoa";
-    const bookingDate = data.bookingDate || "---";
-    const timeSlot = escapeHtml(data.timeSlot || (data.startTime && data.endTime ? `${data.startTime} - ${data.endTime}` : "Trong giờ hành chính"));
-    const queueNumber = data.queueNumber ? `#${data.queueNumber}` : (data.queueCode || "Đang cấp");
-    const price = Number(data.price || data.totalAmount || 0);
+    const bookingCode = escapeHtml(data.bookingCode && String(data.bookingCode).trim() ? String(data.bookingCode).trim() : "Chưa có mã");
+    const patientName = escapeHtml(data.patientName && String(data.patientName).trim() ? String(data.patientName).trim() : "Chưa có dữ liệu");
+    const phoneNumber = escapeHtml((data.phoneNumber || data.patientPhone) && String(data.phoneNumber || data.patientPhone).trim() ? String(data.phoneNumber || data.patientPhone).trim() : "Chưa có dữ liệu");
+    const departmentName = escapeHtml(data.departmentName && String(data.departmentName).trim() ? String(data.departmentName).trim() : "Chưa có dữ liệu");
+    const roomName = escapeHtml(data.roomName && String(data.roomName).trim() ? String(data.roomName).trim() : "Chưa xếp phòng");
+    const doctorName = escapeHtml(data.doctorName && String(data.doctorName).trim() ? String(data.doctorName).trim() : "Chưa phân công");
+    const bookingDate = escapeHtml(data.bookingDate && String(data.bookingDate).trim() ? String(data.bookingDate).trim() : "Chưa có dữ liệu");
+    const timeSlot = escapeHtml(data.timeSlot && String(data.timeSlot).trim() ? String(data.timeSlot).trim() : (data.startTime && data.endTime ? `${data.startTime} - ${data.endTime}` : "Chưa có dữ liệu"));
+
+    let queueNumber = "Chờ cấp số tại quầy";
+    if (data.queueNumber !== null && data.queueNumber !== undefined && data.queueNumber !== "") {
+        queueNumber = `#${data.queueNumber}`;
+    } else if (data.queueCode && String(data.queueCode).trim()) {
+        queueNumber = escapeHtml(String(data.queueCode).trim());
+    }
+
+    let rawPrice = undefined;
+    if (data.price !== null && data.price !== undefined) {
+        rawPrice = data.price;
+    } else if (data.totalAmount !== null && data.totalAmount !== undefined) {
+        rawPrice = data.totalAmount;
+    }
+
+    let priceDisplay = "Chưa có dữ liệu";
+    if (rawPrice === 0 || rawPrice === "0") {
+        priceDisplay = "0 ₫";
+    } else if (rawPrice != null && rawPrice !== "" && !isNaN(Number(rawPrice))) {
+        priceDisplay = formatCurrency(Number(rawPrice));
+    }
 
     const printWindow = window.open("", "_blank");
     if (!printWindow) {
@@ -216,16 +239,16 @@ export function printAppointmentTicket(data) {
                     line-height: 1.4;
                 }
                 .header-table { width: 100%; margin-bottom: 10px; border-collapse: collapse; }
-                .title { text-align: center; font-size: 16pt; font-weight: bold; margin: 10px 0 2px 0; text-transform: uppercase; color: #002D5A; }
+                .title { text-align: center; font-size: 16pt; font-weight: bold; margin: 10px 0 2px 0; text-transform: uppercase; color: #0F766E; }
                 .queue-box {
                     text-align: center;
-                    border: 2px dashed #002D5A;
+                    border: 2px dashed #0F766E;
                     padding: 10px;
                     margin: 12px 0;
                     border-radius: 6px;
                     background-color: #f8fafc;
                 }
-                .queue-number { font-size: 26pt; font-weight: bold; color: #0284c7; }
+                .queue-number { font-size: 26pt; font-weight: bold; color: #0F766E; }
                 .info-table { width: 100%; border-collapse: collapse; margin: 15px 0; }
                 .info-table td { padding: 5px 0; border-bottom: 1px dotted #ccc; }
                 .guide-box { border: 1px solid #000; padding: 10px; margin-top: 15px; font-size: 9.5pt; border-radius: 4px; }
@@ -267,7 +290,7 @@ export function printAppointmentTicket(data) {
                 </tr>
                 <tr>
                     <td>Phòng khám:</td>
-                    <td><b style="color: #0284c7;">${roomName}</b></td>
+                    <td><b style="color: #0F766E;">${roomName}</b></td>
                 </tr>
                 <tr>
                     <td>Bác sĩ phụ trách:</td>
@@ -283,7 +306,7 @@ export function printAppointmentTicket(data) {
                 </tr>
                 <tr>
                     <td>Tiền khám bệnh:</td>
-                    <td style="font-weight: bold; color: #059669;">${formatCurrency(price)}</td>
+                    <td style="font-weight: bold; color: #0F766E;">${priceDisplay}</td>
                 </tr>
             </table>
 
@@ -799,6 +822,12 @@ export function printShiftReconciliation(data) {
             <div class="title">BIÊN BẢN ĐỐI SOÁT & KẾT CA THU VIỆN PHÍ</div>
             <div class="subtitle">(Áp dụng đối chiếu tiền mặt két và giao dịch chuyển khoản VietQR/POS)</div>
 
+            ${data.hasMissingAmount ? `
+                <div style="border: 2px solid #b91c1c; background: #fef2f2; color: #991b1b; padding: 10px; margin: 12px 0; font-weight: bold; border-radius: 4px; font-size: 10pt;">
+                    ⚠️ CẢNH BÁO ĐỐI SOÁT: Ca trực ghi nhận có giao dịch chưa xác định được số tiền từ máy chủ. Tổng tiền thực thu dưới đây chỉ là tổng từng phần của các giao dịch hợp lệ, chưa phản ánh đầy đủ doanh thu ca trực.
+                </div>
+            ` : ''}
+
             <p style="margin: 6px 0;">
                 - <b>Thu ngân phụ trách:</b> ${cashierName}<br>
                 - <b>Ca làm việc:</b> ${shiftName}<br>
@@ -854,15 +883,19 @@ export function printShiftReconciliation(data) {
                     </tr>
                 </thead>
                 <tbody>
-                    ${transactions.slice(0, 25).map((t, i) => `
+                    ${transactions.slice(0, 25).map((t, i) => {
+                        const rawVal = t.totalAmount !== undefined ? t.totalAmount : t.amount;
+                        const isValValid = rawVal != null && (typeof rawVal === "number" ? Number.isFinite(rawVal) && rawVal >= 0 : (typeof rawVal === "string" && rawVal.trim() !== "" && Number.isFinite(Number(rawVal.trim())) && Number(rawVal.trim()) >= 0));
+                        return `
                         <tr>
                             <td align="center">${i + 1}</td>
                             <td>${t.receiptCode || t.billId || '---'}</td>
                             <td>${t.patientName || 'Khách hàng'}</td>
                             <td align="center">${t.paymentMethod === 'CASH' ? 'Tiền mặt' : (t.paymentMethod === 'POS' ? 'Thẻ POS' : 'VietQR')}</td>
-                            <td align="right">${formatCurrency(t.totalAmount || t.amount || 0)}</td>
+                            <td align="right">${isValValid ? formatCurrency(Number(rawVal)) : '<span style="color: #b91c1c; font-style: italic;">Chưa có dữ liệu</span>'}</td>
                         </tr>
-                    `).join('')}
+                        `;
+                    }).join('')}
                     ${transactions.length > 25 ? `
                         <tr>
                             <td colspan="5" align="center" style="font-style: italic; color: #555;">
@@ -921,16 +954,16 @@ export function printShiftReconciliation(data) {
 export function printDispenseSlip(data) {
     if (!data) return;
 
-    const dispenseCode = data.dispenseCode || "DISP-" + Math.floor(100000 + Math.random() * 900000);
-    const prescriptionCode = data.prescriptionCode || "---";
-    const patientName = data.patientName || "Khách hàng";
-    const patientPhone = data.patientPhone || "---";
-    const bookingCode = data.bookingCode || "---";
-    const warehouseName = data.warehouseName || "Kho Ngoại Trú";
-    const dispensedByName = data.dispensedByName || "Dược sĩ cấp phát";
-    const dispensedAt = data.dispensedAt ? formatDateTime(data.dispensedAt) : formatDateTime(new Date().toISOString());
-    const totalAmount = Number(data.totalAmount || 0);
-    const notes = data.notes || "Uống thuốc đúng theo hướng dẫn, bảo quản nơi khô ráo thoáng mát.";
+    const dispenseCode = escapeHtml(data.dispenseCode || "Chưa có mã phiếu xuất");
+    const prescriptionCode = escapeHtml(data.prescriptionCode || "---");
+    const patientName = escapeHtml(data.patientName || "Chưa có dữ liệu");
+    const patientPhone = escapeHtml(data.patientPhone || "---");
+    const bookingCode = escapeHtml(data.bookingCode || "---");
+    const warehouseName = escapeHtml(data.warehouseName || "Chưa có dữ liệu");
+    const dispensedByName = escapeHtml(data.dispensedByName || "Dược sĩ phụ trách");
+    const dispensedAt = data.dispensedAt ? formatDateTime(data.dispensedAt) : "Chưa có dữ liệu";
+    const totalAmount = data.totalAmount != null ? data.totalAmount : (data.amount != null ? data.amount : null);
+    const notes = escapeHtml(data.notes || "Uống thuốc đúng theo hướng dẫn, bảo quản nơi khô ráo thoáng mát.");
     const items = data.items || [];
 
     const printWindow = window.open("", "_blank");
@@ -964,7 +997,7 @@ export function printDispenseSlip(data) {
                 .info-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
                 .info-table td { padding: 2px 0; vertical-align: top; font-size: 10pt; }
                 .item-table { width: 100%; border-collapse: collapse; margin: 8px 0; }
-                .item-table th, .item-table td { border: 1px solid #333; padding: 4px 5px; font-size: 9.5pt; }
+                .item-table th, .item-table td { border: 1px solid #333; padding: 4px 5px; font-size: 9.5pt; word-break: break-word; }
                 .item-table th { background-color: #f2f2f2; text-align: center; font-weight: bold; }
                 .total-box { margin-top: 6px; font-weight: bold; font-size: 10.5pt; text-align: right; }
                 .sign-table { width: 100%; margin-top: 15px; border-collapse: collapse; }
@@ -1022,11 +1055,11 @@ export function printDispenseSlip(data) {
                     ${items.map((it, idx) => `
                         <tr>
                             <td align="center">${idx + 1}</td>
-                            <td><b>${it.medicineName || '---'}</b></td>
-                            <td align="center"><code>${it.batchNumber || '---'}</code></td>
-                            <td align="center">${it.expiryDate ? it.expiryDate : '---'}</td>
-                            <td align="center"><b>${it.quantityDispensed || it.quantity || 1}</b></td>
-                            <td style="font-size: 8.5pt;">${it.dosageInstruction || 'Uống theo đơn'}</td>
+                            <td><b>${escapeHtml(it.medicineName || '---')}</b></td>
+                            <td align="center"><code>${escapeHtml(it.batchNumber || '---')}</code></td>
+                            <td align="center">${escapeHtml(it.expiryDate ? it.expiryDate : '---')}</td>
+                            <td align="center"><b>${escapeHtml(it.quantityDispensed || it.quantity || 1)}</b></td>
+                            <td style="font-size: 8.5pt;">${escapeHtml(it.dosageInstruction || 'Uống theo đơn')}</td>
                         </tr>
                     `).join('')}
                 </tbody>

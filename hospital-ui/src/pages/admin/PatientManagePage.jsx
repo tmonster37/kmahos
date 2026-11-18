@@ -55,6 +55,11 @@ import axiosInstance from "../../services/AxiosInstance";
 import { formatDate, formatDateTime, formatCurrency, isValidPhoneNumber, isValidIdentityNumber, isValidHealthInsurance } from "../../utils/formatters";
 import PatientProfileDetailModal from "../../components/common/PatientProfileDetailModal";
 import ElectronicMedicalRecordModal from "../../components/common/ElectronicMedicalRecordModal";
+import designTokens from "../../theme/designTokens";
+
+const BRAND_PRIMARY = designTokens.brand.primary;
+const BRAND_DARK = designTokens.brand.primaryDark;
+const BRAND_LIGHT = designTokens.brand.primaryLight;
 
 const defaultFormData = {
     fullName: "",
@@ -288,8 +293,8 @@ export default function PatientManagePage() {
                                 fontSize: "0.68rem",
                                 fontWeight: 800,
                                 letterSpacing: "0.06em",
-                                bgcolor: "rgba(0, 136, 214, 0.08)",
-                                color: "#0088D6",
+                                bgcolor: BRAND_LIGHT,
+                                color: BRAND_PRIMARY,
                                 mb: 1
                             }}
                         />
@@ -308,10 +313,10 @@ export default function PatientManagePage() {
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "center",
-                                    border: "1px solid rgba(0, 136, 214, 0.2)"
+                                    border: "1px solid rgba(15, 118, 110, 0.2)"
                                 }}
                             >
-                                <PeopleAltIcon sx={{ color: "#0088D6", fontSize: 24 }} />
+                                <PeopleAltIcon sx={{ color: BRAND_PRIMARY, fontSize: 24 }} />
                             </Box>
                             Quản Lý Danh Sách & Hồ Sơ Bệnh Nhân
                         </Typography>
@@ -332,7 +337,7 @@ export default function PatientManagePage() {
                                 px: 2.5,
                                 borderColor: "rgba(15, 23, 42, 0.15)",
                                 color: "#334155",
-                                "&:hover": { borderColor: "#0088D6", bgcolor: "rgba(0, 136, 214, 0.04)" }
+                                "&:hover": { borderColor: BRAND_PRIMARY, bgcolor: "rgba(15, 118, 110, 0.04)" }
                             }}
                         >
                             {loading ? "Đang tải..." : "Làm mới"}
@@ -346,10 +351,10 @@ export default function PatientManagePage() {
                                 borderRadius: 2.5,
                                 fontWeight: 700,
                                 textTransform: "none",
-                                bgcolor: "#0088D6",
+                                bgcolor: BRAND_PRIMARY,
                                 "&:hover": { bgcolor: "#0070BA" },
                                 px: 3,
-                                boxShadow: "0 4px 14px rgba(0, 136, 214, 0.25)"
+                                boxShadow: "0 4px 14px rgba(15, 118, 110, 0.25)"
                             }}
                         >
                             Thêm Bệnh Nhân Mới
@@ -369,7 +374,7 @@ export default function PatientManagePage() {
                             borderRadius: 3,
                             bgcolor: "#FFFFFF",
                             border: "1px solid rgba(15, 23, 42, 0.08)",
-                            borderTop: "3px solid #0088D6",
+                            borderTop: `3px solid ${BRAND_PRIMARY}`,
                             boxShadow: "0 1px 3px rgba(0,0,0,0.02)"
                         }}
                     >
@@ -385,7 +390,7 @@ export default function PatientManagePage() {
                                     Hồ sơ đăng ký trong hệ thống
                                 </Typography>
                             </Box>
-                            <Avatar sx={{ bgcolor: "rgba(0, 136, 214, 0.1)", color: "#0088D6", width: 48, height: 48, borderRadius: 2.5 }}>
+                            <Avatar sx={{ bgcolor: BRAND_LIGHT, color: BRAND_PRIMARY, width: 48, height: 48, borderRadius: 2.5 }}>
                                 <PeopleAltIcon />
                             </Avatar>
                         </Box>
@@ -636,8 +641,8 @@ export default function PatientManagePage() {
                                                         fontFamily: "monospace",
                                                         fontWeight: 700,
                                                         fontSize: "0.8rem",
-                                                        bgcolor: "rgba(0, 136, 214, 0.08)",
-                                                        color: "#0088D6",
+                                                        bgcolor: BRAND_LIGHT,
+                                                        color: BRAND_PRIMARY,
                                                         px: 1,
                                                         py: 0.4,
                                                         borderRadius: 1.5,
@@ -653,8 +658,8 @@ export default function PatientManagePage() {
                                                         sx={{
                                                             width: 34,
                                                             height: 34,
-                                                            bgcolor: p.gender === "FEMALE" ? "rgba(236, 72, 153, 0.12)" : "rgba(0, 136, 214, 0.12)",
-                                                            color: p.gender === "FEMALE" ? "#DB2777" : "#0088D6",
+                                                            bgcolor: p.gender === "FEMALE" ? "rgba(236, 72, 153, 0.12)" : "rgba(15, 118, 110, 0.12)",
+                                                            color: p.gender === "FEMALE" ? "#DB2777" : BRAND_PRIMARY,
                                                             fontSize: "0.85rem",
                                                             fontWeight: 800
                                                         }}
@@ -718,8 +723,8 @@ export default function PatientManagePage() {
                                                         fontWeight: 700,
                                                         height: 22,
                                                         fontSize: "0.75rem",
-                                                        bgcolor: (p.totalVisits || 0) > 0 ? "rgba(0, 136, 214, 0.1)" : "#F1F5F9",
-                                                        color: (p.totalVisits || 0) > 0 ? "#0088D6" : "#64748B"
+                                                        bgcolor: (p.totalVisits || 0) > 0 ? BRAND_LIGHT : "#F1F5F9",
+                                                        color: (p.totalVisits || 0) > 0 ? BRAND_PRIMARY : "#64748B"
                                                     }}
                                                 />
                                             </TableCell>
@@ -741,10 +746,10 @@ export default function PatientManagePage() {
                                                                 setOpenDetailModal(true);
                                                             }}
                                                             sx={{
-                                                                bgcolor: "rgba(0, 136, 214, 0.08)",
-                                                                color: "#0088D6",
+                                                                bgcolor: BRAND_LIGHT,
+                                                                color: BRAND_PRIMARY,
                                                                 borderRadius: 2,
-                                                                "&:hover": { bgcolor: "rgba(0, 136, 214, 0.16)" }
+                                                                "&:hover": { bgcolor: "rgba(15, 118, 110, 0.16)" }
                                                             }}
                                                         >
                                                             <VisibilityIcon fontSize="small" />
@@ -979,7 +984,7 @@ export default function PatientManagePage() {
                                 borderRadius: 2.5,
                                 textTransform: "none",
                                 fontWeight: 700,
-                                bgcolor: "#0088D6",
+                                bgcolor: BRAND_PRIMARY,
                                 "&:hover": { bgcolor: "#0070BA" },
                                 px: 3
                             }}

@@ -55,18 +55,46 @@ import BarChartOutlinedIcon from "@mui/icons-material/BarChartOutlined";
 import axiosInstance from "../../services/AxiosInstance";
 import { formatCurrency } from "../../utils/formatters";
 import { useAuth } from "../../context/AuthContext";
+import designTokens from "../../theme/designTokens";
 
-// Bảng màu y tế tối ưu chuẩn WCAG AAA
+// Chuẩn hóa hiển thị chỉ số KPI an toàn dữ liệu (không biến lỗi thành 0)
+export function formatKpiMetric(value, type = "COUNT") {
+    if (value === null || value === undefined) return "Chưa có dữ liệu";
+    const num = Number(value);
+    if (isNaN(num)) return "Chưa có dữ liệu";
+
+    switch (type) {
+        case "CURRENCY":
+            return formatCurrency(num);
+        case "PERCENT":
+            return `${num}%`;
+        case "COUNT":
+        default:
+            return `${num} ca`;
+    }
+}
+
+// Bảng màu y tế tối ưu chuẩn WCAG AAA với thương hiệu TNT Healthcare
 const COLORS = {
-    primary: "#0088D6",
-    primaryLight: "rgba(0, 136, 214, 0.08)",
-    success: "#00A878",
-    warning: "#F59E0B",
-    danger: "#EF4444",
+    primary: designTokens.brand.primary, // #0F766E
+    primaryLight: "rgba(15, 118, 110, 0.08)",
+    success: designTokens.status.success.main, // #00A878
+    warning: designTokens.status.warning.main, // #D97706
+    danger: designTokens.status.danger.main, // #EF4444
     purple: "#7C3AED",
-    teal: "#0D9488",
-    slate: "#64748B",
-    chartPalette: ["#0088D6", "#00A878", "#7C3AED", "#F59E0B", "#0D9488", "#E11D48", "#6366F1", "#0284C7"]
+    teal: designTokens.brand.logoTeal, // #00C4CC
+    coral: designTokens.brand.coral, // #FF5757
+    slate: designTokens.neutral.textSecondary,
+    chartPalette: [
+        designTokens.brand.primary,
+        designTokens.status.success.main,
+        designTokens.brand.logoTeal,
+        designTokens.status.warning.main,
+        "#7C3AED",
+        designTokens.brand.coral,
+        "#6366F1",
+        "#0284C7"
+    ]
 };
 
 // Custom Tooltip cho Recharts phong cách Linear
@@ -314,7 +342,7 @@ export default function DashboardPage() {
 
         if (total > 0) {
             return [
-                { name: "VietQR (Chuyển khoản)", value: rawVietQr, color: "#0088D6" },
+                { name: "VietQR (Chuyển khoản)", value: rawVietQr, color: COLORS.primary },
                 { name: "Tiền mặt tại Quầy", value: rawCash, color: "#00A878" },
                 { name: "Ví MoMo", value: rawMomo, color: "#D81B60" },
                 { name: "Cổng VNPAY-QR", value: rawVnpay, color: "#F59E0B" },
@@ -344,11 +372,14 @@ export default function DashboardPage() {
         csvContent += `Khoảng thời gian: ${timeRange} | Ngày xuất: ${new Date().toLocaleString("vi-VN")}\n\n`;
 
         csvContent += "1. CHỈ SỐ DOANH THU & TIẾP NHẬN\n";
-        csvContent += `Tổng Doanh Thu Thực Tế (VNĐ),${kpiRevenue?.totalRevenue || utilStats?.totalRevenueThisMonth || 0}\n`;
-        csvContent += `Tổng Giao Dịch Quyết Toán,${kpiRevenue?.totalTransactions || 0}\n`;
-        csvContent += `Lượt Đặt Khám Hôm Nay,${kpiRevenue?.todayAppointments || utilStats?.totalBookingsToday || 0}\n`;
-        csvContent += `Lượt Khám Hoàn Tất,${kpiRevenue?.completedAppointments || utilStats?.totalCompletedExams || 0}\n`;
-        csvContent += `Tỷ Lệ Hoàn Tất Khám (%),${kpiRevenue?.completionRate || 0}\n\n`;
+        const safeTotalRev = kpiRevenue?.totalRevenue ?? utilStats?.totalRevenueThisMonth;
+        csvContent += `Tổng Doanh Thu Thực Tế (VNĐ),${safeTotalRev != null ? safeTotalRev : "Chưa có dữ liệu"}\n`;
+        csvContent += `Tổng Giao Dịch Quyết Toán,${kpiRevenue?.totalTransactions != null ? kpiRevenue.totalTransactions : "Chưa có dữ liệu"}\n`;
+        const safeTodayApps = kpiRevenue?.todayAppointments ?? utilStats?.totalBookingsToday;
+        csvContent += `Lượt Đặt Khám Hôm Nay,${safeTodayApps != null ? safeTodayApps : "Chưa có dữ liệu"}\n`;
+        const safeCompleted = kpiRevenue?.completedAppointments ?? utilStats?.totalCompletedExams;
+        csvContent += `Lượt Khám Hoàn Tất,${safeCompleted != null ? safeCompleted : "Chưa có dữ liệu"}\n`;
+        csvContent += `Tỷ Lệ Hoàn Tất Khám (%),${kpiRevenue?.completionRate != null ? kpiRevenue.completionRate : "Chưa có dữ liệu"}\n\n`;
 
         csvContent += "2. DOANH THU THEO CHUỖI NGÀY\n";
         csvContent += "Ngày,Doanh thu (VNĐ),Số giao dịch\n";
@@ -376,7 +407,7 @@ export default function DashboardPage() {
     const statCards = isHeadOfDepartment ? [
         {
             title: "Bác Sĩ Thuộc Khoa",
-            value: `${utilStats?.totalDoctors ?? 0} bác sĩ`,
+            value: utilStats?.totalDoctors != null ? `${utilStats.totalDoctors} bác sĩ` : "Chưa có dữ liệu",
             subtext: `Nhân sự chuyên môn của khoa`,
             icon: <PeopleAltOutlinedIcon />,
             color: COLORS.primary,
@@ -385,8 +416,8 @@ export default function DashboardPage() {
         },
         {
             title: timeRange === "TODAY" ? "Lượt Khám Khoa (Hôm nay)" : "Lượt Khám Khoa",
-            value: `${utilStats?.totalBookingsToday ?? 0} ca`,
-            subtext: `Hoàn tất: ${utilStats?.totalCompletedExams ?? 0} ca`,
+            value: formatKpiMetric(utilStats?.totalBookingsToday, "COUNT"),
+            subtext: utilStats?.totalCompletedExams != null ? `Hoàn tất: ${utilStats.totalCompletedExams} ca` : "Chưa có dữ liệu",
             icon: <EventAvailableOutlinedIcon />,
             color: COLORS.success,
             bgColor: "rgba(0, 168, 120, 0.08)",
@@ -394,8 +425,8 @@ export default function DashboardPage() {
         },
         {
             title: "Công Suất Buồng Khám Khoa",
-            value: `${roomCapacity?.overallUtilizationRate ?? 0}%`,
-            subtext: `${roomCapacity?.activeRooms ?? 0}/${roomCapacity?.totalRooms ?? roomList.length} buồng đang mở phiên`,
+            value: formatKpiMetric(roomCapacity?.overallUtilizationRate, "PERCENT"),
+            subtext: roomCapacity?.activeRooms != null ? `${roomCapacity.activeRooms}/${roomCapacity.totalRooms ?? roomList.length} buồng đang mở phiên` : "Chưa có dữ liệu",
             icon: <MeetingRoomOutlinedIcon />,
             color: overloadedRoomsCount > 0 ? COLORS.danger : COLORS.teal,
             bgColor: overloadedRoomsCount > 0 ? "rgba(239, 68, 68, 0.08)" : "rgba(13, 148, 136, 0.08)",
@@ -403,18 +434,18 @@ export default function DashboardPage() {
         },
         {
             title: "Bệnh Nhân Chờ Khám Khoa",
-            value: `${totalWaitingBN} người`,
-            subtext: `${totalExaminingBN} bệnh nhân đang ngồi ghế khám`,
+            value: totalWaitingBN != null ? `${totalWaitingBN} người` : "Chưa có dữ liệu",
+            subtext: totalExaminingBN != null ? `${totalExaminingBN} bệnh nhân đang ngồi ghế khám` : "Chưa có dữ liệu",
             icon: <PeopleAltOutlinedIcon />,
             color: totalWaitingBN > 20 ? COLORS.warning : COLORS.purple,
             bgColor: totalWaitingBN > 20 ? "rgba(245, 158, 11, 0.08)" : "rgba(124, 58, 237, 0.08)",
-            trend: `${utilStats?.totalPatients ?? 0} lượt BN`
+            trend: utilStats?.totalPatients != null ? `${utilStats.totalPatients} lượt BN` : "Chưa có dữ liệu"
         }
     ] : [
         {
             title: "Tổng Doanh Thu Quyết Toán",
-            value: formatCurrency(kpiRevenue?.totalRevenue ?? utilStats?.totalRevenueThisMonth ?? 0),
-            subtext: `Đã đối soát ${kpiRevenue?.totalTransactions ?? 0} giao dịch`,
+            value: formatKpiMetric(kpiRevenue?.totalRevenue ?? utilStats?.totalRevenueThisMonth, "CURRENCY"),
+            subtext: kpiRevenue?.totalTransactions != null ? `Đã đối soát ${kpiRevenue.totalTransactions} giao dịch` : "Chưa có dữ liệu",
             icon: <MonetizationOnOutlinedIcon />,
             color: COLORS.success,
             bgColor: "rgba(0, 168, 120, 0.08)",
@@ -422,12 +453,12 @@ export default function DashboardPage() {
         },
         {
             title: timeRange === "TODAY" ? "Lượt Tiếp Nhận (Hôm nay)" : `Lượt Tiếp Nhận (${timeRange === "WEEK" ? "7 ngày qua" : (timeRange === "MONTH" ? "30 ngày" : (timeRange === "YEAR" ? "Năm 2026" : "Kỳ chọn"))})`,
-            value: `${kpiRevenue?.todayAppointments ?? utilStats?.totalBookingsToday ?? 0} ca`,
-            subtext: `Hoàn tất: ${kpiRevenue?.completedAppointments ?? utilStats?.totalCompletedExams ?? 0} ca (${kpiRevenue?.completionRate ?? 0}%)`,
+            value: formatKpiMetric(kpiRevenue?.todayAppointments ?? utilStats?.totalBookingsToday, "COUNT"),
+            subtext: (kpiRevenue?.completedAppointments != null ? `Hoàn tất: ${kpiRevenue.completedAppointments} ca (${kpiRevenue.completionRate ?? 0}%)` : (utilStats?.totalCompletedExams != null ? `Hoàn tất: ${utilStats.totalCompletedExams} ca` : "Chưa có dữ liệu")),
             icon: <EventAvailableOutlinedIcon />,
             color: COLORS.primary,
             bgColor: "rgba(0, 136, 214, 0.08)",
-            trend: `Hủy: ${kpiRevenue?.cancelledAppointments ?? 0} ca`
+            trend: kpiRevenue?.cancelledAppointments != null ? `Hủy: ${kpiRevenue.cancelledAppointments} ca` : "Chưa có dữ liệu"
         },
         {
             title: "Công Suất Buồng Khám",
@@ -556,9 +587,9 @@ export default function DashboardPage() {
                                     fontSize: "0.825rem",
                                     color: "#64748B",
                                     "&.Mui-selected": {
-                                        bgcolor: "#0088D6",
+                                        bgcolor: COLORS.primary,
                                         color: "#FFFFFF",
-                                        boxShadow: "0 1px 3px rgba(0, 136, 214, 0.2)"
+                                        boxShadow: "0 1px 3px rgba(15, 118, 110, 0.2)"
                                     }
                                 }
                             }}
@@ -616,11 +647,11 @@ export default function DashboardPage() {
                                 borderRadius: "10px",
                                 fontWeight: 700,
                                 textTransform: "none",
-                                bgcolor: "#0088D6",
+                                bgcolor: COLORS.primary,
                                 px: 2,
                                 py: 0.8,
-                                boxShadow: "0 2px 8px rgba(0, 136, 214, 0.25)",
-                                "&:hover": { bgcolor: "#0070B3" }
+                                boxShadow: "0 2px 8px rgba(15, 118, 110, 0.25)",
+                                "&:hover": { bgcolor: COLORS.primaryDark }
                             }}
                         >
                             Xuất CSV
@@ -778,7 +809,7 @@ export default function DashboardPage() {
                         >
                             <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} flexWrap="wrap" gap={1}>
                                 <Stack direction="row" alignItems="center" spacing={1}>
-                                    <ShowChartOutlinedIcon sx={{ color: "#0088D6" }} />
+                                    <ShowChartOutlinedIcon sx={{ color: COLORS.primary }} />
                                     <Typography variant="h6" sx={{ fontWeight: 800, color: "#0F172A", fontSize: "1.05rem" }}>
                                         Biến Động Doanh Thu & Số Giao Dịch
                                     </Typography>
@@ -1022,7 +1053,7 @@ export default function DashboardPage() {
                         >
                             <Box display="flex" justifyContent="space-between" alignItems="center" mb={1} flexWrap="wrap" gap={1}>
                                 <Stack direction="row" alignItems="center" spacing={1}>
-                                    <MeetingRoomOutlinedIcon sx={{ color: "#0088D6" }} />
+                                    <MeetingRoomOutlinedIcon sx={{ color: COLORS.primary }} />
                                     <Typography variant="h6" sx={{ fontWeight: 800, color: "#0F172A", fontSize: "1.05rem" }}>
                                         Giám Sát Buồng Khám & Mức Tải
                                     </Typography>
@@ -1034,8 +1065,8 @@ export default function DashboardPage() {
                                         fontWeight: 700,
                                         fontSize: "0.72rem",
                                         borderRadius: "6px",
-                                        bgcolor: overloadedRoomsCount > 0 ? "rgba(239, 68, 68, 0.08)" : "rgba(0, 136, 214, 0.08)",
-                                        color: overloadedRoomsCount > 0 ? "#EF4444" : "#0088D6"
+                                        bgcolor: overloadedRoomsCount > 0 ? "rgba(239, 68, 68, 0.08)" : COLORS.primaryLight,
+                                        color: overloadedRoomsCount > 0 ? "#EF4444" : COLORS.primary
                                     }}
                                 />
                             </Box>
@@ -1120,8 +1151,8 @@ export default function DashboardPage() {
                                                                     fontSize: "0.68rem",
                                                                     fontWeight: 700,
                                                                     borderRadius: "4px",
-                                                                    bgcolor: (rm.examiningCount || 0) > 0 ? "rgba(0, 136, 214, 0.1)" : "#F1F5F9",
-                                                                    color: (rm.examiningCount || 0) > 0 ? "#0088D6" : "#94A3B8"
+                                                                    bgcolor: (rm.examiningCount || 0) > 0 ? COLORS.primaryLight : "#F1F5F9",
+                                                                    color: (rm.examiningCount || 0) > 0 ? COLORS.primary : "#94A3B8"
                                                                 }}
                                                             />
                                                         </TableCell>
@@ -1134,8 +1165,8 @@ export default function DashboardPage() {
                                                                     fontSize: "0.65rem",
                                                                     height: 20,
                                                                     borderRadius: "4px",
-                                                                    bgcolor: isHeavy ? "rgba(239, 68, 68, 0.1)" : (rm.examiningCount > 0 ? "rgba(0, 136, 214, 0.1)" : "rgba(0, 168, 120, 0.1)"),
-                                                                    color: isHeavy ? "#EF4444" : (rm.examiningCount > 0 ? "#0088D6" : "#00A878")
+                                                                    bgcolor: isHeavy ? "rgba(239, 68, 68, 0.1)" : (rm.examiningCount > 0 ? COLORS.primaryLight : "rgba(0, 168, 120, 0.1)"),
+                                                                    color: isHeavy ? "#EF4444" : (rm.examiningCount > 0 ? COLORS.primary : "#00A878")
                                                                 }}
                                                             />
                                                         </TableCell>
@@ -1171,7 +1202,7 @@ export default function DashboardPage() {
                 >
                     <Box display="flex" justifyContent="space-between" alignItems="center" mb={1.5} flexWrap="wrap" gap={1}>
                         <Stack direction="row" alignItems="center" spacing={1}>
-                            <SecurityOutlinedIcon sx={{ color: "#0088D6" }} />
+                            <SecurityOutlinedIcon sx={{ color: COLORS.primary }} />
                             <Typography variant="h6" sx={{ fontWeight: 800, color: "#0F172A", fontSize: "1.05rem" }}>
                                 Nhật Ký Kiểm Toán Toàn Viện (Immutable Audit Trail)
                             </Typography>
@@ -1236,14 +1267,14 @@ export default function DashboardPage() {
                                                         borderRadius: "4px",
                                                         bgcolor: log.action?.includes("DELETE") || log.action?.includes("CANCEL") ? "rgba(239, 68, 68, 0.1)" :
                                                             log.action?.includes("UPDATE") || log.action?.includes("PAY") ? "rgba(245, 158, 11, 0.1)" :
-                                                            log.action?.includes("CREATE") || log.action?.includes("CHECK_IN") ? "rgba(0, 168, 120, 0.1)" : "rgba(0, 136, 214, 0.1)",
+                                                            log.action?.includes("CREATE") || log.action?.includes("CHECK_IN") ? "rgba(0, 168, 120, 0.1)" : COLORS.primaryLight,
                                                         color: log.action?.includes("DELETE") || log.action?.includes("CANCEL") ? "#EF4444" :
                                                             log.action?.includes("UPDATE") || log.action?.includes("PAY") ? "#D97706" :
-                                                            log.action?.includes("CREATE") || log.action?.includes("CHECK_IN") ? "#00A878" : "#0088D6"
+                                                            log.action?.includes("CREATE") || log.action?.includes("CHECK_IN") ? "#00A878" : COLORS.primary
                                                     }}
                                                 />
                                             </TableCell>
-                                            <TableCell sx={{ fontWeight: 700, color: "#0088D6", fontSize: "0.78rem" }}>
+                                            <TableCell sx={{ fontWeight: 700, color: COLORS.primary, fontSize: "0.78rem" }}>
                                                 {log.actorName || "Hệ thống"}
                                             </TableCell>
                                             <TableCell>

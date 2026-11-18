@@ -148,18 +148,8 @@ export default function CounterManagementPanel({ onPatientDispatched, onOpenPayM
 
   // Tính toán danh sách buồng khám và số lượng bệnh nhân đang chờ thực tế (Smart Load Balancing)
   const standardClinicRooms = useMemo(() => {
-    const defaultRooms = [
-      { roomId: "101", roomName: "Phòng 101", departmentName: "Khoa Nội Tổng Quát", doctorName: "BS. Mai Thị Lan" },
-      { roomId: "102", roomName: "Phòng 102", departmentName: "Khoa Nội Tổng Quát", doctorName: "BS. Nguyễn Văn Hùng" },
-      { roomId: "201", roomName: "Phòng 201", departmentName: "Khoa Tim Mạch", doctorName: "BS. Lê Tuấn Anh" },
-      { roomId: "301", roomName: "Phòng 301", departmentName: "Khoa Nhi", doctorName: "BS. Phạm Thị Hoa" },
-      { roomId: "401", roomName: "Phòng 401", departmentName: "Khoa Răng Hàm Mặt", doctorName: "BS. Vũ Đình Trọng" },
-      { roomId: "501", roomName: "Phòng 501", departmentName: "Khoa Tai Mũi Họng", doctorName: "BS. Đỗ Minh Khang" }
-    ];
     const filteredInput = Array.isArray(rooms) ? rooms.filter(isClinicalConsultationRoom) : [];
-    const rawRooms = filteredInput.length > 0 ? filteredInput : defaultRooms;
-
-    return rawRooms.map(r => {
+    return filteredInput.map(r => {
       const waitCount = (queueList || []).filter(q =>
         (String(q.roomId) === String(r.roomId) || q.roomName === r.roomName) && q.status === "WAITING"
       ).length;
@@ -180,12 +170,15 @@ export default function CounterManagementPanel({ onPatientDispatched, onOpenPayM
     if (!activeTicket) return standardClinicRooms;
     const targetDept = (activeTicket.departmentName || "").trim().toLowerCase();
     const targetDeptId = activeTicket.departmentId ? String(activeTicket.departmentId) : null;
+    if (!targetDept && !targetDeptId) {
+      return [];
+    }
     const filtered = standardClinicRooms.filter(r => {
       if (targetDeptId && String(r.departmentId) === targetDeptId) return true;
       if (targetDept && r.departmentName && (r.departmentName.toLowerCase().includes(targetDept) || targetDept.includes(r.departmentName.toLowerCase()))) return true;
       return false;
     });
-    return (targetDept || targetDeptId) ? filtered : standardClinicRooms;
+    return filtered;
   }, [payTargetTicket, currentCallingTicket, standardClinicRooms]);
 
   // Tìm buồng khám có ít người chờ nhất trong đúng chuyên khoa của bệnh nhân
@@ -398,21 +391,27 @@ export default function CounterManagementPanel({ onPatientDispatched, onOpenPayM
     const cName = counter?.counterName || "Quầy tiếp đón";
     const cCode = counter?.counterCode || "";
     const priorityPrefix = ticket.isPriority ? "ưu tiên " : "";
+    const ticketIdPhrase = ticket.ticketCode
+      ? `số thứ tự ${ticket.ticketCode}`
+      : (ticket.bookingCode ? `mã đặt hẹn ${ticket.bookingCode}` : "");
+    const callTargetPhrase = ticketIdPhrase
+      ? `Xin mời bệnh nhân ${priorityPrefix}${ticket.patientName}, ${ticketIdPhrase}`
+      : `Xin mời bệnh nhân ${priorityPrefix}${ticket.patientName}`;
     
     // Tạo câu thoại chuyên trách theo từng loại quầy nghiệp vụ
-    let sentence = `Xin mời bệnh nhân ${priorityPrefix}${ticket.patientName}, số thứ tự ${ticket.ticketCode}, đến ${cName} để làm thủ tục.`;
+    let sentence = `${callTargetPhrase}, đến ${cName} để làm thủ tục.`;
     if (cCode === "CTR-01" || cName.includes("Thu Tiền Khám")) {
-      sentence = `Xin mời bệnh nhân ${priorityPrefix}${ticket.patientName}, số thứ tự ${ticket.ticketCode}, đến Quầy 1 Tiếp đón Thường, để nộp tiền khám và làm thủ tục.`;
+      sentence = `${callTargetPhrase}, đến Quầy 1 Tiếp đón Thường, để nộp tiền khám và làm thủ tục.`;
     } else if (cCode === "CTR-02" || cName.includes("Xét Nghiệm")) {
-      sentence = `Xin mời bệnh nhân ${priorityPrefix}${ticket.patientName}, số thứ tự ${ticket.ticketCode}, đến Quầy 2 Thu Tiền Xét Nghiệm, để nộp chi phí xét nghiệm cận lâm sàng.`;
+      sentence = `${callTargetPhrase}, đến Quầy 2 Thu Tiền Xét Nghiệm, để nộp chi phí xét nghiệm cận lâm sàng.`;
     } else if (cCode === "CTR-03" || cName.includes("BHYT")) {
-      sentence = `Xin mời bệnh nhân ${ticket.patientName}, số thứ tự ${ticket.ticketCode}, đến Quầy 3 Tiếp nhận Bảo hiểm y tế, để làm thủ tục và kiểm tra thẻ.`;
+      sentence = `${callTargetPhrase}, đến Quầy 3 Tiếp nhận Bảo hiểm y tế, để làm thủ tục và kiểm tra thẻ.`;
     } else if (cCode === "CTR-04" || cName.includes("Ưu Tiên")) {
-      sentence = `Xin mời bệnh nhân ưu tiên ${ticket.patientName}, số thứ tự ${ticket.ticketCode}, đến Quầy 4 Tiếp đón Ưu Tiên, để làm thủ tục tiếp đón và thanh toán.`;
+      sentence = `${callTargetPhrase}, đến Quầy 4 Tiếp đón Ưu Tiên, để làm thủ tục tiếp đón và thanh toán.`;
     } else if (cCode === "CTR-05" || cName.includes("Đặt hẹn")) {
-      sentence = `Xin mời bệnh nhân ${ticket.patientName}, số thứ tự ${ticket.ticketCode}, đến Quầy 5 Tiếp nhận Đặt hẹn, để làm thủ tục check-in.`;
+      sentence = `${callTargetPhrase}, đến Quầy 5 Tiếp nhận Đặt hẹn, để làm thủ tục check-in.`;
     } else if (cCode === "CTR-06" || cName.includes("Nội Trú")) {
-      sentence = `Xin mời bệnh nhân ${ticket.patientName}, số thứ tự ${ticket.ticketCode}, đến Quầy 6 Thu Tiền Nội Trú, để làm thủ tục thanh toán viện phí.`;
+      sentence = `${callTargetPhrase}, đến Quầy 6 Thu Tiền Nội Trú, để làm thủ tục thanh toán viện phí.`;
     }
 
     try {
@@ -438,7 +437,7 @@ export default function CounterManagementPanel({ onPatientDispatched, onOpenPayM
         }, 70);
       } else {
         await speakCashierCall({
-          ticketCode: ticket.ticketCode,
+          ticketCode: ticket.ticketCode || null,
           patientName: ticket.patientName,
           counterName: cName,
           isPriority: ticket.isPriority
@@ -539,12 +538,16 @@ export default function CounterManagementPanel({ onPatientDispatched, onOpenPayM
     const calling = {
       ...ticket,
       status: "CALLING",
-      ticketCode: ticket.ticketCode || ticket.queueCode || `#${ticket.queueNumber || 1}`
+      ticketCode: ticket.ticketCode || null,
+      bookingQueueCode: ticket.bookingQueueCode || ticket.queueCode || null
     };
     updateCurrentCallingTicket(calling);
+    const identifier = calling.ticketCode 
+      ? `[${calling.ticketCode}]`
+      : (calling.bookingCode ? `[Hẹn: ${calling.bookingCode}]` : "");
     setFeedback({
       type: "success",
-      message: `🔔 Đang phát loa gọi bệnh nhân [${ticket.patientName}] (${calling.ticketCode}) vào ${activeCounter?.counterName || "Quầy Tiếp Đón"} để nộp viện phí!`
+      message: `🔔 Đang phát loa gọi bệnh nhân [${ticket.patientName}] ${identifier ? `${identifier} ` : ""}vào ${activeCounter?.counterName || "Quầy Tiếp Đón"} để nộp viện phí!`
     });
     await announceCounterCall(calling, activeCounter);
   };
@@ -594,12 +597,16 @@ export default function CounterManagementPanel({ onPatientDispatched, onOpenPayM
         const calling = {
           ...ticket,
           status: "CALLING",
-          ticketCode: ticket.ticketCode || ticket.queueCode || `#${ticket.queueNumber || 1}`
+          ticketCode: ticket.ticketCode || null,
+          bookingQueueCode: ticket.bookingQueueCode || ticket.queueCode || null
         };
         updateCurrentCallingTicket(calling);
+        const identifier = calling.ticketCode 
+          ? `[${calling.ticketCode}]`
+          : (calling.bookingCode ? `[Hẹn: ${calling.bookingCode}]` : "");
         setFeedback({
           type: "success",
-          message: `🔔 Đang phát loa gọi ${calling.isPriority ? "Bệnh nhân ƯU TIÊN" : "Bệnh nhân"} [${calling.ticketCode}] - ${calling.patientName} vào ${activeCounter?.counterName} để nộp tiền và làm thủ tục!`
+          message: `🔔 Đang phát loa gọi ${calling.isPriority ? "Bệnh nhân ƯU TIÊN" : "Bệnh nhân"} [${calling.patientName}] ${identifier ? `${identifier} ` : ""}vào ${activeCounter?.counterName} để nộp tiền và làm thủ tục!`
         });
 
         // Phát chuông ding dong và đọc loa giọng nói chuyên trách
@@ -619,9 +626,10 @@ export default function CounterManagementPanel({ onPatientDispatched, onOpenPayM
   const handleRecallCurrent = () => {
     if (!currentCallingTicket) return;
     announceCounterCall(currentCallingTicket, activeCounter);
+    const identifier = currentCallingTicket.ticketCode || currentCallingTicket.bookingCode || "chưa có mã";
     setFeedback({
       type: "info",
-      message: `Đã phát loa gọi lại số ${currentCallingTicket.ticketCode} - ${currentCallingTicket.patientName}.`
+      message: `Đã phát loa gọi lại số ${identifier} - ${currentCallingTicket.patientName}.`
     });
   };
 
@@ -634,9 +642,10 @@ export default function CounterManagementPanel({ onPatientDispatched, onOpenPayM
       if (isNumeric) {
         await axiosInstance.post(`/api/counters/${selectedCounterId}/tickets/${currentCallingTicket.ticketId}/skip`).catch(() => null);
       }
+      const identifier = currentCallingTicket.ticketCode || currentCallingTicket.bookingCode || "chưa có mã";
       setFeedback({
         type: "info",
-        message: `Đã bỏ qua số [${currentCallingTicket.ticketCode}] do vắng mặt.`
+        message: `Đã bỏ qua lượt [${identifier}] do vắng mặt.`
       });
       updateCurrentCallingTicket(null);
       await fetchCounterQueue(selectedCounterId);
@@ -649,127 +658,13 @@ export default function CounterManagementPanel({ onPatientDispatched, onOpenPayM
   };
 
   // Tìm hóa đơn / xét nghiệm chờ thu ứng với vé
-  const getTicketPendingBill = (ticket) => {
-    if (!ticket) return null;
-    if (ticket.billId) {
-      const byBillId = pendingBills.find(b => b.billId === ticket.billId);
-      if (byBillId) return byBillId;
-    }
-    if (ticket.ticketId && String(ticket.ticketId).startsWith("BILL-")) {
-      const byTicketBillId = pendingBills.find(b => b.billId === String(ticket.ticketId));
-      if (byTicketBillId) return byTicketBillId;
-    }
-    if (!ticket.bookingCode) return null;
-    const billsForBooking = pendingBills.filter(b => b.bookingCode === ticket.bookingCode);
-    return billsForBooking.find(b => b.billType === "TEST" || b.billType === "PRESCRIPTION" || b.billType === "TREATMENT")
-      || billsForBooking[0]
-      || null;
-  };
+  const getTicketPendingBill = (ticket) => getTicketPendingBillPure(ticket, pendingBills);
 
   // Kiểm tra vé có phải là hóa đơn thu phí CLS / Đơn thuốc (đã đóng tiền khám ban đầu)
-  const isClsOrTreatmentTicket = (ticket) => {
-    if (!ticket) return false;
-    const tId = String(ticket.billId || ticket.ticketId || "");
-    const tCode = String(ticket.ticketCode || "");
-    if (
-      ticket.isClsBill ||
-      ticket.billType === "TEST" ||
-      ticket.billType === "PRESCRIPTION" ||
-      ticket.billType === "TREATMENT" ||
-      /-(TEST|PRESCRIPTION|TREATMENT)$/i.test(tId) ||
-      tCode.startsWith("CLS-") ||
-      tCode.startsWith("THUOC-")
-    ) {
-      return true;
-    }
-    if (ticket.bookingCode) {
-      const billsForBooking = pendingBills.filter(b => b.bookingCode === ticket.bookingCode);
-      const hasExamBill = billsForBooking.some(b => b.billType === "EXAM");
-      const hasTreatmentBill = billsForBooking.some(b => b.billType === "TEST" || b.billType === "PRESCRIPTION" || b.billType === "TREATMENT");
-      if (!hasExamBill && hasTreatmentBill && ticket.source === "PENDING_BILLS") {
-        return true;
-      }
-    }
-    return false;
-  };
+  const isClsOrTreatmentTicket = (ticket) => isClsOrTreatmentTicketPure(ticket, pendingBills);
 
   // Tính tổng số tiền cần thanh toán cho vé đang gọi
-  const calculateTicketDue = (ticket) => {
-    if (!ticket) return { consultationFee: 0, testFee: 0, totalDue: 0, testItems: [], targetBillId: null, isClsOnly: false };
-    const bill = getTicketPendingBill(ticket);
-    const billsForBooking = ticket.bookingCode
-      ? pendingBills.filter(b => b.bookingCode === ticket.bookingCode)
-      : (bill ? [bill] : []);
-
-    const examBill = billsForBooking.find(b => b.billType === "EXAM");
-    const treatmentBills = billsForBooking.filter(
-      b => b.billType === "TEST" || b.billType === "PRESCRIPTION" || b.billType === "TREATMENT"
-    );
-    const matchedQueueBooking = ticket.bookingCode
-      ? (queueList || []).find(q => q.bookingCode === ticket.bookingCode)
-      : null;
-
-    const explicitCls = isClsOrTreatmentTicket(ticket);
-    const isClsOnly = explicitCls && !examBill;
-
-    let consultationFee = 0;
-    if (!ticket.isPaid && !isClsOnly) {
-      if (examBill && Number(examBill.totalAmount) > 0) {
-        consultationFee = Number(examBill.totalAmount);
-      } else if (matchedQueueBooking && !matchedQueueBooking.isPaid && Number(matchedQueueBooking.price) > 0) {
-        consultationFee = Number(matchedQueueBooking.price);
-      } else if (matchedQueueBooking && matchedQueueBooking.isPaid && treatmentBills.length > 0) {
-        consultationFee = 0;
-      } else if (ticket.price != null && Number(ticket.price) > 0) {
-        consultationFee = Number(ticket.price);
-      }
-    }
-
-    let testItems = [];
-    const sourceBills = treatmentBills.length > 0 ? treatmentBills : (bill ? [bill] : []);
-    sourceBills.forEach(b => {
-      if (b && Array.isArray(b.items)) {
-        b.items.forEach(i => {
-          if (
-            i.category === "TEST" ||
-            i.category === "MEDICINE" ||
-            i.itemType === "LAB_TEST" ||
-            i.itemType === "SERVICE"
-          ) {
-            testItems.push({
-              ...i,
-              itemName: i.itemName || i.name || "Chỉ định Cận lâm sàng / Thuốc",
-              unitPrice: Number(i.unitPrice ?? i.totalPrice ?? 0),
-              totalPrice: Number(i.totalPrice ?? i.unitPrice ?? 0)
-            });
-          }
-        });
-      }
-    });
-
-    if (isClsOnly && testItems.length === 0) {
-      const fallbackAmt = Number(ticket.testFee ?? bill?.totalAmount ?? ticket.price ?? 0);
-      if (fallbackAmt > 0) {
-        testItems.push({
-          itemId: ticket.billId || ticket.ticketId || "CLS-FEE",
-          itemName: "Chi phí Cận lâm sàng & Xét nghiệm",
-          unitPrice: fallbackAmt,
-          totalPrice: fallbackAmt,
-          category: "TEST"
-        });
-      }
-    }
-
-    const testFee = testItems.reduce((acc, curr) => acc + (Number(curr.totalPrice) || Number(curr.unitPrice) || 0), 0);
-    const totalDue = consultationFee + testFee;
-    const targetBillId =
-      (explicitCls && (ticket.billId || (String(ticket.ticketId || "").startsWith("BILL-") ? String(ticket.ticketId) : null))) ||
-      (treatmentBills[0]?.billId) ||
-      (bill?.billId) ||
-      null;
-
-    return { consultationFee, testFee, totalDue, testItems, targetBillId, isClsOnly: isClsOnly || (consultationFee === 0 && testFee > 0) };
-  };
+  const calculateTicketDue = (ticket) => calculateTicketDuePure(ticket, { pendingBills, queueList });
 
   // Mở modal thu tiền nhanh & tự động dispatch vào buồng bác sĩ
   const handleOpenQuickPay = (ticket) => {
@@ -786,8 +681,8 @@ export default function CounterManagementPanel({ onPatientDispatched, onOpenPayM
 
     // Mặc định chọn cân bằng tải tự động (buồng ít người nhất)
     setDispatchMode("AUTO");
-    const bestRoom = leastLoadedRoom || standardClinicRooms[0];
-    setSelectedTargetRoomId(t.dispatchedRoomId ? t.dispatchedRoomId.toString() : (bestRoom ? bestRoom.roomId : "101"));
+    const bestRoom = leastLoadedRoom || (eligibleRoomsForTicket && eligibleRoomsForTicket.length > 0 ? eligibleRoomsForTicket[0] : null);
+    setSelectedTargetRoomId(t.dispatchedRoomId ? t.dispatchedRoomId.toString() : (bestRoom ? bestRoom.roomId.toString() : ""));
 
     // Reset dữ liệu PayOS
     setPayosData(null);
@@ -819,149 +714,38 @@ export default function CounterManagementPanel({ onPatientDispatched, onOpenPayM
     setModalAlert({ type: "", message: "" });
     setPayingAndDispatching(true);
     try {
-      const { consultationFee, testFee, totalDue, testItems, targetBillId, isClsOnly } = calculateTicketDue(ticket);
-      let receiptData = null;
+      const isAlreadyPaid = Boolean(ticket.isPaid || dispatchRetryNeeded);
+      const result = await executePayAndDispatch({
+        ticket,
+        effectiveCounterId,
+        paymentMethod,
+        amountGiven,
+        paymentNotes,
+        dispatchMode,
+        selectedTargetRoomId,
+        candidateRooms: eligibleRoomsForTicket || [],
+        leastLoadedRoom,
+        isAlreadyPaid,
+        queueList,
+        pendingBills,
+        axiosClient: axiosInstance
+      });
 
-      // Tìm mã lượt khám bookingId chuẩn nếu phiếu chưa gắn trực tiếp
-      let effectiveBookingId = ticket.bookingId;
-      if (!effectiveBookingId && ticket.bookingCode && queueList) {
-        const matched = queueList.find(q => q.bookingCode === ticket.bookingCode);
-        if (matched && matched.bookingId) {
-          effectiveBookingId = matched.bookingId;
-        }
-      }
-      if (!effectiveBookingId && ticket.ticketId) {
-        const strId = String(ticket.ticketId);
-        if (strId.length === 36 && strId.includes("-")) {
-          effectiveBookingId = strId;
-        }
-      }
-
-      const isAlreadyPaid = ticket.isPaid || dispatchRetryNeeded;
-
-      // 1. Thực hiện thu tiền khám lâm sàng ban đầu nếu chưa thanh toán
-      if (!isAlreadyPaid && consultationFee > 0 && (effectiveBookingId || ticket.bookingCode)) {
-        const payPayload = {
-          bookingId: (effectiveBookingId && String(effectiveBookingId).length === 36) ? effectiveBookingId : undefined,
-          bookingCode: ticket.bookingCode || (!effectiveBookingId || String(effectiveBookingId).length !== 36 ? String(effectiveBookingId || ticket.ticketId) : undefined),
-          amount: consultationFee,
-          paymentMethod: paymentMethod || "CASH",
-          cashierNotes: paymentNotes || `Thu tiền khám tại quầy dịch vụ cho phiếu ${ticket.ticketCode || ""}`
-        };
-        const payRes = await axiosInstance.post("/api/nurse/reception/pay-at-clinic", payPayload);
-        receiptData = payRes?.data?.data || payRes?.data;
-        if (testFee <= 0) {
+      if (!result.success) {
+        if (result.dispatchRetryNeeded) {
           ticket.isPaid = true;
-        }
-      }
-
-      // 2. Thu tiền xét nghiệm CLS / Đơn thuốc nếu có chỉ định phát sinh và chưa trả
-      if (!isAlreadyPaid && testFee > 0 && (targetBillId || ticket.bookingCode)) {
-        const givenNum = Math.max(Number(amountGiven) || 0, totalDue);
-        const testPayPayload = {
-          bookingCode: targetBillId || ticket.bookingCode,
-          paymentMethod: paymentMethod || "CASH",
-          amountGiven: givenNum,
-          notes: paymentNotes || `Thu phí xét nghiệm CLS tại quầy cho phiếu ${ticket.ticketCode || ""}`
-        };
-        if (consultationFee === 0) {
-          const testRes = await axiosInstance.post("/api/cashier/pay", testPayPayload);
-          const cashData = testRes?.data?.data || testRes?.data;
-          if (cashData) {
-            receiptData = {
-              ...cashData,
-              paidAmount: cashData.totalAmount || testFee,
-              phoneNumber: cashData.patientPhone || ticket.phoneNumber
-            };
-          }
-          ticket.isPaid = true;
+          setDispatchRetryNeeded(true);
+          setModalAlert({ type: "error", message: result.error });
+          setFeedback({ type: "error", message: result.error });
+          await fetchCounterQueue(effectiveCounterId);
+          await fetchPendingBills();
+          if (onPatientDispatched) onPatientDispatched();
+          return;
         } else {
-          const testRes = await axiosInstance.post("/api/cashier/pay", testPayPayload).catch(e => {
-            console.warn("Lỗi thu phí CLS qua cashier API:", e);
-            return null;
-          });
-          if (testRes?.data?.data) {
-            receiptData = testRes.data.data;
-          }
-          ticket.isPaid = true;
+          setModalAlert({ type: "error", message: result.error });
+          setFeedback({ type: "error", message: result.error });
+          return;
         }
-      }
-
-      // Xác định buồng khám đích: Chỉ được chọn trong danh sách buồng hợp lệ của chuyên khoa
-      const candidateRooms = (eligibleRoomsForTicket && eligibleRoomsForTicket.length > 0)
-        ? eligibleRoomsForTicket
-        : (standardClinicRooms && standardClinicRooms.length > 0 ? standardClinicRooms : (rooms || []).filter(isClinicalConsultationRoom));
-
-      const targetRoom = dispatchMode === "AUTO"
-        ? (leastLoadedRoom || candidateRooms[0] || null)
-        : (candidateRooms.find(r => String(r.roomId) === String(selectedTargetRoomId)) || leastLoadedRoom || candidateRooms[0] || null);
-
-      const isNumericTicketId = ticket.ticketId != null && /^\d+$/.test(String(ticket.ticketId));
-
-      if (!isClsOnly && !targetRoom && (ticket.departmentName || ticket.departmentId) && candidateRooms.length === 0) {
-        const roomErrMsg = `Không tìm thấy buồng khám hợp lệ thuộc khoa [${ticket.departmentName || ticket.departmentId}]. Vui lòng cấu hình lịch trực hoặc buồng khám trước!`;
-        setModalAlert({ type: "error", message: roomErrMsg });
-        setFeedback({ type: "error", message: roomErrMsg });
-        return;
-      }
-
-      const targetRoomId = targetRoom ? parseInt(targetRoom.roomId) : (selectedTargetRoomId ? parseInt(selectedTargetRoomId) : 101);
-      const targetRoomName = targetRoom ? targetRoom.roomName : (ticket.roomName || `Phòng ${targetRoomId}`);
-      const targetDoctor = targetRoom ? targetRoom.doctorName : (ticket.doctorName || "Bác sĩ phụ trách");
-
-      // 3. TỰ ĐỘNG HOÀN TẤT VÉ VÀ ĐƯA VÀO HÀNG ĐỢI PHÒNG KHÁM BÁC SĨ (NẾU LÀ VÉ TIẾP ĐÓN KHÁM BAN ĐẦU)
-      let dispatchSucceeded = false;
-      let dispatchErrorMsg = "";
-      if (isClsOnly && !isNumericTicketId) {
-        // Hóa đơn thu phí CLS / Đơn thuốc phát sinh khi bệnh nhân đang khám -> Không điều phối lại buồng khám bác sĩ
-        dispatchSucceeded = true;
-      } else {
-        try {
-          if (isNumericTicketId) {
-            try {
-              await axiosInstance.post(`/api/counters/${effectiveCounterId}/tickets/${ticket.ticketId}/complete`, {
-                targetRoomId: targetRoomId
-              });
-            } catch (firstErr) {
-              // Nếu phòng tự động chọn chưa gắn lịch trực của ca khám này, fallback về phòng đã đặt trong lịch của booking
-              await axiosInstance.post(`/api/counters/${effectiveCounterId}/tickets/${ticket.ticketId}/complete`, {});
-            }
-            dispatchSucceeded = true;
-          } else if (effectiveBookingId || ticket.ticketId || ticket.bookingCode) {
-            const bId = effectiveBookingId || (ticket.ticketId && String(ticket.ticketId).length === 36 ? ticket.ticketId : undefined);
-            try {
-              await axiosInstance.post(`/api/nurse/reception/dispatch`, {
-                bookingId: bId,
-                bookingCode: ticket.bookingCode,
-                targetRoomId: targetRoomId,
-                roomId: targetRoomId
-              });
-            } catch (firstErr) {
-              await axiosInstance.post(`/api/nurse/reception/dispatch`, {
-                bookingId: bId,
-                bookingCode: ticket.bookingCode
-              });
-            }
-            dispatchSucceeded = true;
-          } else {
-            dispatchSucceeded = true;
-          }
-        } catch (dispErr) {
-          dispatchErrorMsg = dispErr.response?.data?.message || dispErr.message || "Lỗi điều phối buồng khám";
-          console.error("Lỗi điều phối buồng khám:", dispErr);
-        }
-      }
-
-      if (!dispatchSucceeded) {
-        ticket.isPaid = true; // Đánh dấu đã nộp để lần thử lại không thu tiền lại
-        setDispatchRetryNeeded(true);
-        const dispFailMsg = `Khoản phí đã được ghi nhận thành công, nhưng chưa thể điều phối vào buồng khám: ${dispatchErrorMsg}. Vui lòng chọn lại buồng khám và ấn [Thử Lại Điều Phối]!`;
-        setModalAlert({ type: "error", message: dispFailMsg });
-        setFeedback({ type: "error", message: dispFailMsg });
-        await fetchCounterQueue(effectiveCounterId);
-        await fetchPendingBills();
-        if (onPatientDispatched) onPatientDispatched();
-        return;
       }
 
       setDispatchRetryNeeded(false);
@@ -970,12 +754,12 @@ export default function CounterManagementPanel({ onPatientDispatched, onOpenPayM
       // 4. Phát loa tự động mời bệnh nhân đến phòng khám Bác sĩ
       try {
         speakPatientCall({
-          queueCode: ticket.bookingQueueCode || ticket.ticketCode,
-          queueNumber: ticket.bookingQueueNumber || ticket.queueNumber,
+          queueCode: ticket.bookingQueueCode || ticket.queueCode || null,
+          queueNumber: ticket.bookingQueueNumber || ticket.queueNumber || null,
           patientName: ticket.patientName,
-          roomName: targetRoomName,
-          departmentName: targetRoom?.departmentName || ticket.departmentName || "Khoa Khám Bệnh",
-          doctorName: targetDoctor,
+          roomName: result.targetRoomName,
+          departmentName: result.targetRoom?.departmentName || ticket.departmentName || null,
+          doctorName: result.targetDoctor,
           isPriority: ticket.isPriority,
           isReturnAfterResult: false
         });
@@ -984,32 +768,33 @@ export default function CounterManagementPanel({ onPatientDispatched, onOpenPayM
       }
 
       // 5. Chuẩn bị dữ liệu biên lai A5 để in ấn
+      let receiptData = result.receiptData;
       if (!receiptData) {
         receiptData = {
-          receiptCode: `HD-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${ticket.ticketCode || "01"}`,
+          receiptCode: `HD-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${ticket.ticketCode || ticket.bookingCode || "QUAY"}`,
           patientName: ticket.patientName,
           phoneNumber: ticket.phoneNumber,
-          paidAmount: totalDue,
-          totalAmount: totalDue,
+          paidAmount: result.totalDue,
+          totalAmount: result.totalDue,
           paymentMethod: paymentMethod || "CASH",
-          departmentName: targetRoom?.departmentName || ticket.departmentName || "Khoa Khám Bệnh",
-          doctorName: targetDoctor,
+          departmentName: result.targetRoom?.departmentName || ticket.departmentName || "Khoa Khám Bệnh",
+          doctorName: result.targetDoctor,
           paidAt: new Date().toLocaleTimeString("vi-VN") + " " + formatDate(new Date()),
-          items: testItems.length > 0
+          items: result.testItems.length > 0
             ? [
-                ...(consultationFee > 0 ? [{ itemName: "Công khám lâm sàng chuyên khoa", quantity: 1, totalPrice: consultationFee }] : []),
-                ...testItems
+                ...(result.consultationFee > 0 ? [{ itemName: "Công khám lâm sàng chuyên khoa", quantity: 1, totalPrice: result.consultationFee }] : []),
+                ...result.testItems
               ]
-            : [{ itemName: "Công khám lâm sàng chuyên khoa", quantity: 1, totalPrice: consultationFee }]
+            : [{ itemName: "Công khám lâm sàng chuyên khoa", quantity: 1, totalPrice: result.consultationFee }]
         };
       }
       setRecentReceipt(receiptData);
 
       setFeedback({
         type: "success",
-        message: isClsOnly
+        message: result.isClsOnly
           ? `✅ Thu phí Cận lâm sàng / Xét nghiệm thành công cho bệnh nhân [${ticket.patientName}]!`
-          : `✅ Thu viện phí thành công! Bệnh nhân [${ticket.patientName}] đã được TỰ ĐỘNG ĐIỀU PHỐI vào hàng đợi [${targetRoomName} - ${targetDoctor}].`
+          : `✅ Thu viện phí thành công! Bệnh nhân [${ticket.patientName}] đã được TỰ ĐỘNG ĐIỀU PHỐI vào hàng đợi [${result.targetRoomName || "Phòng khám"} - ${result.targetDoctor || "BS"}].`
       });
 
       setOpenQuickPayModal(false);
@@ -1056,11 +841,11 @@ export default function CounterManagementPanel({ onPatientDispatched, onOpenPayM
 
       const destRoom = t.roomName || "Phòng Khám Bác Sĩ";
       speakPatientCall({
-        queueCode: t.bookingQueueCode || t.ticketCode,
-        queueNumber: t.bookingQueueNumber || t.queueNumber,
+        queueCode: t.bookingQueueCode || t.queueCode || null,
+        queueNumber: t.bookingQueueNumber || t.queueNumber || null,
         patientName: t.patientName,
         roomName: destRoom,
-        departmentName: t.departmentName || "Khoa Khám Bệnh",
+        departmentName: t.departmentName || null,
         isPriority: t.isPriority,
         isReturnAfterResult: false
       });
@@ -1101,13 +886,16 @@ export default function CounterManagementPanel({ onPatientDispatched, onOpenPayM
           (currentCallingTicket.bookingCode && currentCallingTicket.bookingCode === item.bookingCode) ||
           (currentCallingTicket.bookingId && currentCallingTicket.bookingId === item.bookingId) ||
           (currentCallingTicket.ticketId && (currentCallingTicket.ticketId === item.bookingId || currentCallingTicket.ticketId === `BK-${item.bookingCode}`)) ||
-          (currentCallingTicket.ticketCode && item.queueCode && currentCallingTicket.ticketCode === item.queueCode) ||
+          (currentCallingTicket.ticketCode && item.ticketCode && currentCallingTicket.ticketCode === item.ticketCode) ||
+          (currentCallingTicket.bookingQueueCode && item.queueCode && currentCallingTicket.bookingQueueCode === item.queueCode) ||
           (currentCallingTicket.patientName && item.patientName && currentCallingTicket.patientName.trim().toLowerCase() === item.patientName.trim().toLowerCase())
         );
         list.push({
           ticketId: item.bookingId || `BK-${item.bookingCode}`,
-          ticketCode: item.queueCode?.startsWith("#") ? item.queueCode : (item.queueNumber ? `TH-${String(item.queueNumber).padStart(2, '0')}` : `#${item.bookingCode?.slice(-4) || "01"}`),
-          queueNumber: item.queueNumber || 1,
+          ticketCode: item.ticketCode || null,
+          bookingQueueCode: item.bookingQueueCode || item.queueCode || null,
+          queueCode: item.queueCode || null,
+          queueNumber: item.queueNumber || null,
           patientName: item.patientName,
           phoneNumber: item.phone || item.phoneNumber,
           bookingCode: item.bookingCode,
@@ -1140,8 +928,10 @@ export default function CounterManagementPanel({ onPatientDispatched, onOpenPayM
           billType: bill.billType,
           isClsBill: isTreatmentBill,
           items: bill.items || [],
-          ticketCode: isTreatmentBill ? `CLS-${bill.bookingCode?.slice(-3) || "01"}` : `KB-${bill.bookingCode?.slice(-3) || "01"}`,
-          queueNumber: 99,
+          ticketCode: bill.ticketCode || null,
+          bookingQueueCode: bill.bookingQueueCode || bill.queueCode || null,
+          queueCode: bill.queueCode || null,
+          queueNumber: null,
           patientName: bill.patientName,
           phoneNumber: bill.patientPhone || bill.phone,
           bookingCode: bill.bookingCode,
@@ -1474,7 +1264,7 @@ export default function CounterManagementPanel({ onPatientDispatched, onOpenPayM
                     color={currentCallingTicket.isPriority ? "#DC2626" : "#0D9488"}
                     sx={{ my: 0.5, textAlign: "center", letterSpacing: 1 }}
                   >
-                    {currentCallingTicket.ticketCode}
+                    {currentCallingTicket.ticketCode || (currentCallingTicket.bookingCode ? `Hẹn: ${currentCallingTicket.bookingCode}` : "Chưa có mã quầy")}
                   </Typography>
 
                   <Typography variant="h6" fontWeight="900" color="#0F172A" sx={{ textAlign: "center" }}>
@@ -1742,7 +1532,7 @@ export default function CounterManagementPanel({ onPatientDispatched, onOpenPayM
                             <TableCell sx={{ fontWeight: 900, color: ticket.isPriority ? "#DC2626" : "#0D9488" }}>
                               <Box display="flex" alignItems="center" gap={0.5}>
                                 {ticket.isPriority && <StarsIcon sx={{ fontSize: 16, color: "#DC2626" }} />}
-                                <span>{ticket.ticketCode}</span>
+                                <span>{ticket.ticketCode || (ticket.bookingQueueCode ? `Khám: ${ticket.bookingQueueCode}` : (ticket.bookingCode || "Chưa có mã"))}</span>
                               </Box>
                             </TableCell>
 
@@ -1863,7 +1653,7 @@ export default function CounterManagementPanel({ onPatientDispatched, onOpenPayM
         onClose={() => setOpenQuickPayModal(false)}
         maxWidth="sm"
         fullWidth
-        PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
+        PaperProps={{ sx: { borderRadius: 3, p: 1, maxHeight: "90vh", display: "flex", flexDirection: "column" } }}
       >
         <DialogTitle sx={{ fontWeight: 900, color: "#0F172A", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #E2E8F0" }}>
           <Box display="flex" alignItems="center" gap={1.2}>
@@ -1873,7 +1663,7 @@ export default function CounterManagementPanel({ onPatientDispatched, onOpenPayM
           <Chip label="Bàn Thu Ngân Tiếp Đón" color="primary" size="small" sx={{ fontWeight: 800 }} />
         </DialogTitle>
 
-        <DialogContent sx={{ pt: 2.5, maxHeight: "75vh", overflowY: "auto" }}>
+        <DialogContent sx={{ pt: 2.5, maxHeight: "75vh", overflowY: "auto", flex: 1 }}>
           {modalAlert.message && (
             <Alert
               severity={modalAlert.type || "error"}
@@ -1894,7 +1684,7 @@ export default function CounterManagementPanel({ onPatientDispatched, onOpenPayM
                   <Box display="flex" alignItems="center" gap={0.8}>
                     {renderReceptionSourceBadge(payTargetTicket)}
                     <Chip
-                      label={`Phiếu #${payTargetTicket.ticketCode}`}
+                      label={payTargetTicket.ticketCode ? `Phiếu #${payTargetTicket.ticketCode}` : (payTargetTicket.bookingCode ? `Mã hẹn #${payTargetTicket.bookingCode}` : "Chưa có mã quầy")}
                       color={payTargetTicket.isPriority ? "error" : "primary"}
                       size="small"
                       sx={{ fontWeight: 800 }}
@@ -2120,11 +1910,11 @@ export default function CounterManagementPanel({ onPatientDispatched, onOpenPayM
                           <Box sx={{ minWidth: 0, flex: 1, mr: 1 }}>
                             <Typography variant="caption" color="#64748B" display="block">Nội dung chuyển khoản:</Typography>
                             <Typography variant="body2" fontWeight={900} fontFamily="monospace" color="#0D9488" noWrap>
-                              {payosData?.transferContent || `VP ${payTargetTicket.ticketCode} ${payTargetTicket.bookingCode || ""}`}
+                              {payosData?.transferContent || `VP ${payTargetTicket.ticketCode || payTargetTicket.bookingCode || ""} ${payTargetTicket.bookingCode || ""}`.trim()}
                             </Typography>
                           </Box>
                           <Tooltip title="Sao chép nội dung">
-                            <IconButton size="small" onClick={() => handleCopy(payosData?.transferContent || `VP ${payTargetTicket.ticketCode} ${payTargetTicket.bookingCode || ""}`, "content")}>
+                            <IconButton size="small" onClick={() => handleCopy(payosData?.transferContent || `VP ${payTargetTicket.ticketCode || payTargetTicket.bookingCode || ""} ${payTargetTicket.bookingCode || ""}`.trim(), "content")}>
                               {copiedField === "content" ? <CheckIcon fontSize="small" color="success" /> : <ContentCopyIcon fontSize="small" />}
                             </IconButton>
                           </Tooltip>
@@ -2259,7 +2049,7 @@ export default function CounterManagementPanel({ onPatientDispatched, onOpenPayM
           </Box>
         )}
 
-        <DialogActions sx={{ p: 2, borderTop: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <DialogActions sx={{ p: 2, borderTop: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", bottom: 0, bgcolor: "#FFFFFF", zIndex: 2 }}>
           <Box>
             {payingAndDispatching && (
               <Typography variant="caption" sx={{ color: "#0D9488", fontWeight: 800, display: "flex", alignItems: "center", gap: 0.8 }}>
@@ -2274,7 +2064,7 @@ export default function CounterManagementPanel({ onPatientDispatched, onOpenPayM
             )}
           </Box>
           <Stack direction="row" spacing={1.5}>
-            <Button onClick={() => setOpenQuickPayModal(false)} color="inherit" sx={{ fontWeight: 700 }}>
+            <Button onClick={() => setOpenQuickPayModal(false)} color="inherit" sx={{ fontWeight: 700, minHeight: 44, minWidth: 44 }}>
               Hủy Bỏ
             </Button>
             <Button
@@ -2290,6 +2080,8 @@ export default function CounterManagementPanel({ onPatientDispatched, onOpenPayM
                 borderRadius: 2,
                 px: 3,
                 py: 1,
+                minHeight: 44,
+                minWidth: 44,
                 textTransform: "none"
               }}
             >
@@ -2309,13 +2101,13 @@ export default function CounterManagementPanel({ onPatientDispatched, onOpenPayM
         onClose={() => setOpenReceiptModal(false)}
         maxWidth="xs"
         fullWidth
-        PaperProps={{ sx: { borderRadius: 3 } }}
+        PaperProps={{ sx: { borderRadius: 3, maxHeight: "90vh" } }}
       >
         <DialogTitle sx={{ fontWeight: 900, color: "#0F172A", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span>Biên Lai Thu Viện Phí A5</span>
           <Chip label="Đã Xác Thực" color="success" size="small" sx={{ fontWeight: 800 }} />
         </DialogTitle>
-        <DialogContent dividers sx={{ p: 2.5 }}>
+        <DialogContent dividers sx={{ p: 2.5, maxHeight: "70vh", overflowY: "auto" }}>
           {recentReceipt && (
             <Box sx={{ p: 2, bgcolor: "#F8FAFC", borderRadius: 2, border: "1px dashed #CBD5E1" }}>
               <Typography variant="subtitle2" fontWeight="900" textAlign="center" color="#0F172A">
@@ -2344,7 +2136,7 @@ export default function CounterManagementPanel({ onPatientDispatched, onOpenPayM
           )}
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpenReceiptModal(false)} color="inherit" sx={{ fontWeight: 700 }}>
+          <Button onClick={() => setOpenReceiptModal(false)} color="inherit" sx={{ fontWeight: 700, minHeight: 44, minWidth: 44 }}>
             Đóng Lại
           </Button>
           <Button
@@ -2354,7 +2146,7 @@ export default function CounterManagementPanel({ onPatientDispatched, onOpenPayM
             onClick={() => {
               if (recentReceipt) printReceipt(recentReceipt);
             }}
-            sx={{ fontWeight: 800, borderRadius: 2, textTransform: "none" }}
+            sx={{ fontWeight: 800, borderRadius: 2, textTransform: "none", minHeight: 44, minWidth: 44 }}
           >
             In Biên Lai A5
           </Button>
@@ -2362,4 +2154,326 @@ export default function CounterManagementPanel({ onPatientDispatched, onOpenPayM
       </Dialog>
     </Paper>
   );
+}
+
+export function selectTargetRoomCandidate({ dispatchMode, selectedTargetRoomId, candidateRooms = [], leastLoadedRoom = null }) {
+  if (dispatchMode === "AUTO") {
+    return leastLoadedRoom || (candidateRooms.length > 0 ? candidateRooms[0] : null);
+  }
+  if (!selectedTargetRoomId) return null;
+  return candidateRooms.find(r => String(r.roomId) === String(selectedTargetRoomId)) || null;
+}
+
+export function filterEligibleRoomsForTicket(ticket, standardClinicRooms = []) {
+  if (!ticket) return standardClinicRooms;
+  const targetDept = (ticket.departmentName || "").trim().toLowerCase();
+  const targetDeptId = ticket.departmentId ? String(ticket.departmentId) : null;
+  if (!targetDept && !targetDeptId) return [];
+  return standardClinicRooms.filter(r => {
+    if (targetDeptId && String(r.departmentId) === targetDeptId) return true;
+    if (targetDept && r.departmentName && (r.departmentName.toLowerCase().includes(targetDept) || targetDept.includes(r.departmentName.toLowerCase()))) return true;
+    return false;
+  });
+}
+
+export const isClsOrTreatmentTicketPure = (ticket, pendingBills = []) => {
+  if (!ticket) return false;
+  const tId = String(ticket.billId || ticket.ticketId || "");
+  const tCode = String(ticket.ticketCode || "");
+  if (
+    ticket.isClsBill ||
+    ticket.billType === "TEST" ||
+    ticket.billType === "PRESCRIPTION" ||
+    ticket.billType === "TREATMENT" ||
+    /-(TEST|PRESCRIPTION|TREATMENT)$/i.test(tId) ||
+    tCode.startsWith("CLS-") ||
+    tCode.startsWith("THUOC-")
+  ) {
+    return true;
+  }
+  if (ticket.bookingCode) {
+    const billsForBooking = (pendingBills || []).filter(b => b.bookingCode === ticket.bookingCode);
+    const hasExamBill = billsForBooking.some(b => b.billType === "EXAM");
+    const hasTreatmentBill = billsForBooking.some(b => b.billType === "TEST" || b.billType === "PRESCRIPTION" || b.billType === "TREATMENT");
+    if (!hasExamBill && hasTreatmentBill && ticket.source === "PENDING_BILLS") {
+      return true;
+    }
+  }
+  return false;
+};
+
+export const getTicketPendingBillPure = (ticket, pendingBills = []) => {
+  if (!ticket) return null;
+  if (ticket.billId) {
+    const byBillId = (pendingBills || []).find(b => b.billId === ticket.billId);
+    if (byBillId) return byBillId;
+  }
+  if (ticket.ticketId && String(ticket.ticketId).startsWith("BILL-")) {
+    const byTicketBillId = (pendingBills || []).find(b => b.billId === String(ticket.ticketId));
+    if (byTicketBillId) return byTicketBillId;
+  }
+  if (!ticket.bookingCode) return null;
+  const billsForBooking = (pendingBills || []).filter(b => b.bookingCode === ticket.bookingCode);
+  return billsForBooking.find(b => b.billType === "TEST" || b.billType === "PRESCRIPTION" || b.billType === "TREATMENT")
+    || billsForBooking[0]
+    || null;
+};
+
+export const calculateTicketDuePure = (ticket, { pendingBills = [], queueList = [] } = {}) => {
+  if (!ticket) return { consultationFee: 0, testFee: 0, totalDue: 0, testItems: [], targetBillId: null, isClsOnly: false };
+  const bill = getTicketPendingBillPure(ticket, pendingBills);
+  const billsForBooking = ticket.bookingCode
+    ? (pendingBills || []).filter(b => b.bookingCode === ticket.bookingCode)
+    : (bill ? [bill] : []);
+
+  const examBill = billsForBooking.find(b => b.billType === "EXAM");
+  const treatmentBills = billsForBooking.filter(
+    b => b.billType === "TEST" || b.billType === "PRESCRIPTION" || b.billType === "TREATMENT"
+  );
+  const matchedQueueBooking = ticket.bookingCode
+    ? (queueList || []).find(q => q.bookingCode === ticket.bookingCode)
+    : null;
+
+  const explicitCls = isClsOrTreatmentTicketPure(ticket, pendingBills);
+  const isClsOnly = explicitCls && !examBill;
+
+  let consultationFee = 0;
+  if (!ticket.isPaid && !isClsOnly) {
+    if (examBill && Number(examBill.totalAmount) > 0) {
+      consultationFee = Number(examBill.totalAmount);
+    } else if (matchedQueueBooking && !matchedQueueBooking.isPaid && Number(matchedQueueBooking.price) > 0) {
+      consultationFee = Number(matchedQueueBooking.price);
+    } else if (matchedQueueBooking && matchedQueueBooking.isPaid && treatmentBills.length > 0) {
+      consultationFee = 0;
+    } else if (ticket.price != null && Number(ticket.price) > 0) {
+      consultationFee = Number(ticket.price);
+    }
+  }
+
+  let testItems = [];
+  const sourceBills = treatmentBills.length > 0 ? treatmentBills : (bill ? [bill] : []);
+  sourceBills.forEach(b => {
+    if (b && Array.isArray(b.items)) {
+      b.items.forEach(i => {
+        if (
+          i.category === "TEST" ||
+          i.category === "MEDICINE" ||
+          i.itemType === "LAB_TEST" ||
+          i.itemType === "SERVICE"
+        ) {
+          testItems.push({
+            ...i,
+            itemName: i.itemName || i.name || "Chỉ định Cận lâm sàng / Thuốc",
+            unitPrice: Number(i.unitPrice ?? i.totalPrice ?? 0),
+            totalPrice: Number(i.totalPrice ?? i.unitPrice ?? 0)
+          });
+        }
+      });
+    }
+  });
+
+  if (isClsOnly && testItems.length === 0) {
+    const fallbackAmt = Number(ticket.testFee ?? bill?.totalAmount ?? ticket.price ?? 0);
+    if (fallbackAmt > 0) {
+      testItems.push({
+        itemId: ticket.billId || ticket.ticketId || "CLS-FEE",
+        itemName: "Chi phí Cận lâm sàng & Xét nghiệm",
+        unitPrice: fallbackAmt,
+        totalPrice: fallbackAmt,
+        category: "TEST"
+      });
+    }
+  }
+
+  const testFee = testItems.reduce((acc, curr) => acc + (Number(curr.totalPrice) || Number(curr.unitPrice) || 0), 0);
+  const totalDue = consultationFee + testFee;
+  const targetBillId =
+    (explicitCls && (ticket.billId || (String(ticket.ticketId || "").startsWith("BILL-") ? String(ticket.ticketId) : null))) ||
+    (treatmentBills[0]?.billId) ||
+    (bill?.billId) ||
+    null;
+
+  return { consultationFee, testFee, totalDue, testItems, targetBillId, isClsOnly: isClsOnly || (consultationFee === 0 && testFee > 0) };
+};
+
+export async function executePayAndDispatch({
+  ticket,
+  effectiveCounterId,
+  paymentMethod = "CASH",
+  amountGiven,
+  paymentNotes,
+  dispatchMode = "AUTO",
+  selectedTargetRoomId,
+  candidateRooms = [],
+  leastLoadedRoom = null,
+  isAlreadyPaid = false,
+  queueList = [],
+  pendingBills = [],
+  axiosClient = axiosInstance
+}) {
+  if (!ticket) {
+    return { success: false, error: "Không tìm thấy thông tin lượt khám cần thu viện phí!" };
+  }
+
+  const { consultationFee, testFee, totalDue, testItems, targetBillId, isClsOnly } = calculateTicketDuePure(ticket, { pendingBills, queueList });
+  let receiptData = null;
+
+  // Tìm mã lượt khám bookingId chuẩn nếu phiếu chưa gắn trực tiếp
+  let effectiveBookingId = ticket.bookingId;
+  if (!effectiveBookingId && ticket.bookingCode && queueList) {
+    const matched = queueList.find(q => q.bookingCode === ticket.bookingCode);
+    if (matched && matched.bookingId) {
+      effectiveBookingId = matched.bookingId;
+    }
+  }
+  if (!effectiveBookingId && ticket.ticketId) {
+    const strId = String(ticket.ticketId);
+    if (strId.length === 36 && strId.includes("-")) {
+      effectiveBookingId = strId;
+    }
+  }
+
+  // 1. Thực hiện thu tiền khám lâm sàng ban đầu nếu chưa thanh toán
+  if (!isAlreadyPaid && consultationFee > 0 && (effectiveBookingId || ticket.bookingCode)) {
+    const payPayload = {
+      bookingId: (effectiveBookingId && String(effectiveBookingId).length === 36) ? effectiveBookingId : undefined,
+      bookingCode: ticket.bookingCode || (!effectiveBookingId || String(effectiveBookingId).length !== 36 ? String(effectiveBookingId || ticket.ticketId) : undefined),
+      amount: consultationFee,
+      paymentMethod: paymentMethod || "CASH",
+      cashierNotes: paymentNotes || `Thu tiền khám tại quầy dịch vụ cho phiếu ${ticket.ticketCode || ticket.bookingCode || ""}`
+    };
+    const payRes = await axiosClient.post("/api/nurse/reception/pay-at-clinic", payPayload);
+    receiptData = payRes?.data?.data || payRes?.data;
+    if (testFee <= 0) {
+      ticket.isPaid = true;
+    }
+  }
+
+  // 2. Thu tiền xét nghiệm CLS / Đơn thuốc nếu có chỉ định phát sinh và chưa trả
+  if (!isAlreadyPaid && testFee > 0 && (targetBillId || ticket.bookingCode)) {
+    const givenNum = Math.max(Number(amountGiven) || 0, totalDue);
+    const testPayPayload = {
+      bookingCode: targetBillId || ticket.bookingCode,
+      paymentMethod: paymentMethod || "CASH",
+      amountGiven: givenNum,
+      notes: paymentNotes || `Thu phí xét nghiệm CLS tại quầy cho phiếu ${ticket.ticketCode || ticket.bookingCode || ""}`
+    };
+    if (consultationFee === 0) {
+      const testRes = await axiosClient.post("/api/cashier/pay", testPayPayload);
+      const cashData = testRes?.data?.data || testRes?.data;
+      if (cashData) {
+        receiptData = {
+          ...cashData,
+          paidAmount: cashData.totalAmount || testFee,
+          phoneNumber: cashData.patientPhone || ticket.phoneNumber
+        };
+      }
+      ticket.isPaid = true;
+    } else {
+      const testRes = await axiosClient.post("/api/cashier/pay", testPayPayload).catch(e => {
+        console.warn("Lỗi thu phí CLS qua cashier API:", e);
+        return null;
+      });
+      if (testRes?.data?.data) {
+        receiptData = testRes.data.data;
+      }
+      ticket.isPaid = true;
+    }
+  }
+
+  // Xác định buồng khám đích: Chỉ được chọn trong danh sách buồng hợp lệ của chuyên khoa
+  const hasDeptInfo = Boolean(ticket.departmentId || (ticket.departmentName && ticket.departmentName.trim() !== ""));
+  if (!isClsOnly && !hasDeptInfo) {
+    const roomErrMsg = "Lượt tiếp đón thiếu thông tin chuyên khoa khám. Vui lòng cập nhật chuyên khoa trước khi điều phối buồng khám!";
+    return { success: false, error: roomErrMsg, isPaid: ticket.isPaid };
+  }
+
+  if (!isClsOnly && (!candidateRooms || candidateRooms.length === 0)) {
+    const roomErrMsg = `Không tìm thấy buồng khám hợp lệ thuộc chuyên khoa [${ticket.departmentName || ticket.departmentId || "chưa xác định"}]. Vui lòng cấu hình lịch trực hoặc buồng khám trước!`;
+    return { success: false, error: roomErrMsg, isPaid: ticket.isPaid };
+  }
+
+  let targetRoom = null;
+  if (!isClsOnly) {
+    if (dispatchMode === "AUTO") {
+      targetRoom = selectTargetRoomCandidate({ dispatchMode: "AUTO", candidateRooms, leastLoadedRoom });
+      if (!targetRoom) {
+        return { success: false, error: "Không có buồng khám hợp lệ để điều phối tự động.", isPaid: ticket.isPaid };
+      }
+    } else {
+      if (!selectedTargetRoomId) {
+        return { success: false, error: "Chưa chọn buồng khám. Vui lòng chọn một buồng khám trong danh sách hợp lệ của khoa!", isPaid: ticket.isPaid };
+      }
+      targetRoom = selectTargetRoomCandidate({ dispatchMode: "MANUAL", selectedTargetRoomId, candidateRooms });
+      if (!targetRoom) {
+        return { success: false, error: `Buồng khám đã chọn [ID: ${selectedTargetRoomId}] không hợp lệ hoặc không thuộc danh sách buồng khám của khoa. Vui lòng chọn lại!`, isPaid: ticket.isPaid };
+      }
+    }
+  }
+
+  const targetRoomId = targetRoom ? parseInt(targetRoom.roomId) : null;
+  if (!isClsOnly && !targetRoomId) {
+    return { success: false, error: "Chưa xác định được buồng khám hợp lệ. Vui lòng chọn buồng khám trước khi điều phối!", isPaid: ticket.isPaid };
+  }
+
+  const targetRoomName = targetRoom ? targetRoom.roomName : (ticket.roomName || (targetRoomId ? `Phòng ${targetRoomId}` : null));
+  const targetDoctor = targetRoom ? targetRoom.doctorName : (ticket.doctorName || null);
+
+  // 3. TỰ ĐỘNG HOÀN TẤT VÉ VÀ ĐƯA VÀO HÀNG ĐỢI PHÒNG KHÁM BÁC SĨ (NẾU LÀ VÉ TIẾP ĐÓN KHÁM BAN ĐẦU)
+  const isNumericTicketId = ticket.ticketId != null && /^\d+$/.test(String(ticket.ticketId));
+  let dispatchSucceeded = false;
+  let dispatchErrorMsg = "";
+
+  if (isClsOnly && !isNumericTicketId) {
+    dispatchSucceeded = true;
+  } else {
+    try {
+      if (isNumericTicketId) {
+        await axiosClient.post(`/api/counters/${effectiveCounterId}/tickets/${ticket.ticketId}/complete`, {
+          targetRoomId: targetRoomId
+        });
+        dispatchSucceeded = true;
+      } else if (effectiveBookingId || ticket.ticketId || ticket.bookingCode) {
+        const bId = effectiveBookingId || (ticket.ticketId && String(ticket.ticketId).length === 36 ? ticket.ticketId : undefined);
+        await axiosClient.post(`/api/nurse/reception/dispatch`, {
+          bookingId: bId,
+          bookingCode: ticket.bookingCode,
+          targetRoomId: targetRoomId,
+          roomId: targetRoomId
+        });
+        dispatchSucceeded = true;
+      } else {
+        dispatchSucceeded = true;
+      }
+    } catch (dispErr) {
+      dispatchErrorMsg = dispErr.response?.data?.message || dispErr.message || "Lỗi điều phối buồng khám";
+    }
+  }
+
+  if (!dispatchSucceeded) {
+    ticket.isPaid = true; // Đã trả tiền, nhưng dispatch lỗi -> cần thử lại
+    return {
+      success: false,
+      dispatchRetryNeeded: true,
+      isPaid: true,
+      error: `Khoản phí đã được ghi nhận thành công, nhưng chưa thể điều phối vào buồng khám: ${dispatchErrorMsg}. Vui lòng chọn lại buồng khám và ấn [Thử Lại Điều Phối]!`,
+      targetRoom
+    };
+  }
+
+  return {
+    success: true,
+    dispatchRetryNeeded: false,
+    isPaid: true,
+    receiptData,
+    targetRoom,
+    targetRoomId,
+    targetRoomName,
+    targetDoctor,
+    totalDue,
+    consultationFee,
+    testFee,
+    testItems,
+    isClsOnly
+  };
 }

@@ -42,6 +42,11 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import SearchIcon from "@mui/icons-material/Search";
 import axiosInstance from "../../services/AxiosInstance";
 import { useAuth } from "../../context/AuthContext";
+import designTokens from "../../theme/designTokens";
+
+const BRAND_PRIMARY = designTokens.brand.primary;
+const BRAND_DARK = designTokens.brand.primaryDark;
+const BRAND_LIGHT = designTokens.brand.primaryLight;
 
 export default function DepartmentManagePage() {
     const { user } = useAuth();
@@ -395,12 +400,12 @@ export default function DepartmentManagePage() {
                             width: 48,
                             height: 48,
                             borderRadius: "14px",
-                            bgcolor: "rgba(0, 136, 214, 0.1)",
-                            color: "#0088D6",
+                            bgcolor: BRAND_LIGHT,
+                            color: BRAND_PRIMARY,
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
-                            boxShadow: "0 4px 14px rgba(0, 136, 214, 0.2)"
+                            boxShadow: "0 4px 14px rgba(15, 118, 110, 0.2)"
                         }}
                     >
                         <MeetingRoomIcon sx={{ fontSize: 26 }} />
@@ -417,9 +422,9 @@ export default function DepartmentManagePage() {
                                     height: 22,
                                     fontSize: "0.72rem",
                                     fontWeight: 700,
-                                    bgcolor: "rgba(0, 136, 214, 0.1)",
-                                    color: "#0088D6",
-                                    border: "1px solid rgba(0, 136, 214, 0.2)"
+                                    bgcolor: BRAND_LIGHT,
+                                    color: BRAND_PRIMARY,
+                                    border: "1px solid rgba(15, 118, 110, 0.2)"
                                 }}
                             />
                         </Box>
@@ -431,13 +436,13 @@ export default function DepartmentManagePage() {
                 <Box display="flex" gap={1.2} alignItems="center" flexWrap="wrap">
                     {isHeadOfDept && selectedDept && (
                         <Chip
-                            icon={<StarsIcon sx={{ fontSize: "16px !important", color: "#0088D6 !important" }} />}
+                            icon={<StarsIcon sx={{ fontSize: "16px !important", color: `${BRAND_PRIMARY} !important` }} />}
                             label={`Trưởng Khoa: ${selectedDept.departmentName}`}
                             sx={{
                                 fontWeight: 700,
-                                bgcolor: "rgba(0, 136, 214, 0.08)",
-                                color: "#0088D6",
-                                border: "1px solid rgba(0, 136, 214, 0.2)"
+                                bgcolor: BRAND_LIGHT,
+                                color: BRAND_PRIMARY,
+                                border: "1px solid rgba(15, 118, 110, 0.2)"
                             }}
                         />
                     )}
@@ -467,9 +472,9 @@ export default function DepartmentManagePage() {
                                 fontWeight: 700,
                                 textTransform: "none",
                                 fontSize: "0.85rem",
-                                bgcolor: "#0088D6",
-                                boxShadow: "0 4px 14px rgba(0, 136, 214, 0.25)",
-                                "&:hover": { bgcolor: "#0073B7" }
+                                bgcolor: BRAND_PRIMARY,
+                                boxShadow: "0 4px 14px rgba(15, 118, 110, 0.25)",
+                                "&:hover": { bgcolor: BRAND_DARK }
                             }}
                         >
                             Thêm Chuyên Khoa Mới
@@ -527,7 +532,7 @@ export default function DepartmentManagePage() {
                         "& .MuiTabs-indicator": {
                             height: 3,
                             borderRadius: 3,
-                            bgcolor: "#0088D6"
+                            bgcolor: BRAND_PRIMARY
                         }
                     }}
                 >
@@ -593,7 +598,7 @@ export default function DepartmentManagePage() {
                             {loading ? (
                                 <TableRow>
                                     <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
-                                        <CircularProgress size={32} sx={{ color: "#0088D6" }} />
+                                        <CircularProgress size={32} sx={{ color: BRAND_PRIMARY }} />
                                     </TableCell>
                                 </TableRow>
                             ) : filteredDepartments.length === 0 ? (
@@ -615,7 +620,7 @@ export default function DepartmentManagePage() {
                                             "&.Mui-selected": { bgcolor: "rgba(0, 136, 214, 0.04) !important" }
                                         }}
                                     >
-                                        <TableCell sx={{ fontFamily: "monospace", fontWeight: 700, color: "#0088D6", fontSize: "0.85rem" }}>
+                                        <TableCell sx={{ fontFamily: "monospace", fontWeight: 700, color: BRAND_PRIMARY, fontSize: "0.85rem" }}>
                                             #KHOA-{dept.departmentId}
                                         </TableCell>
                                         <TableCell>
@@ -629,25 +634,25 @@ export default function DepartmentManagePage() {
                                         <TableCell>
                                             {headDoc ? (
                                                 <Chip 
-                                                    icon={<StarsIcon sx={{ fontSize: "16px !important", color: "#0088D6 !important" }} />} 
+                                                    icon={<StarsIcon sx={{ fontSize: "16px !important", color: `${BRAND_PRIMARY} !important` }} />} 
                                                     label={headDoc.fullName} 
                                                     size="small" 
                                                     sx={{ 
                                                         fontWeight: 700, 
                                                         bgcolor: "rgba(0, 136, 214, 0.08)", 
-                                                        color: "#0088D6", 
+                                                        color: BRAND_PRIMARY, 
                                                         border: "1px solid rgba(0, 136, 214, 0.2)" 
                                                     }} 
                                                 />
                                             ) : dept.headDoctorName ? (
                                                 <Chip 
-                                                    icon={<StarsIcon sx={{ fontSize: "16px !important", color: "#0088D6 !important" }} />} 
+                                                    icon={<StarsIcon sx={{ fontSize: "16px !important", color: `${BRAND_PRIMARY} !important` }} />} 
                                                     label={dept.headDoctorName} 
                                                     size="small" 
                                                     sx={{ 
                                                         fontWeight: 700, 
                                                         bgcolor: "rgba(0, 136, 214, 0.08)", 
-                                                        color: "#0088D6", 
+                                                        color: BRAND_PRIMARY, 
                                                         border: "1px solid rgba(0, 136, 214, 0.2)" 
                                                     }} 
                                                 />
@@ -684,7 +689,7 @@ export default function DepartmentManagePage() {
                                                             onClick={() => handleOpenEditDept(dept)} 
                                                             sx={{ 
                                                                 bgcolor: "rgba(0, 136, 214, 0.08)", 
-                                                                color: "#0088D6",
+                                                                color: BRAND_PRIMARY,
                                                                 "&:hover": { bgcolor: "rgba(0, 136, 214, 0.18)" }
                                                             }}
                                                         >
@@ -703,8 +708,8 @@ export default function DepartmentManagePage() {
                                                             fontWeight: 700, 
                                                             textTransform: "none",
                                                             borderColor: "rgba(0, 136, 214, 0.3)",
-                                                            color: "#0088D6",
-                                                            "&:hover": { borderColor: "#0088D6", bgcolor: "rgba(0, 136, 214, 0.04)" }
+                                                            color: BRAND_PRIMARY,
+                                                            "&:hover": { borderColor: BRAND_PRIMARY, bgcolor: "rgba(0, 136, 214, 0.04)" }
                                                         }}
                                                     >
                                                         Chi tiết
@@ -740,7 +745,7 @@ export default function DepartmentManagePage() {
             {activeTab === 1 && !selectedDept && (
                 <Paper sx={{ p: 5, textAlign: "center", borderRadius: 3.5, border: "1px solid rgba(15, 23, 42, 0.08)", bgcolor: "#FFFFFF" }}>
                     {loading ? (
-                        <CircularProgress size={32} sx={{ color: "#0088D6" }} />
+                        <CircularProgress size={32} sx={{ color: BRAND_PRIMARY }} />
                     ) : (
                         <Typography variant="body1" color="textSecondary">
                             Vui lòng chọn một chuyên khoa để xem danh sách bác sĩ và trưởng khoa.
@@ -769,9 +774,9 @@ export default function DepartmentManagePage() {
                                 borderRadius: 2.2, 
                                 fontWeight: 700, 
                                 textTransform: "none",
-                                bgcolor: "#0088D6",
+                                bgcolor: BRAND_PRIMARY,
                                 boxShadow: "0 4px 14px rgba(0, 136, 214, 0.25)",
-                                "&:hover": { bgcolor: "#0073B7" }
+                                "&:hover": { bgcolor: BRAND_DARK }
                             }}
                         >
                             Phân Công Bác Sĩ Vào Khoa
@@ -830,7 +835,7 @@ export default function DepartmentManagePage() {
                                         const isHead = doc.role === "ROLE_HEAD_OF_DEPARTMENT";
                                         return (
                                             <TableRow key={doc.doctorId} hover sx={{ "&:hover": { bgcolor: "rgba(0, 136, 214, 0.02) !important" } }}>
-                                                <TableCell sx={{ fontFamily: "monospace", fontWeight: 700, color: "#0088D6", fontSize: "0.85rem" }}>
+                                                <TableCell sx={{ fontFamily: "monospace", fontWeight: 700, color: BRAND_PRIMARY, fontSize: "0.85rem" }}>
                                                     #DOC-{doc.doctorId}
                                                 </TableCell>
                                                 <TableCell>
@@ -845,11 +850,11 @@ export default function DepartmentManagePage() {
                                                         <Chip 
                                                             label="Trưởng Khoa" 
                                                             size="small" 
-                                                            icon={<StarsIcon sx={{ fontSize: "16px !important", color: "#0088D6 !important" }} />} 
+                                                            icon={<StarsIcon sx={{ fontSize: "16px !important", color: `${BRAND_PRIMARY} !important` }} />} 
                                                             sx={{ 
                                                                 fontWeight: 700, 
                                                                 bgcolor: "rgba(0, 136, 214, 0.1)", 
-                                                                color: "#0088D6", 
+                                                                color: BRAND_PRIMARY, 
                                                                 border: "1px solid rgba(0, 136, 214, 0.25)" 
                                                             }} 
                                                         />
@@ -876,8 +881,8 @@ export default function DepartmentManagePage() {
                                                                         fontWeight: 700, 
                                                                         textTransform: "none",
                                                                         borderColor: "rgba(0, 136, 214, 0.3)",
-                                                                        color: "#0088D6",
-                                                                        "&:hover": { borderColor: "#0088D6", bgcolor: "rgba(0, 136, 214, 0.04)" }
+                                                                        color: BRAND_PRIMARY,
+                                                                        "&:hover": { borderColor: BRAND_PRIMARY, bgcolor: "rgba(0, 136, 214, 0.04)" }
                                                                     }}
                                                                 >
                                                                     Bổ nhiệm Trưởng khoa
@@ -908,7 +913,7 @@ export default function DepartmentManagePage() {
                                                                     fontWeight: 700, 
                                                                     fontSize: "0.72rem", 
                                                                     bgcolor: isHead ? "rgba(0, 136, 214, 0.08)" : "#F1F5F9", 
-                                                                    color: isHead ? "#0088D6" : "#475569",
+                                                                    color: isHead ? BRAND_PRIMARY : "#475569",
                                                                     border: isHead ? "1px solid rgba(0, 136, 214, 0.2)" : "1px solid rgba(15, 23, 42, 0.08)"
                                                                 }}
                                                             />
@@ -929,7 +934,7 @@ export default function DepartmentManagePage() {
             {activeTab === 2 && !selectedDept && (
                 <Paper sx={{ p: 5, textAlign: "center", borderRadius: 3.5, border: "1px solid rgba(15, 23, 42, 0.08)", bgcolor: "#FFFFFF" }}>
                     {loading ? (
-                        <CircularProgress size={32} sx={{ color: "#0088D6" }} />
+                        <CircularProgress size={32} sx={{ color: BRAND_PRIMARY }} />
                     ) : (
                         <Typography variant="body1" color="textSecondary">
                             Vui lòng chọn một chuyên khoa để xem sơ đồ buồng phòng và lịch trực.
@@ -1028,7 +1033,7 @@ export default function DepartmentManagePage() {
                                                 fontWeight: 700,
                                                 fontSize: "0.75rem",
                                                 borderRadius: 1.8,
-                                                ...(roomTypeFilter === t.key ? { bgcolor: "#0088D6" } : {})
+                                                ...(roomTypeFilter === t.key ? { bgcolor: BRAND_PRIMARY } : {})
                                             }}
                                         />
                                     ))}
@@ -1068,7 +1073,7 @@ export default function DepartmentManagePage() {
                                 ) : (
                                     filteredRooms.map((room) => {
                                         const typeConfig = {
-                                            EXAMINATION_ROOM: { label: "Phòng khám lâm sàng", color: "#0088D6", bg: "rgba(0, 136, 214, 0.08)" },
+                                            EXAMINATION_ROOM: { label: "Phòng khám lâm sàng", color: BRAND_PRIMARY, bg: "rgba(0, 136, 214, 0.08)" },
                                             LABORATORY_ROOM: { label: "Phòng xét nghiệm / CĐHA", color: "#8B5CF6", bg: "rgba(139, 92, 246, 0.08)" },
                                             TREATMENT_ROOM_STANDARD: { label: "Buồng nội trú (Tiêu chuẩn)", color: "#0284C7", bg: "rgba(2, 132, 199, 0.08)" },
                                             TREATMENT_ROOM_VIP: { label: "Buồng nội trú (VIP)", color: "#D97706", bg: "rgba(217, 119, 6, 0.08)" },
@@ -1077,7 +1082,7 @@ export default function DepartmentManagePage() {
 
                                         return (
                                             <TableRow key={room.roomId} hover sx={{ "&:hover": { bgcolor: "rgba(0, 136, 214, 0.02) !important" } }}>
-                                                <TableCell sx={{ fontFamily: "monospace", fontWeight: 700, color: "#0088D6", fontSize: "0.85rem" }}>
+                                                <TableCell sx={{ fontFamily: "monospace", fontWeight: 700, color: BRAND_PRIMARY, fontSize: "0.85rem" }}>
                                                     #ROOM-{room.roomId}
                                                 </TableCell>
                                                 <TableCell>
@@ -1127,7 +1132,7 @@ export default function DepartmentManagePage() {
                                                                 onClick={() => handleOpenEditRoom(room)}
                                                                 sx={{ 
                                                                     bgcolor: "rgba(0, 136, 214, 0.08)", 
-                                                                    color: "#0088D6",
+                                                                    color: BRAND_PRIMARY,
                                                                     "&:hover": { bgcolor: "rgba(0, 136, 214, 0.18)" }
                                                                 }}
                                                             >
@@ -1145,8 +1150,8 @@ export default function DepartmentManagePage() {
                                                                 fontWeight: 700, 
                                                                 textTransform: "none",
                                                                 borderColor: "rgba(0, 136, 214, 0.3)",
-                                                                color: "#0088D6",
-                                                                "&:hover": { borderColor: "#0088D6", bgcolor: "rgba(0, 136, 214, 0.04)" }
+                                                                color: BRAND_PRIMARY,
+                                                                "&:hover": { borderColor: BRAND_PRIMARY, bgcolor: "rgba(0, 136, 214, 0.04)" }
                                                             }}
                                                         >
                                                             Xem Lịch Trực

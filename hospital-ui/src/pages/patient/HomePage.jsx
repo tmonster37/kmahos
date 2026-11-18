@@ -56,6 +56,7 @@ import axiosInstance from "../../services/AxiosInstance";
 import { formatISODate, formatDate } from "../../utils/formatters";
 import designTokens from "../../theme/designTokens";
 import { useAuth } from "../../context/AuthContext";
+import { getDoctorInitials } from "../customer/BookingPage";
 
 /**
  * Ánh xạ icon đại diện theo tên chuyên khoa (Chuẩn hóa màu Teal và Heart Red)
@@ -70,100 +71,6 @@ const getDepartmentIcon = (name = "") => {
     if (n.includes("nhiễm") || n.includes("dịch")) return <CoronavirusIcon sx={{ fontSize: 24, color: "#EC4899" }} />;
     return <LocalHospitalIcon sx={{ fontSize: 24, color: designTokens.brand.primary }} />;
 };
-
-/**
- * Danh sách ảnh bác sĩ thực tế đã được AI xóa nền sạch 100%
- * Phân chia nghiêm ngặt theo Giới tính Nam và Nữ
- */
-const MALE_DOCTOR_AVATARS = [
-    "/images/doctor-senior-male.png",
-    "/images/doctor-young-male.png",
-    "/images/doctor-glasses-male.png"
-];
-
-const FEMALE_DOCTOR_AVATARS = [
-    "/images/doctor-clipboard-female.png",
-    "/images/doctor-smile-female.png",
-    "/images/doctor-writing-female.png"
-];
-
-/**
- * Thuật toán nhận diện giới tính Bác sĩ qua cấu trúc tên tiếng Việt
- * Đảm bảo bác sĩ Nam không bao giờ nhận ảnh Nữ và ngược lại
- */
-const isFemaleDoctorName = (name = "") => {
-    if (!name) return false;
-    const n = " " + name.toLowerCase().normalize("NFC").replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, " ") + " ";
-    const femaleMarkers = [
-        " thị ", " thi ", " mai ", " trang ", " lan ", " hương ", " huong ",
-        " hoa ", " thảo ", " thao ", " linh ", " nhung ", " hà ", " ha ",
-        " phương ", " phuong ", " vy ", " yến ", " yen ", " ngọc ", " ngoc ",
-        " quyên ", " quyen ", " tuyết ", " tuyet ", " hiền ", " hien ", " nga ",
-        " vân ", " van ", " dung ", " hạnh ", " hanh ", " liên ", " lien ",
-        " hằng ", " hang ", " thu ", " loan ", " bích ", " bich ", " huệ ", " hue ",
-        " oanh ", " thủy ", " thuy ", " hồng ", " hong ", " diệp ", " diep ",
-        " huyền ", " huyen ", " chi ", " trâm ", " tram ", " ly ", " my ", " trinh ",
-        " uyên ", " giang ", " quỳnh "
-    ];
-    return femaleMarkers.some((m) => n.includes(m));
-};
-
-const getDoctorAvatar = (index = 0, name = "") => {
-    const list = isFemaleDoctorName(name) ? FEMALE_DOCTOR_AVATARS : MALE_DOCTOR_AVATARS;
-    if (!name) return list[index % list.length];
-    let sum = 0;
-    for (let i = 0; i < name.length; i++) {
-        sum += name.charCodeAt(i);
-    }
-    return list[sum % list.length];
-};
-
-/**
- * 4 Bác sĩ chuyên khoa tiêu biểu cố định (Showcase đội ngũ tinh hoa)
- * Chuẩn hóa 100% giới tính: Nam dùng ảnh Nam, Nữ dùng ảnh Nữ, ảnh đã xóa nền trong suốt
- */
-const FEATURED_DOCTORS = [
-    {
-        name: "BS.CKII Nguyễn Văn An",
-        title: "Trưởng Hội Đồng Chẩn Đoán Cấp Cao",
-        dept: "Nội Đa Khoa & Lão Khoa",
-        exp: "25+ năm kinh nghiệm",
-        image: "/images/doctor-senior-male.png", // BS Nam lớn tuổi, tóc bạc, rất uy tín
-        rating: "4.9",
-        reviews: 320,
-        badge: "Bác sĩ ưu tú"
-    },
-    {
-        name: "ThS.BS Trần Thị Mai",
-        title: "Phó Trưởng Khoa Tim Mạch",
-        dept: "Tim Mạch Can Thiệp",
-        exp: "16+ năm kinh nghiệm",
-        image: "/images/doctor-smile-female.png", // BS Nữ trẻ, khoanh tay mỉm cười
-        rating: "5.0",
-        reviews: 284,
-        badge: "Đào tạo tại Pháp"
-    },
-    {
-        name: "BS. Lê Quang Huy",
-        title: "Bác Sĩ Phẫu Thuật Chính",
-        dept: "Chấn Thương Chỉnh Hình",
-        exp: "12+ năm kinh nghiệm",
-        image: "/images/doctor-young-male.png", // BS Nam trẻ, giơ nắm đấm tự tin
-        rating: "4.9",
-        reviews: 198,
-        badge: "Chuyên gia nội soi khớp"
-    },
-    {
-        name: "ThS.BS Phạm Thu Trang",
-        title: "Trưởng Phòng Khám Nhi",
-        dept: "Nhi Khoa & Sơ Sinh",
-        exp: "14+ năm kinh nghiệm",
-        image: "/images/doctor-clipboard-female.png", // BS Nữ trẻ cầm kẹp hồ sơ xanh
-        rating: "5.0",
-        reviews: 412,
-        badge: "Ân cần chu đáo"
-    }
-];
 
 /**
  * Chuẩn hóa nhãn học vị y khoa từ enum backend
@@ -707,7 +614,7 @@ export default function HomePage() {
                                     }}
                                 />
 
-                                {/* Glass Container for Senior Doctor Image */}
+                                {/* Healthcare Portal Highlights Card (Chuẩn thương hiệu TNT, không dùng ảnh stock) */}
                                 <Box
                                     sx={{
                                         position: "relative",
@@ -715,175 +622,96 @@ export default function HomePage() {
                                         width: "100%",
                                         maxWidth: 420,
                                         borderRadius: "28px",
-                                        p: { xs: 2, sm: 3 },
-                                        background: "linear-gradient(180deg, #F0FDFA 0%, #E6FAF4 100%)",
-                                        border: "1px solid #99F6E4",
-                                        boxShadow: "0 20px 40px rgba(13, 148, 136, 0.12)"
+                                        p: { xs: 3, sm: 3.5 },
+                                        background: "linear-gradient(180deg, #FFFFFF 0%, #F0FDFA 100%)",
+                                        border: `1.5px solid ${designTokens.brand.primaryBorder}`,
+                                        boxShadow: "0 24px 48px -12px rgba(15, 118, 110, 0.18)"
                                     }}
                                 >
-                                    {/* Doctor Portrait Image (Ảnh BS Nam Trưởng Khoa đã xóa nền 100%) */}
-                                    <Box
-                                        component="img"
-                                        src="/images/doctor-senior-male.png"
-                                        alt="BS.CKII Nguyễn Văn An - Trưởng Hội Đồng Chẩn Đoán YouMed TNT"
-                                        sx={{
-                                            width: "100%",
-                                            maxHeight: { xs: 320, sm: 400, md: 440 },
-                                            objectFit: "contain",
-                                            display: "block",
-                                            filter: "drop-shadow(0 14px 28px rgba(0,0,0,0.15))",
-                                            transition: "transform 0.4s ease",
-                                            "&:hover": {
-                                                transform: "scale(1.02)"
-                                            }
-                                        }}
-                                    />
-
-                                    {/* Floating Glass Badge 1 (Top Left): Rating & Patients */}
-                                    <Box
-                                        sx={{
-                                            position: "absolute",
-                                            top: 20,
-                                            left: -15,
-                                            bgcolor: "#FFFFFF",
-                                            border: "1px solid #E2E8F0",
-                                            borderRadius: "16px",
-                                            px: 1.8,
-                                            py: 1,
-                                            boxShadow: "0 10px 25px rgba(0,0,0,0.08)",
-                                            display: { xs: "none", sm: "flex" },
-                                            alignItems: "center",
-                                            gap: 1.2
-                                        }}
-                                    >
-                                        <Box
+                                    <Box display="flex" alignItems="center" gap={1.5} mb={2.5}>
+                                        <Avatar
+                                            src="/images/logo.png"
+                                            alt="TNT Hospital"
                                             sx={{
-                                                width: 36,
-                                                height: 36,
-                                                borderRadius: "10px",
-                                                bgcolor: "#FFF1F2",
-                                                color: "#F43F5E",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "center",
-                                                border: "1px solid #FECDD3"
-                                            }}
-                                        >
-                                            <MonitorHeartIcon sx={{ fontSize: 20 }} />
-                                        </Box>
-                                        <Box>
-                                            <Typography sx={{ fontSize: "0.82rem", fontWeight: 800, color: "#0F172A", lineHeight: 1.2 }}>
-                                                ⭐ 4.9/5 Đánh Giá
-                                            </Typography>
-                                            <Typography sx={{ fontSize: "0.72rem", color: "#64748B", fontWeight: 600 }}>
-                                                150.000+ Lượt khám an tâm
-                                            </Typography>
-                                        </Box>
-                                    </Box>
-
-                                    {/* Floating Glass Badge 2 (Bottom Right): Verified License */}
-                                    <Box
-                                        sx={{
-                                            position: "absolute",
-                                            bottom: 75,
-                                            right: -15,
-                                            bgcolor: "#FFFFFF",
-                                            border: "1px solid #E2E8F0",
-                                            borderRadius: "16px",
-                                            px: 1.8,
-                                            py: 1,
-                                            boxShadow: "0 10px 25px rgba(0,0,0,0.08)",
-                                            display: { xs: "none", sm: "flex" },
-                                            alignItems: "center",
-                                            gap: 1.2
-                                        }}
-                                    >
-                                        <Box
-                                            sx={{
-                                                width: 36,
-                                                height: 36,
-                                                borderRadius: "10px",
+                                                width: 52,
+                                                height: 52,
                                                 bgcolor: "#F0FDFA",
-                                                color: "#0D9488",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "center",
-                                                border: "1px solid #99F6E4"
+                                                border: `2px solid ${designTokens.brand.primaryBorder}`,
+                                                p: 0.5
                                             }}
-                                        >
-                                            <VerifiedIcon sx={{ fontSize: 20 }} />
-                                        </Box>
+                                        />
                                         <Box>
-                                            <Typography sx={{ fontSize: "0.82rem", fontWeight: 800, color: "#0F172A", lineHeight: 1.2 }}>
-                                                100% Bác Sĩ CCHN
+                                            <Typography variant="caption" sx={{ color: designTokens.brand.primary, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                                                HỆ THỐNG Y TẾ SỐ
                                             </Typography>
-                                            <Typography sx={{ fontSize: "0.72rem", color: "#64748B", fontWeight: 600 }}>
-                                                Bộ Y Tế cấp phép chính quy
+                                            <Typography variant="h6" fontWeight="900" color="#0F172A" sx={{ fontSize: "1.1rem", lineHeight: 1.2 }}>
+                                                Bệnh Viện Đa Khoa TNT
                                             </Typography>
                                         </Box>
                                     </Box>
 
-                                    {/* Doctor Info Card at bottom of visual */}
-                                    <Box
-                                        sx={{
-                                            mt: 1.5,
-                                            p: 1.5,
-                                            bgcolor: "#FFFFFF",
-                                            borderRadius: "18px",
-                                            border: "1px solid #E2E8F0",
-                                            boxShadow: "0 8px 20px rgba(0, 0, 0, 0.05)",
-                                            display: "flex",
-                                            alignItems: "center",
-                                            justifyContent: "space-between"
-                                        }}
-                                    >
-                                        <Box display="flex" alignItems="center" gap={1.2}>
-                                            <Avatar
-                                                src="/images/logo.png"
-                                                alt="TNT Hospital"
-                                                sx={{
-                                                    width: 40,
-                                                    height: 40,
-                                                    bgcolor: "#F0FDFA",
-                                                    border: "1.5px solid #99F6E4",
-                                                    p: 0.3
-                                                }}
-                                            />
+                                    {/* Feature items */}
+                                    <Stack spacing={2} mb={3}>
+                                        <Box display="flex" alignItems="center" gap={1.5} p={1.5} sx={{ bgcolor: "#FFFFFF", borderRadius: "14px", border: "1px solid #E2E8F0" }}>
+                                            <Box sx={{ width: 40, height: 40, borderRadius: "10px", bgcolor: "#F0FDFA", color: designTokens.brand.primary, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                                <CalendarMonthIcon sx={{ fontSize: 22 }} />
+                                            </Box>
                                             <Box>
-                                                <Box display="flex" alignItems="center" gap={0.6}>
-                                                    <Typography
-                                                        variant="subtitle2"
-                                                        fontWeight={800}
-                                                        color="#0F172A"
-                                                        sx={{ fontSize: "0.85rem", lineHeight: 1.2 }}
-                                                    >
-                                                        BS.CKII Nguyễn Văn An
-                                                    </Typography>
-                                                    <VerifiedIcon sx={{ fontSize: 15, color: "#0D9488" }} />
-                                                </Box>
-                                                <Typography
-                                                    variant="caption"
-                                                    color="#64748B"
-                                                    sx={{ fontSize: "0.72rem", fontWeight: 600, display: "block" }}
-                                                >
-                                                    Hội Đồng Cố Vấn Chuyên Môn
+                                                <Typography variant="subtitle2" fontWeight={800} color="#0F172A">
+                                                    Đặt Khám Chuyên Khoa
+                                                </Typography>
+                                                <Typography variant="caption" color="#64748B">
+                                                    Chủ động chọn ngày, giờ và bác sĩ
                                                 </Typography>
                                             </Box>
                                         </Box>
 
-                                        <Chip
-                                            label="Đang trực"
-                                            size="small"
-                                            sx={{
-                                                bgcolor: "#DCFCE7",
-                                                color: "#15803D",
-                                                fontWeight: 800,
-                                                fontSize: "0.7rem",
-                                                height: 22,
-                                                border: "1px solid #86EFAC"
-                                            }}
-                                        />
-                                    </Box>
+                                        <Box display="flex" alignItems="center" gap={1.5} p={1.5} sx={{ bgcolor: "#FFFFFF", borderRadius: "14px", border: "1px solid #E2E8F0" }}>
+                                            <Box sx={{ width: 40, height: 40, borderRadius: "10px", bgcolor: "#FEF3C7", color: "#B45309", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                                <AccessTimeIcon sx={{ fontSize: 22 }} />
+                                            </Box>
+                                            <Box>
+                                                <Typography variant="subtitle2" fontWeight={800} color="#0F172A">
+                                                    Cấp Số Thứ Tự Tự Động
+                                                </Typography>
+                                                <Typography variant="caption" color="#64748B">
+                                                    Giảm thiểu tối đa thời gian chờ tại viện
+                                                </Typography>
+                                            </Box>
+                                        </Box>
+
+                                        <Box display="flex" alignItems="center" gap={1.5} p={1.5} sx={{ bgcolor: "#FFFFFF", borderRadius: "14px", border: "1px solid #E2E8F0" }}>
+                                            <Box sx={{ width: 40, height: 40, borderRadius: "10px", bgcolor: "#F0FDFA", color: designTokens.brand.primary, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                                <CalendarMonthIcon sx={{ fontSize: 22 }} />
+                                            </Box>
+                                            <Box>
+                                                <Typography variant="subtitle2" fontWeight={800} color="#0F172A">
+                                                    Đặt Lịch Khám Trực Tuyến
+                                                </Typography>
+                                                <Typography variant="caption" color="#64748B">
+                                                    Lựa chọn chuyên khoa và thời gian phù hợp
+                                                </Typography>
+                                            </Box>
+                                        </Box>
+                                    </Stack>
+
+                                    <Button
+                                        component={Link}
+                                        to="/booking"
+                                        fullWidth
+                                        variant="contained"
+                                        size="large"
+                                        endIcon={<ArrowForwardIcon />}
+                                        sx={{
+                                            bgcolor: designTokens.brand.primary,
+                                            fontWeight: 800,
+                                            borderRadius: "14px",
+                                            py: 1.4,
+                                            "&:hover": { bgcolor: designTokens.brand.primaryHover }
+                                        }}
+                                    >
+                                        Bắt Đầu Đặt Lịch Ngay
+                                    </Button>
                                 </Box>
                             </Box>
                         </Grid>
@@ -1478,7 +1306,7 @@ export default function HomePage() {
                                 const sessionInfo = formatSession(sch.session);
                                 const availableSlots = sch.timeSlots ? sch.timeSlots.filter(s => !s.isFull).length : 0;
                                 const totalSlots = sch.timeSlots ? sch.timeSlots.length : 0;
-                                const doctorPhoto = getDoctorAvatar(idx, sch.doctorName);
+                                const doctorPhoto = sch.avatar || null;
 
                                 return (
                                     <Grid item xs={12} sm={6} md={3} key={sch.scheduleId}>
@@ -1504,23 +1332,40 @@ export default function HomePage() {
                                             }}
                                         >
                                             <Box>
-                                                {/* Doctor Portrait Image with Verified Badge */}
+                                                {/* Doctor Portrait Image or Neutral Initials Avatar */}
                                                 <Box position="relative" display="inline-block" mx="auto" mb={1.8}>
-                                                    <Box
-                                                        component="img"
-                                                        src={doctorPhoto}
-                                                        alt={sch.doctorName || "Bác sĩ phụ trách"}
-                                                        sx={{
-                                                            width: 82,
-                                                            height: 82,
-                                                            borderRadius: "50%",
-                                                            objectFit: "cover",
-                                                            objectPosition: "top center",
-                                                            border: "3px solid #CCFBF1",
-                                                            boxShadow: "0 6px 16px rgba(13, 148, 136, 0.2)",
-                                                            background: "radial-gradient(circle at 50% 30%, #CCFBF1 0%, #F0FDFA 70%, #E2E8F0 100%)"
-                                                        }}
-                                                    />
+                                                    {doctorPhoto ? (
+                                                        <Box
+                                                            component="img"
+                                                            src={doctorPhoto}
+                                                            alt={sch.doctorName || "Bác sĩ phụ trách"}
+                                                            sx={{
+                                                                width: 82,
+                                                                height: 82,
+                                                                borderRadius: "50%",
+                                                                objectFit: "cover",
+                                                                objectPosition: "top center",
+                                                                border: `3px solid ${designTokens.brand.primaryBorder}`,
+                                                                boxShadow: "0 6px 16px rgba(15, 118, 110, 0.2)",
+                                                                background: "radial-gradient(circle at 50% 30%, #CCFBF1 0%, #F0FDFA 70%, #E2E8F0 100%)"
+                                                            }}
+                                                        />
+                                                    ) : (
+                                                        <Avatar
+                                                            sx={{
+                                                                width: 82,
+                                                                height: 82,
+                                                                bgcolor: designTokens.brand.primary,
+                                                                color: "#FFFFFF",
+                                                                fontSize: "1.8rem",
+                                                                fontWeight: 800,
+                                                                border: `3px solid ${designTokens.brand.primaryBorder}`,
+                                                                boxShadow: "0 6px 16px rgba(15, 118, 110, 0.2)"
+                                                            }}
+                                                        >
+                                                            {getDoctorInitials(sch.doctorName)}
+                                                        </Avatar>
+                                                    )}
                                                     <Box
                                                         sx={{
                                                             position: "absolute",
@@ -1533,7 +1378,7 @@ export default function HomePage() {
                                                             boxShadow: "0 2px 6px rgba(0,0,0,0.12)"
                                                         }}
                                                     >
-                                                        <VerifiedIcon sx={{ color: "#0D9488", fontSize: 20 }} />
+                                                        <VerifiedIcon sx={{ color: designTokens.brand.primary, fontSize: 20 }} />
                                                     </Box>
                                                 </Box>
 
@@ -1641,167 +1486,66 @@ export default function HomePage() {
                     )}
 
                     {/* =========================================================================
-                        SHOWCASE 4 BÁC SĨ CHUYÊN KHOA TIÊU BIỂU (Hình ảnh thực tế chuẩn viện)
+                        ONLINE BOOKING CALL TO ACTION BANNER (Trung thực, không dữ liệu giả)
                     ========================================================================= */}
-                    <Box mt={6} pt={5} sx={{ borderTop: "1px dashed #E2E8F0" }}>
-                        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3.5} flexWrap="wrap" gap={2}>
-                            <Box>
-                                <Typography
-                                    variant="caption"
+                    <Box
+                        mt={6}
+                        p={{ xs: 3.5, md: 5 }}
+                        sx={{
+                            borderRadius: "24px",
+                            background: `linear-gradient(135deg, ${designTokens.brand.primary} 0%, ${designTokens.brand.primaryDark} 100%)`,
+                            color: "#FFFFFF",
+                            boxShadow: "0 12px 32px -8px rgba(15, 118, 110, 0.35)",
+                            position: "relative",
+                            overflow: "hidden"
+                        }}
+                    >
+                        <Grid container spacing={3} alignItems="center">
+                            <Grid item xs={12} md={8}>
+                                <Chip
+                                    label="DỊCH VỤ Y TẾ SỐ TNT HOSPITAL"
+                                    size="small"
                                     sx={{
+                                        bgcolor: "rgba(255, 255, 255, 0.15)",
+                                        color: "#FFFFFF",
                                         fontWeight: 800,
-                                        color: "#F43F5E",
-                                        letterSpacing: "0.08em",
-                                        textTransform: "uppercase",
-                                        display: "block",
-                                        mb: 0.5
+                                        fontSize: "0.75rem",
+                                        mb: 1.5,
+                                        backdropFilter: "blur(4px)"
+                                    }}
+                                />
+                                <Typography variant="h3" fontWeight="900" sx={{ fontSize: { xs: "1.45rem", md: "1.9rem" }, mb: 1.2 }}>
+                                    Đặt Lịch Khám Trực Tuyến & Cấp Số Thứ Tự Tự Động
+                                </Typography>
+                                <Typography variant="body1" sx={{ color: "rgba(255, 255, 255, 0.9)", fontSize: "0.95rem", lineHeight: 1.6, maxWidth: 640 }}>
+                                    Chủ động lựa chọn chuyên khoa, bác sĩ phụ trách và khung giờ thuận tiện. Nhận ngay phiếu khám điện tử có mã vạch định danh để làm thủ tục nhanh chóng khi đến viện.
+                                </Typography>
+                            </Grid>
+                            <Grid item xs={12} md={4} sx={{ textAlign: { xs: "left", md: "right" } }}>
+                                <Button
+                                    component={Link}
+                                    to="/booking"
+                                    variant="contained"
+                                    size="large"
+                                    endIcon={<ArrowForwardIcon />}
+                                    sx={{
+                                        bgcolor: "#FFFFFF",
+                                        color: designTokens.brand.primaryDark,
+                                        fontWeight: 800,
+                                        px: 3.5,
+                                        py: 1.6,
+                                        borderRadius: "14px",
+                                        fontSize: "1rem",
+                                        boxShadow: "0 6px 20px rgba(0, 0, 0, 0.15)",
+                                        "&:hover": {
+                                            bgcolor: "#F0FDFA",
+                                            transform: "translateY(-2px)"
+                                        }
                                     }}
                                 >
-                                    ĐỘI NGŨ TINH HOA
-                                </Typography>
-                                <Typography variant="h3" fontWeight="900" color="#0F172A" sx={{ fontSize: { xs: "1.35rem", md: "1.75rem" } }}>
-                                    Bác Sĩ Chuyên Khoa Tiêu Biểu
-                                </Typography>
-                            </Box>
-                            <Typography variant="body2" color="#64748B" sx={{ fontSize: "0.88rem" }}>
-                                Các chuyên gia đầu ngành luôn đồng hành, lắng nghe và chăm sóc tận tâm
-                            </Typography>
-                        </Box>
-
-                        <Grid container spacing={2.5}>
-                            {FEATURED_DOCTORS.map((doc, idx) => (
-                                <Grid item xs={12} sm={6} md={3} key={idx}>
-                                    <Card
-                                        elevation={0}
-                                        sx={{
-                                            borderRadius: "20px",
-                                            overflow: "hidden",
-                                            bgcolor: "#FFFFFF",
-                                            border: "1px solid rgba(13, 148, 136, 0.15)",
-                                            boxShadow: "0 8px 24px -6px rgba(15, 23, 42, 0.06)",
-                                            transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
-                                            display: "flex",
-                                            flexDirection: "column",
-                                            justifyContent: "space-between",
-                                            height: "100%",
-                                            "&:hover": {
-                                                transform: "translateY(-6px)",
-                                                boxShadow: "0 18px 36px -8px rgba(13, 148, 136, 0.2)",
-                                                borderColor: "#0D9488"
-                                            }
-                                        }}
-                                    >
-                                        {/* Doctor Image Header with Gradient Background */}
-                                        <Box
-                                            sx={{
-                                                height: 240,
-                                                background: "radial-gradient(circle at 50% 30%, #F0FDFA 0%, #CCFBF1 65%, #99F6E4 100%)",
-                                                position: "relative",
-                                                display: "flex",
-                                                alignItems: "flex-end",
-                                                justifyContent: "center",
-                                                overflow: "hidden"
-                                            }}
-                                        >
-                                            <Box
-                                                component="img"
-                                                src={doc.image}
-                                                alt={doc.name}
-                                                sx={{
-                                                    maxHeight: "96%",
-                                                    width: "auto",
-                                                    maxWidth: "88%",
-                                                    objectFit: "contain",
-                                                    display: "block",
-                                                    filter: "drop-shadow(0 10px 20px rgba(13, 148, 136, 0.25))",
-                                                    transition: "transform 0.3s ease",
-                                                    "&:hover": {
-                                                        transform: "scale(1.05)"
-                                                    }
-                                                }}
-                                            />
-                                            {/* Badge nổi trên ảnh */}
-                                            <Chip
-                                                label={doc.badge}
-                                                size="small"
-                                                sx={{
-                                                    position: "absolute",
-                                                    top: 12,
-                                                    right: 12,
-                                                    bgcolor: "rgba(255, 255, 255, 0.9)",
-                                                    backdropFilter: "blur(6px)",
-                                                    color: "#0F766E",
-                                                    fontWeight: 800,
-                                                    fontSize: "0.68rem",
-                                                    borderRadius: "6px",
-                                                    border: "1px solid #99F6E4"
-                                                }}
-                                            />
-                                        </Box>
-
-                                        {/* Doctor Information Content */}
-                                        <Box p={2.5} sx={{ flexGrow: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                                            <Box>
-                                                <Box display="flex" alignItems="center" gap={0.8} mb={0.8}>
-                                                    <Box
-                                                        sx={{
-                                                            display: "inline-flex",
-                                                            alignItems: "center",
-                                                            bgcolor: "#FEF3C7",
-                                                            color: "#B45309",
-                                                            px: 0.8,
-                                                            py: 0.2,
-                                                            borderRadius: "4px",
-                                                            fontSize: "0.72rem",
-                                                            fontWeight: 800
-                                                        }}
-                                                    >
-                                                        ★ {doc.rating}
-                                                    </Box>
-                                                    <Typography variant="caption" color="#64748B" fontWeight="600" sx={{ fontSize: "0.75rem" }}>
-                                                        ({doc.reviews} lượt hài lòng)
-                                                    </Typography>
-                                                </Box>
-
-                                                <Typography variant="subtitle1" fontWeight="900" color="#0F172A" sx={{ fontSize: "1.05rem", lineHeight: 1.3 }}>
-                                                    {doc.name}
-                                                </Typography>
-
-                                                <Typography variant="caption" color="#0D9488" fontWeight="800" display="block" sx={{ mt: 0.4, fontSize: "0.82rem" }}>
-                                                    {doc.title}
-                                                </Typography>
-
-                                                <Typography variant="body2" color="#475569" sx={{ mt: 0.6, fontSize: "0.8rem" }}>
-                                                    Khoa: <b>{doc.dept}</b> · {doc.exp}
-                                                </Typography>
-                                            </Box>
-
-                                            <Button
-                                                component={Link}
-                                                to="/booking"
-                                                variant="outlined"
-                                                fullWidth
-                                                size="small"
-                                                sx={{
-                                                    mt: 2,
-                                                    borderRadius: "10px",
-                                                    fontWeight: 800,
-                                                    fontSize: "0.82rem",
-                                                    borderColor: "#0D9488",
-                                                    color: "#0D9488",
-                                                    py: 0.9,
-                                                    "&:hover": {
-                                                        bgcolor: "#F0FDFA",
-                                                        borderColor: "#0F766E"
-                                                    }
-                                                }}
-                                            >
-                                                Đặt Hẹn Bác Sĩ
-                                            </Button>
-                                        </Box>
-                                    </Card>
-                                </Grid>
-                            ))}
+                                    Đặt Lịch Khám Ngay
+                                </Button>
+                            </Grid>
                         </Grid>
                     </Box>
 
@@ -1968,7 +1712,7 @@ export default function HomePage() {
             </Box>
 
             {/* =========================================================================
-                6. THÔNG TIN TẠO NIỀM TIN & HÌNH ẢNH ĐỘI NGŨ Y BÁC SĨ (doctor-team.jpg)
+                6. THÔNG TIN TẠO NIỀM TIN & QUY CHUẨN HOẠT ĐỘNG
             ========================================================================= */}
             <Container maxWidth="xl" component="section" aria-label="Thông tin uy tín bệnh viện" sx={{ py: { xs: 6, md: 8 } }}>
                 <Paper
@@ -2033,44 +1777,48 @@ export default function HomePage() {
                             </Stack>
                         </Grid>
 
-                        {/* CỘT PHẢI: ẢNH ĐỘI NGŨ Y BÁC SĨ (doctor-team.jpg) */}
+                        {/* CỘT PHẢI: QUY CHUẨN HOẠT ĐỘNG VÀ AN TOÀN Y TẾ */}
                         <Grid item xs={12} md={5}>
                             <Box
                                 sx={{
-                                    position: "relative",
+                                    height: "100%",
+                                    minHeight: { xs: 260, sm: 320 },
                                     borderRadius: "20px",
-                                    overflow: "hidden",
-                                    boxShadow: "0 16px 40px rgba(0, 0, 0, 0.12)",
-                                    border: "1px solid rgba(13, 148, 136, 0.2)"
+                                    p: { xs: 3, sm: 4 },
+                                    background: `linear-gradient(135deg, ${designTokens.brand.primary} 0%, ${designTokens.brand.primaryDark} 100%)`,
+                                    color: "#FFFFFF",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    justifyContent: "space-between",
+                                    boxShadow: "0 16px 40px rgba(15, 118, 110, 0.25)",
+                                    border: `1px solid ${designTokens.brand.primaryHover}`
                                 }}
                             >
-                                <Box
-                                    component="img"
-                                    src="/images/doctor-team.jpg"
-                                    alt="Đội ngũ Bác sĩ Bệnh Viện YouMed TNT"
-                                    sx={{
-                                        width: "100%",
-                                        height: { xs: 260, sm: 320, md: 360 },
-                                        objectFit: "cover",
-                                        display: "block"
-                                    }}
-                                />
-                                <Box
-                                    sx={{
-                                        position: "absolute",
-                                        bottom: 0,
-                                        left: 0,
-                                        right: 0,
-                                        p: 2,
-                                        background: "linear-gradient(to top, rgba(15, 23, 42, 0.88) 0%, rgba(15, 23, 42, 0) 100%)",
-                                        color: "#FFFFFF"
-                                    }}
-                                >
-                                    <Typography sx={{ fontWeight: 800, fontSize: "0.92rem", color: "#F0FDFA" }}>
-                                        Hội đồng chuyên môn giàu kinh nghiệm
+                                <Box>
+                                    <Chip
+                                        label="THÔNG TIN BỆNH VIỆN"
+                                        size="small"
+                                        sx={{
+                                            bgcolor: "rgba(255, 255, 255, 0.15)",
+                                            color: "#FFFFFF",
+                                            fontWeight: 800,
+                                            fontSize: "0.72rem",
+                                            mb: 2,
+                                            backdropFilter: "blur(4px)"
+                                        }}
+                                    />
+                                    <Typography variant="h5" fontWeight="900" sx={{ fontSize: { xs: "1.25rem", md: "1.45rem" }, mb: 1.5, color: "#FFFFFF" }}>
+                                        Bệnh Viện Đa Khoa Quốc Tế TNT
                                     </Typography>
-                                    <Typography sx={{ fontSize: "0.78rem", color: "#CCFBF1" }}>
-                                        Đặt y đức và sự tận tâm chăm sóc người bệnh lên hàng đầu
+                                    <Typography variant="body2" sx={{ color: "rgba(255, 255, 255, 0.88)", lineHeight: 1.6, fontSize: "0.85rem" }}>
+                                        Cung cấp dịch vụ thăm khám và điều trị theo quy định chuyên môn, hỗ trợ người dân và gia đình với tinh thần trách nhiệm và chu đáo.
+                                    </Typography>
+                                </Box>
+
+                                <Box sx={{ mt: 3, pt: 2, borderTop: "1px solid rgba(255, 255, 255, 0.2)", display: "flex", alignItems: "center", gap: 1.5 }}>
+                                    <LocalHospitalIcon sx={{ fontSize: 24, color: "#5EEAD4" }} />
+                                    <Typography sx={{ fontSize: "0.82rem", fontWeight: 700, color: "#F0FDFA" }}>
+                                        Hỗ trợ tiếp đón và hướng dẫn người bệnh tại viện
                                     </Typography>
                                 </Box>
                             </Box>
@@ -2080,7 +1828,7 @@ export default function HomePage() {
             </Container>
 
             {/* =========================================================================
-                7. CTA CUỐI TRANG (Closing Banner với Bác Sĩ Mỉm Cười doctor-female-smile.png)
+                7. CTA CUỐI TRANG (Closing Banner Kêu Gọi Đặt Khám 24/7)
             ========================================================================= */}
             <Container maxWidth="xl" component="section" aria-label="Kêu gọi đặt khám" sx={{ mb: 4 }}>
                 <Box
@@ -2195,20 +1943,23 @@ export default function HomePage() {
                             </Box>
                         </Grid>
 
-                        {/* CỘT PHẢI: BÁC SĨ MỈM CƯỜI ĐÓN TIẾP NGƯỜI BỆNH */}
-                        <Grid item xs={12} md={4} sx={{ display: { xs: "none", md: "flex" }, justifyContent: "center" }}>
+                        {/* CỘT PHẢI: BIỂU TƯỢNG HỖ TRỢ Y TẾ 24/7 */}
+                        <Grid item xs={12} md={4} sx={{ display: { xs: "none", md: "flex" }, justifyContent: "center", alignItems: "center" }}>
                             <Box
-                                component="img"
-                                src="/images/doctor-female-smile.png"
-                                alt="Bác sĩ đón tiếp bệnh nhân"
                                 sx={{
-                                    height: 250,
-                                    width: "auto",
-                                    objectFit: "contain",
-                                    filter: "drop-shadow(0 14px 28px rgba(0,0,0,0.4))",
-                                    display: "block"
+                                    width: 140,
+                                    height: 140,
+                                    borderRadius: "50%",
+                                    bgcolor: "rgba(255, 255, 255, 0.12)",
+                                    border: "2px dashed rgba(255, 255, 255, 0.3)",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    boxShadow: "0 8px 32px rgba(0, 0, 0, 0.15)"
                                 }}
-                            />
+                            >
+                                <LocalHospitalIcon sx={{ fontSize: 64, color: "#FFFFFF", opacity: 0.95 }} />
+                            </Box>
                         </Grid>
                     </Grid>
                 </Box>

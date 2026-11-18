@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Schedule } from '@/features/booking/booking.types';
-import { schedulesApi, SchedulesApi } from '@/features/booking/schedules.api';
+import { getDeviceLocalToday, schedulesApi, SchedulesApi } from '@/features/booking/schedules.api';
 import { tokens } from '@/theme/tokens';
 
 export interface DepartmentSchedulesScreenProps {
@@ -22,13 +22,13 @@ export interface DepartmentSchedulesScreenProps {
 export default function DepartmentSchedulesScreen({
   api = schedulesApi,
   departmentIdOverride,
-  initialDate = '2026-11-08',
+  initialDate,
 }: DepartmentSchedulesScreenProps) {
   const router = useRouter();
   const params = useLocalSearchParams<{ departmentId?: string }>();
   const deptId = departmentIdOverride ?? Number(params.departmentId ?? 0);
 
-  const [selectedDate, setSelectedDate] = useState(initialDate);
+  const [selectedDate, setSelectedDate] = useState(() => initialDate ?? getDeviceLocalToday());
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -54,6 +54,10 @@ export default function DepartmentSchedulesScreen({
 
   return (
     <ScrollView style={styles.screen} testID="department-schedules-screen">
+      <View style={styles.stepHeader}>
+        <Text style={styles.stepBadge}>Bước 2 / 3</Text>
+        <Text style={styles.stepSubtext}>Quy trình đặt khám</Text>
+      </View>
       <Text style={styles.title}>Chọn lịch khám & khung giờ</Text>
 
       <View style={styles.dateRow}>
@@ -140,9 +144,28 @@ const styles = StyleSheet.create({
     backgroundColor: tokens.colors.background,
     padding: tokens.spacing.lg,
   },
+  stepHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: tokens.spacing.xs,
+    marginBottom: tokens.spacing.xs,
+  },
+  stepBadge: {
+    fontSize: tokens.typography.caption,
+    fontWeight: '700',
+    color: tokens.colors.primary,
+    backgroundColor: tokens.colors.primaryLight,
+    paddingHorizontal: tokens.spacing.sm,
+    paddingVertical: 2,
+    borderRadius: tokens.radius.pill,
+  },
+  stepSubtext: {
+    fontSize: tokens.typography.caption,
+    color: tokens.colors.textMuted,
+  },
   title: {
     fontSize: tokens.typography.title,
-    fontWeight: '700',
+    fontWeight: '800',
     color: tokens.colors.primaryDark,
     marginBottom: tokens.spacing.md,
   },
@@ -159,12 +182,14 @@ const styles = StyleSheet.create({
     borderRadius: tokens.radius.sm,
     paddingHorizontal: tokens.spacing.md,
     paddingVertical: tokens.spacing.sm,
+    minHeight: 44,
   },
   refreshBtn: {
     backgroundColor: tokens.colors.primary,
     borderRadius: tokens.radius.sm,
     paddingHorizontal: tokens.spacing.lg,
     justifyContent: 'center',
+    minHeight: 44,
   },
   refreshText: {
     color: tokens.colors.surface,
@@ -221,6 +246,10 @@ const styles = StyleSheet.create({
     borderRadius: tokens.radius.sm,
     paddingHorizontal: tokens.spacing.md,
     paddingVertical: tokens.spacing.xs,
+    minHeight: 44,
+    minWidth: 88,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   slotText: {
     color: tokens.colors.primaryDark,

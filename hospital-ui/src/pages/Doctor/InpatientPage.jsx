@@ -65,6 +65,92 @@ import { printReceipt, printTreatmentSheet, printBedsideCard } from "../../utils
 
 // Dữ liệu lâm sàng nội trú thực tế theo chỉ định của Bác sĩ điều trị và Điều dưỡng viên
 
+// Action buttons component with strict nurse vs doctor RBAC
+export function BedActionButtons({
+    isNurse,
+    patient,
+    onNursingCare,
+    onTreatmentSheet,
+    onTransfer,
+    onBedsideCard,
+    onDischarge
+}) {
+    return (
+        <Grid container spacing={0.8} mt={0.5}>
+            <Grid item xs={isNurse ? 6 : 6}>
+                <Button
+                    fullWidth
+                    size="small"
+                    variant="contained"
+                    startIcon={<VolunteerActivismIcon sx={{ fontSize: 14 }} />}
+                    onClick={() => onNursingCare && onNursingCare(patient)}
+                    sx={{ fontSize: "0.7rem", py: 0.5, fontWeight: 700, borderRadius: 2, textTransform: "none", bgcolor: "#0D9488", "&:hover": { bgcolor: "#0F766E" } }}
+                >
+                    Chăm Sóc
+                </Button>
+            </Grid>
+            {!isNurse && (
+                <Grid item xs={6}>
+                    <Button
+                        fullWidth
+                        size="small"
+                        variant="contained"
+                        color="primary"
+                        startIcon={<AssignmentIcon sx={{ fontSize: 14 }} />}
+                        onClick={() => onTreatmentSheet && onTreatmentSheet(patient)}
+                        sx={{ fontSize: "0.7rem", py: 0.5, fontWeight: 700, borderRadius: 2, textTransform: "none" }}
+                    >
+                        Tờ Bệnh Trình
+                    </Button>
+                </Grid>
+            )}
+            {!isNurse && (
+                <Grid item xs={6}>
+                    <Button
+                        fullWidth
+                        size="small"
+                        variant="outlined"
+                        color="info"
+                        startIcon={<SwapHorizIcon sx={{ fontSize: 14 }} />}
+                        onClick={() => onTransfer && onTransfer(patient)}
+                        sx={{ fontSize: "0.7rem", py: 0.5, fontWeight: 700, borderRadius: 2, textTransform: "none" }}
+                    >
+                        Đổi Giường
+                    </Button>
+                </Grid>
+            )}
+            <Grid item xs={isNurse ? 6 : 6}>
+                <Button
+                    fullWidth
+                    size="small"
+                    variant="outlined"
+                    color="inherit"
+                    startIcon={<BadgeIcon sx={{ fontSize: 14 }} />}
+                    onClick={() => onBedsideCard && onBedsideCard(patient)}
+                    sx={{ fontSize: "0.7rem", py: 0.5, fontWeight: 600, borderRadius: 2, textTransform: "none", color: "#475569" }}
+                >
+                    Thẻ Giường
+                </Button>
+            </Grid>
+            {!isNurse && (
+                <Grid item xs={6}>
+                    <Button
+                        fullWidth
+                        size="small"
+                        variant="outlined"
+                        color="error"
+                        startIcon={<ExitToAppIcon sx={{ fontSize: 14 }} />}
+                        onClick={() => onDischarge && onDischarge(patient)}
+                        sx={{ fontSize: "0.7rem", py: 0.5, fontWeight: 700, borderRadius: 2, textTransform: "none" }}
+                    >
+                        Xuất Viện
+                    </Button>
+                </Grid>
+            )}
+        </Grid>
+    );
+}
+
 export default function InpatientPage() {
     const { user } = useAuth();
     const isNurse = user?.role === "ROLE_NURSE";
@@ -365,6 +451,10 @@ export default function InpatientPage() {
     // PHIẾU ĐIỀU TRỊ NỘI TRÚ (TỜ BỆNH TRÌNH) LOGIC
     // ==========================================
     const handleOpenTreatmentSheet = async (admission) => {
+        if (isNurse) {
+            setFeedback({ type: "error", message: "Điều dưỡng không có thẩm quyền ra y lệnh hoặc chỉnh sửa Tờ bệnh trình!" });
+            return;
+        }
         setSelectedAdmission(admission);
         setTreatmentSheetData({
             sheetNumber: "01",
@@ -449,6 +539,10 @@ export default function InpatientPage() {
     // Lưu tờ bệnh trình vào hệ thống
     const handleSaveTreatmentSheet = async () => {
         if (!selectedAdmission) return;
+        if (isNurse) {
+            setFeedback({ type: "error", message: "Điều dưỡng không có thẩm quyền ra y lệnh điều trị hoặc lưu tờ bệnh trình!" });
+            return;
+        }
         setSubmittingTreatment(true);
         try {
             // Định dạng chuỗi y lệnh tổng hợp bao gồm thuốc & chăm sóc
@@ -619,6 +713,10 @@ export default function InpatientPage() {
     // CHUYỂN GIƯỜNG / BUỒNG BỆNH
     // ==========================================
     const handleOpenTransferModal = (admission) => {
+        if (isNurse) {
+            setFeedback({ type: "error", message: "Điều dưỡng không có thẩm quyền điều chuyển buồng giường bệnh nhân!" });
+            return;
+        }
         setSelectedAdmission(admission);
         setTransferTarget({
             targetRoomId: allRooms[0]?.roomId || "",
@@ -662,6 +760,10 @@ export default function InpatientPage() {
     // XUẤT VIỆN LOGIC
     // ==========================================
     const handleOpenDischargeModal = (item) => {
+        if (isNurse) {
+            setFeedback({ type: "error", message: "Điều dưỡng không có thẩm quyền duyệt xuất viện cho bệnh nhân!" });
+            return;
+        }
         setSelectedAdmission(item);
         setDischargeResult(null);
         setOpenDischargeModal(true);
@@ -1328,78 +1430,15 @@ export default function InpatientPage() {
                                                                     </Box>
 
                                                                     {/* Thao tác 1-Click chuẩn Y tế */}
-                                                                    <Grid container spacing={0.8} mt={0.5}>
-                                                                        <Grid item xs={isNurse ? 6 : 6}>
-                                                                            <Button
-                                                                                fullWidth
-                                                                                size="small"
-                                                                                variant="contained"
-                                                                                startIcon={<VolunteerActivismIcon sx={{ fontSize: 14 }} />}
-                                                                                onClick={() => handleOpenNursingCareModal(patientInBed)}
-                                                                                sx={{ fontSize: "0.7rem", py: 0.5, fontWeight: 700, borderRadius: 2, textTransform: "none", bgcolor: "#0D9488", "&:hover": { bgcolor: "#0F766E" } }}
-                                                                            >
-                                                                                Chăm Sóc
-                                                                            </Button>
-                                                                        </Grid>
-                                                                        {!isNurse && (
-                                                                            <Grid item xs={6}>
-                                                                                <Button
-                                                                                fullWidth
-                                                                                size="small"
-                                                                                variant="contained"
-                                                                                color="primary"
-                                                                                startIcon={<AssignmentIcon sx={{ fontSize: 14 }} />}
-                                                                                onClick={() => handleOpenTreatmentSheet(patientInBed)}
-                                                                                sx={{ fontSize: "0.7rem", py: 0.5, fontWeight: 700, borderRadius: 2, textTransform: "none" }}
-                                                                            >
-                                                                                Tờ Bệnh Trình
-                                                                            </Button>
-                                                                        </Grid>
-                                                                        )}
-                                                                        {!isNurse && (
-                                                                            <Grid item xs={6}>
-                                                                                <Button
-                                                                                fullWidth
-                                                                                size="small"
-                                                                                variant="outlined"
-                                                                                color="info"
-                                                                                startIcon={<SwapHorizIcon sx={{ fontSize: 14 }} />}
-                                                                                onClick={() => handleOpenTransferModal(patientInBed)}
-                                                                                sx={{ fontSize: "0.7rem", py: 0.5, fontWeight: 700, borderRadius: 2, textTransform: "none" }}
-                                                                            >
-                                                                                Đổi Giường
-                                                                            </Button>
-                                                                        </Grid>
-                                                                        )}
-                                                                        <Grid item xs={isNurse ? 6 : 6}>
-                                                                            <Button
-                                                                                fullWidth
-                                                                                size="small"
-                                                                                variant="outlined"
-                                                                                color="inherit"
-                                                                                startIcon={<BadgeIcon sx={{ fontSize: 14 }} />}
-                                                                                onClick={() => handlePrintBedside(patientInBed)}
-                                                                                sx={{ fontSize: "0.7rem", py: 0.5, fontWeight: 600, borderRadius: 2, textTransform: "none", color: "#475569" }}
-                                                                            >
-                                                                                Thẻ Giường
-                                                                            </Button>
-                                                                        </Grid>
-                                                                        {!isNurse && (
-                                                                            <Grid item xs={6}>
-                                                                                <Button
-                                                                                fullWidth
-                                                                                size="small"
-                                                                                variant="outlined"
-                                                                                color="error"
-                                                                                startIcon={<ExitToAppIcon sx={{ fontSize: 14 }} />}
-                                                                                onClick={() => handleOpenDischargeModal(patientInBed)}
-                                                                                sx={{ fontSize: "0.7rem", py: 0.5, fontWeight: 700, borderRadius: 2, textTransform: "none" }}
-                                                                            >
-                                                                                Xuất Viện
-                                                                            </Button>
-                                                                        </Grid>
-                                                                        )}
-                                                                    </Grid>
+                                                                    <BedActionButtons
+                                                                        isNurse={isNurse}
+                                                                        patient={patientInBed}
+                                                                        onNursingCare={handleOpenNursingCareModal}
+                                                                        onTreatmentSheet={handleOpenTreatmentSheet}
+                                                                        onTransfer={handleOpenTransferModal}
+                                                                        onBedsideCard={handlePrintBedside}
+                                                                        onDischarge={handleOpenDischargeModal}
+                                                                    />
                                                                 </Box>
                                                             ) : (
                                                                 <Box textAlign="center" py={2}>

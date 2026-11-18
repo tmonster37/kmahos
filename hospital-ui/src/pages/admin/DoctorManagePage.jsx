@@ -53,6 +53,11 @@ import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 import { useAuth } from "../../context/AuthContext";
 import axiosInstance from "../../services/AxiosInstance";
 import { formatCurrency } from "../../utils/formatters";
+import designTokens from "../../theme/designTokens";
+
+const BRAND_PRIMARY = designTokens.brand.primary;
+const BRAND_DARK = designTokens.brand.primaryDark;
+const BRAND_LIGHT = designTokens.brand.primaryLight;
 
 const DEGREE_OPTIONS = [
     { value: "BS", label: "BS - Bác sĩ Đa khoa" },
@@ -285,7 +290,7 @@ export default function DoctorManagePage() {
                                 size="small"
                                 sx={{
                                     bgcolor: "rgba(0, 136, 214, 0.08)",
-                                    color: "#0088D6",
+                                    color: BRAND_PRIMARY,
                                     fontWeight: 700,
                                     fontSize: "0.75rem",
                                     borderRadius: "6px",
@@ -340,13 +345,13 @@ export default function DoctorManagePage() {
                                 borderRadius: "10px",
                                 fontWeight: 700,
                                 textTransform: "none",
-                                bgcolor: "#0088D6",
+                                bgcolor: BRAND_PRIMARY,
                                 px: 2.5,
                                 py: 0.9,
                                 boxShadow: "0 2px 8px rgba(0, 136, 214, 0.25)",
                                 transition: "all 0.15s cubic-bezier(0.16, 1, 0.3, 1)",
                                 "&:hover": {
-                                    bgcolor: "#0070B3",
+                                    bgcolor: BRAND_DARK,
                                     boxShadow: "0 4px 14px rgba(0, 136, 214, 0.35)",
                                     transform: "translateY(-1px)"
                                 }
@@ -402,7 +407,7 @@ export default function DoctorManagePage() {
                                     height: 46,
                                     borderRadius: "12px",
                                     bgcolor: "rgba(0, 136, 214, 0.08)",
-                                    color: "#0088D6",
+                                    color: BRAND_PRIMARY,
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "center"
@@ -674,7 +679,7 @@ export default function DoctorManagePage() {
                                     fontWeight: 600,
                                     fontSize: "0.75rem",
                                     borderRadius: "6px",
-                                    bgcolor: licenseFilter === "ALL" ? "#0088D6" : "#F1F5F9",
+                                    bgcolor: licenseFilter === "ALL" ? BRAND_PRIMARY : "#F1F5F9",
                                     color: licenseFilter === "ALL" ? "#FFFFFF" : "#475569"
                                 }}
                             />
@@ -717,7 +722,7 @@ export default function DoctorManagePage() {
                 {/* 4. Main Content: Table or Grid */}
                 {loading ? (
                     <Box textAlign="center" py={10}>
-                        <CircularProgress size={36} sx={{ color: "#0088D6" }} />
+                        <CircularProgress size={36} sx={{ color: BRAND_PRIMARY }} />
                         <Typography variant="body2" color="#64748B" mt={2} fontWeight={500}>
                             Đang đồng bộ dữ liệu bác sĩ từ máy chủ...
                         </Typography>
@@ -809,7 +814,7 @@ export default function DoctorManagePage() {
                                                         width: 42,
                                                         height: 42,
                                                         bgcolor: "rgba(0, 136, 214, 0.1)",
-                                                        color: "#0088D6",
+                                                        color: BRAND_PRIMARY,
                                                         fontWeight: 700,
                                                         fontSize: "0.95rem",
                                                         border: "1px solid rgba(0, 136, 214, 0.2)"
@@ -849,7 +854,7 @@ export default function DoctorManagePage() {
                                                 size="small"
                                                 sx={{
                                                     fontWeight: 600,
-                                                    color: "#0088D6",
+                                                    color: BRAND_PRIMARY,
                                                     bgcolor: "rgba(0, 136, 214, 0.08)",
                                                     border: "1px solid rgba(0, 136, 214, 0.15)",
                                                     borderRadius: "6px"
@@ -906,7 +911,7 @@ export default function DoctorManagePage() {
 
                                         {/* Đơn giá */}
                                         <TableCell>
-                                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#0088D6", fontSize: "0.925rem" }}>
+                                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: BRAND_PRIMARY, fontSize: "0.925rem" }}>
                                                 {formatCurrency(doc.consultationFee)}
                                             </Typography>
                                         </TableCell>
@@ -920,7 +925,7 @@ export default function DoctorManagePage() {
                                                         size="small"
                                                         onClick={() => handleOpenLicense(doc)}
                                                         sx={{
-                                                            color: "#0088D6",
+                                                            color: BRAND_PRIMARY,
                                                             bgcolor: "rgba(0, 136, 214, 0.08)",
                                                             borderRadius: "8px",
                                                             "&:hover": { bgcolor: "rgba(0, 136, 214, 0.16)" }
@@ -999,7 +1004,7 @@ export default function DoctorManagePage() {
                                                     width: 48,
                                                     height: 48,
                                                     bgcolor: "rgba(0, 136, 214, 0.1)",
-                                                    color: "#0088D6",
+                                                    color: BRAND_PRIMARY,
                                                     fontWeight: 800,
                                                     fontSize: "1.1rem",
                                                     border: "1px solid rgba(0, 136, 214, 0.2)"
@@ -1086,7 +1091,7 @@ export default function DoctorManagePage() {
                                                     {doc.phoneNumber}
                                                 </Typography>
                                             </Stack>
-                                            <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "#0088D6" }}>
+                                            <Typography variant="subtitle2" sx={{ fontWeight: 800, color: BRAND_PRIMARY }}>
                                                 {formatCurrency(doc.consultationFee)}
                                             </Typography>
                                         </Box>
@@ -1110,7 +1115,7 @@ export default function DoctorManagePage() {
                                             <IconButton
                                                 size="small"
                                                 onClick={() => handleOpenLicense(doc)}
-                                                sx={{ color: "#0088D6", bgcolor: "#FFFFFF", borderRadius: "8px", border: "1px solid rgba(15, 23, 42, 0.08)" }}
+                                                sx={{ color: BRAND_PRIMARY, bgcolor: "#FFFFFF", borderRadius: "8px", border: "1px solid rgba(15, 23, 42, 0.08)" }}
                                             >
                                                 <BadgeOutlinedIcon fontSize="small" />
                                             </IconButton>
@@ -1167,7 +1172,7 @@ export default function DoctorManagePage() {
                                     height: 40,
                                     borderRadius: "10px",
                                     bgcolor: "rgba(0, 136, 214, 0.1)",
-                                    color: "#0088D6",
+                                    color: BRAND_PRIMARY,
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "center"
@@ -1202,7 +1207,7 @@ export default function DoctorManagePage() {
                                 border: "1px solid rgba(0, 136, 214, 0.15)"
                             }}
                         >
-                            <Typography variant="subtitle2" sx={{ color: "#0070B3", fontWeight: 700 }}>
+                            <Typography variant="subtitle2" sx={{ color: BRAND_DARK, fontWeight: 700 }}>
                                 Bác sĩ: {licenseForm.doctorName} (Mã định danh #{licenseForm.doctorId})
                             </Typography>
                             <Typography variant="caption" sx={{ color: "#64748B", display: "block", mt: 0.3 }}>
@@ -1265,9 +1270,9 @@ export default function DoctorManagePage() {
                                 textTransform: "none",
                                 borderRadius: "10px",
                                 fontWeight: 700,
-                                bgcolor: "#0088D6",
+                                bgcolor: BRAND_PRIMARY,
                                 px: 3,
-                                "&:hover": { bgcolor: "#0070B3" }
+                                "&:hover": { bgcolor: BRAND_DARK }
                             }}
                         >
                             {licenseLoading ? "Đang lưu..." : "Lưu Chứng Chỉ"}
@@ -1436,9 +1441,9 @@ export default function DoctorManagePage() {
                                 textTransform: "none",
                                 borderRadius: "10px",
                                 fontWeight: 700,
-                                bgcolor: "#0088D6",
+                                bgcolor: BRAND_PRIMARY,
                                 px: 3,
-                                "&:hover": { bgcolor: "#0070B3" }
+                                "&:hover": { bgcolor: BRAND_DARK }
                             }}
                         >
                             {loading ? "Đang lưu..." : editingDoctorId ? "Cập Nhật Hồ Sơ" : "Tạo Mới"}
