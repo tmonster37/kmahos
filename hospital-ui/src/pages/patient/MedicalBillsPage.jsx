@@ -24,7 +24,8 @@ import {
     CircularProgress,
     Divider,
     IconButton,
-    Alert
+    Alert,
+    Stack
 } from "@mui/material";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import PaymentIcon from "@mui/icons-material/Payment";
@@ -33,12 +34,25 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import QrCodeIcon from "@mui/icons-material/QrCode";
 import HistoryIcon from "@mui/icons-material/History";
+import ConfirmationNumberIcon from "@mui/icons-material/ConfirmationNumber";
 import axiosInstance from "../../services/AxiosInstance";
 import { formatCurrency, formatDate, formatDateTime } from "../../utils/formatters";
 import { printReceipt } from "../../utils/printHelper";
 import PaymentQRModal from "../../components/payment/PaymentQRModal";
+import designTokens, { getStatusConfig } from "../../theme/designTokens";
 
-export default function MedicalBillsPage() {
+export default function MedicalBillsPage({ initialBookingCode } = {}) {
+    const highlightBookingCode = initialBookingCode || (() => {
+        try {
+            if (typeof window !== "undefined" && window.location) {
+                return new URLSearchParams(window.location.search).get("bookingCode");
+            }
+        } catch (e) {
+            // ignore
+        }
+        return null;
+    })();
+
     // Exact initial 8 state hooks preserved to maintain 100% compatibility with Vitest mock implementation
     const [tabIndex, setTabIndex] = useState(0);
     const [bookings, setBookings] = useState([]);
@@ -155,12 +169,12 @@ export default function MedicalBillsPage() {
                             width: 54,
                             height: 54,
                             borderRadius: 3,
-                            bgcolor: "rgba(0, 136, 214, 0.1)",
-                            color: "#0088D6",
+                            bgcolor: designTokens.brand.primaryLight,
+                            color: designTokens.brand.primary,
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
-                            border: "1px solid rgba(0, 136, 214, 0.2)"
+                            border: `1px solid ${designTokens.brand.primaryBorder}`
                         }}
                     >
                         <ReceiptLongIcon sx={{ fontSize: 30 }} />
@@ -175,10 +189,10 @@ export default function MedicalBillsPage() {
                                     fontSize: "0.68rem",
                                     fontWeight: 700,
                                     letterSpacing: "0.06em",
-                                    bgcolor: "#EBF5FF",
-                                    color: "#0088D6",
+                                    bgcolor: designTokens.brand.primaryLight,
+                                    color: designTokens.brand.primaryDark,
                                     borderRadius: 1.5,
-                                    border: "1px solid rgba(0, 136, 214, 0.2)"
+                                    border: `1px solid ${designTokens.brand.primaryBorder}`
                                 }}
                             />
                             <Chip
@@ -188,8 +202,8 @@ export default function MedicalBillsPage() {
                                     height: 22,
                                     fontSize: "0.68rem",
                                     fontWeight: 700,
-                                    bgcolor: "rgba(16, 185, 129, 0.1)",
-                                    color: "#059669",
+                                    bgcolor: designTokens.secondary.light,
+                                    color: designTokens.secondary.main,
                                     borderRadius: 1.5
                                 }}
                             />
@@ -249,14 +263,14 @@ export default function MedicalBillsPage() {
                             borderRadius: 3,
                             bgcolor: "#FFFFFF",
                             border: "1px solid rgba(15, 23, 42, 0.08)",
-                            borderTop: "3px solid #0088D6",
+                            borderTop: `3px solid ${designTokens.brand.primary}`,
                             boxShadow: "0 1px 3px rgba(0,0,0,0.02)"
                         }}
                     >
                         <Typography variant="caption" sx={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "#64748B", display: "block" }}>
                             TỔNG KHOẢN VIỆN PHÍ
                         </Typography>
-                        <Typography variant="h4" fontWeight={800} color="#0088D6" my={0.5}>
+                        <Typography variant="h4" fontWeight={800} color={designTokens.brand.primary} my={0.5}>
                             {bookings.length}
                         </Typography>
                         <Typography variant="caption" color="#64748B">Khoản phí cần quyết toán</Typography>
@@ -270,14 +284,14 @@ export default function MedicalBillsPage() {
                             borderRadius: 3,
                             bgcolor: "#FFFFFF",
                             border: "1px solid rgba(15, 23, 42, 0.08)",
-                            borderTop: "3px solid #10B981",
+                            borderTop: `3px solid ${designTokens.secondary.main}`,
                             boxShadow: "0 1px 3px rgba(0,0,0,0.02)"
                         }}
                     >
                         <Typography variant="caption" sx={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "#64748B", display: "block" }}>
                             TỔNG TIỀN PHẢI TRẢ
                         </Typography>
-                        <Typography variant="h4" fontWeight={800} color="#10B981" my={0.5}>
+                        <Typography variant="h4" fontWeight={800} color={designTokens.secondary.main} my={0.5}>
                             {formatCurrency(totalPaid)}
                         </Typography>
                         <Typography variant="caption" color="#64748B">Theo dữ liệu thực tế từ hệ thống</Typography>
@@ -339,7 +353,9 @@ export default function MedicalBillsPage() {
                     sx={{
                         mb: 2,
                         borderBottom: "1px solid #E2E8F0",
-                        "& .MuiTab-root": { textTransform: "none", fontWeight: 700, fontSize: "0.95rem" }
+                        "& .MuiTab-root": { textTransform: "none", fontWeight: 700, fontSize: "0.95rem" },
+                        "& .Mui-selected": { color: `${designTokens.brand.primary} !important` },
+                        "& .MuiTabs-indicator": { bgcolor: designTokens.brand.primary }
                     }}
                 >
                     <Tab label="Khoản Viện Phí Cần Nộp" icon={<PaymentIcon />} iconPosition="start" />
@@ -355,9 +371,82 @@ export default function MedicalBillsPage() {
                         </Box>
 
                         {loading ? (
-                            <Box display="flex" justifyContent="center" py={6}><CircularProgress size={32} /></Box>
+                            <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" py={6} gap={2}>
+                                <CircularProgress size={36} sx={{ color: designTokens.brand.primary }} />
+                                <Typography variant="body2" color={designTokens.neutral.textMuted} fontWeight={600}>
+                                    Đang đồng bộ hóa đơn viện phí từ hệ thống TNT Hospital...
+                                </Typography>
+                            </Box>
                         ) : bookings.length === 0 ? (
-                            <Alert severity="info" sx={{ my: 2, borderRadius: 2 }}>Bạn không có khoản viện phí nào còn nợ. Tất cả đã được thanh toán đầy đủ!</Alert>
+                            <Paper
+                                elevation={0}
+                                sx={{
+                                    p: 4,
+                                    my: 2,
+                                    borderRadius: 3,
+                                    bgcolor: designTokens.brand.primaryLight,
+                                    border: `1.5px dashed ${designTokens.brand.primaryBorder}`,
+                                    textAlign: "center"
+                                }}
+                            >
+                                <Box sx={{ width: 64, height: 64, borderRadius: "50%", bgcolor: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", mx: "auto", mb: 2, boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+                                    <ReceiptLongIcon sx={{ fontSize: 34, color: designTokens.brand.primary }} />
+                                </Box>
+                                <Typography variant="h6" fontWeight={800} color={designTokens.neutral.textPrimary} gutterBottom>
+                                    Không Có Khoản Viện Phí Cần Nộp
+                                </Typography>
+                                <Typography variant="body2" color={designTokens.neutral.textSecondary} sx={{ maxWidth: 540, mx: "auto", mb: 3 }}>
+                                    {highlightBookingCode
+                                        ? `Phiếu khám ${highlightBookingCode} hiện chưa phát sinh khoản thu mới hoặc đã được thanh toán đầy đủ. Quý khách vui lòng kiểm tra tab 'Lịch Sử Giao Dịch & Biên Lai' hoặc liên hệ quầy tiếp đón.`
+                                        : "Tất cả các lượt khám và dịch vụ cận lâm sàng của quý khách đã được quyết toán xong hoặc chưa phát sinh chi phí mới."
+                                    }
+                                </Typography>
+                                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} justifyContent="center">
+                                    <Button
+                                        variant="contained"
+                                        onClick={() => { setTabIndex(1); loadTransactions(); }}
+                                        startIcon={<HistoryIcon />}
+                                        sx={{
+                                            borderRadius: 2.5,
+                                            fontWeight: 700,
+                                            textTransform: "none",
+                                            bgcolor: designTokens.brand.primary,
+                                            "&:hover": { bgcolor: designTokens.brand.primaryHover }
+                                        }}
+                                    >
+                                        Xem Lịch Sử Giao Dịch
+                                    </Button>
+                                    <Button
+                                        variant="outlined"
+                                        component="a"
+                                        href="/profiles?tab=ticket"
+                                        startIcon={<ConfirmationNumberIcon />}
+                                        sx={{
+                                            borderRadius: 2.5,
+                                            fontWeight: 700,
+                                            textTransform: "none",
+                                            borderColor: designTokens.brand.primaryBorder,
+                                            color: designTokens.brand.primaryDark,
+                                            "&:hover": { borderColor: designTokens.brand.primary, bgcolor: "#FFFFFF" }
+                                        }}
+                                    >
+                                        Xem Phiếu Hẹn Khám
+                                    </Button>
+                                    <Button
+                                        variant="text"
+                                        component="a"
+                                        href="/booking"
+                                        sx={{
+                                            borderRadius: 2.5,
+                                            fontWeight: 700,
+                                            textTransform: "none",
+                                            color: designTokens.neutral.textSecondary
+                                        }}
+                                    >
+                                        Đặt Lịch Khám Mới
+                                    </Button>
+                                </Stack>
+                            </Paper>
                         ) : (
                             <TableContainer>
                                 <Table>
@@ -373,76 +462,99 @@ export default function MedicalBillsPage() {
                                         </TableRow>
                                     </TableHead>
                                     <TableBody>
-                                        {bookings.map((b) => (
-                                            <TableRow key={b.bookingId || b.bookingCode} hover sx={{ "&:hover": { bgcolor: "rgba(0, 136, 214, 0.02)" } }}>
-                                                <TableCell>
-                                                    <Typography fontWeight={700} sx={{ fontFamily: "monospace", color: "#0088D6", bgcolor: "rgba(0, 136, 214, 0.08)", px: 1, py: 0.35, borderRadius: 1.5, display: "inline-block" }}>
-                                                        {b.bookingCode}
-                                                    </Typography>
-                                                    {b.queueNumber && <Typography variant="caption" color="textSecondary" display="block" sx={{ mt: 0.5 }}>Số khám: #{b.queueNumber}</Typography>}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Typography fontWeight={700} color="#0F172A">{b.patientName}</Typography>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Typography fontWeight={600} color="#1E293B">{b.departmentName || "Khám Chuyên Khoa"}</Typography>
-                                                    <Typography variant="caption" color="textSecondary">BS. {b.doctorName || "Đang phân công"}</Typography>
-                                                </TableCell>
-                                                <TableCell sx={{ whiteSpace: "nowrap" }}>
-                                                    <Typography variant="body2">{formatDate(b.bookingDate)}</Typography>
-                                                    <Typography variant="caption" color="textSecondary">{b.startTime || ""}</Typography>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Typography fontWeight={800} color="#10B981">
-                                                        {formatCurrency(b.price != null ? b.price : (b.totalAmount != null ? b.totalAmount : 0))}
-                                                    </Typography>
-                                                </TableCell>
-                                                <TableCell align="center">
-                                                    <Chip
-                                                        label={b.status === "COMPLETED" ? "Đã khám" : b.status === "CONFIRMED" ? "Đã xác nhận" : "Chờ thanh toán"}
-                                                        color={b.status === "COMPLETED" ? "success" : "primary"}
-                                                        size="small"
-                                                        sx={{ fontWeight: 700, borderRadius: 1.5 }}
-                                                    />
-                                                </TableCell>
-                                                <TableCell align="center">
-                                                    <Box display="flex" gap={1} justifyContent="center">
-                                                        <Button
+                                        {bookings.map((b) => {
+                                            const isHighlighted = highlightBookingCode && (
+                                                b.bookingCode === highlightBookingCode ||
+                                                String(b.bookingId) === highlightBookingCode
+                                            );
+                                            const paymentStatusCfg = getStatusConfig("PAYMENT", b.status === "COMPLETED" ? "PAID" : (b.isPaid ? "PAID" : "PENDING"));
+
+                                            return (
+                                                <TableRow
+                                                    key={b.bookingId || b.bookingCode}
+                                                    hover
+                                                    sx={{
+                                                        bgcolor: isHighlighted ? "rgba(15, 118, 110, 0.08)" : "inherit",
+                                                        "&:hover": { bgcolor: isHighlighted ? "rgba(15, 118, 110, 0.12)" : "rgba(15, 118, 110, 0.02)" }
+                                                    }}
+                                                >
+                                                    <TableCell>
+                                                        <Typography fontWeight={700} sx={{ fontFamily: "monospace", color: designTokens.brand.primaryDark, bgcolor: designTokens.brand.primaryLight, px: 1, py: 0.35, borderRadius: 1.5, display: "inline-block" }}>
+                                                            {b.bookingCode}
+                                                        </Typography>
+                                                        {isHighlighted && (
+                                                            <Chip label="Đang xem" size="small" sx={{ ml: 1, height: 20, fontSize: "0.65rem", fontWeight: 800, bgcolor: designTokens.brand.primary, color: "#FFFFFF" }} />
+                                                        )}
+                                                        {b.queueNumber && <Typography variant="caption" color="textSecondary" display="block" sx={{ mt: 0.5 }}>Số khám: #{b.queueNumber}</Typography>}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Typography fontWeight={700} color="#0F172A">{b.patientName}</Typography>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Typography fontWeight={600} color="#1E293B">{b.departmentName || "Khám Chuyên Khoa"}</Typography>
+                                                        <Typography variant="caption" color="textSecondary">BS. {b.doctorName || "Đang phân công"}</Typography>
+                                                    </TableCell>
+                                                    <TableCell sx={{ whiteSpace: "nowrap" }}>
+                                                        <Typography variant="body2">{formatDate(b.bookingDate)}</Typography>
+                                                        <Typography variant="caption" color="textSecondary">{b.startTime || ""}</Typography>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Typography fontWeight={800} color={designTokens.secondary.main}>
+                                                            {formatCurrency(b.price != null ? b.price : (b.totalAmount != null ? b.totalAmount : 0))}
+                                                        </Typography>
+                                                    </TableCell>
+                                                    <TableCell align="center">
+                                                        <Chip
+                                                            label={paymentStatusCfg.label}
                                                             size="small"
-                                                            variant="contained"
-                                                            startIcon={<PaymentIcon />}
-                                                            disabled={creatingPayment}
-                                                            onClick={() => handleCreatePayOSPayment(b)}
-                                                            sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none", bgcolor: "#0088D6", "&:hover": { bgcolor: "#0077BE" } }}
-                                                        >
-                                                            PayOS
-                                                        </Button>
-                                                        <Button
-                                                            size="small"
-                                                            variant="outlined"
-                                                            startIcon={<PrintIcon />}
-                                                            onClick={() => printReceipt({
-                                                                receiptCode: `RC-${b.bookingCode}`,
-                                                                patientName: b.patientName || "Bệnh nhân TNT",
-                                                                phoneNumber: b.patientPhone || "---",
-                                                                departmentName: b.departmentName || "Khoa Khám Bệnh",
-                                                                doctorName: b.doctorName || "Bác sĩ phụ trách",
-                                                                items: [
-                                                                    { name: `Viện phí ${b.departmentName || "Chuyên khoa"}`, qty: 1, price: b.price || b.totalAmount || 0 }
-                                                                ],
-                                                                totalAmount: b.price || b.totalAmount || 0,
-                                                                paymentMethod: "VIETQR",
-                                                                paidAt: b.bookingDate,
-                                                                cashierName: "Hệ thống Quản Trị Viện Phí TNT"
-                                                            })}
-                                                            sx={{ borderRadius: 2, textTransform: "none", fontWeight: 600, borderColor: "rgba(15, 23, 42, 0.15)" }}
-                                                        >
-                                                            In biên lai
-                                                        </Button>
-                                                    </Box>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
+                                                            sx={{
+                                                                fontWeight: 700,
+                                                                borderRadius: 1.5,
+                                                                color: paymentStatusCfg.color,
+                                                                bgcolor: paymentStatusCfg.bgColor,
+                                                                border: `1px solid ${paymentStatusCfg.borderColor}`
+                                                            }}
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell align="center">
+                                                        <Box display="flex" gap={1} justifyContent="center">
+                                                            <Button
+                                                                size="small"
+                                                                variant="contained"
+                                                                startIcon={<PaymentIcon />}
+                                                                disabled={creatingPayment}
+                                                                onClick={() => handleCreatePayOSPayment(b)}
+                                                                sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none", bgcolor: designTokens.brand.primary, "&:hover": { bgcolor: designTokens.brand.primaryHover } }}
+                                                            >
+                                                                PayOS
+                                                            </Button>
+                                                            <Button
+                                                                size="small"
+                                                                variant="outlined"
+                                                                startIcon={<PrintIcon />}
+                                                                onClick={() => printReceipt({
+                                                                    receiptCode: `RC-${b.bookingCode}`,
+                                                                    patientName: b.patientName || "Bệnh nhân TNT",
+                                                                    phoneNumber: b.patientPhone || "---",
+                                                                    departmentName: b.departmentName || "Khoa Khám Bệnh",
+                                                                    doctorName: b.doctorName || "Bác sĩ phụ trách",
+                                                                    items: [
+                                                                        { name: `Viện phí ${b.departmentName || "Chuyên khoa"}`, qty: 1, price: b.price || b.totalAmount || 0 }
+                                                                    ],
+                                                                    totalAmount: b.price || b.totalAmount || 0,
+                                                                    paymentMethod: "VIETQR",
+                                                                    paidAt: b.bookingDate,
+                                                                    cashierName: "Hệ thống Quản Trị Viện Phí TNT"
+                                                                })}
+                                                                sx={{ borderRadius: 2, textTransform: "none", fontWeight: 600, borderColor: "rgba(15, 23, 42, 0.15)" }}
+                                                            >
+                                                                In biên lai
+                                                            </Button>
+                                                        </Box>
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })}
                                     </TableBody>
                                 </Table>
                             </TableContainer>

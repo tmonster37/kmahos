@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
     Container,
     Grid,
@@ -60,6 +60,10 @@ import ClearIcon from "@mui/icons-material/Clear";
 import TimerOutlinedIcon from "@mui/icons-material/TimerOutlined";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
+import PersonSearchIcon from "@mui/icons-material/PersonSearch";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 
 import PaymentQRModal from "../../components/payment/PaymentQRModal";
 import AddOrLinkPatientProfileModal from "../../components/common/AddOrLinkPatientProfileModal";
@@ -117,6 +121,18 @@ export const getQueueNumberDisplay = (num, code) => {
         return `#${num}`;
     }
     return "Chờ cấp số tại quầy";
+};
+
+/**
+ * Chuyển đổi mã buổi khám sang nhãn tiếng Việt dễ hiểu
+ */
+export const getSessionLabel = (session) => {
+    switch (session) {
+        case "MORNING": return "Buổi sáng";
+        case "AFTERNOON": return "Buổi chiều";
+        case "EVENING": return "Buổi tối";
+        default: return session || "Trong ngày";
+    }
 };
 
 /**
@@ -384,16 +400,17 @@ export const getDoctorInitials = (name) => {
     return cleanName ? cleanName.charAt(0).toUpperCase() : "BS";
 };
 
-export default function BookingPage() {
+export default function BookingPage({ initialActiveStep, initialBookingResult = null } = {}) {
     const location = useLocation();
     const navigate = useNavigate();
     const { user, isAuthenticated } = useAuth();
     const queryParams = new URLSearchParams(location.search);
     const paramDeptId = queryParams.get("departmentId");
     const paramSymptoms = queryParams.get("symptoms");
+    const initialTargetDeptId = location.state?.departmentId || paramDeptId;
 
     // Stepper State
-    const [activeStep, setActiveStep] = useState(0);
+    const [activeStep, setActiveStep] = useState(() => initialActiveStep !== undefined ? initialActiveStep : (initialTargetDeptId ? 1 : 0));
 
     // Data States
     const [departments, setDepartments] = useState([]);
@@ -407,11 +424,26 @@ export default function BookingPage() {
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     });
     const [activeSession, setActiveSession] = useState("ALL"); // ALL, MORNING, AFTERNOON, EVENING
+    const [doctorSearch, setDoctorSearch] = useState("");
 
     // Profile & Symptoms States
     const [profiles, setProfiles] = useState([]);
     const [selectedProfile, setSelectedProfile] = useState(null);
-    const [symptoms, setSymptoms] = useState(paramSymptoms ? decodeURIComponent(paramSymptoms) : "");
+    // Nhận triệu chứng: Ưu tiên state điều hướng, fallback URL queryParams (URLSearchParams tự giải mã chuẩn, không gọi decodeURIComponent lặp lại gây URIError khi có %)
+    const stateSymptoms = location.state?.symptoms;
+    const initialSymptoms = (typeof stateSymptoms === "string" && stateSymptoms.trim().length > 0)
+        ? stateSymptoms
+        : (paramSymptoms || "");
+    const [symptoms, setSymptoms] = useState(initialSymptoms);
+
+    // Đồng bộ triệu chứng nếu state điều hướng hoặc URL params thay đổi
+    useEffect(() => {
+        if (location.state?.symptoms && typeof location.state.symptoms === "string") {
+            setSymptoms(location.state.symptoms);
+        } else if (paramSymptoms && !symptoms) {
+            setSymptoms(paramSymptoms);
+        }
+    }, [location.state?.symptoms, paramSymptoms]);
 
     // New Profile Modal
     const [openNewProfileModal, setOpenNewProfileModal] = useState(false);
@@ -430,7 +462,7 @@ export default function BookingPage() {
     const [paymentMethod, setPaymentMethod] = useState("VIETQR"); // VIETQR (PayOS), WALLET, COUNTER
     const [paymentModalData, setPaymentModalData] = useState(null);
     const [openQRModal, setOpenQRModal] = useState(false);
-    const [bookingResult, setBookingResult] = useState(null);
+    const [bookingResult, setBookingResult] = useState(initialBookingResult);
     const [loadingBooking, setLoadingBooking] = useState(false);
     const [error, setError] = useState("");
 
@@ -449,6 +481,7 @@ export default function BookingPage() {
         reservingSlot,
         loadingSchedules,
         scheduleError,
+        setScheduleError,
         fetchSchedules,
         handleSelectSlot
     } = useBookingScheduleWorkflow({
@@ -458,6 +491,37 @@ export default function BookingPage() {
         axiosClient: axiosInstance,
         onSessionError: (msg) => setError(msg)
     });
+
+    // Lọc danh sách bác sĩ theo từ khóa tìm kiếm (tên, học vị, phòng khám)
+    const filteredSchedules = useMemo(() => {
+        if (!doctorSearch.trim()) return schedules;
+        const q = doctorSearch.trim().toLowerCase();
+        return schedules.filter(sch => {
+            const name = (sch.doctorName || "").toLowerCase();
+            const deg = (sch.degree || "").toLowerCase();
+            const room = (sch.roomName || "").toLowerCase();
+            return name.includes(q) || deg.includes(q) || room.includes(q);
+        });
+    }, [schedules, doctorSearch]);
+
+    // Đồng bộ chọn bác sĩ khi danh sách lọc thay đổi:
+    // Nếu có bác sĩ đang chọn nhưng không nằm trong danh sách lọc thì tự chọn bác sĩ đầu tiên phù hợp (hoặc null nếu không tìm thấy)
+    useEffect(() => {
+        if (!doctorSearch.trim()) {
+            if (!selectedDoctorSchedule && schedules.length > 0) {
+                setSelectedDoctorSchedule(schedules[0]);
+            }
+            return;
+        }
+        if (filteredSchedules.length > 0) {
+            const stillVisible = filteredSchedules.some(s => s.scheduleId === selectedDoctorSchedule?.scheduleId);
+            if (!stillVisible) {
+                setSelectedDoctorSchedule(filteredSchedules[0]);
+            }
+        } else {
+            setSelectedDoctorSchedule(null);
+        }
+    }, [doctorSearch, filteredSchedules, schedules]);
 
     // Callback khi thanh toán Cổng PayOS (VietQR) thành công
     const handleQRPaymentSuccess = () => {
@@ -472,8 +536,9 @@ export default function BookingPage() {
             setDepartments(list);
             setFilteredDepartments(list);
 
-            if (paramDeptId) {
-                const found = list.find(d => String(d.departmentId) === String(paramDeptId));
+            const targetDeptId = location.state?.departmentId || paramDeptId;
+            if (targetDeptId) {
+                const found = list.find(d => String(d.departmentId) === String(targetDeptId));
                 if (found) {
                     setSelectedDept(found);
                     setActiveStep(1);
@@ -563,6 +628,7 @@ export default function BookingPage() {
 
     // Đặt khám & Cấp phiếu
     const handleFinalBooking = async () => {
+        if (loadingBooking) return; // Chống double submit khi nhấn xác nhận 2 lần liên tiếp
         if (!isAuthenticated) {
             navigate("/login?redirect=/booking");
             return;
@@ -998,7 +1064,7 @@ export default function BookingPage() {
                                     Bước 2: Chọn Ngày Khám & Bác Sĩ Chuyên Khoa
                                 </Typography>
                                 <Typography variant="body2" color="#64748B">
-                                    Chuyên khoa đã chọn: <b style={{ color: designTokens.brand.primary }}>{selectedDept?.departmentName}</b>
+                                    Chuyên khoa đã chọn: <b style={{ color: designTokens.brand.primary }}>{selectedDept?.departmentName || "Đang tải chuyên khoa..."}</b>
                                 </Typography>
                             </Box>
                         </Box>
@@ -1070,15 +1136,87 @@ export default function BookingPage() {
                             </Grid>
                         </Paper>
 
-                        {/* Danh sách Bác sĩ trực */}
-                        <Typography variant="h6" fontWeight="800" color="#0F172A" mb={2} sx={{ fontSize: "1.1rem" }}>
-                            Danh Sách Bác Sĩ Có Lịch Trực ({formatDate(selectedDate)}):
-                        </Typography>
+                        {/* Thanh tìm kiếm & lọc bác sĩ */}
+                        <Box
+                            display="flex"
+                            flexDirection={{ xs: "column", sm: "row" }}
+                            justifyContent="space-between"
+                            alignItems={{ xs: "stretch", sm: "center" }}
+                            gap={2}
+                            mb={2.5}
+                        >
+                            <Typography variant="h6" fontWeight="800" color="#0F172A" sx={{ fontSize: "1.1rem" }}>
+                                Danh Sách Bác Sĩ Có Lịch Trực ({formatDate(selectedDate)}):
+                            </Typography>
+                            <TextField
+                                placeholder="Tìm kiếm bác sĩ theo tên, học vị..."
+                                size="small"
+                                value={doctorSearch}
+                                onChange={(e) => setDoctorSearch(e.target.value)}
+                                sx={{
+                                    minWidth: { xs: "100%", sm: 300 },
+                                    bgcolor: "#FFFFFF",
+                                    "& .MuiOutlinedInput-root": {
+                                        borderRadius: "10px"
+                                    }
+                                }}
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <SearchIcon sx={{ color: "#94A3B8" }} />
+                                        </InputAdornment>
+                                    ),
+                                    endAdornment: doctorSearch ? (
+                                        <InputAdornment position="end">
+                                            <IconButton size="small" onClick={() => setDoctorSearch("")} edge="end" aria-label="Xóa tìm kiếm">
+                                                <ClearIcon fontSize="small" />
+                                            </IconButton>
+                                        </InputAdornment>
+                                    ) : null
+                                }}
+                            />
+                        </Box>
 
+                        {/* Các trạng thái hiển thị danh sách bác sĩ */}
                         {loadingSchedules ? (
-                            <Box display="flex" justifyContent="center" py={6}>
-                                <CircularProgress size={36} />
+                            <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" py={6} gap={1.5}>
+                                <CircularProgress size={38} sx={{ color: designTokens.brand.primary }} />
+                                <Typography variant="body2" color="#64748B" fontWeight={600}>
+                                    Đang tải danh sách bác sĩ trực ngày {formatDate(selectedDate)}...
+                                </Typography>
                             </Box>
+                        ) : scheduleError ? (
+                            <Paper
+                                elevation={0}
+                                sx={{
+                                    p: 4,
+                                    borderRadius: "16px",
+                                    bgcolor: "#FEF2F2",
+                                    border: "1px solid #FCA5A5",
+                                    textAlign: "center"
+                                }}
+                            >
+                                <ErrorOutlineIcon sx={{ fontSize: 44, color: "#DC2626", mb: 1 }} />
+                                <Typography variant="subtitle1" fontWeight="800" color="#991B1B" gutterBottom>
+                                    Không thể tải lịch khám của bác sĩ
+                                </Typography>
+                                <Typography variant="body2" color="#7F1D1D" mb={2.5}>
+                                    {scheduleError}
+                                </Typography>
+                                <Button
+                                    variant="contained"
+                                    onClick={fetchSchedules}
+                                    startIcon={<RefreshIcon />}
+                                    sx={{
+                                        bgcolor: "#DC2626",
+                                        "&:hover": { bgcolor: "#B91C1C" },
+                                        borderRadius: "8px",
+                                        fontWeight: 700
+                                    }}
+                                >
+                                    Thử lại
+                                </Button>
+                            </Paper>
                         ) : schedules.length === 0 ? (
                             <Paper
                                 elevation={0}
@@ -1098,10 +1236,43 @@ export default function BookingPage() {
                                     Vui lòng chọn ngày khác trong tuần hoặc chuyển sang chuyên khoa khác.
                                 </Typography>
                             </Paper>
+                        ) : filteredSchedules.length === 0 ? (
+                            <Paper
+                                elevation={0}
+                                sx={{
+                                    p: 4,
+                                    borderRadius: "16px",
+                                    bgcolor: "#FFFFFF",
+                                    border: "1px dashed #CBD5E1",
+                                    textAlign: "center"
+                                }}
+                            >
+                                <PersonSearchIcon sx={{ fontSize: 44, color: "#94A3B8", mb: 1 }} />
+                                <Typography variant="subtitle1" fontWeight="800" color="#0F172A" gutterBottom>
+                                    Không tìm thấy bác sĩ phù hợp
+                                </Typography>
+                                <Typography variant="body2" color="#64748B" mb={2}>
+                                    Không có bác sĩ nào khớp với từ khóa "{doctorSearch}". Vui lòng thử từ khóa khác hoặc xóa bộ lọc.
+                                </Typography>
+                                <Button
+                                    variant="outlined"
+                                    onClick={() => setDoctorSearch("")}
+                                    sx={{ borderRadius: "8px", fontWeight: 700 }}
+                                >
+                                    Xóa bộ lọc tìm kiếm
+                                </Button>
+                            </Paper>
                         ) : (
                             <Grid container spacing={2.5}>
-                                {schedules.map((sch) => {
+                                {filteredSchedules.map((sch) => {
                                     const isSelected = selectedDoctorSchedule?.scheduleId === sch.scheduleId;
+                                    const rawSlots = sch.timeSlots || [];
+                                    const hasSlots = rawSlots.length > 0;
+                                    const availableSlots = rawSlots.filter(s => !s.isFull && (s.currentBookings == null || s.maxCapacity == null || s.currentBookings < s.maxCapacity));
+                                    const isDoctorFull = hasSlots ? availableSlots.length === 0 : Boolean(sch.isFull);
+                                    const availableCount = availableSlots.length;
+                                    const sessionLabel = getSessionLabel(sch.session);
+
                                     return (
                                         <Grid item xs={12} md={6} key={sch.scheduleId}>
                                             <Card
@@ -1152,18 +1323,45 @@ export default function BookingPage() {
                                                     </Box>
 
                                                     <Box flexGrow={1}>
-                                                        <Box display="flex" alignItems="center" justifyContent="space-between" mb={0.5}>
-                                                            <Chip
-                                                                label={sch.degree || "Bác sĩ Chuyên khoa"}
-                                                                size="small"
-                                                                sx={{
-                                                                    fontWeight: 800,
-                                                                    fontSize: "0.7rem",
-                                                                    bgcolor: designTokens.brand.primaryLight,
-                                                                    color: designTokens.brand.primaryDark,
-                                                                    borderRadius: "6px"
-                                                                }}
-                                                            />
+                                                        <Box display="flex" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1} mb={0.5}>
+                                                            <Box display="flex" alignItems="center" gap={0.8}>
+                                                                <Chip
+                                                                    label={sch.degree || "Bác sĩ Chuyên khoa"}
+                                                                    size="small"
+                                                                    sx={{
+                                                                        fontWeight: 800,
+                                                                        fontSize: "0.7rem",
+                                                                        bgcolor: designTokens.brand.primaryLight,
+                                                                        color: designTokens.brand.primaryDark,
+                                                                        borderRadius: "6px"
+                                                                    }}
+                                                                />
+                                                                {isDoctorFull ? (
+                                                                    <Chip
+                                                                        label="Hết chỗ"
+                                                                        size="small"
+                                                                        sx={{
+                                                                            fontWeight: 800,
+                                                                            fontSize: "0.7rem",
+                                                                            bgcolor: "#FEF2F2",
+                                                                            color: "#B91C1C",
+                                                                            border: "1px solid #FECACA"
+                                                                        }}
+                                                                    />
+                                                                ) : (
+                                                                    <Chip
+                                                                        label={hasSlots ? `Còn chỗ (${availableCount} khung giờ)` : "Còn chỗ"}
+                                                                        size="small"
+                                                                        sx={{
+                                                                            fontWeight: 800,
+                                                                            fontSize: "0.7rem",
+                                                                            bgcolor: "#ECFDF5",
+                                                                            color: "#065F46",
+                                                                            border: "1px solid #A7F3D0"
+                                                                        }}
+                                                                    />
+                                                                )}
+                                                            </Box>
                                                             <Typography
                                                                 variant="body2"
                                                                 fontWeight="900"
@@ -1179,12 +1377,38 @@ export default function BookingPage() {
                                                         </Typography>
 
                                                         <Typography variant="body2" color="#64748B" sx={{ fontSize: "0.85rem", mt: 0.3 }}>
-                                                            Phòng: <b>{sch.roomName}</b> | Ca: <b>{sch.session === "MORNING" ? "Sáng" : sch.session === "AFTERNOON" ? "Chiều" : "Tối"}</b>
+                                                            Phòng: <b>{sch.roomName || "Chưa xếp phòng"}</b> | Ca: <b>{sessionLabel}</b>
                                                         </Typography>
 
-                                                        <Typography variant="caption" color={designTokens.brand.primary} fontWeight="700" display="block" mt={0.5}>
-                                                            Khung giờ có sẵn: {sch.timeSlots?.length || 0} lượt
-                                                        </Typography>
+                                                        <Box display="flex" justifyContent="space-between" alignItems="center" mt={1}>
+                                                            <Typography variant="caption" color="#64748B" fontWeight="600">
+                                                                Ngày khám: <b>{formatDate(sch.scheduleDate || selectedDate)}</b>
+                                                            </Typography>
+                                                            {isSelected ? (
+                                                                <Chip
+                                                                    icon={<CheckCircleIcon sx={{ fontSize: "16px !important", color: "#FFFFFF !important" }} />}
+                                                                    label="Đã chọn"
+                                                                    size="small"
+                                                                    sx={{
+                                                                        bgcolor: designTokens.brand.primary,
+                                                                        color: "#FFFFFF",
+                                                                        fontWeight: 800,
+                                                                        fontSize: "0.72rem"
+                                                                    }}
+                                                                />
+                                                            ) : (
+                                                                <Typography
+                                                                    variant="caption"
+                                                                    sx={{
+                                                                        color: designTokens.brand.primary,
+                                                                        fontWeight: 700,
+                                                                        "&:hover": { textDecoration: "underline" }
+                                                                    }}
+                                                                >
+                                                                    Chọn bác sĩ này →
+                                                                </Typography>
+                                                            )}
+                                                        </Box>
                                                     </Box>
                                                 </Box>
                                             </Card>
@@ -1194,19 +1418,26 @@ export default function BookingPage() {
                             </Grid>
                         )}
 
-                        <Box display="flex" justifyContent="space-between" mt={4}>
+                        <Box
+                            display="flex"
+                            flexDirection={{ xs: "column-reverse", sm: "row" }}
+                            justifyContent="space-between"
+                            alignItems={{ xs: "stretch", sm: "center" }}
+                            gap={2}
+                            mt={4}
+                        >
                             <Button
                                 variant="outlined"
                                 size="large"
                                 onClick={() => setActiveStep(0)}
-                                sx={{ borderRadius: "10px", px: 3, fontWeight: 700 }}
+                                sx={{ borderRadius: "10px", px: 3, fontWeight: 700, minHeight: 48 }}
                             >
                                 Quay lại
                             </Button>
                             <Button
                                 variant="contained"
                                 size="large"
-                                disabled={!selectedDoctorSchedule}
+                                disabled={!selectedDoctorSchedule || !filteredSchedules.some(s => s.scheduleId === selectedDoctorSchedule.scheduleId)}
                                 endIcon={<ArrowForwardIcon />}
                                 onClick={() => setActiveStep(2)}
                                 sx={{
@@ -1214,6 +1445,7 @@ export default function BookingPage() {
                                     px: 4,
                                     borderRadius: "12px",
                                     fontWeight: 800,
+                                    minHeight: 48,
                                     "&:hover": { bgcolor: designTokens.brand.primaryHover }
                                 }}
                             >
@@ -1237,10 +1469,44 @@ export default function BookingPage() {
                                     Bước 3: Chọn Khung Giờ Khám Bệnh
                                 </Typography>
                                 <Typography variant="body2" color="#64748B">
-                                    Bác sĩ: <b style={{ color: designTokens.brand.primary }}>{selectedDoctorSchedule?.doctorName}</b> - Phòng: <b>{selectedDoctorSchedule?.roomName}</b> ({formatDate(selectedDate)})
+                                    Bác sĩ: <b style={{ color: designTokens.brand.primary }}>{selectedDoctorSchedule?.doctorName}</b> • Phòng: <b>{selectedDoctorSchedule?.roomName || "Chưa xếp"}</b> • <b>{getSessionLabel(selectedDoctorSchedule?.session)}</b> ({formatDate(selectedDate)})
                                 </Typography>
                             </Box>
                         </Box>
+
+                        {(scheduleError || error) && (
+                            <Alert
+                                severity="error"
+                                onClose={() => { setError(""); setScheduleError(""); }}
+                                sx={{ mb: 2.5, borderRadius: "12px" }}
+                            >
+                                {scheduleError || error}
+                            </Alert>
+                        )}
+
+                        {holdingSecondsLeft > 0 && selectedSlot && (
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 1,
+                                    p: 1.5,
+                                    mb: 2.5,
+                                    borderRadius: "10px",
+                                    bgcolor: "#FFFBEB",
+                                    border: "1px solid #FDE68A",
+                                    color: "#92400E"
+                                }}
+                            >
+                                <TimerOutlinedIcon sx={{ fontSize: 20 }} />
+                                <Typography variant="body2" fontWeight="700">
+                                    Đang giữ chỗ khung giờ <b>{selectedSlot.startTime} - {selectedSlot.endTime}</b>. Thời gian còn lại:{" "}
+                                    <b style={{ color: "#B45309" }}>
+                                        {Math.floor(holdingSecondsLeft / 60)}:{String(holdingSecondsLeft % 60).padStart(2, '0')}
+                                    </b>
+                                </Typography>
+                            </Box>
+                        )}
 
                         <Paper
                             elevation={0}
@@ -1349,19 +1615,26 @@ export default function BookingPage() {
                             })()}
                         </Paper>
 
-                        <Box display="flex" justifyContent="space-between" mt={4}>
+                        <Box
+                            display="flex"
+                            flexDirection={{ xs: "column-reverse", sm: "row" }}
+                            justifyContent="space-between"
+                            alignItems={{ xs: "stretch", sm: "center" }}
+                            gap={2}
+                            mt={4}
+                        >
                             <Button
                                 variant="outlined"
                                 size="large"
                                 onClick={() => setActiveStep(1)}
-                                sx={{ borderRadius: "10px", px: 3, fontWeight: 700 }}
+                                sx={{ borderRadius: "10px", px: 3, fontWeight: 700, minHeight: 48 }}
                             >
-                                Quay lại
+                                Quay lại: Chọn Bác Sĩ
                             </Button>
                             <Button
                                 variant="contained"
                                 size="large"
-                                disabled={!selectedSlot || !reservationId}
+                                disabled={!selectedSlot || !reservationId || reservingSlot}
                                 endIcon={<ArrowForwardIcon />}
                                 onClick={() => setActiveStep(3)}
                                 sx={{
@@ -1369,6 +1642,7 @@ export default function BookingPage() {
                                     px: 4,
                                     borderRadius: "12px",
                                     fontWeight: 800,
+                                    minHeight: 48,
                                     "&:hover": { bgcolor: designTokens.brand.primaryHover }
                                 }}
                             >
@@ -1595,6 +1869,14 @@ export default function BookingPage() {
                                                 <Typography color="#64748B" variant="body2">Bệnh nhân:</Typography>
                                                 <Typography fontWeight="700" color="#0F172A" variant="body2">{selectedProfile?.fullName || "Chưa chọn"}</Typography>
                                             </Box>
+                                            {symptoms ? (
+                                                <Box display="flex" justifyContent="space-between" alignItems="flex-start" gap={1}>
+                                                    <Typography color="#64748B" variant="body2" sx={{ whiteSpace: "nowrap" }}>Triệu chứng:</Typography>
+                                                    <Typography fontWeight="700" color="#0F172A" variant="body2" sx={{ textAlign: "right", wordBreak: "break-word" }}>
+                                                        {symptoms}
+                                                    </Typography>
+                                                </Box>
+                                            ) : null}
                                         </Stack>
 
                                         <Divider sx={{ my: 1.8 }} />
@@ -1714,11 +1996,12 @@ export default function BookingPage() {
                                             fullWidth
                                             variant="contained"
                                             size="large"
-                                            disabled={loadingBooking || !selectedProfile}
+                                            disabled={loadingBooking || !selectedProfile || !selectedSlot || !reservationId}
                                             onClick={handleFinalBooking}
                                             sx={{
                                                 mt: 2.5,
                                                 py: 1.4,
+                                                minHeight: 48,
                                                 borderRadius: "12px",
                                                 bgcolor: designTokens.brand.primary,
                                                 fontWeight: 800,
@@ -1842,8 +2125,25 @@ export default function BookingPage() {
                                 </Grid>
                             </Grid>
 
-                            {/* Action Buttons */}
-                            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} justifyContent="center">
+                            {/* Action Buttons - Luồng nghiệm thu xuyên suốt Đợt 4 */}
+                            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} justifyContent="center" flexWrap="wrap">
+                                <Button
+                                    component={Link}
+                                    to={`/profiles?tab=ticket&bookingCode=${encodeURIComponent(bookingResult.bookingCode || "")}`}
+                                    variant="contained"
+                                    size="large"
+                                    startIcon={<QrCode2Icon />}
+                                    sx={{
+                                        py: 1.3,
+                                        px: 3,
+                                        borderRadius: "12px",
+                                        fontWeight: 800,
+                                        bgcolor: designTokens.brand.primary,
+                                        "&:hover": { bgcolor: designTokens.brand.primaryHover }
+                                    }}
+                                >
+                                    Xem Phiếu Hẹn Khám
+                                </Button>
                                 {bookingResult.paymentUrl && (
                                     <Button
                                         component="a"
@@ -1858,8 +2158,8 @@ export default function BookingPage() {
                                             px: 3,
                                             borderRadius: "12px",
                                             fontWeight: 800,
-                                            bgcolor: designTokens.brand.primary,
-                                            "&:hover": { bgcolor: designTokens.brand.primaryHover }
+                                            bgcolor: designTokens.status.warning.main,
+                                            "&:hover": { bgcolor: "#92400E" }
                                         }}
                                     >
                                         Mở Cổng Thanh Toán PayOS
@@ -1867,15 +2167,24 @@ export default function BookingPage() {
                                 )}
                                 <Button
                                     component={Link}
-                                    to="/my-history"
+                                    to={`/my-bills?bookingCode=${encodeURIComponent(bookingResult.bookingCode || "")}`}
                                     variant="outlined"
                                     size="large"
-                                    sx={{ py: 1.3, px: 3, borderRadius: "12px", fontWeight: 700 }}
+                                    startIcon={<ReceiptLongIcon />}
+                                    sx={{
+                                        py: 1.3,
+                                        px: 3,
+                                        borderRadius: "12px",
+                                        fontWeight: 700,
+                                        borderColor: designTokens.brand.primaryBorder,
+                                        color: designTokens.brand.primaryDark,
+                                        "&:hover": { borderColor: designTokens.brand.primary, bgcolor: designTokens.brand.primaryLight }
+                                    }}
                                 >
-                                    Xem Lịch Sử Khám
+                                    Mở Viện Phí Liên Quan
                                 </Button>
                                 <Button
-                                    variant="contained"
+                                    variant="outlined"
                                     size="large"
                                     onClick={() => printAppointmentTicket({
                                         bookingCode: bookingResult.bookingCode,
@@ -1891,9 +2200,26 @@ export default function BookingPage() {
                                         price: bookingResult.price != null ? bookingResult.price : (selectedDoctorSchedule?.consultationFee != null ? selectedDoctorSchedule.consultationFee : undefined)
                                     })}
                                     startIcon={<PrintIcon />}
-                                    sx={{ py: 1.3, px: 3, borderRadius: "12px", fontWeight: 800, bgcolor: designTokens.secondary.main, "&:hover": { bgcolor: designTokens.secondary.hover } }}
+                                    sx={{
+                                        py: 1.3,
+                                        px: 3,
+                                        borderRadius: "12px",
+                                        fontWeight: 800,
+                                        color: designTokens.secondary.main,
+                                        borderColor: designTokens.secondary.border,
+                                        "&:hover": { borderColor: designTokens.secondary.main, bgcolor: designTokens.secondary.light }
+                                    }}
                                 >
                                     In Phiếu Khám
+                                </Button>
+                                <Button
+                                    component={Link}
+                                    to="/my-history"
+                                    variant="text"
+                                    size="large"
+                                    sx={{ py: 1.3, px: 2, borderRadius: "12px", fontWeight: 700, color: designTokens.neutral.textSecondary }}
+                                >
+                                    Xem Lịch Sử Khám
                                 </Button>
                             </Stack>
                         </Paper>

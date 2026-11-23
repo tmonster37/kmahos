@@ -301,6 +301,51 @@ export function getStatusConfig(domain, status) {
         };
     }
 
+    // 6. VIỆN PHÍ & THANH TOÁN (PAYMENT / BILL)
+    if (domain === "PAYMENT" || domain === "BILL") {
+        switch (s) {
+            case "PAID":
+            case "SUCCESS":
+            case "COMPLETED":
+            case "DA_THANH_TOAN":
+                return {
+                    label: "Đã thanh toán",
+                    color: designTokens.status.success.main,
+                    bgColor: designTokens.status.success.bg,
+                    borderColor: designTokens.status.success.border,
+                    chipColor: "success",
+                };
+            case "PENDING":
+            case "UNPAID":
+            case "CHO_THANH_TOAN":
+                return {
+                    label: "Chờ thanh toán",
+                    color: designTokens.status.warning.main,
+                    bgColor: designTokens.status.warning.bg,
+                    borderColor: designTokens.status.warning.border,
+                    chipColor: "warning",
+                };
+            case "FAILED":
+            case "CANCELLED":
+            case "THAT_BAI":
+                return {
+                    label: "Thất bại / Hủy",
+                    color: designTokens.status.danger.main,
+                    bgColor: designTokens.status.danger.bg,
+                    borderColor: designTokens.status.danger.border,
+                    chipColor: "error",
+                };
+            default:
+                return {
+                    label: status || "Chưa quyết toán",
+                    color: designTokens.neutral.textMuted,
+                    bgColor: designTokens.neutral.borderLight,
+                    borderColor: designTokens.neutral.border,
+                    chipColor: "default",
+                };
+        }
+    }
+
     // Mặc định chung
     return {
         label: String(status || ""),

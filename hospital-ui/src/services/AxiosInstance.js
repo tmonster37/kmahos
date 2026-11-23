@@ -23,7 +23,7 @@ export const clearInMemoryAccessToken = () => {
 
 const axiosInstance = axios.create({
     baseURL: API_BASE_URL,
-    timeout: 75000,
+    timeout: 15000, // 15 giây (thay vì 75s để tránh treo giao diện khi máy chủ cold-start)
     withCredentials: true,
     headers: {
         "Content-Type": "application/json",
@@ -79,10 +79,12 @@ axiosInstance.interceptors.response.use(
                 friendlyMessage = "Dữ liệu gửi lên không hợp lệ, vui lòng kiểm tra lại.";
             } else if (status === 500) {
                 friendlyMessage = "Hệ thống máy chủ bệnh viện đang bận, vui lòng thử lại sau ít phút.";
+            } else if (status === 503) {
+                friendlyMessage = "Máy chủ đang trong quá trình khởi động hoặc bảo trì (Cold Start). Vui lòng thử lại sau 30-60 giây.";
             } else if (error.code === "ECONNABORTED" || error.message?.includes("timeout")) {
-                friendlyMessage = "Máy chủ đang khởi động từ chế độ ngủ đông (Cold Start), vui lòng chờ thêm ít giây rồi thử lại...";
+                friendlyMessage = "Máy chủ phản hồi chậm hoặc đang thức dậy từ chế độ ngủ đông. Vui lòng tải lại hoặc thử lại sau giây lát.";
             } else if (error.message?.includes("Network Error")) {
-                friendlyMessage = "Không thể kết nối đến máy chủ API Bệnh Viện (Port 8080). Vui lòng kiểm tra lại kết nối mạng.";
+                friendlyMessage = "Không thể kết nối đến máy chủ API Bệnh Viện. Vui lòng kiểm tra kết nối mạng hoặc thử lại khi máy chủ đã khởi động.";
             } else {
                 friendlyMessage = error.message || "Đã xảy ra lỗi không xác định.";
             }

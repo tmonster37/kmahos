@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: ${PORT:8080}
 
 spring:
   application:
@@ -62,7 +62,16 @@ app:
   ai-triage:
     clinical-approved: ${APP_AI_TRIAGE_CLINICAL_APPROVED:false}
   cors:
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000,http://localhost:3001,http://localhost:8080,http://127.0.0.1:5173,http://127.0.0.1:3000,http://127.0.0.1:3001,https://hospital.kma.edu.vn,https://kiosk.hospital.kma.edu.vn,https://admin.hospital.kma.edu.vn}
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000,http://localhost:3001,http://localhost:8080,http://127.0.0.1:5173,http://127.0.0.1:3000,http://127.0.0.1:3001,https://hospital.kma.edu.vn,https://kiosk.hospital.kma.edu.vn,https://admin.hospital.kma.edu.vn,https://kmahos.vercel.app}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when_authorized
 
 vnpay:
   tmn-code: ${VNPAY_TMN_CODE:P48XA8RI}

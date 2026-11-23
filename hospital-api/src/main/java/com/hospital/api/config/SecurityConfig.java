@@ -46,7 +46,7 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/health", "/health", "/actuator/**").permitAll()
+                .requestMatchers("/", "/api/health", "/health", "/actuator/**").permitAll()
                 .requestMatchers("/api/auth/**", "/api/payment/payos/webhook", "/api/payment/vnpay/callback", "/api/payment/vnpay/ipn", "/api/payment/vnpay-ipn", "/api/payment/kiosk/vietqr", "/api/payment/kiosk/sync/**", "/error").permitAll()
                 .requestMatchers("/api/prescriptions/verify", "/api/prescriptions/*/verify", "/api/prescriptions/*/pdf", "/api/prescriptions/*/hash").permitAll()
                 .requestMatchers("/api/bookings/kiosk", "/api/bookings/kiosk/**", "/api/bookings/code/**", "/api/bookings/reserve-slot", "/api/bookings/release-slot/**", "/api/clinical/queue/public", "/api/patient-profiles/lookup").permitAll()

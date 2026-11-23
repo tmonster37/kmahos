@@ -124,21 +124,52 @@ const formatSession = (session) => {
     }
 };
 
+const DEFAULT_FALLBACK_DEPARTMENTS = [
+    { departmentId: 1, departmentName: "Khoa Khám Bệnh", description: "Tiếp đón, phân luồng và khám sức khỏe ban đầu cho mọi bệnh nhân" },
+    { departmentId: 2, departmentName: "Khoa Nội Tổng Quát", description: "Chẩn đoán và điều trị toàn diện các bệnh lý nội khoa người lớn" },
+    { departmentId: 3, departmentName: "Khoa Ngoại Tổng Quát", description: "Khám, tư vấn và can thiệp phẫu thuật các bệnh lý ngoại khoa" },
+    { departmentId: 4, departmentName: "Khoa Nhi", description: "Khám, điều trị và chăm sóc sức khỏe toàn diện cho trẻ sơ sinh và trẻ nhỏ" },
+    { departmentId: 5, departmentName: "Khoa Tim Mạch", description: "Khám chuyên sâu bệnh lý mạch vành, tăng huyết áp và suy tim" },
+    { departmentId: 6, departmentName: "Khoa Tai Mũi Họng", description: "Khám và nội soi điều trị các bệnh lý tai, mũi, họng người lớn và trẻ em" },
+    { departmentId: 7, departmentName: "Khoa Mắt", description: "Đo thị lực, tầm soát và điều trị tật khúc xạ, bệnh lý nhãn khoa" },
+    { departmentId: 8, departmentName: "Khoa Răng Hàm Mặt", description: "Khám, nhổ răng, nha khoa thẩm mỹ và điều trị bệnh lý khoang miệng" }
+];
+
+const getInitialDepartments = () => {
+    try {
+        if (typeof window !== "undefined" && window.localStorage) {
+            const cached = localStorage.getItem("tnt_cached_departments");
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            }
+        }
+    } catch {
+        // bỏ qua lỗi đọc cache
+    }
+    return DEFAULT_FALLBACK_DEPARTMENTS;
+};
+
 export default function HomePage() {
     const navigate = useNavigate();
     const { isAuthenticated } = useAuth();
 
-    // 1. Dữ liệu Chuyên khoa từ API
-    const [departments, setDepartments] = useState([]);
-    const [loadingDepts, setLoadingDepts] = useState(true);
+    // 1. Dữ liệu Chuyên khoa từ API (khởi tạo ngay từ cache/fallback để tránh delay trắng màn hình)
+    const [departments, setDepartments] = useState(() => getInitialDepartments());
+    const [loadingDepts, setLoadingDepts] = useState(false);
     const [deptError, setDeptError] = useState("");
     const [deptFilterTerm, setDeptFilterTerm] = useState("");
 
-    // 2. Tìm kiếm ở Hero
-    const [heroSearchTerm, setHeroSearchTerm] = useState("");
+    // 2. Tìm kiếm ở Hero: Tách rõ Chuyên khoa vs Triệu chứng
+    const [searchMode, setSearchMode] = useState("department"); // "department" | "symptoms"
+    const [deptSearchTerm, setDeptSearchTerm] = useState("");
+    const [symptomSearchTerm, setSymptomSearchTerm] = useState("");
 
     // 3. Dữ liệu Lịch trực bác sĩ trong ngày (Dữ liệu thật từ /api/schedules/by-department)
-    const [selectedDeptId, setSelectedDeptId] = useState(null);
+    const [selectedDeptId, setSelectedDeptId] = useState(() => {
+        const init = getInitialDepartments();
+        return init.length > 0 ? init[0].departmentId : null;
+    });
     const [schedules, setSchedules] = useState([]);
     const [loadingSchedules, setLoadingSchedules] = useState(false);
     const [scheduleError, setScheduleError] = useState("");
@@ -155,12 +186,18 @@ export default function HomePage() {
             const list = (res && res.data && Array.isArray(res.data))
                 ? res.data
                 : (Array.isArray(res) ? res : []);
-            setDepartments(list);
-            if (list.length > 0 && !selectedDeptId) {
-                setSelectedDeptId(list[0].departmentId);
+            if (list.length > 0) {
+                setDepartments(list);
+                try {
+                    localStorage.setItem("tnt_cached_departments", JSON.stringify(list));
+                } catch {}
+                if (!selectedDeptId) {
+                    setSelectedDeptId(list[0].departmentId);
+                }
             }
         } catch (err) {
-            setDeptError("Không thể tải danh mục chuyên khoa từ máy chủ. Vui lòng kiểm tra kết nối mạng và thử lại.");
+            const msg = err.message || "Máy chủ đang khởi động";
+            setDeptError(`Hệ thống đang kết nối máy chủ (${msg}). Bạn vẫn có thể tra cứu và đặt khám theo danh mục hiện có.`);
         } finally {
             setLoadingDepts(false);
         }
@@ -209,19 +246,79 @@ export default function HomePage() {
         );
     }, [departments, deptFilterTerm]);
 
-    // Xử lý tìm kiếm nhanh từ Hero Bar
-    const handleHeroSearch = (e) => {
+    // Lọc chuyên khoa khớp realtime khi nhập vào ô Tìm chuyên khoa ở Hero
+    const matchingHeroDepartments = useMemo(() => {
+        if (!deptSearchTerm.trim()) return [];
+        const kw = deptSearchTerm.toLowerCase().trim();
+        return departments.filter(d =>
+            (d.departmentName && d.departmentName.toLowerCase().includes(kw)) ||
+            (d.description && d.description.toLowerCase().includes(kw))
+        ).slice(0, 5);
+    }, [departments, deptSearchTerm]);
+
+    // Chọn chuyên khoa và điều hướng tới Booking
+    const handleSelectDepartment = (dept) => {
+        if (!dept) return;
+        navigate(`/booking?departmentId=${dept.departmentId}`, {
+            state: { departmentId: dept.departmentId }
+        });
+    };
+
+    // Xử lý tìm kiếm Chuyên khoa (Trả về kết quả hoặc dẫn tới đúng khoa)
+    const handleDepartmentSearch = (e) => {
         if (e) e.preventDefault();
-        const term = heroSearchTerm.trim();
+        const term = deptSearchTerm.trim();
+        if (!term) {
+            navigate("/booking");
+            return;
+        }
+        const matched = departments.find(d =>
+            (d.departmentName && d.departmentName.toLowerCase().includes(term.toLowerCase())) ||
+            (d.description && d.description.toLowerCase().includes(term.toLowerCase()))
+        );
+        if (matched) {
+            navigate(`/booking?departmentId=${matched.departmentId}`, {
+                state: { departmentId: matched.departmentId }
+            });
+        } else {
+            const el = document.getElementById("chuyen-khoa");
+            if (el) {
+                el.scrollIntoView({ behavior: "smooth" });
+                setDeptFilterTerm(term);
+            } else {
+                navigate("/booking");
+            }
+        }
+    };
+
+    // Xử lý mô tả triệu chứng (Thuộc luồng đặt khám, chuyển tiếp và giữ nguyên)
+    const handleSymptomSearch = (e) => {
+        if (e) e.preventDefault();
+        const term = symptomSearchTerm.trim();
         if (term) {
-            navigate(`/booking?symptoms=${encodeURIComponent(term)}`);
+            navigate(`/booking?symptoms=${encodeURIComponent(term)}`, {
+                state: { symptoms: term }
+            });
         } else {
             navigate("/booking");
         }
     };
 
-    const handleQuickTagClick = (tag) => {
-        navigate(`/booking?symptoms=${encodeURIComponent(tag)}`);
+    const handleQuickDeptTag = (deptName) => {
+        const matched = departments.find(d =>
+            d.departmentName && d.departmentName.toLowerCase().includes(deptName.toLowerCase())
+        );
+        if (matched) {
+            navigate(`/booking?departmentId=${matched.departmentId}`, {
+                state: { departmentId: matched.departmentId }
+            });
+        } else {
+            setDeptSearchTerm(deptName);
+        }
+    };
+
+    const handleQuickSymptomTag = (tag) => {
+        setSymptomSearchTerm(prev => prev ? `${prev}, ${tag}` : tag);
     };
 
     // 4 Dịch vụ Cốt lõi & Lối tắt thực tế của dự án (Chuẩn hóa màu Teal và Heart Red)
@@ -405,7 +502,7 @@ export default function HomePage() {
                                 Chủ động chọn chuyên khoa, bác sĩ và khung giờ khám trước. Nhận phiếu số thứ tự điện tử, thủ tục tinh gọn và thanh toán viện phí trực tuyến qua PayOS VietQR.
                             </Typography>
 
-                            {/* Action Buttons */}
+                            {/* Action Buttons: Đặt lịch khám (chính), Tra cứu (phụ) */}
                             <Stack
                                 direction={{ xs: "column", sm: "row" }}
                                 spacing={2}
@@ -435,7 +532,7 @@ export default function HomePage() {
                                         }
                                     }}
                                 >
-                                    Đặt Lịch Khám Ngay
+                                    Đặt lịch khám
                                 </Button>
 
                                 <Button
@@ -461,11 +558,11 @@ export default function HomePage() {
                                         }
                                     }}
                                 >
-                                    Tra Cứu Hồ Sơ & Sơ Đồ
+                                    Tra cứu
                                 </Button>
                             </Stack>
 
-                            {/* HỘP TÌM KIẾM THÔNG MINH (Apple Frosted Glass Container) */}
+                            {/* HỘP TÌM KIẾM THÔNG MINH: TÁCH RÕ TÌM CHUYÊN KHOA VÀ MÔ TẢ TRIỆU CHỨNG */}
                             <Paper
                                 elevation={0}
                                 sx={{
@@ -477,116 +574,325 @@ export default function HomePage() {
                                     border: "1px solid #E2E8F0"
                                 }}
                             >
-                                <Box
-                                    component="form"
-                                    onSubmit={handleHeroSearch}
-                                    role="search"
-                                    aria-label="Tìm kiếm chuyên khoa hoặc triệu chứng"
-                                    sx={{
-                                        display: "flex",
-                                        flexDirection: { xs: "column", sm: "row" },
-                                        alignItems: "stretch",
-                                        gap: 1.2,
-                                        bgcolor: "#F8FAFC",
-                                        borderRadius: "14px",
-                                        p: 0.8,
-                                        border: "1.5px solid #E2E8F0",
-                                        transition: "all 0.2s ease",
-                                        "&:focus-within": {
-                                            borderColor: "#0D9488",
-                                            bgcolor: "#FFFFFF",
-                                            boxShadow: "0 0 0 4px rgba(13, 148, 136, 0.16)"
-                                        }
-                                    }}
-                                >
-                                    <TextField
-                                        fullWidth
-                                        variant="standard"
-                                        placeholder="Nhập triệu chứng, bệnh lý (VD: Tim mạch, Đau ngực, Khám Nhi...)"
-                                        value={heroSearchTerm}
-                                        onChange={(e) => setHeroSearchTerm(e.target.value)}
-                                        InputProps={{
-                                            disableUnderline: true,
-                                            startAdornment: (
-                                                 <InputAdornment position="start" sx={{ pl: 1, color: "#0D9488" }}>
-                                                    <SearchIcon sx={{ fontSize: 24 }} />
-                                                </InputAdornment>
-                                            ),
-                                            endAdornment: heroSearchTerm ? (
-                                                <InputAdornment position="end">
-                                                    <IconButton size="small" onClick={() => setHeroSearchTerm("")} sx={{ mr: 0.5 }}>
-                                                        <ClearIcon sx={{ fontSize: 18 }} />
-                                                    </IconButton>
-                                                </InputAdornment>
-                                            ) : null,
-                                            sx: {
-                                                fontSize: { xs: "0.92rem", md: "0.98rem" },
-                                                fontWeight: 500,
-                                                color: "#0F172A",
-                                                px: 1,
-                                                py: 0.6
-                                            }
-                                        }}
-                                    />
-
+                                {/* Switch Tabs giữa Tìm chuyên khoa và Mô tả triệu chứng */}
+                                <Box sx={{ mb: 2, display: "flex", gap: 1 }}>
                                     <Button
-                                        type="submit"
-                                        variant="contained"
-                                        size="large"
+                                        size="small"
+                                        variant={searchMode === "department" ? "contained" : "text"}
+                                        startIcon={<LocalHospitalIcon sx={{ fontSize: 18 }} />}
+                                        onClick={() => setSearchMode("department")}
                                         sx={{
                                             borderRadius: "10px",
-                                            px: { xs: 2.5, md: 3.2 },
-                                            py: { xs: 1.2, md: 1.2 },
-                                            fontWeight: 700,
-                                            fontSize: "0.95rem",
-                                            whiteSpace: "nowrap",
-                                            bgcolor: "#0D9488",
-                                            boxShadow: "0 4px 14px rgba(13, 148, 136, 0.35)",
+                                            fontWeight: 800,
+                                            fontSize: { xs: "0.8rem", sm: "0.86rem" },
+                                            px: 1.8,
+                                            py: 0.7,
+                                            textTransform: "none",
+                                            bgcolor: searchMode === "department" ? "#0D9488 !important" : "transparent",
+                                            color: searchMode === "department" ? "#FFFFFF !important" : "#64748B",
                                             "&:hover": {
-                                                bgcolor: "#0F766E"
+                                                bgcolor: searchMode === "department" ? "#0F766E !important" : "#F1F5F9"
                                             }
                                         }}
                                     >
-                                        Tìm Kiếm
+                                        Tìm chuyên khoa
+                                    </Button>
+
+                                    <Button
+                                        size="small"
+                                        variant={searchMode === "symptoms" ? "contained" : "text"}
+                                        startIcon={<MedicalServicesIcon sx={{ fontSize: 18 }} />}
+                                        onClick={() => setSearchMode("symptoms")}
+                                        sx={{
+                                            borderRadius: "10px",
+                                            fontWeight: 800,
+                                            fontSize: { xs: "0.8rem", sm: "0.86rem" },
+                                            px: 1.8,
+                                            py: 0.7,
+                                            textTransform: "none",
+                                            bgcolor: searchMode === "symptoms" ? "#0D9488 !important" : "transparent",
+                                            color: searchMode === "symptoms" ? "#FFFFFF !important" : "#64748B",
+                                            "&:hover": {
+                                                bgcolor: searchMode === "symptoms" ? "#0F766E !important" : "#F1F5F9"
+                                            }
+                                        }}
+                                    >
+                                        Mô tả triệu chứng
                                     </Button>
                                 </Box>
 
-                                {/* Các từ khóa gợi ý */}
-                                <Box display="flex" alignItems="center" gap={1} mt={1.5} flexWrap="wrap">
-                                    <Typography
-                                        variant="caption"
-                                        sx={{
-                                            color: "#64748B",
-                                            fontWeight: 700,
-                                            fontSize: "0.76rem"
-                                        }}
-                                    >
-                                        Gợi ý:
-                                    </Typography>
-                                    {["Khám tổng quát", "Tim mạch", "Nhi khoa", "Cơ xương khớp", "Đau ngực", "Sốt cao", "Tai mũi họng"].map((tag, idx) => (
-                                        <Chip
-                                            key={idx}
-                                            label={tag}
-                                            size="small"
-                                            onClick={() => handleQuickTagClick(tag)}
+                                {searchMode === "department" ? (
+                                    /* --- FORM TÌM CHUYÊN KHOA --- */
+                                    <Box>
+                                        <Box
+                                            component="form"
+                                            onSubmit={handleDepartmentSearch}
+                                            role="search"
+                                            aria-label="Tìm kiếm chuyên khoa"
                                             sx={{
-                                                cursor: "pointer",
-                                                bgcolor: "#F1F5F9",
-                                                color: "#334155",
-                                                fontWeight: 600,
-                                                fontSize: "0.74rem",
-                                                borderRadius: "6px",
-                                                transition: "all 0.15s ease",
-                                                border: "1px solid #E2E8F0",
-                                                "&:hover": {
-                                                    bgcolor: "#F0FDFA",
-                                                    color: "#0D9488",
-                                                    borderColor: "#CCFBF1"
+                                                display: "flex",
+                                                flexDirection: { xs: "column", sm: "row" },
+                                                alignItems: "stretch",
+                                                gap: 1.2,
+                                                bgcolor: "#F8FAFC",
+                                                borderRadius: "14px",
+                                                p: 0.8,
+                                                border: "1.5px solid #E2E8F0",
+                                                transition: "all 0.2s ease",
+                                                "&:focus-within": {
+                                                    borderColor: "#0D9488",
+                                                    bgcolor: "#FFFFFF",
+                                                    boxShadow: "0 0 0 4px rgba(13, 148, 136, 0.16)"
                                                 }
                                             }}
-                                        />
-                                    ))}
-                                </Box>
+                                        >
+                                            <TextField
+                                                fullWidth
+                                                variant="standard"
+                                                placeholder="Nhập tên chuyên khoa (VD: Tim mạch, Nhi khoa, Cơ xương khớp...)"
+                                                value={deptSearchTerm}
+                                                onChange={(e) => setDeptSearchTerm(e.target.value)}
+                                                InputProps={{
+                                                    disableUnderline: true,
+                                                    startAdornment: (
+                                                        <InputAdornment position="start" sx={{ pl: 1, color: "#0D9488" }}>
+                                                            <LocalHospitalIcon sx={{ fontSize: 22 }} />
+                                                        </InputAdornment>
+                                                    ),
+                                                    endAdornment: deptSearchTerm ? (
+                                                        <InputAdornment position="end">
+                                                            <IconButton size="small" onClick={() => setDeptSearchTerm("")} sx={{ mr: 0.5 }}>
+                                                                <ClearIcon sx={{ fontSize: 18 }} />
+                                                            </IconButton>
+                                                        </InputAdornment>
+                                                    ) : null,
+                                                    sx: {
+                                                        fontSize: { xs: "0.92rem", md: "0.98rem" },
+                                                        fontWeight: 500,
+                                                        color: "#0F172A",
+                                                        px: 1,
+                                                        py: 0.6
+                                                    }
+                                                }}
+                                            />
+
+                                            <Button
+                                                type="submit"
+                                                variant="contained"
+                                                size="large"
+                                                sx={{
+                                                    borderRadius: "10px",
+                                                    px: { xs: 2.5, md: 3 },
+                                                    py: { xs: 1.1, md: 1.2 },
+                                                    fontWeight: 700,
+                                                    fontSize: "0.95rem",
+                                                    whiteSpace: "nowrap",
+                                                    bgcolor: "#0D9488 !important",
+                                                    boxShadow: "0 4px 14px rgba(13, 148, 136, 0.35)",
+                                                    "&:hover": {
+                                                        bgcolor: "#0F766E !important"
+                                                    }
+                                                }}
+                                            >
+                                                Tìm chuyên khoa
+                                            </Button>
+                                        </Box>
+
+                                        {/* Dropdown danh sách chuyên khoa khớp thời gian thực */}
+                                        {deptSearchTerm.trim() && matchingHeroDepartments.length > 0 && (
+                                            <Paper
+                                                elevation={2}
+                                                sx={{
+                                                    mt: 1.5,
+                                                    borderRadius: "12px",
+                                                    border: "1px solid #E2E8F0",
+                                                    maxHeight: 240,
+                                                    overflowY: "auto",
+                                                    bgcolor: "#FFFFFF"
+                                                }}
+                                            >
+                                                {matchingHeroDepartments.map((dept) => (
+                                                    <Box
+                                                        key={dept.departmentId}
+                                                        onClick={() => handleSelectDepartment(dept)}
+                                                        sx={{
+                                                            p: 1.4,
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            justifyContent: "space-between",
+                                                            cursor: "pointer",
+                                                            borderBottom: "1px solid #F1F5F9",
+                                                            transition: "all 0.15s ease",
+                                                            "&:hover": { bgcolor: "#F0FDFA" }
+                                                        }}
+                                                    >
+                                                        <Box display="flex" alignItems="center" gap={1.2}>
+                                                            <Box sx={{ color: "#0D9488", display: "flex" }}>
+                                                                {getDepartmentIcon(dept.departmentName)}
+                                                            </Box>
+                                                            <Box>
+                                                                <Typography variant="subtitle2" fontWeight={800} color="#0F172A">
+                                                                    {dept.departmentName}
+                                                                </Typography>
+                                                                {dept.description ? (
+                                                                    <Typography variant="caption" color="#64748B" sx={{ display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                                                                        {dept.description}
+                                                                    </Typography>
+                                                                ) : null}
+                                                            </Box>
+                                                        </Box>
+                                                        <Chip
+                                                            label="Đặt lịch khoa này"
+                                                            size="small"
+                                                            sx={{
+                                                                fontSize: "0.72rem",
+                                                                fontWeight: 700,
+                                                                bgcolor: "#F0FDFA",
+                                                                color: "#0D9488",
+                                                                borderColor: "#CCFBF1"
+                                                            }}
+                                                        />
+                                                    </Box>
+                                                ))}
+                                            </Paper>
+                                        )}
+
+                                        {/* Gợi ý chuyên khoa phổ biến */}
+                                        <Box display="flex" alignItems="center" gap={1} mt={1.5} flexWrap="wrap">
+                                            <Typography variant="caption" sx={{ color: "#64748B", fontWeight: 700, fontSize: "0.76rem" }}>
+                                                Khoa phổ biến:
+                                            </Typography>
+                                            {["Tim mạch", "Nhi khoa", "Cơ xương khớp", "Thần kinh", "Tai mũi họng", "Ngoại tổng quát"].map((name, idx) => (
+                                                <Chip
+                                                    key={idx}
+                                                    label={name}
+                                                    size="small"
+                                                    onClick={() => handleQuickDeptTag(name)}
+                                                    sx={{
+                                                        cursor: "pointer",
+                                                        bgcolor: "#F1F5F9",
+                                                        color: "#334155",
+                                                        fontWeight: 600,
+                                                        fontSize: "0.74rem",
+                                                        borderRadius: "6px",
+                                                        border: "1px solid #E2E8F0",
+                                                        "&:hover": {
+                                                            bgcolor: "#F0FDFA",
+                                                            color: "#0D9488",
+                                                            borderColor: "#CCFBF1"
+                                                        }
+                                                    }}
+                                                />
+                                            ))}
+                                        </Box>
+                                    </Box>
+                                ) : (
+                                    /* --- FORM MÔ TẢ TRIỆU CHỨNG (Thuộc luồng đặt khám, chuyển tiếp và giữ nguyên) --- */
+                                    <Box>
+                                        <Box
+                                            component="form"
+                                            onSubmit={handleSymptomSearch}
+                                            role="search"
+                                            aria-label="Mô tả triệu chứng bệnh lý"
+                                            sx={{
+                                                display: "flex",
+                                                flexDirection: { xs: "column", sm: "row" },
+                                                alignItems: "stretch",
+                                                gap: 1.2,
+                                                bgcolor: "#F8FAFC",
+                                                borderRadius: "14px",
+                                                p: 0.8,
+                                                border: "1.5px solid #E2E8F0",
+                                                transition: "all 0.2s ease",
+                                                "&:focus-within": {
+                                                    borderColor: "#0D9488",
+                                                    bgcolor: "#FFFFFF",
+                                                    boxShadow: "0 0 0 4px rgba(13, 148, 136, 0.16)"
+                                                }
+                                            }}
+                                        >
+                                            <TextField
+                                                fullWidth
+                                                variant="standard"
+                                                placeholder="Nhập triệu chứng bạn đang gặp (VD: Đau đầu, sốt cao, tức ngực...)"
+                                                value={symptomSearchTerm}
+                                                onChange={(e) => setSymptomSearchTerm(e.target.value)}
+                                                InputProps={{
+                                                    disableUnderline: true,
+                                                    startAdornment: (
+                                                        <InputAdornment position="start" sx={{ pl: 1, color: "#0D9488" }}>
+                                                            <MedicalServicesIcon sx={{ fontSize: 22 }} />
+                                                        </InputAdornment>
+                                                    ),
+                                                    endAdornment: symptomSearchTerm ? (
+                                                        <InputAdornment position="end">
+                                                            <IconButton size="small" onClick={() => setSymptomSearchTerm("")} sx={{ mr: 0.5 }}>
+                                                                <ClearIcon sx={{ fontSize: 18 }} />
+                                                            </IconButton>
+                                                        </InputAdornment>
+                                                    ) : null,
+                                                    sx: {
+                                                        fontSize: { xs: "0.92rem", md: "0.98rem" },
+                                                        fontWeight: 500,
+                                                        color: "#0F172A",
+                                                        px: 1,
+                                                        py: 0.6
+                                                    }
+                                                }}
+                                            />
+
+                                            <Button
+                                                type="submit"
+                                                variant="contained"
+                                                size="large"
+                                                sx={{
+                                                    borderRadius: "10px",
+                                                    px: { xs: 2.5, md: 3 },
+                                                    py: { xs: 1.1, md: 1.2 },
+                                                    fontWeight: 700,
+                                                    fontSize: "0.95rem",
+                                                    whiteSpace: "nowrap",
+                                                    bgcolor: "#0D9488 !important",
+                                                    boxShadow: "0 4px 14px rgba(13, 148, 136, 0.35)",
+                                                    "&:hover": {
+                                                        bgcolor: "#0F766E !important"
+                                                    }
+                                                }}
+                                            >
+                                                Tiếp tục đặt khám
+                                            </Button>
+                                        </Box>
+
+                                        {/* Gợi ý triệu chứng phổ biến */}
+                                        <Box display="flex" alignItems="center" gap={1} mt={1.5} flexWrap="wrap">
+                                            <Typography variant="caption" sx={{ color: "#64748B", fontWeight: 700, fontSize: "0.76rem" }}>
+                                                Triệu chứng hay gặp:
+                                            </Typography>
+                                            {["Đau đầu, chóng mặt", "Sốt cao, ho có đờm", "Tức ngực, khó thở", "Đau bụng, khó tiêu", "Đau mỏi xương khớp", "Phát ban, ngứa"].map((tag, idx) => (
+                                                <Chip
+                                                    key={idx}
+                                                    label={tag}
+                                                    size="small"
+                                                    onClick={() => handleQuickSymptomTag(tag)}
+                                                    sx={{
+                                                        cursor: "pointer",
+                                                        bgcolor: "#F1F5F9",
+                                                        color: "#334155",
+                                                        fontWeight: 600,
+                                                        fontSize: "0.74rem",
+                                                        borderRadius: "6px",
+                                                        border: "1px solid #E2E8F0",
+                                                        "&:hover": {
+                                                            bgcolor: "#F0FDFA",
+                                                            color: "#0D9488",
+                                                            borderColor: "#CCFBF1"
+                                                        }
+                                                    }}
+                                                />
+                                            ))}
+                                        </Box>
+                                    </Box>
+                                )}
                             </Paper>
                         </Grid>
 
@@ -719,115 +1025,151 @@ export default function HomePage() {
                 </Container>
             </Box>
             {/* =========================================================================
-                2. DỊCH VỤ CỐT LÕI (Bento Grid 4 Highlights)
+                2. DỊCH VỤ CỐT LÕI (Service Grid theo mốc TheDuckHospital, đặt ngay sau Hero)
             ========================================================================= */}
-            <Container maxWidth="xl" sx={{ mt: { xs: -4, md: -6 }, position: "relative", zIndex: 10 }}>
-                <Grid container spacing={2.5}>
-                    {CORE_SERVICES.map((item, index) => (
-                        <Grid item xs={12} sm={6} md={3} key={index}>
-                            <Card
-                                component={Link}
-                                to={item.to}
-                                elevation={0}
+            <Box
+                component="section"
+                aria-label="Lưới dịch vụ y tế trực tuyến"
+                sx={{
+                    bgcolor: "#FFFFFF",
+                    py: { xs: 4, md: 5 },
+                    borderBottom: "1px solid #E2E8F0"
+                }}
+            >
+                <Container maxWidth="xl" sx={{ overflowX: "hidden" }}>
+                    <Box mb={2.5}>
+                        <Box display="inline-flex" alignItems="center" gap={1} mb={0.5}>
+                            <MedicalServicesIcon sx={{ color: "#0D9488", fontSize: 18 }} />
+                            <Typography
+                                variant="caption"
                                 sx={{
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    justifyContent: "space-between",
-                                    p: 2.5,
-                                    borderRadius: "16px",
-                                    textDecoration: "none",
-                                    bgcolor: "#FFFFFF",
-                                    border: `1px solid ${item.border}`,
-                                    boxShadow: "0 8px 24px -6px rgba(15, 23, 42, 0.08)",
-                                    transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
-                                    height: "100%",
-                                    minHeight: 140,
-                                    "&:hover": {
-                                        transform: "translateY(-4px)",
-                                        boxShadow: "0 16px 32px -8px rgba(0, 136, 214, 0.18)",
-                                        borderColor: item.color,
-                                        "& .arrow-icon": {
-                                            transform: "translateX(4px)",
-                                            color: item.color
-                                        }
-                                    }
+                                    fontWeight: 800,
+                                    color: "#0D9488",
+                                    letterSpacing: "0.08em",
+                                    textTransform: "uppercase"
                                 }}
                             >
-                                <Box>
-                                    <Box display="flex" alignItems="center" justifyContent="space-between" mb={1.5}>
-                                        <Box
+                                DỊCH VỤ TRỰC TUYẾN
+                            </Typography>
+                        </Box>
+                        <Typography
+                            variant="h3"
+                            component="h2"
+                            fontWeight="900"
+                            color="#0F172A"
+                            sx={{ fontSize: { xs: "1.3rem", md: "1.65rem" }, letterSpacing: "-0.02em" }}
+                        >
+                            Tiện Ích Y Tế Thông Minh Cho Bệnh Nhân
+                        </Typography>
+                    </Box>
+
+                    <Grid container spacing={2.5}>
+                        {CORE_SERVICES.map((item, index) => (
+                            <Grid item xs={12} sm={6} md={3} key={index}>
+                                <Card
+                                    component={Link}
+                                    to={item.to}
+                                    elevation={0}
+                                    sx={{
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        justifyContent: "space-between",
+                                        p: 2.5,
+                                        borderRadius: "16px",
+                                        textDecoration: "none",
+                                        bgcolor: "#FFFFFF",
+                                        border: `1px solid ${item.border}`,
+                                        boxShadow: "0 4px 16px -4px rgba(15, 23, 42, 0.06)",
+                                        transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+                                        height: "100%",
+                                        minHeight: 140,
+                                        "&:hover": {
+                                            transform: "translateY(-4px)",
+                                            boxShadow: "0 14px 28px -6px rgba(13, 148, 136, 0.16)",
+                                            borderColor: item.color,
+                                            "& .arrow-icon": {
+                                                transform: "translateX(4px)",
+                                                color: item.color
+                                            }
+                                        }
+                                    }}
+                                >
+                                    <Box>
+                                        <Box display="flex" alignItems="center" justifyContent="space-between" mb={1.5}>
+                                            <Box
+                                                sx={{
+                                                    width: 44,
+                                                    height: 44,
+                                                    borderRadius: "12px",
+                                                    bgcolor: item.bgColor,
+                                                    color: item.color,
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "center",
+                                                    border: `1px solid ${item.border}`
+                                                }}
+                                            >
+                                                {item.icon}
+                                            </Box>
+                                            <Chip
+                                                label={item.badge}
+                                                size="small"
+                                                sx={{
+                                                    fontSize: "0.68rem",
+                                                    fontWeight: 800,
+                                                    bgcolor: item.bgColor,
+                                                    color: item.color,
+                                                    borderRadius: "6px",
+                                                    height: 22,
+                                                    border: `1px solid ${item.border}`
+                                                }}
+                                            />
+                                        </Box>
+
+                                        <Typography
+                                            variant="subtitle1"
+                                            fontWeight="800"
+                                            color="#0F172A"
+                                            sx={{ fontSize: "0.98rem", mb: 0.5 }}
+                                        >
+                                            {item.title}
+                                        </Typography>
+                                        <Typography
+                                            variant="body2"
+                                            color="#64748B"
                                             sx={{
-                                                width: 44,
-                                                height: 44,
-                                                borderRadius: "12px",
-                                                bgcolor: item.bgColor,
-                                                color: item.color,
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "center",
-                                                border: `1px solid ${item.border}`
+                                                fontSize: "0.82rem",
+                                                lineHeight: 1.5,
+                                                display: "-webkit-box",
+                                                WebkitLineClamp: 2,
+                                                WebkitBoxOrient: "vertical",
+                                                overflow: "hidden"
                                             }}
                                         >
-                                            {item.icon}
-                                        </Box>
-                                        <Chip
-                                            label={item.badge}
-                                            size="small"
+                                            {item.desc}
+                                        </Typography>
+                                    </Box>
+
+                                    <Box display="flex" alignItems="center" justifyContent="flex-end" mt={1.5}>
+                                        <ArrowForwardIcon
+                                            className="arrow-icon"
                                             sx={{
-                                                fontSize: "0.68rem",
-                                                fontWeight: 800,
-                                                bgcolor: item.bgColor,
-                                                color: item.color,
-                                                borderRadius: "6px",
-                                                height: 22,
-                                                border: `1px solid ${item.border}`
+                                                fontSize: 18,
+                                                color: "#94A3B8",
+                                                transition: "all 0.2s ease"
                                             }}
                                         />
                                     </Box>
-
-                                    <Typography
-                                        variant="subtitle1"
-                                        fontWeight="800"
-                                        color="#0F172A"
-                                        sx={{ fontSize: "0.98rem", mb: 0.5 }}
-                                    >
-                                        {item.title}
-                                    </Typography>
-                                    <Typography
-                                        variant="body2"
-                                        color="#64748B"
-                                        sx={{
-                                            fontSize: "0.82rem",
-                                            lineHeight: 1.5,
-                                            display: "-webkit-box",
-                                            WebkitLineClamp: 2,
-                                            WebkitBoxOrient: "vertical",
-                                            overflow: "hidden"
-                                        }}
-                                    >
-                                        {item.desc}
-                                    </Typography>
-                                </Box>
-
-                                <Box display="flex" alignItems="center" justifyContent="flex-end" mt={1.5}>
-                                    <ArrowForwardIcon
-                                        className="arrow-icon"
-                                        sx={{
-                                            fontSize: 18,
-                                            color: "#94A3B8",
-                                            transition: "all 0.2s ease"
-                                        }}
-                                    />
-                                </Box>
-                            </Card>
-                        </Grid>
-                    ))}
-                </Grid>
-            </Container>
+                                </Card>
+                            </Grid>
+                        ))}
+                    </Grid>
+                </Container>
+            </Box>
             {/* =========================================================================
                 3. CHUYÊN KHOA NỔI BẬT (DỮ LIỆU THẬT TỪ /api/departments)
             ========================================================================= */}
-            <Container maxWidth="xl" component="section" aria-label="Chuyên khoa nổi bật" sx={{ pt: { xs: 6, md: 8 }, pb: { xs: 6, md: 8 } }}>
+            <Container id="chuyen-khoa" maxWidth="xl" component="section" aria-label="Chuyên khoa nổi bật" sx={{ pt: { xs: 6, md: 8 }, pb: { xs: 6, md: 8 } }}>
                 <Box display="flex" justifyContent="space-between" alignItems="flex-end" mb={3.5} flexWrap="wrap" gap={2}>
                     <Box maxWidth={720}>
                         <Box display="inline-flex" alignItems="center" gap={1} mb={1}>

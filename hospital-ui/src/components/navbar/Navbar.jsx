@@ -18,7 +18,8 @@ import {
     List,
     ListItem,
     ListItemButton,
-    Tooltip
+    Tooltip,
+    ListSubheader
 } from "@mui/material";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import LocalHospitalIcon from "@mui/icons-material/LocalHospital";
@@ -69,6 +70,14 @@ export default function Navbar() {
     const handlePatientRecordsClose = () => setPatientRecordsAnchor(null);
 
     const isActive = (path) => location.pathname === path;
+    const isItemActive = (path, query) => {
+        if (location.pathname !== path) return false;
+        if (!query) return true;
+        if (query === "tab=profiles") {
+            return !location.search.includes("tab=ticket");
+        }
+        return location.search.includes(query);
+    };
 
     const handleLogout = () => {
         handleUserMenuClose();
@@ -226,6 +235,10 @@ export default function Navbar() {
                         {isAuthenticated && !isStaff && (
                             <>
                                 <Button
+                                    id="patient-records-button"
+                                    aria-controls={patientRecordsAnchor ? "patient-records-menu" : undefined}
+                                    aria-haspopup="true"
+                                    aria-expanded={patientRecordsAnchor ? "true" : undefined}
                                     onClick={handlePatientRecordsOpen}
                                     endIcon={<KeyboardArrowDownIcon sx={{ fontSize: 16 }} />}
                                     sx={{
@@ -241,42 +254,182 @@ export default function Navbar() {
                                     Sổ Khám Điện Tử
                                 </Button>
                                 <Menu
+                                    id="patient-records-menu"
                                     anchorEl={patientRecordsAnchor}
                                     open={Boolean(patientRecordsAnchor)}
                                     onClose={handlePatientRecordsClose}
+                                    MenuListProps={{
+                                        "aria-labelledby": "patient-records-button",
+                                        role: "menu"
+                                    }}
                                     PaperProps={{
                                         sx: {
                                             borderRadius: 2.5,
-                                            minWidth: 220,
+                                            minWidth: 260,
                                             mt: 1,
-                                            boxShadow: "0 10px 25px rgba(0,0,0,0.08)",
-                                            p: 0.5
+                                            boxShadow: "0 10px 30px rgba(0,0,0,0.1)",
+                                            p: 0.8
                                         }
                                     }}
                                 >
-                                    <MenuItem onClick={() => { handlePatientRecordsClose(); navigate("/profiles?tab=profiles"); }}>
+                                    {/* Nhóm 1: Hồ sơ & phiếu hẹn */}
+                                    <ListSubheader
+                                        disableSticky
+                                        sx={{
+                                            bgcolor: "transparent",
+                                            color: designTokens.neutral.textMuted,
+                                            fontWeight: 800,
+                                            fontSize: "0.7rem",
+                                            letterSpacing: "0.5px",
+                                            lineHeight: "26px",
+                                            px: 1.5,
+                                            pt: 0.5,
+                                            textTransform: "uppercase"
+                                        }}
+                                    >
+                                        Hồ sơ & phiếu hẹn
+                                    </ListSubheader>
+                                    <MenuItem
+                                        selected={isItemActive("/profiles", "tab=profiles")}
+                                        onClick={() => { handlePatientRecordsClose(); navigate("/profiles"); }}
+                                        sx={{
+                                            borderRadius: 1.5,
+                                            mx: 0.5,
+                                            my: 0.2,
+                                            "&.Mui-selected": {
+                                                bgcolor: designTokens.brand.primaryLight,
+                                                color: designTokens.brand.primary,
+                                                fontWeight: 700
+                                            }
+                                        }}
+                                    >
                                         <ListItemIcon><FolderSharedIcon fontSize="small" sx={{ color: designTokens.brand.primary }} /></ListItemIcon>
                                         <ListItemText primary="Hồ Sơ Bệnh Nhân (Gia Đình)" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
                                     </MenuItem>
-                                    <MenuItem onClick={() => { handlePatientRecordsClose(); navigate("/profiles?tab=ticket"); }}>
+                                    <MenuItem
+                                        selected={isItemActive("/profiles", "tab=ticket")}
+                                        onClick={() => { handlePatientRecordsClose(); navigate("/profiles?tab=ticket"); }}
+                                        sx={{
+                                            borderRadius: 1.5,
+                                            mx: 0.5,
+                                            my: 0.2,
+                                            "&.Mui-selected": {
+                                                bgcolor: designTokens.brand.primaryLight,
+                                                color: designTokens.brand.primary,
+                                                fontWeight: 700
+                                            }
+                                        }}
+                                    >
                                         <ListItemIcon><QrCodeScannerIcon fontSize="small" sx={{ color: designTokens.brand.primary }} /></ListItemIcon>
                                         <ListItemText primary="Phiếu Khám Bệnh (Barcode & STT)" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
                                     </MenuItem>
-                                    <MenuItem onClick={() => { handlePatientRecordsClose(); navigate("/my-history"); }}>
+
+                                    <Divider sx={{ my: 0.8 }} />
+
+                                    {/* Nhóm 2: Bệnh án */}
+                                    <ListSubheader
+                                        disableSticky
+                                        sx={{
+                                            bgcolor: "transparent",
+                                            color: designTokens.neutral.textMuted,
+                                            fontWeight: 800,
+                                            fontSize: "0.7rem",
+                                            letterSpacing: "0.5px",
+                                            lineHeight: "26px",
+                                            px: 1.5,
+                                            pt: 0.5,
+                                            textTransform: "uppercase"
+                                        }}
+                                    >
+                                        Bệnh án
+                                    </ListSubheader>
+                                    <MenuItem
+                                        selected={isActive("/my-history")}
+                                        onClick={() => { handlePatientRecordsClose(); navigate("/my-history"); }}
+                                        sx={{
+                                            borderRadius: 1.5,
+                                            mx: 0.5,
+                                            my: 0.2,
+                                            "&.Mui-selected": {
+                                                bgcolor: designTokens.brand.primaryLight,
+                                                color: designTokens.brand.primary,
+                                                fontWeight: 700
+                                            }
+                                        }}
+                                    >
                                         <ListItemIcon><HistoryIcon fontSize="small" sx={{ color: designTokens.secondary.main }} /></ListItemIcon>
                                         <ListItemText primary="Sổ Bệnh Án & Lịch Sử Khám" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
                                     </MenuItem>
-                                    <MenuItem onClick={() => { handlePatientRecordsClose(); navigate("/my-bills"); }}>
+                                    <MenuItem
+                                        selected={isActive("/reminders")}
+                                        onClick={() => { handlePatientRecordsClose(); navigate("/reminders"); }}
+                                        sx={{
+                                            borderRadius: 1.5,
+                                            mx: 0.5,
+                                            my: 0.2,
+                                            "&.Mui-selected": {
+                                                bgcolor: designTokens.brand.primaryLight,
+                                                color: designTokens.brand.primary,
+                                                fontWeight: 700
+                                            }
+                                        }}
+                                    >
+                                        <ListItemIcon><MedicationIcon fontSize="small" sx={{ color: "#EC4899" }} /></ListItemIcon>
+                                        <ListItemText primary="Nhắc Uống Thuốc" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
+                                    </MenuItem>
+
+                                    <Divider sx={{ my: 0.8 }} />
+
+                                    {/* Nhóm 3: Viện phí */}
+                                    <ListSubheader
+                                        disableSticky
+                                        sx={{
+                                            bgcolor: "transparent",
+                                            color: designTokens.neutral.textMuted,
+                                            fontWeight: 800,
+                                            fontSize: "0.7rem",
+                                            letterSpacing: "0.5px",
+                                            lineHeight: "26px",
+                                            px: 1.5,
+                                            pt: 0.5,
+                                            textTransform: "uppercase"
+                                        }}
+                                    >
+                                        Viện phí
+                                    </ListSubheader>
+                                    <MenuItem
+                                        selected={isActive("/my-bills")}
+                                        onClick={() => { handlePatientRecordsClose(); navigate("/my-bills"); }}
+                                        sx={{
+                                            borderRadius: 1.5,
+                                            mx: 0.5,
+                                            my: 0.2,
+                                            "&.Mui-selected": {
+                                                bgcolor: designTokens.brand.primaryLight,
+                                                color: designTokens.brand.primary,
+                                                fontWeight: 700
+                                            }
+                                        }}
+                                    >
                                         <ListItemIcon><ReceiptLongIcon fontSize="small" sx={{ color: designTokens.status.info.main }} /></ListItemIcon>
                                         <ListItemText primary="Hóa Đơn Viện Phí" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
                                     </MenuItem>
-                                    <MenuItem onClick={() => { handlePatientRecordsClose(); navigate("/payment"); }}>
+                                    <MenuItem
+                                        selected={isActive("/payment")}
+                                        onClick={() => { handlePatientRecordsClose(); navigate("/payment"); }}
+                                        sx={{
+                                            borderRadius: 1.5,
+                                            mx: 0.5,
+                                            my: 0.2,
+                                            "&.Mui-selected": {
+                                                bgcolor: designTokens.brand.primaryLight,
+                                                color: designTokens.brand.primary,
+                                                fontWeight: 700
+                                            }
+                                        }}
+                                    >
                                         <ListItemIcon><AccountBalanceWalletIcon fontSize="small" sx={{ color: designTokens.status.warning.main }} /></ListItemIcon>
                                         <ListItemText primary="Ví Viện Phí PayOS" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
-                                    </MenuItem>
-                                    <MenuItem onClick={() => { handlePatientRecordsClose(); navigate("/reminders"); }}>
-                                        <ListItemIcon><MedicationIcon fontSize="small" sx={{ color: "#EC4899" }} /></ListItemIcon>
-                                        <ListItemText primary="Nhắc Uống Thuốc" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
                                     </MenuItem>
                                 </Menu>
                             </>
@@ -482,26 +635,108 @@ export default function Navbar() {
                                         </>
                                     ) : (
                                         <>
-                                            {/* Menu Sổ khám chỉ dành cho bệnh nhân */}
-                                            <MenuItem onClick={() => { handleUserMenuClose(); navigate("/profiles"); }}>
-                                                <ListItemIcon><PersonIcon fontSize="small" sx={{ color: designTokens.brand.primary }} /></ListItemIcon>
-                                                <ListItemText primary="Hồ Sơ Bệnh Nhân" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
+                                            {/* Menu Sổ khám chỉ dành cho bệnh nhân - Đồng bộ 3 nhóm */}
+                                            <ListSubheader
+                                                disableSticky
+                                                sx={{
+                                                    bgcolor: "transparent",
+                                                    color: designTokens.neutral.textMuted,
+                                                    fontWeight: 800,
+                                                    fontSize: "0.68rem",
+                                                    letterSpacing: "0.5px",
+                                                    lineHeight: "22px",
+                                                    px: 1.5,
+                                                    pt: 0.5,
+                                                    textTransform: "uppercase"
+                                                }}
+                                            >
+                                                Hồ sơ & phiếu hẹn
+                                            </ListSubheader>
+                                            <MenuItem
+                                                selected={isItemActive("/profiles", "tab=profiles")}
+                                                onClick={() => { handleUserMenuClose(); navigate("/profiles"); }}
+                                                sx={{ borderRadius: 1.5, mx: 0.5, my: 0.2 }}
+                                            >
+                                                <ListItemIcon><FolderSharedIcon fontSize="small" sx={{ color: designTokens.brand.primary }} /></ListItemIcon>
+                                                <ListItemText primary="Hồ Sơ Bệnh Nhân (Gia Đình)" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
                                             </MenuItem>
-                                            <MenuItem onClick={() => { handleUserMenuClose(); navigate("/my-history"); }}>
+                                            <MenuItem
+                                                selected={isItemActive("/profiles", "tab=ticket")}
+                                                onClick={() => { handleUserMenuClose(); navigate("/profiles?tab=ticket"); }}
+                                                sx={{ borderRadius: 1.5, mx: 0.5, my: 0.2 }}
+                                            >
+                                                <ListItemIcon><QrCodeScannerIcon fontSize="small" sx={{ color: designTokens.brand.primary }} /></ListItemIcon>
+                                                <ListItemText primary="Phiếu Khám Bệnh (Barcode & STT)" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
+                                            </MenuItem>
+
+                                            <Divider sx={{ my: 0.5 }} />
+
+                                            <ListSubheader
+                                                disableSticky
+                                                sx={{
+                                                    bgcolor: "transparent",
+                                                    color: designTokens.neutral.textMuted,
+                                                    fontWeight: 800,
+                                                    fontSize: "0.68rem",
+                                                    letterSpacing: "0.5px",
+                                                    lineHeight: "22px",
+                                                    px: 1.5,
+                                                    pt: 0.5,
+                                                    textTransform: "uppercase"
+                                                }}
+                                            >
+                                                Bệnh án
+                                            </ListSubheader>
+                                            <MenuItem
+                                                selected={isActive("/my-history")}
+                                                onClick={() => { handleUserMenuClose(); navigate("/my-history"); }}
+                                                sx={{ borderRadius: 1.5, mx: 0.5, my: 0.2 }}
+                                            >
                                                 <ListItemIcon><HistoryIcon fontSize="small" sx={{ color: designTokens.secondary.main }} /></ListItemIcon>
-                                                <ListItemText primary="Phiếu Khám & Lịch Sử" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
+                                                <ListItemText primary="Sổ Bệnh Án & Lịch Sử Khám" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
                                             </MenuItem>
-                                            <MenuItem onClick={() => { handleUserMenuClose(); navigate("/my-bills"); }}>
+                                            <MenuItem
+                                                selected={isActive("/reminders")}
+                                                onClick={() => { handleUserMenuClose(); navigate("/reminders"); }}
+                                                sx={{ borderRadius: 1.5, mx: 0.5, my: 0.2 }}
+                                            >
+                                                <ListItemIcon><MedicationIcon fontSize="small" sx={{ color: "#EC4899" }} /></ListItemIcon>
+                                                <ListItemText primary="Nhắc Uống Thuốc" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
+                                            </MenuItem>
+
+                                            <Divider sx={{ my: 0.5 }} />
+
+                                            <ListSubheader
+                                                disableSticky
+                                                sx={{
+                                                    bgcolor: "transparent",
+                                                    color: designTokens.neutral.textMuted,
+                                                    fontWeight: 800,
+                                                    fontSize: "0.68rem",
+                                                    letterSpacing: "0.5px",
+                                                    lineHeight: "22px",
+                                                    px: 1.5,
+                                                    pt: 0.5,
+                                                    textTransform: "uppercase"
+                                                }}
+                                            >
+                                                Viện phí
+                                            </ListSubheader>
+                                            <MenuItem
+                                                selected={isActive("/my-bills")}
+                                                onClick={() => { handleUserMenuClose(); navigate("/my-bills"); }}
+                                                sx={{ borderRadius: 1.5, mx: 0.5, my: 0.2 }}
+                                            >
                                                 <ListItemIcon><ReceiptLongIcon fontSize="small" sx={{ color: designTokens.status.info.main }} /></ListItemIcon>
                                                 <ListItemText primary="Hóa Đơn Viện Phí" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
                                             </MenuItem>
-                                            <MenuItem onClick={() => { handleUserMenuClose(); navigate("/payment"); }}>
+                                            <MenuItem
+                                                selected={isActive("/payment")}
+                                                onClick={() => { handleUserMenuClose(); navigate("/payment"); }}
+                                                sx={{ borderRadius: 1.5, mx: 0.5, my: 0.2 }}
+                                            >
                                                 <ListItemIcon><AccountBalanceWalletIcon fontSize="small" sx={{ color: designTokens.status.warning.main }} /></ListItemIcon>
                                                 <ListItemText primary="Ví Viện Phí PayOS" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
-                                            </MenuItem>
-                                            <MenuItem onClick={() => { handleUserMenuClose(); navigate("/reminders"); }}>
-                                                <ListItemIcon><MedicationIcon fontSize="small" sx={{ color: "#EC4899" }} /></ListItemIcon>
-                                                <ListItemText primary="Nhắc Uống Thuốc" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
                                             </MenuItem>
                                         </>
                                     )}
@@ -650,42 +885,145 @@ export default function Navbar() {
                         </ListItem>
                     </List>
 
-                    {/* Sổ khám điện tử (Chỉ dành riêng cho Bệnh nhân) */}
+                    {/* Sổ khám điện tử (Chỉ dành riêng cho Bệnh nhân) - Đồng bộ 3 nhóm */}
                     {isAuthenticated && !isStaff && (
                         <>
                             <Divider sx={{ my: 1.5 }} />
-                            <Typography variant="caption" fontWeight="bold" color={designTokens.neutral.textMuted} sx={{ px: 1, textTransform: "uppercase", fontSize: "0.7rem", letterSpacing: "0.5px" }}>
+                            <Typography variant="caption" fontWeight="bold" color={designTokens.brand.primary} sx={{ px: 1, textTransform: "uppercase", fontSize: "0.75rem", letterSpacing: "0.5px", display: "block", mb: 0.8 }}>
                                 Sổ Khám Điện Tử
                             </Typography>
-                            <List disablePadding sx={{ mt: 0.5 }}>
+
+                            {/* Nhóm 1: Hồ sơ & phiếu hẹn */}
+                            <Typography variant="caption" color={designTokens.neutral.textMuted} sx={{ px: 1, textTransform: "uppercase", fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.4px", display: "block", mt: 0.5, mb: 0.3 }}>
+                                Hồ sơ & phiếu hẹn
+                            </Typography>
+                            <List disablePadding>
                                 <ListItem disablePadding sx={{ mb: 0.5 }}>
-                                    <ListItemButton component={Link} to="/profiles" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
+                                    <ListItemButton
+                                        component={Link}
+                                        to="/profiles"
+                                        selected={isItemActive("/profiles", "tab=profiles")}
+                                        onClick={() => setMobileDrawerOpen(false)}
+                                        sx={{
+                                            borderRadius: 2,
+                                            "&.Mui-selected": {
+                                                bgcolor: designTokens.brand.primaryLight,
+                                                color: designTokens.brand.primaryDark,
+                                                fontWeight: 700
+                                            }
+                                        }}
+                                    >
                                         <ListItemIcon sx={{ color: designTokens.brand.primary, minWidth: 36 }}><FolderSharedIcon fontSize="small" /></ListItemIcon>
-                                        <ListItemText primary="Hồ Sơ Bệnh Nhân" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
+                                        <ListItemText primary="Hồ Sơ Bệnh Nhân (Gia Đình)" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
                                     </ListItemButton>
                                 </ListItem>
                                 <ListItem disablePadding sx={{ mb: 0.5 }}>
-                                    <ListItemButton component={Link} to="/my-history" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
+                                    <ListItemButton
+                                        component={Link}
+                                        to="/profiles?tab=ticket"
+                                        selected={isItemActive("/profiles", "tab=ticket")}
+                                        onClick={() => setMobileDrawerOpen(false)}
+                                        sx={{
+                                            borderRadius: 2,
+                                            "&.Mui-selected": {
+                                                bgcolor: designTokens.brand.primaryLight,
+                                                color: designTokens.brand.primaryDark,
+                                                fontWeight: 700
+                                            }
+                                        }}
+                                    >
+                                        <ListItemIcon sx={{ color: designTokens.brand.primary, minWidth: 36 }}><QrCodeScannerIcon fontSize="small" /></ListItemIcon>
+                                        <ListItemText primary="Phiếu Khám Bệnh (Barcode & STT)" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
+                                    </ListItemButton>
+                                </ListItem>
+                            </List>
+
+                            {/* Nhóm 2: Bệnh án */}
+                            <Typography variant="caption" color={designTokens.neutral.textMuted} sx={{ px: 1, textTransform: "uppercase", fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.4px", display: "block", mt: 1, mb: 0.3 }}>
+                                Bệnh án
+                            </Typography>
+                            <List disablePadding>
+                                <ListItem disablePadding sx={{ mb: 0.5 }}>
+                                    <ListItemButton
+                                        component={Link}
+                                        to="/my-history"
+                                        selected={isActive("/my-history")}
+                                        onClick={() => setMobileDrawerOpen(false)}
+                                        sx={{
+                                            borderRadius: 2,
+                                            "&.Mui-selected": {
+                                                bgcolor: designTokens.brand.primaryLight,
+                                                color: designTokens.brand.primaryDark,
+                                                fontWeight: 700
+                                            }
+                                        }}
+                                    >
                                         <ListItemIcon sx={{ color: designTokens.secondary.main, minWidth: 36 }}><HistoryIcon fontSize="small" /></ListItemIcon>
-                                        <ListItemText primary="Phiếu Khám & Lịch Sử" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
+                                        <ListItemText primary="Sổ Bệnh Án & Lịch Sử Khám" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
                                     </ListItemButton>
                                 </ListItem>
                                 <ListItem disablePadding sx={{ mb: 0.5 }}>
-                                    <ListItemButton component={Link} to="/my-bills" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
-                                        <ListItemIcon sx={{ color: designTokens.status.info.main, minWidth: 36 }}><ReceiptLongIcon fontSize="small" /></ListItemIcon>
-                                        <ListItemText primary="Hóa Đơn Viện Phí" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
-                                    </ListItemButton>
-                                </ListItem>
-                                <ListItem disablePadding sx={{ mb: 0.5 }}>
-                                    <ListItemButton component={Link} to="/payment" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
-                                        <ListItemIcon sx={{ color: designTokens.status.warning.main, minWidth: 36 }}><AccountBalanceWalletIcon fontSize="small" /></ListItemIcon>
-                                        <ListItemText primary="Ví Viện Phí PayOS" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
-                                    </ListItemButton>
-                                </ListItem>
-                                <ListItem disablePadding sx={{ mb: 0.5 }}>
-                                    <ListItemButton component={Link} to="/reminders" onClick={() => setMobileDrawerOpen(false)} sx={{ borderRadius: 2 }}>
+                                    <ListItemButton
+                                        component={Link}
+                                        to="/reminders"
+                                        selected={isActive("/reminders")}
+                                        onClick={() => setMobileDrawerOpen(false)}
+                                        sx={{
+                                            borderRadius: 2,
+                                            "&.Mui-selected": {
+                                                bgcolor: designTokens.brand.primaryLight,
+                                                color: designTokens.brand.primaryDark,
+                                                fontWeight: 700
+                                            }
+                                        }}
+                                    >
                                         <ListItemIcon sx={{ color: "#EC4899", minWidth: 36 }}><MedicationIcon fontSize="small" /></ListItemIcon>
-                                        <ListItemText primary="Nhắc Uống Thuốc" primaryTypographyProps={{ fontSize: "0.875rem", fontWeight: 600 }} />
+                                        <ListItemText primary="Nhắc Uống Thuốc" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
+                                    </ListItemButton>
+                                </ListItem>
+                            </List>
+
+                            {/* Nhóm 3: Viện phí */}
+                            <Typography variant="caption" color={designTokens.neutral.textMuted} sx={{ px: 1, textTransform: "uppercase", fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.4px", display: "block", mt: 1, mb: 0.3 }}>
+                                Viện phí
+                            </Typography>
+                            <List disablePadding>
+                                <ListItem disablePadding sx={{ mb: 0.5 }}>
+                                    <ListItemButton
+                                        component={Link}
+                                        to="/my-bills"
+                                        selected={isActive("/my-bills")}
+                                        onClick={() => setMobileDrawerOpen(false)}
+                                        sx={{
+                                            borderRadius: 2,
+                                            "&.Mui-selected": {
+                                                bgcolor: designTokens.brand.primaryLight,
+                                                color: designTokens.brand.primaryDark,
+                                                fontWeight: 700
+                                            }
+                                        }}
+                                    >
+                                        <ListItemIcon sx={{ color: designTokens.status.info.main, minWidth: 36 }}><ReceiptLongIcon fontSize="small" /></ListItemIcon>
+                                        <ListItemText primary="Hóa Đơn Viện Phí" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
+                                    </ListItemButton>
+                                </ListItem>
+                                <ListItem disablePadding sx={{ mb: 0.5 }}>
+                                    <ListItemButton
+                                        component={Link}
+                                        to="/payment"
+                                        selected={isActive("/payment")}
+                                        onClick={() => setMobileDrawerOpen(false)}
+                                        sx={{
+                                            borderRadius: 2,
+                                            "&.Mui-selected": {
+                                                bgcolor: designTokens.brand.primaryLight,
+                                                color: designTokens.brand.primaryDark,
+                                                fontWeight: 700
+                                            }
+                                        }}
+                                    >
+                                        <ListItemIcon sx={{ color: designTokens.status.warning.main, minWidth: 36 }}><AccountBalanceWalletIcon fontSize="small" /></ListItemIcon>
+                                        <ListItemText primary="Ví Viện Phí PayOS" primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }} />
                                     </ListItemButton>
                                 </ListItem>
                             </List>

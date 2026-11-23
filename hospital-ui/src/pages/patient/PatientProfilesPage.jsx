@@ -66,7 +66,7 @@ import { bookingApi } from "../../services/bookingApi";
 import { clinicalApi } from "../../services/clinicalApi";
 import { getBookingCodeDisplay, getQueueNumberDisplay } from "../customer/BookingPage";
 import { printAppointmentTicket, printMedicalRecordSheet } from "../../utils/printHelper";
-import designTokens from "../../theme/designTokens";
+import designTokens, { getStatusConfig } from "../../theme/designTokens";
 import PatientProfileDetailModal from "../../components/common/PatientProfileDetailModal";
 import ElectronicMedicalRecordModal from "../../components/common/ElectronicMedicalRecordModal";
 import LinkExistingProfileModal from "../../components/common/LinkExistingProfileModal";
@@ -173,6 +173,7 @@ export function usePatientHistoryDetailWorkflow({
 export default function PatientProfilesPage({
     initialActiveTab,
     initialSelectedHistoryDetail,
+    initialSelectedTicketDetail = null,
     initialProfiles,
     initialBookings,
     clinicalApiClient = clinicalApi,
@@ -208,7 +209,7 @@ export default function PatientProfilesPage({
     const [editingProfile, setEditingProfile] = useState(null);
 
     // Modal / View Chi tiết Phiếu khám bệnh (Hình 137)
-    const [selectedTicketDetail, setSelectedTicketDetail] = useState(null);
+    const [selectedTicketDetail, setSelectedTicketDetail] = useState(initialSelectedTicketDetail);
     const [expandedTicketProfileId, setExpandedTicketProfileId] = useState(null);
 
     // Modal / View Chi tiết Lịch sử khám bệnh & Toa thuốc (Hình 139)
@@ -254,9 +255,12 @@ export default function PatientProfilesPage({
         if (initialActiveTab !== undefined) return;
         const params = new URLSearchParams(location.search);
         const tab = params.get("tab");
+        const bookingCode = params.get("bookingCode");
         if (tab === "ticket") {
             setActiveTab(1);
-            setSelectedTicketDetail(null);
+            if (!bookingCode && !initialSelectedTicketDetail) {
+                setSelectedTicketDetail(null);
+            }
         } else if (tab === "history") {
             setActiveTab(2);
             setSelectedHistoryDetail(null);
@@ -268,6 +272,26 @@ export default function PatientProfilesPage({
             setSelectedHistoryDetail(null);
         }
     }, [location.search]);
+
+    // Tự động mở chi tiết vé tương ứng khi URL có bookingCode (liên thông từ Đặt Khám)
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const tab = params.get("tab");
+        const bookingCode = params.get("bookingCode");
+        if (tab === "ticket" && bookingCode && Array.isArray(bookings) && bookings.length > 0) {
+            const match = bookings.find(b =>
+                (b.rawBookingCode && b.rawBookingCode === bookingCode) ||
+                (b.bookingCode && b.bookingCode === bookingCode) ||
+                String(b.bookingId) === bookingCode
+            );
+            if (match) {
+                setSelectedTicketDetail(match);
+                if (match.patientProfileId) {
+                    setExpandedTicketProfileId(match.patientProfileId);
+                }
+            }
+        }
+    }, [location.search, bookings]);
 
     // Đồng bộ URL parameter với tab
     const handleTabChange = (index) => {
@@ -349,6 +373,22 @@ export default function PatientProfilesPage({
                     roomName: b?.roomName || "Chưa xếp phòng",
                     statusLabel: b?.status === "COMPLETED" ? "Đã khám" : (b?.status === "CONFIRMED" ? "Đang chờ khám" : (b?.status === "CANCELLED" ? "Đã hủy lịch" : "Chờ tiếp nhận"))
                 }));
+
+                const params = new URLSearchParams(location.search);
+                const targetBookingCode = params.get("bookingCode");
+                if (targetBookingCode) {
+                    const match = bookingList.find(b =>
+                        (b.rawBookingCode && b.rawBookingCode === targetBookingCode) ||
+                        (b.bookingCode && b.bookingCode === targetBookingCode) ||
+                        String(b.bookingId) === targetBookingCode
+                    );
+                    if (match) {
+                        setSelectedTicketDetail(match);
+                        if (match.patientProfileId) {
+                            setExpandedTicketProfileId(match.patientProfileId);
+                        }
+                    }
+                }
             }
             setBookings(bookingList);
             fetchNotifications();
@@ -990,9 +1030,9 @@ export default function PatientProfilesPage({
                                                     borderRadius: 2,
                                                     textTransform: "none",
                                                     fontWeight: 700,
-                                                    color: "#0088D6",
-                                                    borderColor: "#BAE6FD",
-                                                    "&:hover": { borderColor: "#0088D6", bgcolor: "#F0F9FF" }
+                                                    color: designTokens.brand.primaryDark,
+                                                    borderColor: designTokens.brand.primaryBorder,
+                                                    "&:hover": { borderColor: designTokens.brand.primary, bgcolor: designTokens.brand.primaryLight }
                                                 }}
                                             >
                                                 Quay lại danh sách các phiếu khám bệnh
@@ -1002,7 +1042,7 @@ export default function PatientProfilesPage({
                                                 variant="contained"
                                                 startIcon={<PrintIcon />}
                                                 onClick={() => printAppointmentTicket(selectedTicketDetail)}
-                                                sx={{ bgcolor: "#0088D6", borderRadius: 2, fontWeight: 700, textTransform: "none" }}
+                                                sx={{ bgcolor: designTokens.secondary.main, "&:hover": { bgcolor: designTokens.secondary.hover }, borderRadius: 2, fontWeight: 700, textTransform: "none" }}
                                             >
                                                 In phiếu khám
                                             </Button>
@@ -1027,7 +1067,7 @@ export default function PatientProfilesPage({
                                                 <Typography variant="h6" fontWeight="800" color="#0F172A" sx={{ letterSpacing: "0.5px" }}>
                                                     PHIẾU KHÁM BỆNH
                                                 </Typography>
-                                                <Typography variant="body2" fontWeight="700" color="#0088D6" mt={0.5}>
+                                                <Typography variant="body2" fontWeight="700" color={designTokens.brand.primary} mt={0.5}>
                                                     {selectedTicketDetail.hospitalName || "TNT HOSPITAL"}
                                                 </Typography>
                                                 <Typography variant="caption" color="#64748B" display="block">
@@ -1078,20 +1118,26 @@ export default function PatientProfilesPage({
                                                     </Typography>
                                                 </Box>
 
-                                                {/* Mục 2: Badge Trạng Thái (Hình 137 mục 2) */}
+                                                {/* Mục 2: Badge Trạng Thái (Hình 137 mục 2 - Chuẩn getStatusConfig TNT) */}
                                                 <Box mt={2}>
-                                                    <Chip
-                                                        label={selectedTicketDetail.status === "COMPLETED" ? "Đã khám" : (selectedTicketDetail.status === "CANCELLED" ? "Đã hủy" : (selectedTicketDetail.statusLabel || "Chưa khám"))}
-                                                        sx={{
-                                                            bgcolor: selectedTicketDetail.status === "COMPLETED" ? "#22C55E" : (selectedTicketDetail.status === "CANCELLED" ? "#EF4444" : "#0088D6"),
-                                                            color: "#FFFFFF",
-                                                            fontWeight: 800,
-                                                            fontSize: "0.85rem",
-                                                            px: 2,
-                                                            height: 30,
-                                                            borderRadius: 2
-                                                        }}
-                                                    />
+                                                    {(() => {
+                                                        const cfg = getStatusConfig("BOOKING", selectedTicketDetail.status);
+                                                        return (
+                                                            <Chip
+                                                                label={cfg.label}
+                                                                sx={{
+                                                                    bgcolor: cfg.bgColor,
+                                                                    color: cfg.color,
+                                                                    border: `1px solid ${cfg.borderColor}`,
+                                                                    fontWeight: 800,
+                                                                    fontSize: "0.85rem",
+                                                                    px: 2,
+                                                                    height: 30,
+                                                                    borderRadius: 2
+                                                                }}
+                                                            />
+                                                        );
+                                                    })()}
                                                 </Box>
 
                                                 {/* Mục 3: Phân định Số thứ tự Khám Bác sĩ & Số phiếu Quầy Tiếp đón */}
@@ -1160,17 +1206,25 @@ export default function PatientProfilesPage({
                                                 </Box>
 
                                                 {/* Hướng dẫn hành động tiếp theo (Next Action Card) */}
-                                                <Box sx={{ mt: 1.5, p: 1.8, bgcolor: "#FFFBEB", borderRadius: 2.5, border: "1px solid #FDE68A" }}>
-                                                    <Typography variant="caption" fontWeight="800" color="#92400E" textTransform="uppercase" display="block">
-                                                        Chỉ dẫn tiếp theo:
-                                                    </Typography>
-                                                    <Typography variant="body2" color="#78350F" fontWeight="600" mt={0.25}>
+                                                <Box sx={{ mt: 2, p: 2, bgcolor: selectedTicketDetail.isPaid ? "#F0FDF4" : "#FFFBEB", borderRadius: 2.5, border: `1.5px solid ${selectedTicketDetail.isPaid ? "#BBF7D0" : "#FDE68A"}` }}>
+                                                    <Box display="flex" alignItems="center" justifyContent="space-between" mb={0.8} flexWrap="wrap" gap={1}>
+                                                        <Typography variant="caption" fontWeight="800" color={selectedTicketDetail.isPaid ? "#166534" : "#92400E"} textTransform="uppercase">
+                                                            Chỉ dẫn tiếp theo:
+                                                        </Typography>
+                                                        <Chip
+                                                            size="small"
+                                                            label={selectedTicketDetail.isPaid ? "Viện phí: Đã thanh toán" : "Viện phí: Chờ thanh toán"}
+                                                            color={selectedTicketDetail.isPaid ? "success" : "warning"}
+                                                            sx={{ height: 22, fontSize: "0.7rem", fontWeight: 700 }}
+                                                        />
+                                                    </Box>
+                                                    <Typography variant="body2" color={selectedTicketDetail.isPaid ? "#14532D" : "#78350F"} fontWeight="600" mt={0.25}>
                                                         {selectedTicketDetail.status === "CANCELLED"
                                                             ? "Lịch khám này đã được hủy."
                                                             : selectedTicketDetail.status === "COMPLETED"
-                                                            ? "Lượt khám đã hoàn tất. Quý khách vui lòng bấm 'Xem Bệnh án Điện tử (EMR)' để xem đơn thuốc và lời dặn."
+                                                            ? "Lượt khám đã hoàn tất. Quý khách vui lòng bấm 'Xem Bệnh án Điện tử (EMR)' để xem đơn thuốc và lời dặn của bác sĩ."
                                                             : !selectedTicketDetail.isPaid
-                                                            ? "Quý khách vui lòng thanh toán viện phí trước giờ khám tại mục 'Hóa đơn' hoặc nộp trực tiếp tại Quầy Tiếp Đón."
+                                                            ? "Quý khách vui lòng hoàn tất viện phí trước giờ khám tại mục 'Hóa đơn' hoặc nộp trực tiếp tại Quầy Tiếp Đón."
                                                             : !selectedTicketDetail.checkedInAt
                                                             ? "Khi đến bệnh viện, quý khách vui lòng quét mã QR vé khám tại Kiosk tự phục vụ hoặc tới Quầy Tiếp Đón để check-in."
                                                             : selectedTicketDetail.counterTicketCode && !selectedTicketDetail.dispatchedAt
@@ -1178,6 +1232,25 @@ export default function PatientProfilesPage({
                                                             : `Đã hoàn tất tiếp đón! Vui lòng có mặt trước ${selectedTicketDetail.roomName || "phòng khám"} và theo dõi số khám ${getQueueNumberDisplay(selectedTicketDetail.queueNumber, selectedTicketDetail.queueCode)} trên màn hình.`
                                                         }
                                                     </Typography>
+                                                    <Box mt={1.5} display="flex" gap={1} flexWrap="wrap">
+                                                        <Button
+                                                            size="small"
+                                                            variant="contained"
+                                                            component={Link}
+                                                            to={`/my-bills?bookingCode=${encodeURIComponent(selectedTicketDetail.rawBookingCode || selectedTicketDetail.bookingCode || "")}`}
+                                                            startIcon={<ReceiptLongIcon sx={{ fontSize: 16 }} />}
+                                                            sx={{
+                                                                borderRadius: 2,
+                                                                fontWeight: 700,
+                                                                fontSize: "0.78rem",
+                                                                textTransform: "none",
+                                                                bgcolor: selectedTicketDetail.isPaid ? designTokens.brand.primary : designTokens.status.warning.main,
+                                                                "&:hover": { bgcolor: selectedTicketDetail.isPaid ? designTokens.brand.primaryHover : "#92400E" }
+                                                            }}
+                                                        >
+                                                            {selectedTicketDetail.isPaid ? "Mở Viện Phí & Biên Lai" : "Thanh Toán Viện Phí Qua PayOS"}
+                                                        </Button>
+                                                    </Box>
                                                 </Box>
                                             </Box>
 
@@ -1235,7 +1308,7 @@ export default function PatientProfilesPage({
                                                         </Box>
                                                         <Box display="flex" justifyContent="space-between">
                                                             <Typography variant="body2" color="#64748B">Phòng khám</Typography>
-                                                            <Typography variant="body2" fontWeight="700" color="#0088D6">
+                                                            <Typography variant="body2" fontWeight="700" color={designTokens.brand.primary}>
                                                                 {selectedTicketDetail.roomName || "B1-202"}
                                                             </Typography>
                                                         </Box>
@@ -1253,7 +1326,7 @@ export default function PatientProfilesPage({
                                                         </Box>
                                                         <Box display="flex" justifyContent="space-between">
                                                             <Typography variant="body2" color="#64748B">Ngày khám</Typography>
-                                                            <Typography variant="body2" fontWeight="700" color="#0088D6">
+                                                            <Typography variant="body2" fontWeight="700" color={designTokens.brand.primary}>
                                                                 {formatDate(selectedTicketDetail.bookingDate || selectedTicketDetail.appointmentDate)}
                                                             </Typography>
                                                         </Box>
@@ -1265,7 +1338,7 @@ export default function PatientProfilesPage({
                                                         </Box>
                                                         <Box display="flex" justifyContent="space-between">
                                                             <Typography variant="body2" color="#64748B">Phí khám</Typography>
-                                                            <Typography variant="body2" fontWeight="800" color="#0088D6">
+                                                            <Typography variant="body2" fontWeight="800" color={designTokens.brand.primaryDark}>
                                                                 {(selectedTicketDetail.price != null || selectedTicketDetail.totalAmount != null) ? formatCurrency(selectedTicketDetail.price ?? selectedTicketDetail.totalAmount) : "Chưa có dữ liệu"}
                                                             </Typography>
                                                         </Box>
@@ -1289,23 +1362,24 @@ export default function PatientProfilesPage({
                                                         </Box>
                                                         <Box display="flex" justifyContent="space-between">
                                                             <Typography variant="body2" color="#64748B">Mã bệnh nhân:</Typography>
-                                                            <Typography variant="body2" fontWeight="800" fontFamily="monospace" color="#0088D6">
+                                                            <Typography variant="body2" fontWeight="800" fontFamily="monospace" color={designTokens.brand.primary}>
                                                                 {selectedTicketDetail.patientCode || "BN2EAAE2DD"}
                                                             </Typography>
                                                         </Box>
                                                     </Box>
                                                 </Box>
 
-                                                {/* Nút In phiếu và Hủy lịch */}
-                                                <Box sx={{ mt: 3, display: "flex", gap: 1.5 }}>
+                                                {/* Nút In phiếu, Mở Viện phí và Hủy lịch */}
+                                                <Box sx={{ mt: 3, display: "flex", gap: 1.5, flexWrap: "wrap" }}>
                                                     <Button
-                                                        fullWidth
                                                         variant="contained"
                                                         startIcon={<PrintIcon />}
                                                         onClick={() => printAppointmentTicket(selectedTicketDetail)}
                                                         sx={{
-                                                            bgcolor: "#0088D6",
-                                                            "&:hover": { bgcolor: "#0070BA" },
+                                                            flex: 1,
+                                                            minWidth: 140,
+                                                            bgcolor: designTokens.secondary.main,
+                                                            "&:hover": { bgcolor: designTokens.secondary.hover },
                                                             borderRadius: 2.5,
                                                             py: 1.2,
                                                             fontWeight: 700,
@@ -1313,6 +1387,26 @@ export default function PatientProfilesPage({
                                                         }}
                                                     >
                                                         In phiếu khám
+                                                    </Button>
+
+                                                    <Button
+                                                        variant="outlined"
+                                                        component={Link}
+                                                        to={`/my-bills?bookingCode=${encodeURIComponent(selectedTicketDetail.rawBookingCode || selectedTicketDetail.bookingCode || "")}`}
+                                                        startIcon={<ReceiptLongIcon />}
+                                                        sx={{
+                                                            flex: 1,
+                                                            minWidth: 140,
+                                                            borderRadius: 2.5,
+                                                            py: 1.2,
+                                                            fontWeight: 700,
+                                                            textTransform: "none",
+                                                            borderColor: designTokens.brand.primary,
+                                                            color: designTokens.brand.primaryDark,
+                                                            "&:hover": { borderColor: designTokens.brand.primaryDark, bgcolor: designTokens.brand.primaryLight }
+                                                        }}
+                                                    >
+                                                        Mở Viện Phí
                                                     </Button>
 
                                                     {selectedTicketDetail.status !== "CANCELLED" && selectedTicketDetail.status !== "COMPLETED" && (
@@ -1324,6 +1418,7 @@ export default function PatientProfilesPage({
                                                             sx={{
                                                                 borderRadius: 2.5,
                                                                 px: 2,
+                                                                py: 1.2,
                                                                 fontWeight: 700,
                                                                 textTransform: "none",
                                                                 whiteSpace: "nowrap"
@@ -1355,8 +1450,8 @@ export default function PatientProfilesPage({
                                                 startIcon={<CalendarMonthIcon />}
                                                 onClick={() => navigate("/booking")}
                                                 sx={{
-                                                    bgcolor: "#0088D6",
-                                                    "&:hover": { bgcolor: "#0070BA" },
+                                                    bgcolor: designTokens.brand.primary,
+                                                    "&:hover": { bgcolor: designTokens.brand.primaryHover },
                                                     borderRadius: 2,
                                                     fontWeight: 700,
                                                     fontSize: "0.875rem",
@@ -1368,8 +1463,8 @@ export default function PatientProfilesPage({
                                         </Box>
 
                                         {(Array.isArray(profiles) ? profiles : []).length === 0 && (Array.isArray(bookings) ? bookings : []).length === 0 ? (
-                                            <Paper elevation={0} sx={{ p: 4, textAlign: "center", borderRadius: 3, bgcolor: "#FFFFFF", border: "1px dashed #CBD5E1" }}>
-                                                <ReceiptLongIcon sx={{ fontSize: 44, color: "#94A3B8", mb: 1 }} />
+                                            <Paper elevation={0} sx={{ p: 4, textAlign: "center", borderRadius: 3, bgcolor: designTokens.brand.primaryLight, border: `1.5px dashed ${designTokens.brand.primaryBorder}` }}>
+                                                <ReceiptLongIcon sx={{ fontSize: 44, color: designTokens.brand.primary, mb: 1 }} />
                                                 <Typography variant="subtitle1" fontWeight="700" color="#334155" gutterBottom>
                                                     Chưa có phiếu khám bệnh nào
                                                 </Typography>
@@ -1379,7 +1474,7 @@ export default function PatientProfilesPage({
                                                 <Button
                                                     variant="contained"
                                                     onClick={() => navigate("/booking")}
-                                                    sx={{ bgcolor: "#0088D6", textTransform: "none", borderRadius: 2, fontWeight: 700 }}
+                                                    sx={{ bgcolor: designTokens.brand.primary, "&:hover": { bgcolor: designTokens.brand.primaryHover }, textTransform: "none", borderRadius: 2, fontWeight: 700 }}
                                                 >
                                                     Đặt khám ngay
                                                 </Button>
@@ -1404,7 +1499,7 @@ export default function PatientProfilesPage({
                                                             sx={{
                                                                 borderRadius: "16px !important",
                                                                 border: "1px solid",
-                                                                borderColor: isExpanded ? "#0088D6" : "#E2E8F0",
+                                                                borderColor: isExpanded ? designTokens.brand.primary : "#E2E8F0",
                                                                 bgcolor: "#FFFFFF",
                                                                 overflow: "hidden",
                                                                 "&:before": { display: "none" },
@@ -1412,9 +1507,9 @@ export default function PatientProfilesPage({
                                                             }}
                                                         >
                                                             <AccordionSummary
-                                                                expandIcon={<ExpandMoreIcon sx={{ color: isExpanded ? "#0088D6" : "#64748B" }} />}
+                                                                expandIcon={<ExpandMoreIcon sx={{ color: isExpanded ? designTokens.brand.primary : "#64748B" }} />}
                                                                 sx={{
-                                                                    bgcolor: isExpanded ? "#F0F9FF" : "#FFFFFF",
+                                                                    bgcolor: isExpanded ? designTokens.brand.primaryLight : "#FFFFFF",
                                                                     px: 2.5,
                                                                     py: 1
                                                                 }}
@@ -1426,7 +1521,7 @@ export default function PatientProfilesPage({
                                                                                 width: 38,
                                                                                 height: 38,
                                                                                 borderRadius: 2,
-                                                                                bgcolor: isExpanded ? "#0088D6" : "#E2E8F0",
+                                                                                bgcolor: isExpanded ? designTokens.brand.primary : "#E2E8F0",
                                                                                 color: isExpanded ? "#FFFFFF" : "#475569",
                                                                                 display: "flex",
                                                                                 alignItems: "center",
@@ -1440,7 +1535,7 @@ export default function PatientProfilesPage({
                                                                                 {p.fullName?.toUpperCase()}
                                                                             </Typography>
                                                                             <Typography variant="caption" color="text.secondary">
-                                                                                Mã BN: <b style={{ fontFamily: "monospace", color: "#0088D6" }}>{p.patientCode || "---"}</b> • {p.gender === "MALE" ? "Nam" : (p.gender === "FEMALE" ? "Nữ" : "Khác")} • {formatDate(p.dateOfBirth)}
+                                                                                Mã BN: <b style={{ fontFamily: "monospace", color: designTokens.brand.primary }}>{p.patientCode || "---"}</b> • {p.gender === "MALE" ? "Nam" : (p.gender === "FEMALE" ? "Nữ" : "Khác")} • {formatDate(p.dateOfBirth)}
                                                                             </Typography>
                                                                         </Box>
                                                                     </Box>
@@ -1449,8 +1544,8 @@ export default function PatientProfilesPage({
                                                                         size="small"
                                                                         sx={{
                                                                             fontWeight: 700,
-                                                                            bgcolor: pTickets.length > 0 ? "#E0F2FE" : "#F1F5F9",
-                                                                            color: pTickets.length > 0 ? "#0369A1" : "#64748B"
+                                                                            bgcolor: pTickets.length > 0 ? designTokens.brand.primaryLight : "#F1F5F9",
+                                                                            color: pTickets.length > 0 ? designTokens.brand.primaryDark : "#64748B"
                                                                         }}
                                                                     />
                                                                 </Box>
@@ -1464,7 +1559,7 @@ export default function PatientProfilesPage({
                                                                         <Button
                                                                             size="small"
                                                                             onClick={() => navigate("/booking")}
-                                                                            sx={{ textTransform: "none", fontWeight: 700, color: "#0088D6", mt: 1 }}
+                                                                            sx={{ textTransform: "none", fontWeight: 700, color: designTokens.brand.primary, mt: 1 }}
                                                                         >
                                                                             + Đặt khám cho bệnh nhân này
                                                                         </Button>
